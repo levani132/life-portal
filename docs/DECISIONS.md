@@ -250,6 +250,14 @@ easy to get wrong:
   `.env.example` makes the API listen on 3333 while Render scans 10000, and the deploy never
   goes live despite a clean boot.
 
+Vercel's **Root Directory must stay at the repo root**, not `apps/web`. `outputDirectory`
+resolves relative to it, so a Root Directory of `apps/web` looks for
+`apps/web/apps/web/.next` and fails. The repo root is the honest root anyway: there are no npm
+workspaces and no `apps/web/package.json`, and pointing Vercel inside `apps/web` also makes it
+warn that it cannot find an Nx `build` target. The equivalent alternative — Root Directory
+`apps/web` plus `outputDirectory: .next` — was rejected to keep the whole deploy config in git
+rather than split between git and the dashboard.
+
 Neither file carries a `"//"` comment key: Vercel validates `vercel.json` against a schema with
 `additionalProperties: false` and rejects it. `render.yaml` is YAML and comments freely.
 
