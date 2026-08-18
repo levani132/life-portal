@@ -221,3 +221,50 @@ single payment of $6,500 dated at the loan start, leaving the correct $10,500 ou
 put fictional data in a ledger that principle III makes authoritative. One clearly-labelled
 adjustment is honest and easy to replace: delete it and enter the real payments, and every
 balance and scenario recomputes.
+
+---
+
+## 2026-08-18 · The web app deploys to Vercel, the API to Render, from one repo
+
+`vercel.json` builds only `web` and points `outputDirectory` at `apps/web/.next`. `render.yaml`
+builds only `api` and starts `dist/apps/api/main.js`.
+
+**Why:** Nx runs `next build` with `apps/web` as its cwd, so the output lands in `apps/web/.next`
+while Vercel looks for `.next` at the repo root — the first deploy failed with "The Next.js
+output directory .next was not found" even though the build had succeeded. Narrowing each
+platform's build command to a single project also stops Vercel from building the NestJS API and
+Render from building the Next app, neither of which the other can serve.
+
+The API is a long-lived process holding a Mongoose connection pool and running the daily quote
+cron, so it cannot be a Vercel serverless function without being rewritten.
+
+**Costs:** two dashboards and two sets of environment variables. Three of them are coupled and
+easy to get wrong:
+
+- `NEXT_PUBLIC_API_URL` (Vercel) must carry the `/api` prefix, and is baked in at build time —
+  changing it requires a redeploy, not just a restart.
+- `CORS_ORIGINS` (Render) must list the Vercel origin, or every browser request fails against a
+  perfectly healthy API.
+- `API_PORT` must **not** be set on Render. Render injects `PORT` and waits for the process to
+  bind it, but `AppConfig.port` resolves `API_PORT` first — an `API_PORT` copied over from
+  `.env.example` makes the API listen on 3333 while Render scans 10000, and the deploy never
+  goes live despite a clean boot.
+
+Neither file carries a `"//"` comment key: Vercel validates `vercel.json` against a schema with
+`additionalProperties: false` and rejects it. `render.yaml` is YAML and comments freely.
+
+---
+
+## 2026-08-18 · Node is pinned to 22 LTS for deploys
+
+`.node-version` and `package.json` `engines` both pin Node 22.
+
+**Why:** Render defaults to the newest Node when nothing pins it, and picked 24.14.1. Node 24
+ships OpenSSL 3.5, whose stricter default security level fails the TLS handshake against a
+MongoDB Atlas shared-tier cluster with `tlsv1 alert internal error` (SSL alert 80). Mongoose
+reports that as its generic "your IP isn't whitelisted" message, which sends you looking in the
+wrong place — the Atlas access list can be perfectly correct.
+
+A `NODE_VERSION` entry in `render.yaml` did not take effect; the two files do.
+
+**Costs:** the pin has to be lifted deliberately once the driver and Atlas agree on OpenSSL 3.5.
