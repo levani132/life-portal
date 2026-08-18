@@ -1,0 +1,53 @@
+# Render Blueprint for the NestJS API. The web app deploys to Vercel (see vercel.json).
+#
+# Apply with: Render dashboard → New → Blueprint → point at this repo.
+# Variables marked `sync: false` are deliberately not in git — set them in the dashboard.
+services:
+  - type: web
+    name: life-portal-api
+    runtime: node
+    plan: free
+    # Closest region to the owner. Change freely; it only affects latency.
+    region: frankfurt
+
+    # `--include=dev` is load-bearing: Render sets NODE_ENV=production for Node services,
+    # which makes a plain `npm ci` skip devDependencies — and nx, webpack and typescript all
+    # live there, so the build would die with "nx: not found".
+    buildCommand: npm ci --include=dev && npx nx build api
+    # `generatePackageJson` writes dist/apps/api/package.json, but the process runs from the
+    # repo root against the root node_modules, so nothing needs installing inside dist.
+    startCommand: node dist/apps/api/main.js
+
+    # Unauthenticated by design, so the probe needs no token. Note this does NOT keep a free
+    # instance awake — Render only counts external traffic towards the idle timer.
+    healthCheckPath: /api/health
+
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      # The Nx daemon is pointless in a one-shot container and occasionally hangs the build.
+      - key: NX_DAEMON
+        value: 'false'
+
+      # ---- required: the API refuses to boot without these ----
+      # MongoDB Atlas M0 connection string. Atlas must allow 0.0.0.0/0, because a free Render
+      # instance has no static outbound IP to allowlist.
+      - key: MONGODB_URI
+        sync: false
+      # Render generates a 256-bit base64 value, comfortably over the 32-character minimum.
+      # Changing it later invalidates every issued token.
+      - key: JWT_SECRET
+        generateValue: true
+
+      # ---- required in practice ----
+      # Without the Vercel origin here, every browser request fails CORS even though the API
+      # itself is healthy. Comma-separated, no trailing slash, include the scheme.
+      - key: CORS_ORIGINS
+        sync: false
+      # Gates POST /auth/register. Unset means anyone who finds the URL can create an account.
+      - key: REGISTRATION_INVITE_CODE
+        sync: false
+
+      # ---- optional ----
+      - key: FINNHUB_API_KEY
+        sync: false
