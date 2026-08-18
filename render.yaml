@@ -33,8 +33,16 @@ services:
         value: 'false'
 
       # ---- required: the API refuses to boot without these ----
-      # MongoDB Atlas M0 connection string. Atlas must allow 0.0.0.0/0, because a free Render
-      # instance has no static outbound IP to allowlist.
+      # MongoDB Atlas connection string.
+      #
+      # For the Atlas access list, use the outbound CIDR ranges for this service's region
+      # (dashboard → the service → Connect → Outbound) rather than 0.0.0.0/0. A free instance
+      # gets no single static IP — it may use any address inside those ranges, so the whole
+      # range has to be allowed — but that is still far narrower than the open internet.
+      # The ranges are per-region, so changing `region` above means updating Atlas too.
+      #
+      # Those ranges are shared with every other Render customer in the region, so the
+      # database user's password remains the real security boundary. Make it long and random.
       - key: MONGODB_URI
         sync: false
       # Render generates a 256-bit base64 value, comfortably over the 32-character minimum.
