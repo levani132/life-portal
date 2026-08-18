@@ -2,5 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "buildCommand": "npx nx build web",
-  "outputDirectory": "apps/web/.next"
+  "outputDirectory": ".next"
 }
