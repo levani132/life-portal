@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "//": "Nx runs `next build` with apps/web as its cwd, so the build output lands at apps/web/.next rather than the repo root where Vercel looks by default. Pointing outputDirectory at it is the Nx-recommended way to deploy from the repo root, and it keeps the deploy config in git instead of in the dashboard. The build command is `nx build web` and not the root `build` script because that script also builds the NestJS API, which Vercel cannot serve and which only slows the deploy down.",
+  "framework": "nextjs",
+  "buildCommand": "npx nx build web",
+  "outputDirectory": "apps/web/.next"
+}
