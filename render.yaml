@@ -23,6 +23,11 @@ services:
     healthCheckPath: /api/health
 
     envVars:
+      # Do NOT set API_PORT here or in the dashboard. Render injects PORT and scans for it,
+      # but configuration.ts resolves `API_PORT ?? PORT`, so an API_PORT copied over from
+      # .env.example makes the process bind 3333 while Render waits on 10000 and the deploy
+      # never goes live. API_PORT exists only to keep local dev off the web app's port.
+      #
       # The Node version is pinned by .node-version and package.json engines rather than here.
       # A NODE_VERSION entry in this file did not take effect on the first deploy — Render
       # logged "Using Node.js version 24.14.1 (default)" — and Node 24's OpenSSL 3.5 rejects
