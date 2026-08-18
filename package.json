@@ -17,6 +17,10 @@
     "check": "npm run typecheck && npm run lint && npm test"
   },
   "private": true,
+  "// engines": "Pinned to 22 LTS and duplicated in .node-version. Node 24 ships OpenSSL 3.5, whose stricter default security level makes the TLS handshake against a MongoDB Atlas shared-tier cluster fail with `tlsv1 alert internal error` (SSL alert 80). Render defaults to the newest Node when nothing pins it.",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "devDependencies": {
     "@eslint/js": "^9.8.0",
     "@nestjs/schematics": "^11.0.0",

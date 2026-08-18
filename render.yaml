@@ -23,8 +23,11 @@ services:
     healthCheckPath: /api/health
 
     envVars:
-      - key: NODE_VERSION
-        value: '22'
+      # The Node version is pinned by .node-version and package.json engines rather than here.
+      # A NODE_VERSION entry in this file did not take effect on the first deploy — Render
+      # logged "Using Node.js version 24.14.1 (default)" — and Node 24's OpenSSL 3.5 rejects
+      # the TLS handshake against an Atlas shared-tier cluster with SSL alert 80.
+      #
       # The Nx daemon is pointless in a one-shot container and occasionally hangs the build.
       - key: NX_DAEMON
         value: 'false'
