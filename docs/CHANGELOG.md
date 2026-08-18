@@ -2,6 +2,57 @@
 
 User-visible changes. Newest first.
 
+## 2026-08-18 — Today's balance is calculated, not remembered
+
+**"On hand now" was showing the figure you last typed in**, not what you have today. It is now the
+reconciliation rolled forward through every salary, expense and sale since — so the salary that
+landed on the 7th is in it — and it is marked as the estimate it is, with the confirmed figure and
+its date underneath. The "Update balance" form opens on that projected number so you only have to
+correct it.
+
+**"On this plan you run out of money on …" no longer points at the past.** It only reports a
+shortfall from today onward; the stretch between your last reconciliation and today already
+happened.
+
+**Debts now tell you when the ledger has fallen behind the plan.** If scheduled repayments have
+fallen due with no payment recorded, the loan shows how many and how much, and what you would owe
+if they all went out as planned — with a one-click prefilled way to record them. Outstanding itself
+still counts only payments you have recorded: a plan is an intention, and assuming it was followed
+would understate a real debt.
+
+## 2026-08-18 — Free money: spending split by cadence, and a day-detail panel
+
+Recurring spending was one flat list where a daily habit sat next to a yearly premium. It is now
+four panels side by side — **Daily, Weekly, Monthly, Yearly** — each with its entry count and
+monthly equivalent (labelled as the estimate it is), plus the total across all of them. A
+"No schedule" panel appears only if a recurring row somehow has no recurrence, so nothing is hidden.
+
+**One-off spending** has its own section with a month chooser: pick a month, step through with
+‹ ›, or jump to any month that has entries, and see just that month's one-offs and their total.
+Paused rows are shown but excluded from the total, matching the projections.
+
+**State on a specific day** is a new panel: opening, in, out and closing balance for the day you
+pick, then everything that lands on it — salary, recurring spending, one-offs and cash from things
+you sold, each labelled with what put it there. **Any date works, including past ones.** Balances
+only exist from your last reconciliation onward, so for earlier days the two balance figures read
+"—" and you still see everything that moved.
+
+Each cadence panel has a **`+`** that opens the add form already set to that cadence, and the
+one-off panel's `+` dates the new entry into the month you are looking at. Empty panels offer the
+same button instead of just saying nothing is there.
+
+**Changing the date no longer reloads the page.** The planning panel used to refetch everything
+for the new date, which blanked the whole screen to a spinner; the three numbers are now computed
+from the projection already in hand.
+
+**Selling something now shows up as money in.** Marking an item sold, or selling shares from a
+lot, produces a one-off inflow in the projection and in the day panel — derived from the item or
+lot itself, so there is nothing extra to record and nothing that can drift out of step. Proceeds
+you earmarked for a debt are deliberately left out of the cash figure, because the Debts screen
+already counts them; a fully earmarked sale is listed at $0 with a "to debt" tag rather than
+hidden. And a sale no longer counts as a payday, so it cannot make "due before payday" look
+smaller than it is.
+
 ## 2026-08-03 — Fixed a dev-server port clash
 
 `npm run dev` started the API and the web app on the same port. `PORT` is read by both NestJS and

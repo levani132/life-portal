@@ -276,3 +276,59 @@ wrong place — the Atlas access list can be perfectly correct.
 A `NODE_VERSION` entry in `render.yaml` did not take effect; the two files do.
 
 **Costs:** the pin has to be lifted deliberately once the driver and Atlas agree on OpenSSL 3.5.
+
+---
+
+## 2026-08-18 · Cash from a sale is derived from the sold row, and earmarked proceeds are excluded
+
+Selling an item or a share lot now shows up as cash in the Free money widget. It is **derived on
+read** by `realisedSales()` from the `sold*` fields the item and lot rows already carry — there is
+no transactions collection and no second write when something sells (constitution principle III).
+Correcting a sale price on the Items screen corrects the cashflow in the same edit.
+
+**Earmarked proceeds are left out of the inflow.** When a sale is allocated to a debt
+(`allocateToLoanId` + `allocationRatio`), the loans widget already counts that money against the
+balance owed. Counting it as spendable cash as well would let the same dollar do two jobs, which
+is exactly what principle IV exists to prevent. So `RealisedSale.amountCents` is the unearmarked
+share only; `grossCents` keeps the full figure for display. A fully earmarked sale produces no
+cash event at all, and the day panel shows it as a `$0` row labelled "to debt" rather than hiding
+it.
+
+**A sale is not a payday.** `snapshotFromDays()` used to end the committed-spending window at the
+next day with *any* inflow. With sales in the projection that would close the window on the day
+you sold your laptop, dropping every obligation between then and the real salary out of "due
+before payday" and overstating free money. It now looks for `sourceKind === 'income'` — income
+sources only. Tested.
+
+**Costs:** `CashflowModule` now imports `ItemsModule` and `StocksModule`, so every projection
+reads two more collections. Both are small, unindexed-scan-cheap lists, and the alternative —
+writing an income row on every sale — trades that for two rows that can disagree.
+
+A sale dated before the last reconciliation is outside the projection window and so is ignored,
+on the same reasoning that already applies to expenses: the reconciled balance includes it.
+
+---
+
+## 2026-08-18 · Today's cash balance is derived; the loan's is not
+
+**Cash.** `CashflowSummary.currentBalanceCents` is now the projection's closing balance for today
+rather than the latest `cash_balances` row. The reconciliation is an anchor, not an answer: with a
+balance last confirmed on the 3rd and a salary paid on the 7th, the old headline was two weeks and
+one payday out of date while every other figure on the screen was current. `reconciledBalanceCents`
+keeps the confirmed figure for display, and the derived one carries an `est` mark (principle VI).
+
+`firstShortfallDate` became forward-looking for the same reason — it was reporting a dip that
+happened before today, which is neither actionable nor necessarily what really happened.
+
+**Debt.** The symmetric change was *rejected*. `remainingCents` still counts recorded payments
+only, because a repayment plan is an intention: rolling it forward would quietly mark a debt as
+repaid on the strength of a schedule, and the person owed the money would disagree. Instead
+`loanBalance()` reports the gap — instalments that have fallen due with nothing recorded — plus
+`expectedRemainingCents` as a labelled estimate, and the UI offers to record the missing payments.
+The user confirms what happened; the app does not decide.
+
+**Costs:** two figures where there was one, and a note on the Debts screen that will look alarming
+the first time a schedule has been running longer than the payment history. That is the honest
+reading of the data: either the payments happened and want recording, or the debt really is that
+big.
+

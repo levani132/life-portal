@@ -56,6 +56,9 @@ surprise.
 ## Cross-links
 
 - **→ loans** — expected/pessimistic/optimistic proceeds per loan.
+- **→ cashflow** — a sold item's `soldPriceCents`/`soldAt` become a one-off cash inflow, derived by
+  `realisedSales()`. Proceeds earmarked to a loan are excluded, because the loans widget already
+  counts them; see `docs/DECISIONS.md`.
 - **→ dashboard** — open count, expected proceeds, realised proceeds, buyers waiting.
 
 ## Open questions

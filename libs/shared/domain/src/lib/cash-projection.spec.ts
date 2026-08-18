@@ -1,4 +1,4 @@
-import type { Expense, IncomeSource } from '@life-portal/shared-types';
+import type { Expense, IncomeSource, RealisedSale } from '@life-portal/shared-types';
 import { projectCash, snapshotAt } from './cash-projection';
 
 const salary: IncomeSource = {
@@ -95,6 +95,36 @@ describe('projectCash', () => {
     expect(projection.firstShortfallDate).toBe('2026-08-07');
   });
 
+  it('only reports a shortfall from today onward', () => {
+    // Reconciled on 28 Jul with $100. Rent on the 1st took it negative and the salary on the
+    // 2nd fixed it — all before today, so there is nothing to warn about.
+    const paidOnTheSecond: IncomeSource = {
+      ...salary,
+      recurrence: { ...salary.recurrence, dayOfMonth: 2 },
+    };
+    const projection = projectCash({
+      ...baseInput,
+      balanceAsOf: '2026-07-28',
+      openingBalanceCents: 10_000,
+      incomes: [paidOnTheSecond],
+      expenses: [rent],
+    });
+    expect(projection.days.find((d) => d.date === '2026-08-01')?.closingCents).toBeLessThan(0);
+    expect(projection.days.find((d) => d.date === '2026-08-03')?.closingCents).toBeGreaterThan(0);
+    expect(projection.firstShortfallDate).toBeUndefined();
+
+    // Still negative *today* counts as now, not as history.
+    expect(
+      projectCash({ ...baseInput, balanceAsOf: '2026-07-28', openingBalanceCents: 10_000 })
+        .firstShortfallDate,
+    ).toBe('2026-08-03');
+
+    // And a shortfall that lands later is reported on its own date.
+    expect(
+      projectCash({ ...baseInput, openingBalanceCents: 10_000, incomes: [] }).firstShortfallDate,
+    ).toBe('2026-08-07');
+  });
+
   it('ignores inactive income and expenses', () => {
     const projection = projectCash({
       ...baseInput,
@@ -117,6 +147,57 @@ describe('projectCash', () => {
     const projection = projectCash({ ...baseInput, expenses: [holiday] });
     expect(projection.days.find((d) => d.date === '2026-09-15')?.outCents).toBe(50_000);
     expect(projection.days.filter((d) => d.outCents > 0)).toHaveLength(1);
+  });
+});
+
+describe('realised sales as inflows', () => {
+  const laptopSale: RealisedSale = {
+    id: 'item-laptop',
+    label: 'MacBook Pro',
+    amountCents: 80_000,
+    grossCents: 80_000,
+    date: '2026-08-20',
+    source: 'item',
+  };
+
+  it('adds sale proceeds to the balance on the day they landed', () => {
+    const projection = projectCash({ ...baseInput, sales: [laptopSale] });
+    const day = projection.days.find((d) => d.date === '2026-08-20');
+
+    expect(day?.inCents).toBe(80_000);
+    expect(day?.events.map((e) => e.sourceKind)).toContain('sale');
+    // 250_000 opening + 400_000 salary - 100_000 loan + 80_000 sale.
+    expect(day?.closingCents).toBe(630_000);
+  });
+
+  it('ignores a sale that predates the reconciliation, which already includes the cash', () => {
+    const projection = projectCash({
+      ...baseInput,
+      sales: [{ ...laptopSale, date: '2026-07-15' }],
+    });
+    expect(projection.days.some((d) => d.events.some((e) => e.sourceKind === 'sale'))).toBe(false);
+    expect(projection.days.find((d) => d.date === '2026-08-03')?.closingCents).toBe(250_000);
+  });
+
+  it('leaves out proceeds that are earmarked for a debt', () => {
+    // The loan widget already counts this money against the balance owed; counting it as
+    // spendable cash too would let the same dollar do two jobs.
+    const projection = projectCash({
+      ...baseInput,
+      sales: [{ ...laptopSale, amountCents: 0, allocatedToLoanId: 'loan1' }],
+    });
+    expect(projection.days.find((d) => d.date === '2026-08-20')?.inCents).toBe(0);
+  });
+
+  it('does not treat a sale as a payday', () => {
+    // The window that "genuinely free" uses must still close at the 7 Sep salary, not at the
+    // 20 Aug sale — otherwise the rent due on 1 Sep would drop out of committed spending.
+    const projection = projectCash({ ...baseInput, sales: [laptopSale] });
+    const snapshot = snapshotAt(projection, '2026-08-08', '2026-08-03');
+
+    expect(snapshot.nextIncomeDate).toBe('2026-09-07');
+    expect(snapshot.nextIncomeAmountCents).toBe(400_000);
+    expect(snapshot.committedBeforeNextIncomeCents).toBe(90_000);
   });
 });
 

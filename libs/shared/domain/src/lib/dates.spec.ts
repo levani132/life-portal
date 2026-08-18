@@ -5,6 +5,7 @@ import {
   diffDays,
   diffMonths,
   eachDay,
+  formatMonth,
   nextDayOfMonth,
   toDay,
   weekdayOf,
@@ -63,5 +64,10 @@ describe('dates', () => {
 
   it('reports weekdays in UTC', () => {
     expect(weekdayOf('2026-08-03')).toBe(1); // a Monday
+  });
+
+  it('formats a month from either a month key or a full day', () => {
+    expect(formatMonth('2026-08')).toBe('August 2026');
+    expect(formatMonth('2026-08-18')).toBe('August 2026');
   });
 });

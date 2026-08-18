@@ -14,7 +14,20 @@ and how much is genuinely mine to spend?*
 | `income_sources` | Recurring inflows. The salary: monthly, day 7. |
 | `expenses` | Recurring and one-off outflows. |
 
+Realised sales are **not** a collection — see below.
+
 ## Projection
+
+**`currentBalanceCents` is derived, not read.** `summary()` returns the projection's closing
+balance for *today*, not the last reconciled figure — the reconciliation is only the anchor
+(principle III). `reconciledBalanceCents` + `balanceAsOf` carry the confirmed figure so the UI can
+show both and mark the derived one as an estimate. Returning the raw reconciliation meant "on hand
+now" still showed the balance from the day the user last checked, ignoring a salary that had since
+landed.
+
+`firstShortfallDate` only looks from **today onward**. The window between the last reconciliation
+and today is history; warning that you ran out of money last Tuesday is noise and hides whether a
+shortfall is still coming.
 
 `projectCash()` starts at the **latest reconciliation**, not at today. If the balance was last
 confirmed a week ago, that week's expenses are part of the forecast rather than silently
@@ -24,16 +37,37 @@ assumed to have already been deducted. It then walks day by day to the horizon, 
 `monthlyRecurringIn/OutCents` are approximations via `monthlyEquivalentCents()` (daily × 30.4375,
 weekly × 4.348, yearly ÷ 12) for the headline figure only. The day-by-day walk is the authority.
 
+## Realised sales
+
+Cash from things already sold is derived, never stored (principle III). `realisedSales()` in
+`libs/shared/domain/src/lib/realised-sales.ts` reads the `sold*` fields off `sellable_items` and
+`stock_lots` and returns one `RealisedSale` per sale:
+
+- an item counts once it is `status: 'sold'` with a `soldAt` and a non-zero `soldPriceCents`;
+- a lot counts once it has `soldAt`, `soldQuantity` and `soldPricePerShareCents` — gross proceeds
+  are `soldQuantity × soldPricePerShareCents`, before tax, which is settled elsewhere.
+
+**Earmarked proceeds are excluded from the inflow.** With `allocateToLoanId` set, that share of the
+money is the loans widget's; counting it as spendable cash too would double-count it (principle
+IV). `amountCents` is therefore the unearmarked share and `grossCents` the full figure. A fully
+earmarked sale nets to zero and produces no cash event; the day panel still lists it, at `$0`.
+
+A sale dated before `balanceAsOf` falls outside the projection window and is ignored — the
+reconciled balance already contains that cash. Same rule as expenses.
+
 ## Free money — the important formula
 
 For a target date:
 
 ```
 projectedBalanceCents          = closing balance on that date
-nextIncomeDate                 = first inflow strictly after it
+nextIncomeDate                 = first *income source* occurrence strictly after it
 committedBeforeNextIncomeCents = Σ outflows in (date, nextIncomeDate)   ← exclusive both ends
 freeCents                      = projectedBalance − committedBeforeNextIncome
 ```
+
+Income *sources* only: a sale is cash, but it is not a payday, and letting one close the window
+would drop every obligation between the sale and the real salary out of committed spending.
 
 The window **excludes the income day itself**. The loan repayment falls on the 7th and so does
 the salary; it is funded by that salary. Counting it against the balance held on the 3rd would
@@ -54,18 +88,58 @@ the projection goes negative at all.
 
 `endDate` is **inclusive**.
 
+## Page layout
+
+Top row (two thirds / one third): the day-by-day projection chart (sampled weekly) and the
+**On a specific date** planning panel, beside income, the category breakdown and runway.
+
+Picking a date there does **not** refetch. The page loads `/cashflow` once with a constant SWR
+key and recomputes the three numbers locally with `snapshotAt(projection, date, today)` — the same
+pure function the API calls. Keying the request on the date meant every date change hit a key with
+no cache, which made `isLoading` true and replaced the entire page with a spinner. For the same
+reason the loading guard is `isLoading && !data`: a revalidation after a write must not tear the
+page down and lose each panel's local state. `?snapshotDate=` still exists on the endpoint for
+`/cashflow/snapshot` callers.
+
+Below it, full width:
+
+- **Recurring spending** — one panel per `Recurrence.cadence`: Daily, Weekly, Monthly, Yearly,
+  side by side, each with its entry count, monthly equivalent, and a `+` that opens the add form
+  already set to that cadence (an empty panel offers the same thing as its empty state). A recurring row with no
+  `recurrence` lands in a fifth "No schedule" panel that appears only when non-empty — dropping it
+  silently would hide money. The section header carries the total monthly equivalent.
+- **One-off spending** — `kind === 'one_off'` rows for one month at a time, chosen with an
+  `<input type="month">` (‹ › steppers, plus a jump list of the months that have entries).
+  Filtering is a `date.startsWith(month)` prefix match, exact because calendar dates are
+  `YYYY-MM-DD` strings. The total counts active rows only, so it agrees with the projection. Its
+  `+` opens the add form dated into the month on screen, not into today.
+- **State on a specific day** — opening / in / out / closing for one day, then everything that
+  lands on it: salary, recurring spending, one-offs and sale proceeds. Each row's label is
+  resolved from the source row via `CashEvent.sourceId`.
+
+  Its date picker takes **any** date, past included, because the rows are rebuilt in the browser
+  with `buildCashEvents()` — the same pure function the projection uses — over the `incomes`,
+  `expenses` and `sales` in the payload. Balances cannot go back before the last reconciliation,
+  so for earlier days opening/closing read `—` and only the movements are shown. This panel has
+  its own date state; the forward-only planning panel above keeps `snapshotDate`.
+
+Everything reads from the single `GET /api/cashflow` payload — which is why `sales` ships with it:
+the day panel can then rebuild any date without another round trip.
+
 ## Cross-links
 
 - **→ loans** — `linkedExpenseAmounts()` returns `{ expenseId: amountCents }` for every active
   loan-linked expense. This is the source of truth for recurring repayment amounts.
 - **← personal** — `syncPersonalPlanExpense()` creates/updates/deletes the one-off expense
   mirroring a personal plan. Called after every personal-plan write, so the two cannot drift.
+- **← items** and **← stocks** — `sales()` derives realised-sale inflows from sold items and sold
+  lots via `realisedSales()`. Read-only: cashflow never writes to either collection.
 - **→ dashboard** — `summary()` provides balance, free-today, next-salary and monthly net.
 
 ## Endpoints
 
 ```
-GET    /api/cashflow                      everything the page needs; ?to= ?snapshotDate=
+GET    /api/cashflow                      everything the page needs, incl. `sales`; ?to= ?snapshotDate=
 GET    /api/cashflow/summary
 GET    /api/cashflow/snapshot?date=        the three planning numbers for one date
 GET    /api/cashflow/balance

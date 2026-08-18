@@ -90,14 +90,36 @@ export interface Expense extends Timestamped {
   note?: string;
 }
 
-/** One materialised occurrence of an income source or expense on a specific day. */
+/**
+ * Cash that arrived from selling something — an item or a share lot. Never stored: derived on
+ * read from the `sold*` fields of the row that was sold, which owns the amount (constitution
+ * principle IV). Cashflow's job is only to say when the cash landed.
+ */
+export interface RealisedSale {
+  /** The id of the sold item or lot. */
+  id: Id;
+  label: string;
+  /** Cash actually reaching the account: `grossCents` minus anything earmarked for a debt. */
+  amountCents: Cents;
+  /** Full proceeds, before the earmark. */
+  grossCents: Cents;
+  date: IsoDate;
+  source: 'item' | 'stock';
+  /**
+   * Set when some or all of the proceeds are earmarked for a debt. That share is the loan
+   * widget's money, so it is excluded from `amountCents` rather than counted twice.
+   */
+  allocatedToLoanId?: Id;
+}
+
+/** One materialised occurrence of an income source, expense or sale on a specific day. */
 export interface CashEvent {
   date: IsoDate;
   label: string;
   amountCents: Cents;
   /** Positive for inflows, negative for outflows. */
   direction: 'in' | 'out';
-  sourceKind: 'income' | 'expense';
+  sourceKind: 'income' | 'expense' | 'sale';
   sourceId: Id;
   category?: ExpenseCategory;
   linkedLoanId?: Id;
@@ -119,7 +141,10 @@ export interface CashProjectionDay {
 export interface CashSnapshot {
   date: IsoDate;
   projectedBalanceCents: Cents;
-  /** Next salary date strictly after `date`, if any income source is active. */
+  /**
+   * Next salary date strictly after `date`, if any income source is active. Income *sources*
+   * only — a one-off sale is cash, but it is not a payday, so it must not close the window.
+   */
   nextIncomeDate?: IsoDate;
   nextIncomeAmountCents?: Cents;
   /** Sum of expense occurrences in (`date`, `nextIncomeDate`]. */
@@ -138,7 +163,11 @@ export interface CashProjection {
   currency: Currency;
   days: CashProjectionDay[];
   snapshot: CashSnapshot;
-  /** First date the projected balance goes below zero, if it ever does. */
+  /**
+   * First date **on or after today** the projected balance goes below zero, if it ever does.
+   * Days between the last reconciliation and today are already history: forecasting a
+   * shortfall into the past says nothing useful and hides whether one is still coming.
+   */
   firstShortfallDate?: IsoDate;
   monthlyRecurringInCents: Cents;
   monthlyRecurringOutCents: Cents;
@@ -147,7 +176,14 @@ export interface CashProjection {
 }
 
 export interface CashflowSummary {
+  /**
+   * Cash on hand **today**: the last reconciliation rolled forward through every income,
+   * expense and sale since (constitution principle III). Equal to `reconciledBalanceCents`
+   * only when the reconciliation is today's.
+   */
   currentBalanceCents: Cents;
+  /** The figure the user last confirmed by hand, as of `balanceAsOf`. */
+  reconciledBalanceCents: Cents;
   balanceAsOf: IsoDate;
   currency: Currency;
   nextIncomeDate?: IsoDate;

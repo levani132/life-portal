@@ -137,7 +137,18 @@ export interface LoanDetail {
   payments: LoanPayment[];
   plans: RepaymentPlan[];
   paidCents: Cents;
+  /** Recorded payments only — `principalCents − Σ payments`. The authoritative figure. */
   remainingCents: Cents;
+  /**
+   * Scheduled repayments that have already fallen due with no recorded payment to account for
+   * them, and what the balance would be if they all went out as planned. An estimate: the
+   * cash-flow projection has already spent that money, so a gap here means the two widgets
+   * disagree and a payment probably needs recording.
+   */
+  unrecordedScheduledCents: Cents;
+  unrecordedScheduledCount: number;
+  unrecordedScheduledFromDate?: IsoDate;
+  expectedRemainingCents: Cents;
   progressRatio: number;
   /** Plans resolved against live item/stock/expense data. */
   inflows: ResolvedInflow[];

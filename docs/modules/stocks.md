@@ -111,6 +111,9 @@ refresh is also reachable by endpoint — a free host that sleeps the process wi
 
 - **→ loans** — `proceedsForLoan()` gives net proceeds now and at target, plus the longest
   target horizon, which dates the best-case share sale.
+- **→ cashflow** — a sold lot becomes a one-off cash inflow of
+  `soldQuantity × soldPricePerShareCents`, derived by `realisedSales()`. Gross of tax, and net of
+  anything earmarked to a loan; see `docs/DECISIONS.md`.
 - **→ dashboard** — market value, gain, value at target, next ESPP date.
 
 ## Open questions

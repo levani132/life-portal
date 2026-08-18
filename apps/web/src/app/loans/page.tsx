@@ -88,7 +88,8 @@ function Loans() {
 
 function LoanBlock({ detail, today }: { detail: LoanDetail; today: string }) {
   const { loan } = detail;
-  const [addingPayment, setAddingPayment] = useState(false);
+  // An object rather than a boolean so the "record what is missing" prompt can prefill it.
+  const [recording, setRecording] = useState<{ amountCents?: number } | null>(null);
   const [addingPlan, setAddingPlan] = useState(false);
   const { run, pending, error } = useAction();
   const currency = loan.currency;
@@ -115,7 +116,7 @@ function LoanBlock({ detail, today }: { detail: LoanDetail; today: string }) {
             <button type="button" className="btn-ghost" onClick={() => setAddingPlan(true)}>
               Add plan
             </button>
-            <button type="button" className="btn-primary" onClick={() => setAddingPayment(true)}>
+            <button type="button" className="btn-primary" onClick={() => setRecording({})}>
               Record payment
             </button>
           </div>
@@ -141,6 +142,42 @@ function LoanBlock({ detail, today }: { detail: LoanDetail; today: string }) {
           </div>
           <ProgressBar ratio={detail.progressRatio} tone="good" />
         </div>
+
+        {/*
+          The budget has already spent these repayments (the linked expense goes out every
+          month), so a gap here means the two widgets disagree about the same money. Outstanding
+          stays the recorded figure — a plan is an intention, and treating one as history would
+          understate a real debt — but the gap is shown rather than left to be discovered.
+        */}
+        {detail.unrecordedScheduledCents > 0 && (
+          <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
+            <p className="text-xs leading-relaxed text-amber-100">
+              {detail.unrecordedScheduledCount === 1
+                ? 'One scheduled repayment has fallen due'
+                : `${detail.unrecordedScheduledCount} scheduled repayments have fallen due`}
+              {detail.unrecordedScheduledFromDate
+                ? ` since ${formatDay(detail.unrecordedScheduledFromDate)}`
+                : ''}{' '}
+              with no payment recorded —{' '}
+              <span className="font-medium">
+                {formatCents(detail.unrecordedScheduledCents, currency)}
+              </span>
+              . Your budget has already spent that money, so if it went out as planned you owe{' '}
+              <span className="font-medium">
+                {formatCents(detail.expectedRemainingCents, currency)}
+              </span>
+              <EstimateMark basis="Outstanding balance minus the scheduled repayments that have fallen due but are not recorded. Recorded payments are the authority; this is what the plan implies." />{' '}
+              rather than {formatCents(detail.remainingCents, currency)}.
+            </p>
+            <button
+              type="button"
+              className="btn-ghost mt-2 text-xs"
+              onClick={() => setRecording({ amountCents: detail.unrecordedScheduledCents })}
+            >
+              Record {formatCents(detail.unrecordedScheduledCents, currency)} as paid…
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-5 p-5 lg:grid-cols-2">
@@ -236,14 +273,16 @@ function LoanBlock({ detail, today }: { detail: LoanDetail; today: string }) {
         </div>
       </div>
 
-      <PaymentModal
-        open={addingPayment}
-        onClose={() => setAddingPayment(false)}
-        loanId={loan.id}
-        today={today}
-        currency={currency}
-        maxCents={detail.remainingCents}
-      />
+      {recording && (
+        <PaymentModal
+          onClose={() => setRecording(null)}
+          loanId={loan.id}
+          today={today}
+          currency={currency}
+          maxCents={detail.remainingCents}
+          initialAmountCents={recording.amountCents}
+        />
+      )}
       <PlanModal
         open={addingPlan}
         onClose={() => setAddingPlan(false)}
@@ -490,21 +529,22 @@ function LoanFormModal({
 }
 
 function PaymentModal({
-  open,
   onClose,
   loanId,
   today,
   currency,
   maxCents,
+  initialAmountCents,
 }: {
-  open: boolean;
   onClose: () => void;
   loanId: string;
   today: string;
   currency: string;
   maxCents: number;
+  /** Prefilled when the user is recording repayments the plan says already went out. */
+  initialAmountCents?: number;
 }) {
-  const [amountCents, setAmountCents] = useState<number | undefined>(undefined);
+  const [amountCents, setAmountCents] = useState<number | undefined>(initialAmountCents);
   const [date, setDate] = useState(today);
   const [source, setSource] = useState('salary');
   const [note, setNote] = useState('');
@@ -512,7 +552,7 @@ function PaymentModal({
 
   return (
     <Modal
-      open={open}
+      open
       onClose={onClose}
       title="Record a payment"
       submitLabel="Record payment"

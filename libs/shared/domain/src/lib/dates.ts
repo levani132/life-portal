@@ -170,3 +170,12 @@ export function relativeDays(from: string, to: string): string {
   if (delta === -1) return 'yesterday';
   return delta > 0 ? `in ${delta} days` : `${Math.abs(delta)} days ago`;
 }
+
+/** Formats a `YYYY-MM` or `YYYY-MM-DD` month for the UI, e.g. `August 2026`. */
+export function formatMonth(month: string, locale = 'en-GB'): string {
+  return toUtcDate(`${month.slice(0, 7)}-01`).toLocaleDateString(locale, {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}

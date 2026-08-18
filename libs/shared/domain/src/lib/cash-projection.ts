@@ -6,6 +6,7 @@ import type {
   Currency,
   Expense,
   IncomeSource,
+  RealisedSale,
 } from '@life-portal/shared-types';
 import { addDays, eachDay, isAfter, maxDay, minDay, toDay, type DayString } from './dates';
 import { monthlyEquivalentCents, occurrencesBetween } from './recurrence';
@@ -23,6 +24,12 @@ export interface CashProjectionInput {
   currency: Currency;
   incomes: IncomeSource[];
   expenses: Expense[];
+  /**
+   * Cash from things already sold, derived from the item/lot rows by `realisedSales()`. A sale
+   * dated before `balanceAsOf` falls outside the window and is therefore never double-counted
+   * against a reconciliation that already includes it.
+   */
+  sales?: RealisedSale[];
   /** Day to compute the headline snapshot for. Defaults to `today`. */
   snapshotDate?: string;
 }
@@ -40,7 +47,7 @@ function expenseOccurrences(expense: Expense, from: string, to: string): DayStri
 
 /** Flattens income sources and expenses into individual dated cash movements. */
 export function buildCashEvents(
-  input: Pick<CashProjectionInput, 'incomes' | 'expenses'>,
+  input: Pick<CashProjectionInput, 'incomes' | 'expenses' | 'sales'>,
   from: string,
   to: string,
 ): CashEvent[] {
@@ -73,6 +80,21 @@ export function buildCashEvents(
         linkedLoanId: expense.linkedLoanId,
       });
     }
+  }
+
+  for (const sale of input.sales ?? []) {
+    const date = toDay(sale.date);
+    // Fully earmarked proceeds net to zero: that money is the loan widget's, not spendable cash.
+    if (sale.amountCents <= 0 || date < toDay(from) || date > toDay(to)) continue;
+    events.push({
+      date,
+      label: sale.label,
+      amountCents: sale.amountCents,
+      direction: 'in',
+      sourceKind: 'sale',
+      sourceId: sale.id,
+      linkedLoanId: sale.allocatedToLoanId,
+    });
   }
 
   return events.sort((a, b) => (a.date === b.date ? a.direction.localeCompare(b.direction) : a.date < b.date ? -1 : 1));
@@ -108,7 +130,9 @@ export function projectCash(input: CashProjectionInput): CashProjection {
     const outCents = sumCents(dayEvents.filter((e) => e.direction === 'out').map((e) => e.amountCents));
     const opening = running;
     running = opening + inCents - outCents;
-    if (running < 0 && !firstShortfallDate) firstShortfallDate = date;
+    // Only from today onward: the stretch between the last reconciliation and today already
+    // happened, so a "you run out on the 3rd" for a date in the past is noise.
+    if (running < 0 && !firstShortfallDate && date >= today) firstShortfallDate = date;
     days.push({ date, openingCents: opening, inCents, outCents, closingCents: running, events: dayEvents });
   }
 
@@ -159,10 +183,13 @@ export function snapshotFromDays(
   const projectedBalanceCents = day?.closingCents ?? 0;
 
   const future = days.slice(resolvedIndex + 1);
-  const incomeDay = future.find((d) => d.events.some((e) => e.direction === 'in'));
+  // Income *sources* only. A sale is cash, but it is not a payday, so it must not close the
+  // committed-spending window early and overstate free money.
+  const isSalary = (event: CashEvent) => event.direction === 'in' && event.sourceKind === 'income';
+  const incomeDay = future.find((d) => d.events.some(isSalary));
   const nextIncomeDate = incomeDay?.date;
   const nextIncomeAmountCents = incomeDay
-    ? sumCents(incomeDay.events.filter((e) => e.direction === 'in').map((e) => e.amountCents))
+    ? sumCents(incomeDay.events.filter(isSalary).map((e) => e.amountCents))
     : undefined;
 
   const committedWindow = nextIncomeDate

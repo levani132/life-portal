@@ -11,6 +11,7 @@ import type {
 } from '@life-portal/shared-types';
 import {
   buildLoanScenarios,
+  loanBalance,
   isAfter,
   loanProgressRatio,
   paidCents,
@@ -267,6 +268,7 @@ export class LoansService {
     ]);
 
     const outstanding = remainingCents(loan, payments);
+    const balance = loanBalance(loan, payments, plans, linkedExpenseAmounts, today);
     const scenarioInput = {
       today,
       remainingCents: outstanding,
@@ -287,6 +289,10 @@ export class LoansService {
       plans,
       paidCents: paidCents(payments),
       remainingCents: outstanding,
+      unrecordedScheduledCents: balance.unrecordedScheduledCents,
+      unrecordedScheduledCount: balance.unrecordedCount,
+      unrecordedScheduledFromDate: balance.unrecordedFromDate,
+      expectedRemainingCents: balance.expectedRemainingCents,
       progressRatio: loanProgressRatio(loan, payments),
       inflows: resolveInflows(scenarioInput),
       scenarios,

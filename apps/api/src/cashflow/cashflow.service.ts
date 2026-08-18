@@ -8,6 +8,7 @@ import type {
   Currency,
   Expense as ExpenseDto,
   IncomeSource as IncomeSourceDto,
+  RealisedSale,
 } from '@life-portal/shared-types';
 import {
   addDays,
@@ -16,10 +17,13 @@ import {
   monthlyEquivalentCents,
   nextOccurrence,
   projectCash,
+  realisedSales,
   runwayDays,
   snapshotAt,
   toDay,
 } from '@life-portal/shared-domain';
+import { ItemsService } from '../items/items.module';
+import { StocksService } from '../stocks/stocks.service';
 import { CashBalance, Expense, IncomeSource } from './cashflow.schemas';
 import type { SetBalanceDto, UpdateExpenseDto, UpdateIncomeDto, UpsertExpenseDto, UpsertIncomeDto } from './cashflow.dto';
 
@@ -29,6 +33,8 @@ export class CashflowService {
     @InjectModel(CashBalance.name) private readonly balances: Model<CashBalance>,
     @InjectModel(IncomeSource.name) private readonly incomes: Model<IncomeSource>,
     @InjectModel(Expense.name) private readonly expenses: Model<Expense>,
+    private readonly items: ItemsService,
+    private readonly stocks: StocksService,
   ) {}
 
   // ---------------------------------------------------------------- balance
@@ -166,6 +172,21 @@ export class CashflowService {
     await this.expenses.deleteOne({ userId, linkedPersonalPlanId: planId });
   }
 
+  // ---------------------------------------------------------------- sales
+
+  /**
+   * Cash from things already sold, across items and share lots. Derived on read from the rows
+   * that own the amounts (constitution principles III and IV) — selling something is recorded
+   * once, on the item or the lot, and shows up here without a second write.
+   */
+  async sales(userId: string): Promise<RealisedSale[]> {
+    const [items, lots] = await Promise.all([
+      this.items.list(userId),
+      this.stocks.listLots(userId),
+    ]);
+    return realisedSales({ items, lots });
+  }
+
   // ---------------------------------------------------------------- projection
 
   async projection(
@@ -173,10 +194,11 @@ export class CashflowService {
     today: string,
     options?: { to?: string; snapshotDate?: string },
   ): Promise<CashProjection> {
-    const [balance, incomes, expenses] = await Promise.all([
+    const [balance, incomes, expenses, sales] = await Promise.all([
       this.currentBalance(userId, today),
       this.listIncomes(userId),
       this.listExpenses(userId),
+      this.sales(userId),
     ]);
 
     return projectCash({
@@ -187,6 +209,7 @@ export class CashflowService {
       currency: balance.currency as Currency,
       incomes,
       expenses,
+      sales,
       snapshotDate: options?.snapshotDate ? toDay(options.snapshotDate) : today,
     });
   }
@@ -209,7 +232,10 @@ export class CashflowService {
     const runway = runwayDays(projection, today);
 
     return {
-      currentBalanceCents: balance.amountCents,
+      // What is in the account *today*, not what was in it when the user last checked. The
+      // reconciliation is the anchor; everything since is already in the projection.
+      currentBalanceCents: freeToday.projectedBalanceCents,
+      reconciledBalanceCents: balance.amountCents,
       balanceAsOf: balance.asOf,
       currency: balance.currency as Currency,
       nextIncomeDate: next?.date,

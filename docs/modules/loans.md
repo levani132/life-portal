@@ -19,6 +19,29 @@ not for one hard-coded loan.
 therefore correct for free, and `status` is reconciled in both directions after every payment
 write by `closeIfRepaid()` — deleting a payment reopens a loan that was marked paid.
 
+## Recorded versus expected
+
+`remainingCents` counts **recorded payments only**. Plans are intentions; treating one as history
+would understate a real debt.
+
+But the recurring plan's linked expense leaves the cash projection every month whether or not a
+payment is recorded, so the two widgets can end up disagreeing about the same dollar.
+`loanBalance()` in `libs/shared/domain/src/lib/loan-balances.ts` reconciles them:
+
+| Field | Meaning |
+| --- | --- |
+| `unrecordedScheduledCents` | Instalments from enabled, **guaranteed** plans that have fallen due with no recorded payment to cover them. Capped at the outstanding balance. |
+| `unrecordedScheduledCount` / `FromDate` | How many, and the earliest one still unaccounted for. |
+| `expectedRemainingCents` | `remaining − unrecordedScheduled`: what is owed if the plan was kept to. An estimate, marked as one in the UI. |
+
+Recorded payments are credited to instalments oldest-first, and only payments dated **on or after
+the first scheduled date** count — an opening-balance adjustment predating the schedule is already
+in `remaining` and must not be spent twice. Item and share plans never appear: they are
+possibilities, not commitments. Scenarios still start from `remainingCents`, never the estimate.
+
+The Debts screen shows the gap as an amber note with a prefilled "record it as paid" action, so the
+figures converge on the truth by the user confirming what happened rather than by the app guessing.
+
 ## Plan kinds
 
 | `kind` | Amount comes from | Counted in "salary only"? |
@@ -82,7 +105,8 @@ DELETE /api/loans/plans/:planId      ?keepExpense=true to keep the budget line
 
 ## Cross-links
 
-- **← cashflow** — `linkedExpenseAmounts` supplies recurring plan amounts.
+- **← cashflow** — `linkedExpenseAmounts` supplies recurring plan amounts, and the same figures
+  drive `loanBalance()`'s expected-versus-recorded reconciliation.
 - **← items** — `itemsProceedsForLoan()` supplies expected/pessimistic/optimistic proceeds.
 - **← stocks** — `proceedsForLoan()` supplies net-of-tax proceeds now and at target.
 - **→ dashboard** — `summary()` provides the focus loan and its payoff dates.

@@ -2,6 +2,8 @@ import { Body, Controller, Delete, Get, Module, Param, Patch, Post, Put, Query }
 import { MongooseModule } from '@nestjs/mongoose';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Today } from '../common/today';
+import { ItemsModule } from '../items/items.module';
+import { StocksModule } from '../stocks/stocks.module';
 import {
   SetBalanceDto,
   UpdateExpenseDto,
@@ -31,15 +33,19 @@ export class CashflowController {
     @Query('to') to?: string,
     @Query('snapshotDate') snapshotDate?: string,
   ) {
-    const [summary, projection, incomes, expenses, breakdown, balanceHistory] = await Promise.all([
-      this.cashflow.summary(userId, today),
-      this.cashflow.projection(userId, today, { to: to ?? this.cashflow.defaultTo(today), snapshotDate }),
-      this.cashflow.listIncomes(userId),
-      this.cashflow.listExpenses(userId),
-      this.cashflow.monthlyBreakdown(userId),
-      this.cashflow.balanceHistory(userId),
-    ]);
-    return { today, summary, projection, incomes, expenses, breakdown, balanceHistory };
+    const [summary, projection, incomes, expenses, sales, breakdown, balanceHistory] =
+      await Promise.all([
+        this.cashflow.summary(userId, today),
+        this.cashflow.projection(userId, today, { to: to ?? this.cashflow.defaultTo(today), snapshotDate }),
+        this.cashflow.listIncomes(userId),
+        this.cashflow.listExpenses(userId),
+        this.cashflow.sales(userId),
+        this.cashflow.monthlyBreakdown(userId),
+        this.cashflow.balanceHistory(userId),
+      ]);
+    // `sales` ships with the payload so the page can rebuild any day's events, including days
+    // before the projection window, without another round trip.
+    return { today, summary, projection, incomes, expenses, sales, breakdown, balanceHistory };
   }
 
   @Get('summary')
@@ -115,6 +121,8 @@ export class CashflowController {
 
 @Module({
   imports: [
+    ItemsModule,
+    StocksModule,
     MongooseModule.forFeature([
       { name: CashBalance.name, schema: CashBalanceSchema },
       { name: IncomeSource.name, schema: IncomeSourceSchema },
