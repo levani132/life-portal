@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * One dark palette, defined as RGB triples so Tailwind's `<alpha-value>` syntax works.
+ * A life dashboard gets looked at in the evening more than the morning, so dark is the only
+ * theme rather than a toggle nobody flips.
+ */
+:root {
+  --surface: 12 14 20;
+  --surface-raised: 22 25 34;
+  --border: 40 45 58;
+  --ink: 237 240 245;
+  --ink-muted: 155 163 180;
+  --ink-faint: 106 114 130;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-surface text-ink antialiased;
+    font-family:
+      ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  ::selection {
+    @apply bg-sky-500/30;
+  }
+}
+
+@layer components {
+  /* Numbers line up in columns without a monospace font everywhere. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .card {
+    @apply rounded-xl border border-border bg-surface-raised;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm
+      font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-sky-500 text-white hover:bg-sky-400;
+  }
+
+  .btn-ghost {
+    @apply btn border border-border text-ink-muted hover:border-ink-faint hover:text-ink;
+  }
+
+  .btn-danger {
+    @apply btn border border-rose-500/40 text-rose-300 hover:bg-rose-500/10;
+  }
+
+  .field {
+    @apply w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink
+      placeholder:text-ink-faint focus:border-sky-500 focus:outline-none;
+  }
+
+  .label {
+    @apply mb-1 block text-xs font-medium uppercase tracking-wide text-ink-faint;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium;
+  }
+}

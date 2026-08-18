@@ -1,0 +1,27 @@
+{
+  "name": "web",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/web",
+  "projectType": "application",
+  "tags": [],
+  "// targets": "to see all targets run: nx show project web --web",
+  "targets": {
+    "// ports": "Pinned explicitly because `next dev` and `next start` both honour the ambient PORT variable. The API also needs a port, and a shared PORT means whichever app starts second dies with EADDRINUSE. Passing --port here makes the web app ignore PORT entirely.",
+    "dev": {
+      "options": {
+        "command": "next dev --port 4200"
+      }
+    },
+    "start": {
+      "options": {
+        "command": "next start --port 4200"
+      }
+    },
+    "test": {
+      "// passWithNoTests": "The constitution requires unit tests for domain logic, which lives in libs/shared/domain. UI-only changes do not, so an empty web suite is a pass rather than a failure.",
+      "options": {
+        "passWithNoTests": true
+      }
+    }
+  }
+}

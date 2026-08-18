@@ -1,0 +1,180 @@
+import type { Expense, IncomeSource } from '@life-portal/shared-types';
+import { projectCash, snapshotAt } from './cash-projection';
+
+const salary: IncomeSource = {
+  id: 'inc1',
+  userId: 'u1',
+  label: 'EPAM salary',
+  amountCents: 400_000,
+  currency: 'USD',
+  recurrence: { cadence: 'monthly', interval: 1, dayOfMonth: 7, startDate: '2026-01-07' },
+  active: true,
+  createdAt: '2026-01-01',
+  updatedAt: '2026-01-01',
+};
+
+const loanRepayment: Expense = {
+  id: 'exp-loan',
+  userId: 'u1',
+  label: 'Loan repayment',
+  amountCents: 100_000,
+  currency: 'USD',
+  category: 'loan',
+  kind: 'recurring',
+  recurrence: { cadence: 'monthly', interval: 1, dayOfMonth: 7, startDate: '2026-01-07' },
+  active: true,
+  linkedLoanId: 'loan1',
+  createdAt: '2026-01-01',
+  updatedAt: '2026-01-01',
+};
+
+const rent: Expense = {
+  id: 'exp-rent',
+  userId: 'u1',
+  label: 'Rent',
+  amountCents: 90_000,
+  currency: 'USD',
+  category: 'housing',
+  kind: 'recurring',
+  recurrence: { cadence: 'monthly', interval: 1, dayOfMonth: 1, startDate: '2026-01-01' },
+  active: true,
+  createdAt: '2026-01-01',
+  updatedAt: '2026-01-01',
+};
+
+const baseInput = {
+  today: '2026-08-03',
+  to: '2026-10-31',
+  openingBalanceCents: 250_000,
+  balanceAsOf: '2026-08-03',
+  currency: 'USD' as const,
+  incomes: [salary],
+  expenses: [loanRepayment, rent],
+};
+
+describe('projectCash', () => {
+  it('rolls the balance forward through income and expenses', () => {
+    const projection = projectCash(baseInput);
+    const day = (date: string) => projection.days.find((d) => d.date === date);
+
+    expect(day('2026-08-03')?.closingCents).toBe(250_000);
+    // 7 Aug: +4000 salary, -1000 loan.
+    expect(day('2026-08-07')?.inCents).toBe(400_000);
+    expect(day('2026-08-07')?.outCents).toBe(100_000);
+    expect(day('2026-08-07')?.closingCents).toBe(550_000);
+    // 1 Sep: -900 rent.
+    expect(day('2026-09-01')?.closingCents).toBe(460_000);
+  });
+
+  it('projects from the reconciliation date, not from today', () => {
+    // Balance was true a week ago; the rent that fell due since then is still a forecast.
+    const projection = projectCash({
+      ...baseInput,
+      balanceAsOf: '2026-07-28',
+      openingBalanceCents: 300_000,
+    });
+    expect(projection.from).toBe('2026-07-28');
+    expect(projection.days.find((d) => d.date === '2026-08-01')?.outCents).toBe(90_000);
+    expect(projection.days.find((d) => d.date === '2026-08-03')?.closingCents).toBe(210_000);
+  });
+
+  it('computes the monthly net from recurring items only', () => {
+    const projection = projectCash(baseInput);
+    expect(projection.monthlyRecurringInCents).toBe(400_000);
+    expect(projection.monthlyRecurringOutCents).toBe(190_000);
+    expect(projection.monthlyNetCents).toBe(210_000);
+  });
+
+  it('flags the first date the balance goes negative', () => {
+    // $100 on hand, no income: the 7 Aug loan repayment of $1,000 is the first shortfall.
+    const projection = projectCash({
+      ...baseInput,
+      openingBalanceCents: 10_000,
+      incomes: [],
+    });
+    expect(projection.firstShortfallDate).toBe('2026-08-07');
+  });
+
+  it('ignores inactive income and expenses', () => {
+    const projection = projectCash({
+      ...baseInput,
+      expenses: [{ ...rent, active: false }, loanRepayment],
+    });
+    expect(projection.monthlyRecurringOutCents).toBe(100_000);
+  });
+
+  it('includes one-off expenses on their date only', () => {
+    const holiday: Expense = {
+      ...rent,
+      id: 'exp-holiday',
+      label: 'Batumi trip',
+      kind: 'one_off',
+      recurrence: undefined,
+      date: '2026-09-15',
+      amountCents: 50_000,
+      category: 'travel',
+    };
+    const projection = projectCash({ ...baseInput, expenses: [holiday] });
+    expect(projection.days.find((d) => d.date === '2026-09-15')?.outCents).toBe(50_000);
+    expect(projection.days.filter((d) => d.outCents > 0)).toHaveLength(1);
+  });
+});
+
+describe('snapshot free-money semantics', () => {
+  it('excludes obligations falling on the next salary day itself', () => {
+    // On 3 Aug the balance is 2500. The next salary is 7 Aug. The loan repayment also falls
+    // on 7 Aug, funded by that salary, so it must not be counted against today's balance.
+    const projection = projectCash(baseInput);
+    const snapshot = snapshotAt(projection, '2026-08-03', '2026-08-03');
+
+    expect(snapshot.projectedBalanceCents).toBe(250_000);
+    expect(snapshot.nextIncomeDate).toBe('2026-08-07');
+    expect(snapshot.nextIncomeAmountCents).toBe(400_000);
+    expect(snapshot.committedBeforeNextIncomeCents).toBe(0);
+    expect(snapshot.freeCents).toBe(250_000);
+  });
+
+  it('counts obligations that fall strictly before the next salary', () => {
+    // Asking on 8 Aug: rent on 1 Sep is due before the 7 Sep salary, so it is committed.
+    const projection = projectCash(baseInput);
+    const snapshot = snapshotAt(projection, '2026-08-08', '2026-08-03');
+
+    expect(snapshot.projectedBalanceCents).toBe(550_000);
+    expect(snapshot.nextIncomeDate).toBe('2026-09-07');
+    expect(snapshot.committedBeforeNextIncomeCents).toBe(90_000);
+    expect(snapshot.freeCents).toBe(460_000);
+  });
+
+  it('reports a mid-period dip that the closing balance would hide', () => {
+    // Rent of $900 on 1 Sep bites before the 7 Sep salary arrives, so a healthy 30 Sep
+    // balance conceals a near-zero moment. That dip is the number worth surfacing.
+    // 1000 → 7 Aug +4000 −1000 = 4000 → 1 Sep −900 = 3100 → 7 Sep +4000 −1000 = 6100.
+    const projection = projectCash({ ...baseInput, openingBalanceCents: 100_000 });
+    const snapshot = snapshotAt(projection, '2026-09-30', '2026-08-03');
+
+    expect(snapshot.projectedBalanceCents).toBe(610_000);
+    expect(snapshot.lowestBalanceDate).toBe('2026-08-03');
+    expect(snapshot.lowestBalanceCents).toBe(100_000);
+    expect(snapshot.lowestBalanceCents).toBeLessThan(snapshot.projectedBalanceCents);
+  });
+
+  it('finds a dip that occurs after today rather than on it', () => {
+    // No salary, so the balance only falls: rent on 1 Sep and 1 Oct takes 3000 to 1200,
+    // and the low is the last rent day rather than today.
+    const projection = projectCash({
+      ...baseInput,
+      openingBalanceCents: 300_000,
+      incomes: [],
+      expenses: [rent],
+    });
+    const snapshot = snapshotAt(projection, '2026-10-31', '2026-08-03');
+    expect(snapshot.lowestBalanceDate).toBe('2026-10-01');
+    expect(snapshot.lowestBalanceCents).toBe(120_000);
+  });
+
+  it('falls back to the last projected day when asked beyond the horizon', () => {
+    const projection = projectCash(baseInput);
+    const snapshot = snapshotAt(projection, '2027-06-01', '2026-08-03');
+    expect(snapshot.date).toBe('2026-10-31');
+  });
+});
