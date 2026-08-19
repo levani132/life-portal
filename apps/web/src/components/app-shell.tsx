@@ -87,26 +87,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 aria-label={menuOpen ? 'Close menu' : 'Open menu'}
                 className="-mr-1 flex h-9 w-9 items-center justify-center rounded-lg border border-border text-ink-muted transition active:scale-95"
               >
-                <span className="relative block h-3 w-4" aria-hidden>
-                  <span
-                    className={clsx(
-                      'absolute left-0 block h-0.5 w-4 rounded bg-current transition-transform',
-                      menuOpen ? 'top-1.5 rotate-45' : 'top-0',
-                    )}
-                  />
-                  <span
-                    className={clsx(
-                      'absolute left-0 top-1.5 block h-0.5 w-4 rounded bg-current transition-opacity',
-                      menuOpen && 'opacity-0',
-                    )}
-                  />
-                  <span
-                    className={clsx(
-                      'absolute left-0 block h-0.5 w-4 rounded bg-current transition-transform',
-                      menuOpen ? 'top-1.5 -rotate-45' : 'top-3',
-                    )}
-                  />
-                </span>
+                <MenuIcon open={menuOpen} />
               </button>
             </div>
           </div>
@@ -163,10 +144,46 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Menu / close icon.
+ *
+ * Drawn as an SVG with `width`/`height` **attributes** rather than three hairline `<span>`s sized
+ * by `h-0.5`: the first version rendered 16×0 and became invisible whenever the stylesheet was
+ * missing those utilities. An SVG carries its own geometry and needs no CSS to have a size.
+ */
+function MenuIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden
+      focusable="false"
+    >
+      {open ? (
+        <>
+          <line x1="5" y1="5" x2="19" y2="19" />
+          <line x1="19" y1="5" x2="5" y2="19" />
+        </>
+      ) : (
+        <>
+          <line x1="4" y1="7" x2="20" y2="7" />
+          <line x1="4" y1="12" x2="20" y2="12" />
+          <line x1="4" y1="17" x2="20" y2="17" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 /** The app mark, so the header matches the installed icon. */
 function Logo() {
   return (
-    <svg viewBox="0 0 512 512" className="h-5 w-5" aria-hidden focusable="false">
+    <svg viewBox="0 0 512 512" width="20" height="20" aria-hidden focusable="false">
       <circle cx="256" cy="256" r="150" fill="none" stroke="rgb(40 45 58)" strokeWidth="52" />
       <circle
         cx="256"
