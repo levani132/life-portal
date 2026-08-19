@@ -79,10 +79,15 @@ export class SettingsService {
   async update(userId: string, dto: UpdateSettingsDto): Promise<UserSettingsDto> {
     const patch: Record<string, unknown> = { ...dto };
     if (dto.fxRates) patch['fxRatesUpdatedAt'] = new Date().toISOString().slice(0, 10);
-    // Upserting with the defaults means a first-ever write does not need a prior read.
+    // Upserting with the defaults means a first-ever write does not need a prior read — but a
+    // path may not appear in `$set` and `$setOnInsert` at once: Mongo answers the whole update
+    // with `ConflictingUpdateOperators` (a 500), so only untouched fields get a default.
+    const seed = Object.fromEntries(
+      Object.entries(DEFAULT_SETTINGS).filter(([field]) => !(field in patch)),
+    );
     const updated = await this.model.findOneAndUpdate(
       { userId },
-      { $set: patch, $setOnInsert: { userId, ...DEFAULT_SETTINGS } },
+      { $set: patch, $setOnInsert: { userId, ...seed } },
       { new: true, upsert: true },
     );
     return updated.toJSON() as unknown as UserSettingsDto;
