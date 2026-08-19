@@ -1,8 +1,9 @@
 import 'dotenv/config';
 import * as bcrypt from 'bcryptjs';
-import type { Collection, Document } from 'mongodb';
 import mongoose from 'mongoose';
 import { loadConfig } from '../config/configuration';
+import { seedFoods } from './foods';
+import { upsert } from './upsert';
 
 /**
  * Seeds a fresh database with the real starting state.
@@ -34,27 +35,6 @@ const today = new Date().toISOString().slice(0, 10);
 
 function log(message: string): void {
   process.stdout.write(`  ${message}\n`);
-}
-
-/**
- * Upsert on a natural key, so re-running the seed never creates a second copy.
- *
- * Takes the raw driver `Collection` (from `db.collection(...)`) rather than a Mongoose model,
- * because the seed deliberately writes without schemas: it must be able to populate a
- * database whose models have since moved on.
- */
-async function upsert<T extends Record<string, unknown>>(
-  collection: Collection<Document>,
-  key: Record<string, unknown>,
-  doc: T,
-): Promise<string> {
-  const now = new Date();
-  const result = await collection.findOneAndUpdate(
-    key,
-    { $set: { ...doc, updatedAt: now }, $setOnInsert: { createdAt: now } },
-    { upsert: true, returnDocument: 'after' },
-  );
-  return String(result?.['_id']);
 }
 
 async function main(): Promise<void> {
@@ -286,6 +266,9 @@ async function main(): Promise<void> {
     await upsert(db.collection('boards'), { userId, key: board.key }, { userId, ...board, archived: false });
   }
   log(`boards: ${boards.map((b) => b.key).join(', ')}`);
+
+  const foodCount = await seedFoods(db, userId);
+  log(`foods: ${foodCount} in the database`);
 
   await mongoose.disconnect();
 

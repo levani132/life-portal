@@ -1,7 +1,7 @@
 # Life Portal — agent guide
 
 A private dashboard for one person's financial and personal state: debts, cash flow,
-sellable assets, share holdings, work obligations, side projects and personal plans.
+sellable assets, share holdings, work obligations, side projects, personal plans and food.
 
 **Read these before changing anything:**
 
@@ -13,8 +13,10 @@ sellable assets, share holdings, work obligations, side projects and personal pl
 ## The six principles, in one line each
 
 1. **Widget = bounded module.** One concern → one Nest module → one Mongo collection family →
-   one Next route. A widget renders twice: summary card, detail page.
-2. **Money is integer cents**, in fields named `*Cents`. Never floats.
+   one Next route. A widget renders twice: summary card, detail page. A card may carry **one**
+   quick action and nothing more (amended in 1.1.0 for logging food).
+2. **Money is integer cents**, in fields named `*Cents`. Never floats. Nutrition follows the
+   same rule: whole kcal, macros as whole milligrams in `*Mg`, body weight in grams.
 3. **Derived never persisted.** Balances and projections are computed on read from event rows.
    A loan stores `principalCents` + payments, never `remainingCents`.
 4. **Cross-widget links are single-sourced.** The monthly loan repayment is owned by a
@@ -29,7 +31,7 @@ sellable assets, share holdings, work obligations, side projects and personal pl
 apps/api          NestJS 11 · MongoDB via Mongoose 9 · JWT auth
 apps/web          Next.js 16 App Router · Tailwind · SWR · Recharts
 libs/shared/types Contracts shared by both. Zero runtime dependencies.
-libs/shared/domain Pure projection/scenario/valuation logic. 97 unit tests.
+libs/shared/domain Pure projection/scenario/valuation/nutrition logic. 182 unit tests.
 .specify/         Spec Kit: constitution, templates, /speckit-* skills
 docs/             Module docs, decisions, changelog
 ```
@@ -86,6 +88,19 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   says `undefined`, and every `a ?? b` fallback silently breaks. This caused two real bugs; see
   `docs/DECISIONS.md`. Use `centsField` (no default) for optional, `requiredCentsField` for
   required.
+- **A logged meal freezes the food's numbers.** `meal_entries.facts` is a snapshot taken at log
+  time — the one place in this codebase where a value is copied rather than referenced, so that
+  correcting a food never rewrites past days. Never refresh it on a `PATCH`, never accept it from a
+  request, and never make `foodId` editable. See `docs/modules/nutrition.md`.
+- **Which day a meal belongs to is decided in the browser**, from the local clock and the profile's
+  `dayStartHour` (default 4, so a 01:00 snack lands on the previous day), and sent explicitly as
+  `?today=` / `day`. The server's day is not the eater's day.
+- **Grams and millilitres are never converted.** A food is measured in one unit, its facts are per
+  100 of that unit, and there are no densities in this app.
+- **A field may not appear in `$set` and `$setOnInsert` in the same update.** Mongo answers the
+  whole thing with `ConflictingUpdateOperators` — a 500, not a merge. Both upsert-with-defaults
+  services (`settings`, `nutrition`) now seed only the fields the caller did not send. This was a
+  live 500 on saving settings until the food widget's boot check hit it.
 - **Config lives in a `@Global()` `ConfigModule`.** A provider declared in `AppModule` is not
   visible to modules `AppModule` imports, so declaring `CONFIG` there broke DI at boot.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so

@@ -6,6 +6,7 @@ import { BoardsModule } from '../boards/boards.module';
 import { CashflowModule } from '../cashflow/cashflow.module';
 import { ItemsModule } from '../items/items.module';
 import { LoansModule } from '../loans/loans.module';
+import { NutritionModule } from '../nutrition/nutrition.module';
 import { PersonalModule } from '../personal/personal.module';
 import { SettingsModule } from '../settings/settings.module';
 import { StocksModule } from '../stocks/stocks.module';
@@ -37,6 +38,7 @@ export class DashboardController {
     StocksModule,
     BoardsModule,
     PersonalModule,
+    NutritionModule,
     SettingsModule,
   ],
   controllers: [DashboardController],

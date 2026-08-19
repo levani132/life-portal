@@ -6,4 +6,5 @@ export * from './lib/items';
 export * from './lib/stocks';
 export * from './lib/boards';
 export * from './lib/personal';
+export * from './lib/nutrition';
 export * from './lib/dashboard';

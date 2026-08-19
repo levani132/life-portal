@@ -25,6 +25,15 @@ export interface AppConfig {
   registrationInviteCode?: string;
   corsOrigins: string[];
   finnhubApiKey?: string;
+  /**
+   * Sent as `User-Agent` on every Open Food Facts request.
+   *
+   * The API needs no key, but it does require a custom agent — a generic one risks being
+   * treated as a bot and blocked. `OFF_USER_AGENT` overrides this outright; otherwise an
+   * `OFF_CONTACT_EMAIL`, if set, becomes the contact in the default agent. No address is
+   * hard-coded, so nothing personal ships in the repo.
+   */
+  offUserAgent: string;
   /** Skips the scheduled quote refresh — useful locally and in tests. */
   disableSchedules: boolean;
 }
@@ -36,6 +45,16 @@ function positiveInt(name: string, value: string | undefined, fallback: number):
     throw new Error(`${name} must be a positive whole number of seconds, got "${value}".`);
   }
   return parsed;
+}
+
+/** See `AppConfig.offUserAgent`. Open Food Facts asks for `AppName/Version (contact)`. */
+function openFoodFactsUserAgent(): string {
+  const explicit = process.env['OFF_USER_AGENT']?.trim();
+  if (explicit) return explicit;
+  const contact = process.env['OFF_CONTACT_EMAIL']?.trim();
+  return contact
+    ? `LifePortal/1.0 (${contact})`
+    : 'LifePortal/1.0 (self-hosted personal dashboard)';
 }
 
 function required(name: string, value: string | undefined): string {
@@ -65,6 +84,7 @@ export function loadConfig(): AppConfig {
       .map((o) => o.trim())
       .filter(Boolean),
     finnhubApiKey: process.env['FINNHUB_API_KEY']?.trim() || undefined,
+    offUserAgent: openFoodFactsUserAgent(),
     disableSchedules: process.env['DISABLE_SCHEDULES'] === 'true',
   };
 }

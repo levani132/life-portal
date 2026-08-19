@@ -332,3 +332,112 @@ the first time a schedule has been running longer than the payment history. That
 reading of the data: either the payments happened and want recording, or the debt really is that
 big.
 
+
+---
+
+## 2026-08-19 · Constitution 1.1.0 — a summary card may carry one quick action
+
+Principle I said a summary card has "no interaction beyond navigation". The food widget breaks
+that: logging a meal happens three to six times a day, and making every entry start with a
+navigation is the difference between a tracker that survives and one that is abandoned in week
+three. The governance clause allows exactly two responses — follow the principle, or amend it in
+the same change. Amended.
+
+The exception is deliberately narrow: **one** primary action per card, nothing else. A second
+button, an inline form or an editable field on a card is still a violation, because the moment a
+card takes arbitrary input it has become a second, worse detail page.
+
+**Rejected:** a floating quick-add in the app shell. It needs no amendment, but it puts a
+food-specific action into chrome shared by every widget, which is a worse boundary violation than
+one button on the widget's own card — and it would be the first thing to break when a second
+widget wants the same treatment.
+
+---
+
+## 2026-08-19 · Nutrition facts are per 100 base units, as integers, with macros in milligrams
+
+Amounts are logged in base units, so per-100 storage makes every derivation one multiply and
+removes the serving size from the arithmetic entirely — editing a serving size can no longer change
+a food's calorie density. Storing what the label says (per serving) would have made every figure
+depend on a mutable field, and two foods with different serving sizes incomparable.
+
+Precision follows principle II by analogy: whole kilocalories, and macronutrients as whole
+**milligrams** in `*Mg` fields — three decimal places of a gram, far more than any label carries,
+and no float ever reaches Mongo. Optional nutrients have **no `default: 0`**, for exactly the
+reason `centsField` does not: "unknown fibre" and "no fibre" are different facts.
+
+The food form still accepts per-serving *or* per-100 input and remembers which via `entryMode`, so
+the owner types what the packet says and reopens the form to find what they typed.
+
+---
+
+## 2026-08-19 · A logged meal freezes the food's numbers
+
+A `meal_entries` row stores `foodId` **and** a `facts` snapshot: name, brand, serving size and the
+per-100 numbers as they were at that moment.
+
+This is the only place in the codebase where a value is copied rather than referenced, and it is
+not a cached derivation — it is what an event row is *for*. Without it, fixing a typo in a food's
+calories next month silently rewrites every day that food has ever appeared in, and the log stops
+being evidence of anything. A stock lot stores its purchase price for the same reason.
+
+What follows from it: the snapshot is built server-side and never accepted from a request;
+`PATCH /entries/:id` corrects an amount **without** re-pricing the meal; `foodId` is immutable
+(a different food is a different meal); and deleting a food that has been eaten *archives* it, so
+the picker stays clean while history keeps its name.
+
+**Rejected:** pure reference (retroactively mutates history), immutable foods (forbids ever fixing
+a typo), and versioned foods (fills the picker — the one surface that must stay clean — with
+near-duplicates).
+
+Totals are still never stored. Only the inputs are.
+
+---
+
+## 2026-08-19 · Amounts stay in the food's own unit; grams and millilitres are not interchangeable
+
+A food is measured in grams or millilitres and its facts are per 100 of that unit. Nothing is
+converted between them, because we have no densities: 1 ml = 1 g is wrong by −8% for oil, +3% for
+milk and +40% for syrup, and that error would quietly corrupt every total involving a liquid.
+
+The original request was to convert everything to grams. The UX it was asking for — "let me type
+servings or millilitres, whichever I prefer" — needs only the serving size, which the modal already
+has, so nothing was lost by keeping the honest unit.
+
+**Rejected:** a per-food density field. It adds a field to every liquid to enable a conversion
+nothing in the app performs.
+
+---
+
+## 2026-08-19 · The verdict on a target's rate is wider than the recommended band
+
+Recommended rates are 0.5–1.0% of body weight a week for loss and 0.25–0.5% for gain. Using those
+as *verdict* thresholds made the app flag its own `fat_loss` recommendation — about 0.45% a week
+for an 80 kg frame — as "too slow". A tool that contradicts its own advice teaches you to ignore
+its warnings, so the thresholds are now `fast` above 1.0% (loss) or 0.5% (gain) and `slow` below
+0.25% either way, with the recommended bands still shown as the target.
+
+Caught by a unit test asserting the five goals, not by review. This is what "a test per branch"
+is for.
+
+---
+
+## 2026-08-20 · Recomposition is its own goal, not a shade of fat loss
+
+"Lose fat and build muscle at once" is a real outcome with its own numbers, and squeezing it into
+`fat_loss` gets both halves wrong: fat loss uses too big a deficit for muscle to arrive, and
+`lean_gain` uses a surplus. Recomposition sits between them — maintenance − 10%, protein 2.4 g/kg
+of body weight (2.8 g/kg of lean mass when it is known), fat 0.8 g/kg.
+
+It is the only goal whose **outcome depends on behaviour the app cannot observe**, so it is the
+only one that ships a `goalNote` about conditions rather than arithmetic: resistance training, the
+protein target actually being hit, sleep, and how much fat there is to start with. Naming the
+conditions is the same principle as labelling an estimate — the number is not the whole claim.
+
+It also needed its own protein ceiling. The default 40%-of-energy guard exists to stop a per-kg
+figure going silly at a high BMI, but at recomposition intakes it would clip a target the evidence
+supports (Longland 2016 used 2.4 g/kg in a deep deficit), so `GOAL_PLAN` gained an optional
+`proteinEnergyCap` and this goal sets it to 50%.
+
+**Not changed:** the model still refuses to promise recomposition. It reports a deficit and a
+protein target; whether muscle arrives is decided in the gym.

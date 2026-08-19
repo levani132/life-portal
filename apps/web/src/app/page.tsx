@@ -2,9 +2,16 @@
 
 import clsx from 'clsx';
 import Link from 'next/link';
-import type { DashboardResponse, WidgetCard } from '@life-portal/shared-types';
+import { useState } from 'react';
+import type {
+  DashboardResponse,
+  FoodWithUsage,
+  MealSlot,
+  WidgetCard,
+} from '@life-portal/shared-types';
 import { formatCents, formatDay } from '@life-portal/shared-domain';
 import { AppShell } from '../components/app-shell';
+import { LogFoodModal } from '../components/log-food-modal';
 import {
   Chip,
   EmptyState,
@@ -15,6 +22,7 @@ import {
   TONE_TEXT,
 } from '../components/ui';
 import { useApi } from '../lib/hooks';
+import { mealContextNow } from '../lib/local-day';
 
 /**
  * Accent → classes. Written out rather than interpolated, because Tailwind's scanner reads
@@ -30,6 +38,7 @@ const ACCENT_RING: Record<string, string> = {
   teal: 'hover:border-teal-500/50',
   cyan: 'hover:border-cyan-500/50',
   fuchsia: 'hover:border-fuchsia-500/50',
+  lime: 'hover:border-lime-500/50',
 };
 
 const ACCENT_DOT: Record<string, string> = {
@@ -42,6 +51,7 @@ const ACCENT_DOT: Record<string, string> = {
   teal: 'bg-teal-500',
   cyan: 'bg-cyan-500',
   fuchsia: 'bg-fuchsia-500',
+  lime: 'bg-lime-500',
 };
 
 export default function DashboardPage() {
@@ -54,6 +64,11 @@ export default function DashboardPage() {
 
 function Dashboard() {
   const { data, error, isLoading } = useApi<DashboardResponse>('/dashboard');
+  // The one quick action a card may carry (constitution principle I, amended 1.1.0). The foods
+  // and the profile's day-start hour come from the food widget's own endpoint, so the dashboard
+  // payload stays a summary.
+  const [logging, setLogging] = useState<MealSlot | null>(null);
+  const { data: food } = useApi<{ foods: FoodWithUsage[] }>(logging ? '/nutrition' : null);
 
   if (isLoading) return <Spinner label="Working out where you stand…" />;
   if (error) return <ErrorNote message={(error as Error).message} />;
@@ -110,9 +125,27 @@ function Dashboard() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {data.cards.map((card) => (
-            <SummaryCard key={card.id} card={card} />
+            <SummaryCard
+              key={card.id}
+              card={card}
+              onQuickAction={
+                card.quickAction?.kind === 'log-food'
+                  ? () => setLogging(mealContextNow().slot)
+                  : undefined
+              }
+            />
           ))}
         </div>
+      )}
+
+      {logging && (
+        <LogFoodModal
+          open
+          onClose={() => setLogging(null)}
+          foods={food?.foods ?? []}
+          day={mealContextNow().day}
+          slot={logging}
+        />
       )}
     </>
   );
@@ -122,7 +155,13 @@ function Dashboard() {
  * The dashboard card: at most three numbers and a link, nothing interactive
  * (constitution principle I). Everything else lives on the detail page.
  */
-function SummaryCard({ card }: { card: WidgetCard }) {
+function SummaryCard({
+  card,
+  onQuickAction,
+}: {
+  card: WidgetCard;
+  onQuickAction?: () => void;
+}) {
   return (
     <Link
       href={card.href}
@@ -139,7 +178,24 @@ function SummaryCard({ card }: { card: WidgetCard }) {
             {card.subtitle && <p className="text-xs text-ink-faint">{card.subtitle}</p>}
           </div>
         </div>
-        <span className="text-ink-faint opacity-0 transition group-hover:opacity-100">→</span>
+        {card.quickAction && onQuickAction ? (
+          <button
+            type="button"
+            aria-label={card.quickAction.label}
+            title={card.quickAction.label}
+            onClick={(event) => {
+              // The card is a link; this one control is not, so navigation has to be stopped.
+              event.preventDefault();
+              event.stopPropagation();
+              onQuickAction();
+            }}
+            className="-m-1 flex h-9 w-9 items-center justify-center rounded-lg border border-border text-xl leading-none text-ink-muted transition hover:border-lime-500/50 hover:text-ink active:scale-95"
+          >
+            +
+          </button>
+        ) : (
+          <span className="text-ink-faint opacity-0 transition group-hover:opacity-100">→</span>
+        )}
       </div>
 
       <dl className="grid grid-cols-3 gap-2">

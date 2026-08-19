@@ -35,7 +35,7 @@ export function revalidateLinked(): Promise<unknown> {
   return globalMutate(
     (key) =>
       typeof key === 'string' &&
-      ['/dashboard', '/loans', '/cashflow', '/items', '/stocks', '/personal', '/boards'].some((root) =>
+      ['/dashboard', '/loans', '/cashflow', '/items', '/stocks', '/personal', '/boards', '/nutrition'].some((root) =>
         key.startsWith(root),
       ),
   );

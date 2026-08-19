@@ -95,6 +95,24 @@ cost and a date can add itself to your budget automatically.
 cross-widget attention feed (salary landing soon, negative free money, a debt with no guaranteed
 plan, stale share prices, people needing attention, overdue 1:1s, a plan this week).
 
+**Food** — what you ate today against what you should eat. Log a meal in three taps from the
+dashboard itself, or from any of breakfast, lunch, dinner, snacks and anything else, choosing
+servings or grams and seeing the calories and macros before you commit to them. Your own food
+database, entered from the packet either per serving or per 100 g, or imported by name or barcode
+from Open Food Facts — and still fully usable by hand when that is unavailable. Calorie, protein,
+carb and fat targets worked out from your height, age, weight, activity and one of six goals —
+including body recomposition, for losing fat and building muscle at the same time, each
+figure showing the equation and inputs behind it, with warnings when a goal asks for a deficit
+deeper than is useful. Weigh-ins are dated, so the targets follow your weight and the trend is
+drawn for you. The week is shown beside the day, because that is what actually moves the scale, and
+a cheat day you set gets a countdown, a priority list of what you want to eat, and the calories
+banked from the days you came in under.
+
+The food database starts with the eleven things you actually eat — the Fresco chicken meals, both
+protein shakes, the Go On bar, grilled chicken breast, buckwheat, and eggs — loaded by
+`npm run seed:foods`, which is safe to re-run.
+
 **Under the hood** — full authentication with rotating refresh tokens, every API route guarded by
 default and scoped to the owner, integer-cent money throughout, calendar dates as strings to
-sidestep timezones, and 79 unit tests over the projection, scenario, ESPP and target-price logic.
+sidestep timezones, and 182 unit tests over the projection, scenario, ESPP, target-price and
+nutrition logic.

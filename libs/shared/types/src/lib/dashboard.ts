@@ -3,6 +3,7 @@ import type { CashflowSummary } from './cashflow';
 import type { Cents, IsoDate } from './common';
 import type { ItemsSummary } from './items';
 import type { LoansSummary } from './loans';
+import type { NutritionSummary } from './nutrition';
 import type { PersonalSummary } from './personal';
 import type { StocksSummary } from './stocks';
 
@@ -17,6 +18,7 @@ export const WIDGET_KEYS = [
   'stocks',
   'board',
   'personal',
+  'nutrition',
 ] as const;
 export type WidgetKey = (typeof WIDGET_KEYS)[number];
 
@@ -35,6 +37,16 @@ export interface WidgetStat {
   estimated?: boolean;
 }
 
+/**
+ * The one interactive control a summary card may carry (constitution principle I, amended
+ * 1.1.0). The API names the *kind*, never a URL or a handler — the dashboard maps the kind to a
+ * component, so the card stays declarative.
+ */
+export interface WidgetQuickAction {
+  kind: 'log-food';
+  label: string;
+}
+
 export interface WidgetCard {
   key: WidgetKey;
   /** Unique per card: `loans`, `board:epam`, … Used as the React key and the deep link. */
@@ -50,6 +62,8 @@ export interface WidgetCard {
   progress?: number;
   /** Short call-to-action line, e.g. "2 people need attention". */
   alert?: string;
+  /** At most one. Present only where the widget earns it (see `WidgetQuickAction`). */
+  quickAction?: WidgetQuickAction;
   order: number;
 }
 
@@ -68,6 +82,7 @@ export interface DashboardResponse {
     stocks: StocksSummary;
     boards: BoardSummary[];
     personal: PersonalSummary;
+    nutrition: NutritionSummary;
   };
   /** Cross-widget nudges, e.g. "salary lands in 4 days" or "quotes are 6 days stale". */
   attention: { tone: WidgetTone; message: string; href?: string }[];

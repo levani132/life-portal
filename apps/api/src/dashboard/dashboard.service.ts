@@ -16,6 +16,7 @@ import { BoardsService } from '../boards/boards.service';
 import { CashflowService } from '../cashflow/cashflow.service';
 import { ItemsService } from '../items/items.module';
 import { LoansService } from '../loans/loans.service';
+import { NutritionService } from '../nutrition/nutrition.service';
 import { PersonalService } from '../personal/personal.module';
 import { SettingsService } from '../settings/settings.module';
 import { StocksService } from '../stocks/stocks.service';
@@ -32,6 +33,7 @@ export class DashboardService {
     private readonly stocks: StocksService,
     private readonly boards: BoardsService,
     private readonly personal: PersonalService,
+    private readonly nutrition: NutritionService,
     private readonly settings: SettingsService,
   ) {}
 
@@ -46,13 +48,14 @@ export class DashboardService {
     const settings = await this.settings.get(userId);
     const currency = settings.displayCurrency;
 
-    const [loans, cashflow, items, stocks, boardSummaries, personal] = await Promise.all([
+    const [loans, cashflow, items, stocks, boardSummaries, personal, nutrition] = await Promise.all([
       this.loans.summary(userId, today),
       this.cashflow.summary(userId, today),
       this.items.summary(userId),
       this.stocks.summary(userId, today, { taxRate: settings.capitalGainsTaxRate }),
       this.boards.summaries(userId, today),
       this.personal.summary(userId, today),
+      this.nutrition.summary(userId, today),
     ]);
 
     const cards: WidgetCard[] = [
@@ -62,6 +65,7 @@ export class DashboardService {
       this.stocksCard(stocks, currency),
       ...boardSummaries.map((board, index) => this.boardCard(board, index)),
       this.personalCard(personal, currency),
+      this.nutritionCard(nutrition),
     ];
 
     // Net position: what is mine, minus what is owed. Stocks are counted at market value
@@ -78,7 +82,7 @@ export class DashboardService {
       cards: cards.sort((a, b) => a.order - b.order),
       netPositionCents,
       displayCurrency: currency,
-      summaries: { loans, cashflow, items, stocks, boards: boardSummaries, personal },
+      summaries: { loans, cashflow, items, stocks, boards: boardSummaries, personal, nutrition },
       attention: this.attention({ loans, cashflow, stocks, boardSummaries, personal, today }),
     };
   }
@@ -339,6 +343,71 @@ export class DashboardService {
   // ---------------------------------------------------------------- attention
 
   /** Cross-widget nudges. These are the only place one widget may comment on another. */
+  /**
+   * The food card: eaten, left, protein left — and the one quick action the amended principle I
+   * allows, because logging happens several times a day and should not start with a navigation.
+   *
+   * Readable before the profile exists: with no targets there is still a calorie count and an
+   * invitation to fill the profile in, rather than three dashes or a misleading zero.
+   */
+  private nutritionCard(nutrition: DashboardResponse['summaries']['nutrition']): WidgetCard {
+    const { targetKcal, leftKcal, proteinLeftG } = nutrition;
+    const overBy = leftKcal != null && leftKcal < 0 ? -leftKcal : 0;
+    const tone: WidgetTone = !nutrition.targetsAvailable
+      ? 'neutral'
+      : overBy > 0
+        ? 'bad'
+        : leftKcal != null && targetKcal != null && leftKcal < targetKcal * 0.1
+          ? 'warn'
+          : 'good';
+
+    const cheatNote =
+      nutrition.daysUntilCheat === 0
+        ? 'cheat day — enjoy it'
+        : nutrition.daysUntilCheat != null
+          ? `cheat day in ${nutrition.daysUntilCheat}d`
+          : undefined;
+
+    return {
+      key: 'nutrition',
+      id: 'nutrition',
+      title: 'Food',
+      subtitle: cheatNote ?? (nutrition.entryCount > 0 ? `${nutrition.entryCount} logged today` : 'nothing logged yet'),
+      href: '/nutrition',
+      icon: 'utensils',
+      accent: 'lime',
+      tone,
+      stats: [
+        {
+          label: 'Eaten',
+          value: `${nutrition.eatenKcal} kcal`,
+          raw: nutrition.eatenKcal,
+        },
+        {
+          label: overBy > 0 ? 'Over by' : 'Left today',
+          value: leftKcal == null ? '—' : `${Math.abs(leftKcal)} kcal`,
+          raw: leftKcal,
+          tone,
+          estimated: nutrition.targetsAvailable,
+        },
+        {
+          label: 'Protein left',
+          value: proteinLeftG == null ? '—' : `${Math.max(0, proteinLeftG)} g`,
+          raw: proteinLeftG,
+          tone: proteinLeftG != null && proteinLeftG <= 0 ? 'good' : 'neutral',
+          estimated: nutrition.targetsAvailable,
+        },
+      ],
+      progress:
+        targetKcal && targetKcal > 0 ? Math.min(1, nutrition.eatenKcal / targetKcal) : undefined,
+      alert: nutrition.targetsAvailable
+        ? undefined
+        : 'No targets yet — add your height, age and weight',
+      quickAction: { kind: 'log-food', label: 'Log food' },
+      order: 25,
+    };
+  }
+
   private attention(input: {
     loans: DashboardResponse['summaries']['loans'];
     cashflow: DashboardResponse['summaries']['cashflow'];

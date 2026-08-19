@@ -11,6 +11,7 @@ import { loadConfig } from '../config/configuration';
 import { DashboardModule } from '../dashboard/dashboard.module';
 import { ItemsModule } from '../items/items.module';
 import { LoansModule } from '../loans/loans.module';
+import { NutritionModule } from '../nutrition/nutrition.module';
 import { PersonalModule } from '../personal/personal.module';
 import { SettingsModule } from '../settings/settings.module';
 import { StocksModule } from '../stocks/stocks.module';
@@ -34,6 +35,7 @@ import { StocksModule } from '../stocks/stocks.module';
     StocksModule,
     BoardsModule,
     PersonalModule,
+    NutritionModule,
     DashboardModule,
   ],
   providers: [
