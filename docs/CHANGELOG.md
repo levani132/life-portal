@@ -112,6 +112,12 @@ The food database starts with the eleven things you actually eat — the Fresco 
 protein shakes, the Go On bar, grilled chicken breast, buckwheat, and eggs — loaded by
 `npm run seed:foods`, which is safe to re-run.
 
+**Install it on your phone** — Life Portal is now a proper app: add it to your home screen and it
+opens without browser chrome, with its own icon and splash screen, and still loads the shell when
+the connection drops. It caches no data of yours to do that. The mobile layout was rebuilt at the
+same time: no more sideways scrolling, and the eleven widgets live behind a menu button instead of
+four rows of wrapped links.
+
 **Under the hood** — full authentication with rotating refresh tokens, every API route guarded by
 default and scoped to the owner, integer-cent money throughout, calendar dates as strings to
 sidestep timezones, and 182 unit tests over the projection, scenario, ESPP, target-price and

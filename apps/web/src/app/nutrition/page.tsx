@@ -317,14 +317,12 @@ function MacroTiles({
               )}
             </div>
             <p className="tabular mt-1 text-2xl font-semibold">
-              {tile.eaten.toLocaleString()}
-              {tile.target != null && (
-                <span className="text-sm font-normal text-ink-faint">
-                  {' / '}
-                  {tile.target.toLocaleString()}
-                </span>
-              )}
-              <span className="ml-1 text-xs font-normal text-ink-faint">{tile.unit}</span>
+              {tile.eaten.toLocaleString()}{' '}
+              {/* Target and unit travel together, so a narrow tile wraps them as one phrase. */}
+              <span className="whitespace-nowrap text-sm font-normal text-ink-faint">
+                {tile.target != null && `/ ${tile.target.toLocaleString()} `}
+                <span className="text-xs">{tile.unit}</span>
+              </span>
             </p>
             <p className={clsx('mt-0.5 text-xs', over ? 'text-rose-400' : 'text-ink-faint')}>
               {left == null

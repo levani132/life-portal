@@ -39,12 +39,17 @@ export function WeekBalancePanel({ week }: { week: WeekBalanceData }) {
         />
       </div>
 
-      <div className="flex h-28 items-end gap-1.5">
+      {/*
+       * `items-stretch`, not `items-end`: with `items-end` the columns size to their content, so
+       * the bar wrapper's `h-full` resolved against nothing and every bar collapsed to zero. The
+       * wrapper now takes the leftover space above the date label with `flex-1`.
+       */}
+      <div className="flex h-28 items-stretch gap-1.5">
         {week.days.map((day) => {
           const height = Math.round((day.eatenKcal / peak) * 100);
           return (
             <div key={day.day} className="flex flex-1 flex-col items-center gap-1">
-              <div className="relative flex h-full w-full items-end">
+              <div className="relative flex w-full flex-1 items-end">
                 {dayTarget != null && (
                   <span
                     className="absolute left-0 right-0 border-t border-dashed border-ink-faint/60"

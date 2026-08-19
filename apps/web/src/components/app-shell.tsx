@@ -3,7 +3,7 @@
 import clsx from 'clsx';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { useApi } from '../lib/hooks';
 import { Spinner } from './ui';
@@ -28,10 +28,23 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login');
   }, [loading, user, router]);
+
+  // A menu left open across a navigation covers the page you just asked for.
+  useEffect(() => setMenuOpen(false), [pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
 
   const { data } = useApi<{ boards: Board[] }>(user ? '/boards' : null);
 
@@ -43,23 +56,81 @@ export function AppShell({ children }: { children: ReactNode }) {
     label: board.name,
   }));
 
+  const links = [...CORE_LINKS, ...boardLinks];
+
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-          <Link href="/" className="text-sm font-semibold tracking-tight">
-            Life<span className="text-sky-400">Portal</span>
-          </Link>
+      <header className="sticky top-0 z-40 border-b border-border bg-surface/90 pt-[env(safe-area-inset-top)] backdrop-blur">
+        <div className="mx-auto max-w-7xl px-4 py-2.5 lg:flex lg:items-center lg:gap-x-6 lg:py-3">
+          <div className="flex items-center justify-between gap-3">
+            <Link
+              href="/"
+              className="flex shrink-0 items-center gap-2 text-sm font-semibold tracking-tight"
+              onClick={() => setMenuOpen(false)}
+            >
+              <Logo />
+              Life<span className="-ml-1.5 text-sky-400">Portal</span>
+            </Link>
 
-          <nav className="flex flex-1 flex-wrap items-center gap-1 text-sm">
-            {[...CORE_LINKS, ...boardLinks].map((link) => {
+            {/*
+             * Eleven links do not fit on a phone in any arrangement worth having: wrapped they ate
+             * four rows and pushed the content off the fold, and a horizontal scroller hid half of
+             * them behind a gesture nobody discovers. So: a menu below lg, the full row above it.
+             */}
+            <div className="flex items-center gap-3 lg:hidden">
+              <span className="text-xs text-ink-faint">{user.name}</span>
+              <button
+                type="button"
+                onClick={() => setMenuOpen((open) => !open)}
+                aria-expanded={menuOpen}
+                aria-controls="widget-menu"
+                aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+                className="-mr-1 flex h-9 w-9 items-center justify-center rounded-lg border border-border text-ink-muted transition active:scale-95"
+              >
+                <span className="relative block h-3 w-4" aria-hidden>
+                  <span
+                    className={clsx(
+                      'absolute left-0 block h-0.5 w-4 rounded bg-current transition-transform',
+                      menuOpen ? 'top-1.5 rotate-45' : 'top-0',
+                    )}
+                  />
+                  <span
+                    className={clsx(
+                      'absolute left-0 top-1.5 block h-0.5 w-4 rounded bg-current transition-opacity',
+                      menuOpen && 'opacity-0',
+                    )}
+                  />
+                  <span
+                    className={clsx(
+                      'absolute left-0 block h-0.5 w-4 rounded bg-current transition-transform',
+                      menuOpen ? 'top-1.5 -rotate-45' : 'top-3',
+                    )}
+                  />
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <nav
+            id="widget-menu"
+            aria-label="Widgets"
+            className={clsx(
+              'gap-1 text-sm',
+              // Below lg the menu is a two-column grid, so every widget is one tap away.
+              menuOpen ? 'mt-2 grid grid-cols-2 border-t border-border pt-2' : 'hidden',
+              'lg:mt-0 lg:flex lg:flex-1 lg:flex-wrap lg:items-center lg:border-0 lg:pt-0',
+            )}
+          >
+            {links.map((link) => {
               const active = link.href === '/' ? pathname === '/' : pathname.startsWith(link.href);
               return (
                 <Link
                   key={link.href}
                   href={link.href}
+                  aria-current={active ? 'page' : undefined}
+                  onClick={() => setMenuOpen(false)}
                   className={clsx(
-                    'rounded-lg px-2.5 py-1.5 transition',
+                    'truncate rounded-lg px-2.5 py-2 transition lg:py-1.5',
                     active ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:text-ink',
                   )}
                 >
@@ -67,10 +138,17 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </Link>
               );
             })}
+            <button
+              type="button"
+              onClick={() => void logout()}
+              className="rounded-lg px-2.5 py-2 text-left text-ink-faint transition hover:text-ink lg:hidden"
+            >
+              Sign out
+            </button>
           </nav>
 
-          <div className="flex items-center gap-3 text-xs text-ink-faint">
-            <span className="hidden sm:inline">{user.name}</span>
+          <div className="hidden items-center gap-3 text-xs text-ink-faint lg:flex">
+            <span>{user.name}</span>
             <button type="button" onClick={() => void logout()} className="hover:text-ink">
               Sign out
             </button>
@@ -78,8 +156,35 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-7xl px-4 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+        {children}
+      </main>
     </div>
+  );
+}
+
+/** The app mark, so the header matches the installed icon. */
+function Logo() {
+  return (
+    <svg viewBox="0 0 512 512" className="h-5 w-5" aria-hidden focusable="false">
+      <circle cx="256" cy="256" r="150" fill="none" stroke="rgb(40 45 58)" strokeWidth="52" />
+      <circle
+        cx="256"
+        cy="256"
+        r="150"
+        fill="none"
+        stroke="rgb(56 189 248)"
+        strokeWidth="52"
+        strokeLinecap="round"
+        strokeDasharray="707 943"
+        transform="rotate(-215 256 256)"
+      />
+      <g fill="rgb(52 211 153)">
+        <rect x="188" y="286" width="34" height="62" rx="14" />
+        <rect x="239" y="248" width="34" height="100" rx="14" />
+        <rect x="290" y="200" width="34" height="148" rx="14" />
+      </g>
+    </svg>
   );
 }
 
@@ -95,7 +200,7 @@ export function PageHeader({
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-      <div>
+      <div className="min-w-0">
         <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-ink-muted">{subtitle}</p>}
       </div>

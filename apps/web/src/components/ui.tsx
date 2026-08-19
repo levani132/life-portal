@@ -45,8 +45,8 @@ export function Panel({
   return (
     <section className={clsx('card p-5', className)}>
       {(title || actions) && (
-        <header className="mb-4 flex items-start justify-between gap-4">
-          <div>
+        <header className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+          <div className="min-w-0 flex-1">
             {title && <h2 className="text-sm font-semibold text-ink">{title}</h2>}
             {description && <p className="mt-0.5 text-xs text-ink-faint">{description}</p>}
           </div>

@@ -84,6 +84,11 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   whole month. Also tested.
 - Finnhub's free tier has **no historical candles**, so price history is grown by appending
   each day's quote. It starts the day you start using the app.
+- **`min-width: 0` is the global default** (`apps/web/src/app/global.css`), because grid and flex
+  items otherwise refuse to shrink and one long label makes the whole page wider than a phone. If
+  something must not shrink, use `shrink-0` (which still works) or an explicit `min-w-*`.
+- **The service worker (`apps/web/public/sw.js`) must never cache `/api`.** It holds one person's
+  financial and health data; the cache outlives the tab. Shell and hashed assets only.
 - **Never put `default: 0` on an optional money field.** Mongo then returns `0` where the type
   says `undefined`, and every `a ?? b` fallback silently breaks. This caused two real bugs; see
   `docs/DECISIONS.md`. Use `centsField` (no default) for optional, `requiredCentsField` for

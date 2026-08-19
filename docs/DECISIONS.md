@@ -441,3 +441,41 @@ supports (Longland 2016 used 2.4 g/kg in a deep deficit), so `GOAL_PLAN` gained 
 
 **Not changed:** the model still refuses to promise recomposition. It reports a deficit and a
 protein target; whether muscle arrives is decided in the gym.
+
+---
+
+## 2026-08-20 · `min-width: 0` is the default, everywhere
+
+Grid and flex items default to `min-width: auto`, meaning they refuse to shrink below their
+content's min-content width. One `shrink-0` control cluster beside a long food name was enough to
+make `/nutrition` 496px wide and `/cashflow` 485px wide inside a 390px phone: the page scrolled
+sideways, the header wrapped into four rows, and — the part that took longest to see — **every
+`truncate` in the app was inert**, because the item grew instead of the text ellipsing.
+
+`global.css` now sets `min-width: 0` on everything, wrapped in `:where()` so it carries zero
+specificity: an explicit `min-w-*` utility still wins, and `shrink-0` still protects control
+clusters from being squashed — it only stops them widening the page. Measured after the change:
+every page fits exactly at 390, 768 and 1280.
+
+**Rejected:** `overflow-x: hidden` on the body. It hides the symptom, leaves the content clipped
+instead of wrapped, and the next long label reintroduces it somewhere new.
+
+---
+
+## 2026-08-20 · Installable, and the service worker caches no data
+
+The app is a PWA: manifest, maskable icons, `display: standalone`, theme colour, safe-area padding
+for the notch and the home indicator. The reason is mundane — this is a dashboard opened several
+times a day from a phone home screen, and browser chrome is wasted vertical space.
+
+The service worker is deliberately thin and hand-written (a workbox dependency would need
+justifying, and this is forty lines). What matters is what it does **not** cache: **every `/api`
+response goes straight to the network, always.** A cache lives on disk long after the tab closes,
+and this API returns one person's debts, weight and food log. Offline you get the app shell and an
+honest failure, never a stale copy of private numbers. Content-hashed build assets are cache-first;
+navigations are network-first with a shell fallback.
+
+**Nav:** eleven widgets do not fit on a phone. Wrapped, they took four rows and pushed the content
+below the fold; as a horizontal scroller, half of them hid behind a gesture nobody discovers. Below
+`lg` it is now a menu button opening a two-column list — one tap to any widget — and the full row
+returns above it.
