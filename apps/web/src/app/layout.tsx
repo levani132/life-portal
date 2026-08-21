@@ -32,8 +32,13 @@ export const viewport: Viewport = {
   themeColor: '#0C0E14',
   width: 'device-width',
   initialScale: 1,
-  // Deliberately not locking `maximumScale`: pinch-zoom is an accessibility feature, and the
-  // layout is fluid enough not to need protecting from it.
+  // Zoom is locked off. Installed on a phone this is an app, not a page: a stray pinch left the
+  // header scrolled off-centre with no chrome to reset it, and iOS zoomed in on its own every time
+  // a sub-16px input took focus. `.field` is 16px on coarse pointers so nothing needs zooming to
+  // read, and `touch-action: pan-x pan-y` on the body covers the browsers that ignore these two.
+  // See docs/DECISIONS.md.
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: 'cover',
 };
 

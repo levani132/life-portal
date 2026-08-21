@@ -108,6 +108,13 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   live 500 on saving settings until the food widget's boot check hit it.
 - **Config lives in a `@Global()` `ConfigModule`.** A provider declared in `AppModule` is not
   visible to modules `AppModule` imports, so declaring `CONFIG` there broke DI at boot.
+- **Zoom is locked off, and form controls are 16px on coarse pointers.** `maximumScale`/
+  `user-scalable=no` are ignored by iOS Safari in a browser tab; the `@media (pointer: coarse)`
+  rule making `.field` 16px is what actually stops iOS zooming in when an input takes focus. If you
+  add a text control, route it through `Input`/`Select`/`Textarea` so it inherits that.
+- **Don't set the `animation` shorthand where an `[animation-delay:*]` utility is used.** The
+  shorthand resets the delay to zero — it is why the loader's bars use animation longhands
+  (`components/portal-loader.tsx`, `global.css`).
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for

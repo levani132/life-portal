@@ -479,3 +479,54 @@ navigations are network-first with a shell fallback.
 below the fold; as a horizontal scroller, half of them hid behind a gesture nobody discovers. Below
 `lg` it is now a menu button opening a two-column list — one tap to any widget — and the full row
 returns above it.
+
+---
+
+## 2026-08-21 · Zoom is locked off, and 16px inputs are the reason it works
+
+The viewport previously carried a comment saying `maximumScale` was deliberately left alone because
+pinch-zoom is an accessibility feature. Reversed, for one concrete reason: **iOS zooms the page in
+by itself whenever it focuses a control whose text is under 16px**, and this app's `.field` is 14px.
+Every tap on a text field left the layout scaled up and horizontally scrolled, and in a standalone
+PWA there is no browser chrome offering a way back out.
+
+Three changes, because no single one of them is enough:
+
+- `maximumScale: 1, userScalable: false` in the viewport. Honoured in a standalone PWA, **ignored by
+  iOS Safari in a browser tab** since iOS 10 — which is why it is not the whole fix.
+- `.field { font-size: 16px }` under `@media (pointer: coarse)`. This is the part that actually stops
+  the focus zoom, and it is a UA behaviour no viewport attribute overrides. Fine pointers keep the
+  14px control size. Every text input, select and textarea goes through `Input`/`Select`/`Textarea`,
+  so one rule covers the app; the bare `<input>`s left in pages are all checkboxes, which never
+  trigger the zoom.
+- `touch-action: pan-x pan-y` on the body, which blocks pinch and double-tap zoom in the browsers
+  that ignore the viewport flags, while leaving scrolling alone.
+
+**On accessibility:** losing pinch-zoom is a real cost, and it is accepted here because this is a
+single-user dashboard whose own text scales with the OS font setting, and because the zoom being
+removed was overwhelmingly *unwanted* zoom — triggered by focus, not by intent.
+
+---
+
+## 2026-08-21 · The boot loader is the logo's gauge, animated
+
+`AppShell` rendered the generic inline `Spinner` while the session resolved: a 16px circle with
+`py-12`, sitting near the top of an empty page — it read as a broken page rather than a loading one.
+The boot state now fills the viewport and centres in it (`100dvh`, so visible browser chrome does
+not push the mark low), and it draws the app's own mark from `public/icon.svg`: the ring is already
+a progress gauge, so the loading animation is that gauge sweeping to 100%, holding, and unwinding
+back to 0%.
+
+Two implementation notes worth keeping:
+
+- The sweep animates **`stroke-dasharray`, not `stroke-dashoffset`**. An offset sweep unwinds from
+  the wrong end — the arc slides around the circle instead of shrinking back to where it started.
+- `.portal-bar` sets its animation with **longhand properties**, because the three bars are
+  staggered with `[animation-delay:*]` utilities and an `animation` shorthand in the later rule
+  resets that delay to zero, putting all three back in lockstep.
+
+**No percentage is shown.** The boot is one `/auth/me` round trip with no measurable stages, and a
+counter that is not measuring anything is the sort of unlabelled fiction principle VI exists to
+forbid. Under `prefers-reduced-motion` the animation stops and the mark falls back to the static
+logo.
+

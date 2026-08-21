@@ -2,6 +2,21 @@
 
 User-visible changes. Newest first.
 
+## 2026-08-21 — The loading screen is the logo, and the app no longer zooms
+
+**The boot screen is centred, and animated.** Opening the app used to show a small spinner and a
+line of text pinned near the top of an otherwise empty page. It now fills the screen with the app's
+own mark — the portal ring from the icon, with its gauge sweeping to 100%, holding for a beat and
+unwinding back to 0% while the three bars inside breathe. It reports no percentage, because the boot
+has no measurable stages and a fake number would be a claim the app cannot support. With
+"reduce motion" turned on it shows the static logo instead.
+
+**Zoom is off.** Pinch-zoom and double-tap zoom are disabled, and — the actual daily annoyance —
+iOS no longer zooms in by itself every time you tap a text field: form controls are 16px on touch
+screens, which is the threshold above which it leaves the page alone. Nothing needs magnifying to
+read, and a stray pinch no longer leaves the app sitting off-centre with no browser chrome to
+reset it.
+
 ## 2026-08-18 — Today's balance is calculated, not remembered
 
 **"On hand now" was showing the figure you last typed in**, not what you have today. It is now the

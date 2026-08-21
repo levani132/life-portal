@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { useApi } from '../lib/hooks';
-import { Spinner } from './ui';
+import { PortalLoader } from './portal-loader';
 import type { Board } from '@life-portal/shared-types';
 
 const CORE_LINKS = [
@@ -48,7 +48,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const { data } = useApi<{ boards: Board[] }>(user ? '/boards' : null);
 
-  if (loading) return <Spinner label="Loading your portal…" />;
+  if (loading) return <PortalLoader label="Loading your portal…" />;
   if (!user) return null;
 
   const boardLinks = (data?.boards ?? []).map((board) => ({
