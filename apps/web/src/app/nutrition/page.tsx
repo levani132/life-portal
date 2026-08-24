@@ -7,6 +7,7 @@ import type {
   Food,
   MealEntry,
   MealSlot,
+  MealSuggestion,
   NutritionOverview,
   NutritionTargets,
   SavedMeal,
@@ -161,6 +162,7 @@ function Nutrition() {
                   key={slot.slot}
                   slot={slot}
                   day={day}
+                  suggestions={data.suggestions.filter((row) => row.slot === slot.slot)}
                   onAdd={() => setLogging({ slot: slot.slot })}
                   onEdit={(entry) => setLogging({ slot: entry.slot, entry })}
                   onChanged={refresh}
@@ -364,12 +366,15 @@ function MissingInputs({ targets, onFix }: { targets: NutritionTargets; onFix: (
 function SlotSection({
   slot,
   day,
+  suggestions,
   onAdd,
   onEdit,
   onChanged,
 }: {
   slot: SlotTotals;
   day: string;
+  /** Already filtered to this slot and ranked by the API. */
+  suggestions: MealSuggestion[];
   onAdd: () => void;
   onEdit: (entry: MealEntry) => void;
   onChanged: () => void;
@@ -471,6 +476,13 @@ function SlotSection({
         </ul>
       )}
 
+      <SlotSuggestions
+        suggestions={suggestions}
+        day={day}
+        slotLabel={SLOT_LABELS[slot.slot]}
+        onChanged={onChanged}
+      />
+
       <Modal
         open={saving}
         onClose={() => setSaving(false)}
@@ -488,6 +500,70 @@ function SlotSection({
         </p>
       </Modal>
     </Panel>
+  );
+}
+
+/**
+ * The one-tap strip: what this slot has eaten before, ranked by the API, logged on a single press.
+ *
+ * The amount shown is the portion from the last day it appeared and the calories are the food's
+ * numbers as they are now, so the button says exactly what pressing it adds. There is no
+ * confirmation step on purpose — the entry lands in the list directly above with its own ✕.
+ */
+function SlotSuggestions({
+  suggestions,
+  day,
+  slotLabel,
+  onChanged,
+}: {
+  suggestions: MealSuggestion[];
+  day: string;
+  slotLabel: string;
+  onChanged: () => void;
+}) {
+  const { run, pending, error } = useAction();
+
+  if (suggestions.length === 0) return null;
+
+  const log = (suggestion: MealSuggestion) =>
+    void run(async () =>
+      api.post('/nutrition/entries', {
+        day,
+        slot: suggestion.slot,
+        foodId: suggestion.foodId,
+        amount: suggestion.amount,
+      }),
+    ).then((ok) => {
+      if (ok) onChanged();
+    });
+
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      <p className="label mb-2">Again</p>
+      <div className="flex flex-wrap gap-2">
+        {suggestions.map((suggestion) => (
+          <button
+            key={suggestion.foodId}
+            type="button"
+            className="max-w-full rounded-lg border border-border px-2.5 py-1.5 text-left text-xs text-ink-muted transition hover:border-lime-500/40 hover:text-ink active:scale-95 disabled:opacity-50"
+            onClick={() => log(suggestion)}
+            disabled={pending}
+            title={
+              suggestion.dayCount > 1
+                ? `${slotLabel} on ${suggestion.dayCount} of the last 14 days, most recently ${formatDay(suggestion.lastDay)}`
+                : `${slotLabel}, ${formatDay(suggestion.lastDay)}`
+            }
+          >
+            <span className="block truncate font-medium text-ink">{suggestion.name}</span>
+            <span className="tabular block text-ink-faint">
+              {suggestion.amount} {suggestion.unit} · {suggestion.totals.energyKcal} kcal
+              {suggestion.dayCount > 1 && ` · ${suggestion.dayCount} days`}
+            </span>
+          </button>
+        ))}
+      </div>
+      {error && <p className="mt-2 text-xs text-rose-400">{error}</p>}
+    </div>
   );
 }
 

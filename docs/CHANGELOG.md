@@ -2,6 +2,19 @@
 
 User-visible changes. Newest first.
 
+## 2026-08-24 — Yesterday's breakfast, one tap away
+
+**Every meal now offers what you usually eat then.** Under breakfast, lunch, dinner, snacks and
+anything else there is an "Again" row of the things that slot has eaten over the last fortnight,
+each one a single button: the food, the portion you actually had, and what it adds. Press it and
+the meal is logged — no picker, no amount to type. Eat the same porridge most mornings and it sits
+first every morning; a one-off from yesterday is offered too, just below the routine.
+
+The portion offered is the one from the last day you ate it, and the calories are the food's
+numbers as they are now, so the button says exactly what pressing it will add. Anything already
+logged in that slot today drops off the row, and the row follows the day you are looking at — fill
+in Saturday and it offers what the Saturdays before it ate, not what today ate.
+
 ## 2026-08-21 — The loading screen is the logo, and the app no longer zooms
 
 **The boot screen is centred, and animated.** Opening the app used to show a small spinner and a

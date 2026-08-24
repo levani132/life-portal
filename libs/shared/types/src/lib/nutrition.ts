@@ -187,6 +187,29 @@ export interface SavedMeal extends Timestamped {
   loggable: boolean;
 }
 
+/**
+ * A food this slot has eaten before, offered for one tap.
+ *
+ * Derived on every read from the log (principle III) and priced with the food's **current**
+ * facts, not with any old snapshot — logging it takes a fresh snapshot, so the calories shown
+ * on the button are the calories that land in the day.
+ */
+export interface MealSuggestion {
+  slot: MealSlot;
+  foodId: Id;
+  name: string;
+  brand?: string;
+  unit: FoodUnit;
+  /** Base units: what this food added to this slot on `lastDay`. */
+  amount: number;
+  servings: number;
+  totals: EntryTotals;
+  /** The most recent day this food was eaten in this slot. */
+  lastDay: IsoDate;
+  /** Distinct days it appeared in this slot inside the lookback window. */
+  dayCount: number;
+}
+
 /** One of the last few logged meals, for "repeat this". */
 export interface RecentMeal {
   day: IsoDate;
@@ -393,5 +416,7 @@ export interface NutritionOverview {
   foods: FoodWithUsage[];
   savedMeals: SavedMeal[];
   recentMeals: RecentMeal[];
+  /** Per-slot one-tap offers, in slot order then rank. Empty until something has been eaten. */
+  suggestions: MealSuggestion[];
   foodLookup: FoodLookupStatus;
 }

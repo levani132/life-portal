@@ -27,11 +27,13 @@ import {
   entryTotals,
   factsFromInput,
   macroEnergyMismatch,
+  mealSuggestions,
   nextCheatDay,
   nutritionTargets,
   perServingTotals,
   servingsToAmount,
   snapshotFacts,
+  SUGGESTION_LOOKBACK_DAYS,
   summariseNutrition,
   sumTotals,
   toDay,
@@ -865,8 +867,9 @@ export class NutritionService {
     ]);
     const targets = nutritionTargets({ profile, weighIns, today });
 
-    const [dayEntries, weekEntries, recent, cheat] = await Promise.all([
-      this.listEntries(userId, { day: viewed }),
+    // One window covers both the day being viewed and the history its suggestions rank over.
+    const [history, weekEntries, recent, cheat] = await Promise.all([
+      this.listEntries(userId, { from: addDays(viewed, -SUGGESTION_LOOKBACK_DAYS), to: viewed }),
       this.listEntries(userId, { from: weekStart(today), to: weekEnd(today) }),
       this.recentMeals(userId, today),
       this.cheatInfo(userId, today),
@@ -877,13 +880,14 @@ export class NutritionService {
       day: viewed,
       profile,
       targets,
-      dayTotals: dayTotals(viewed, dayEntries),
+      dayTotals: dayTotals(viewed, history),
       week: weekBalance(weekEntries, today, targets.energyKcal?.value),
       cheat,
       weighIns,
       foods,
       savedMeals,
       recentMeals: recent,
+      suggestions: mealSuggestions({ entries: history, foods, day: viewed }),
       foodLookup: this.lookup.status,
     };
   }

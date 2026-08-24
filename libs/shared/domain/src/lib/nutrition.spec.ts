@@ -25,6 +25,7 @@ import {
   localDay,
   localMealContext,
   macroEnergyMismatch,
+  mealSuggestions,
   mgToG,
   nextCheatDay,
   nutritionTargets,
@@ -291,6 +292,144 @@ describe('week balance', () => {
     expect(balance.targetKcal).toBeUndefined();
     expect(balance.differenceKcal).toBeUndefined();
     expect(balance.bankedKcal).toBe(0);
+  });
+});
+
+// ------------------------------------------------------------------ suggestions
+
+describe('meal suggestions', () => {
+  const suggest = (entries: MealEntry[], day = TODAY, foods: Food[] = [oats, milk]) =>
+    mealSuggestions({ entries, foods, day });
+
+  it('offers yesterday\'s breakfast back, in the slot it was eaten in', () => {
+    const offers = suggest([entry({ day: '2026-08-18', slot: 'breakfast', amount: 40 })]);
+    expect(offers).toHaveLength(1);
+    expect(offers[0]).toMatchObject({
+      slot: 'breakfast',
+      foodId: oats.id,
+      name: 'Rolled oats',
+      amount: 40,
+      lastDay: '2026-08-18',
+      dayCount: 1,
+    });
+    // Priced with the food as it is now, because logging it takes a fresh snapshot.
+    expect(offers[0].totals).toEqual(entryTotals(40, oats));
+    expect(offers[0].servings).toBe(1);
+  });
+
+  it('keeps a slot to itself: lunch does not offer what breakfast ate', () => {
+    const offers = suggest([entry({ day: '2026-08-18', slot: 'breakfast', amount: 40 })]);
+    expect(offers.filter((row) => row.slot === 'lunch')).toHaveLength(0);
+  });
+
+  it('ranks a daily routine above yesterday one-off, and a one-off above a fortnight-old meal', () => {
+    const offers = suggest([
+      // Oats every morning for four days.
+      entry({ day: '2026-08-15', slot: 'breakfast', amount: 40 }),
+      entry({ day: '2026-08-16', slot: 'breakfast', amount: 40 }),
+      entry({ day: '2026-08-17', slot: 'breakfast', amount: 40 }),
+      entry({ day: '2026-08-18', slot: 'breakfast', amount: 40 }),
+      // Milk once, yesterday.
+      entry({ day: '2026-08-18', slot: 'breakfast', foodId: milk.id, amount: 200 }),
+    ]);
+    expect(offers.map((row) => row.foodId)).toEqual([oats.id, milk.id]);
+  });
+
+  it('prefers the more recent of two meals eaten once each', () => {
+    const offers = suggest([
+      entry({ day: '2026-08-10', slot: 'dinner', amount: 100 }),
+      entry({ day: '2026-08-18', slot: 'dinner', foodId: milk.id, amount: 200 }),
+    ]);
+    expect(offers.map((row) => row.foodId)).toEqual([milk.id, oats.id]);
+  });
+
+  it('breaks a dead heat on the name, so the order does not depend on the log order', () => {
+    const eaten = [
+      entry({ day: '2026-08-18', slot: 'dinner', amount: 100 }),
+      entry({ day: '2026-08-18', slot: 'dinner', foodId: milk.id, amount: 200 }),
+    ];
+    expect(suggest(eaten).map((row) => row.name)).toEqual(['Milk 2%', 'Rolled oats']);
+    expect(suggest([...eaten].reverse()).map((row) => row.name)).toEqual([
+      'Milk 2%',
+      'Rolled oats',
+    ]);
+  });
+
+  it('offers the whole portion when a food was eaten twice in one sitting', () => {
+    const offers = suggest([
+      entry({ day: '2026-08-18', slot: 'breakfast', amount: 40, id: 'a' }),
+      entry({ day: '2026-08-18', slot: 'breakfast', amount: 30, id: 'b' }),
+    ]);
+    expect(offers[0].amount).toBe(70);
+    // One day, twice — a portion split in two is still one morning of oats.
+    expect(offers[0].dayCount).toBe(1);
+  });
+
+  it('takes the portion from the most recent day, not the biggest one', () => {
+    const offers = suggest([
+      entry({ day: '2026-08-16', slot: 'lunch', amount: 200, id: 'big' }),
+      entry({ day: '2026-08-18', slot: 'lunch', amount: 50, id: 'small' }),
+    ]);
+    expect(offers[0].amount).toBe(50);
+    expect(offers[0].dayCount).toBe(2);
+  });
+
+  it('does not offer what is already in that slot today', () => {
+    const offers = suggest([
+      entry({ day: '2026-08-18', slot: 'breakfast', amount: 40 }),
+      entry({ day: TODAY, slot: 'breakfast', amount: 40 }),
+    ]);
+    expect(offers).toHaveLength(0);
+  });
+
+  it('still offers a food eaten today in a different slot', () => {
+    const offers = suggest([
+      entry({ day: '2026-08-18', slot: 'dinner', amount: 100 }),
+      entry({ day: TODAY, slot: 'breakfast', amount: 40 }),
+    ]);
+    expect(offers.map((row) => row.slot)).toEqual(['dinner']);
+  });
+
+  it('never suggests from the day being filled in, or from after it', () => {
+    const offers = suggest(
+      [
+        entry({ day: '2026-08-18', slot: 'lunch', amount: 100 }),
+        entry({ day: TODAY, slot: 'lunch', foodId: milk.id, amount: 200 }),
+      ],
+      '2026-08-18',
+    );
+    expect(offers).toHaveLength(0);
+  });
+
+  it('drops a food that has been archived or deleted', () => {
+    const eaten = [entry({ day: '2026-08-18', slot: 'lunch', amount: 100 })];
+    expect(suggest(eaten, TODAY, [{ ...oats, archived: true }])).toHaveLength(0);
+    expect(suggest(eaten, TODAY, [milk])).toHaveLength(0);
+  });
+
+  it('ignores the log beyond the lookback window', () => {
+    // Fifteen days back, one day outside the fortnight.
+    expect(suggest([entry({ day: '2026-08-04', slot: 'lunch', amount: 100 })])).toHaveLength(0);
+    expect(suggest([entry({ day: '2026-08-05', slot: 'lunch', amount: 100 })])).toHaveLength(1);
+  });
+
+  it('caps each slot and returns them in menu order', () => {
+    const offers = mealSuggestions({
+      entries: [
+        entry({ day: '2026-08-18', slot: 'dinner', amount: 100 }),
+        entry({ day: '2026-08-18', slot: 'dinner', foodId: milk.id, amount: 200 }),
+        entry({ day: '2026-08-17', slot: 'breakfast', amount: 40 }),
+      ],
+      foods: [oats, milk],
+      day: TODAY,
+      perSlot: 1,
+    });
+    expect(offers).toHaveLength(2);
+    expect(offers.map((row) => row.slot)).toEqual(['breakfast', 'dinner']);
+  });
+
+  it('offers nothing when nothing has been eaten', () => {
+    expect(suggest([])).toEqual([]);
   });
 });
 

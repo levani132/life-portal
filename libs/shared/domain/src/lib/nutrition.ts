@@ -9,6 +9,7 @@ import type {
   Food,
   MealEntry,
   MealSlot,
+  MealSuggestion,
   NutritionFacts,
   NutritionGoal,
   NutritionProfile,
@@ -24,7 +25,7 @@ import type {
   WeighIn,
 } from '@life-portal/shared-types';
 import { MEAL_SLOTS } from '@life-portal/shared-types';
-import { addDays, isAfter, toDay, weekdayOf } from './dates';
+import { addDays, diffDays, isAfter, toDay, weekdayOf } from './dates';
 
 /**
  * Food, macros and body-composition maths.
@@ -399,6 +400,116 @@ export function weekBalance(
     balance.differenceKcal = eatenKcal - targetKcal * daysLogged;
   }
   return balance;
+}
+
+// ------------------------------------------------------------------ suggestions
+
+/** How far back a slot looks for something to offer again. */
+export const SUGGESTION_LOOKBACK_DAYS = 14;
+
+/** How many offers one slot makes. Enough to cover a routine, few enough to scan in one glance. */
+export const SUGGESTIONS_PER_SLOT = 4;
+
+/**
+ * What each slot offers for one tap, taken from what that slot has eaten before.
+ *
+ * The point is the routine: the same porridge at breakfast most mornings should be one button,
+ * not a search. So a candidate is a `(slot, food)` pair, and it is ranked by
+ * **recency-weighted frequency** — each distinct day it appeared contributes `1 / (1 + age)`,
+ * where `age` is whole days back from `day`. Yesterday is worth 0.5, a week ago 0.125. A food
+ * eaten five mornings running therefore beats yesterday's one-off, and yesterday's one-off still
+ * beats something eaten once a fortnight ago. Ties break on the most recent day, then the name,
+ * so the order is stable rather than dependent on the order the log came back in.
+ *
+ * The amount offered is **that food's total in that slot on the most recent day it appeared** —
+ * two spoonfuls of oats at one breakfast were one breakfast's worth of oats, and repeating it
+ * should repeat the portion, not half of it.
+ *
+ * Four things are deliberately not offered:
+ *
+ * - anything already logged in that slot on `day` — that is a fact, not a suggestion;
+ * - `day` itself and anything after it, so the day being filled in never suggests itself;
+ * - foods that have been deleted or archived, which cannot be logged;
+ * - the `uncategorized` slot's history is treated like any other slot's, because a meal filed
+ *   there is still a meal that was eaten at roughly that time.
+ *
+ * Priced with the food's **current** facts, because `createEntry` takes a fresh snapshot: the
+ * number on the button has to be the number that lands in the day.
+ */
+export function mealSuggestions(input: {
+  /** The log from `day - lookbackDays` to `day` inclusive. Order does not matter. */
+  entries: MealEntry[];
+  /** The current catalogue. A suggestion the owner cannot log is not a suggestion. */
+  foods: Food[];
+  /** The day being filled in. */
+  day: string;
+  perSlot?: number;
+  lookbackDays?: number;
+}): MealSuggestion[] {
+  const day = toDay(input.day);
+  const perSlot = input.perSlot ?? SUGGESTIONS_PER_SLOT;
+  const earliest = addDays(day, -(input.lookbackDays ?? SUGGESTION_LOOKBACK_DAYS));
+  const catalogue = new Map(input.foods.filter((food) => !food.archived).map((f) => [f.id, f]));
+
+  const alreadyLogged = new Set(
+    input.entries.filter((e) => toDay(e.day) === day).map((e) => `${e.slot}:${e.foodId}`),
+  );
+
+  interface Candidate {
+    slot: MealSlot;
+    foodId: string;
+    /** Base units per day, so a food eaten twice in one sitting counts as one portion. */
+    perDay: Map<string, number>;
+  }
+  const candidates = new Map<string, Candidate>();
+
+  for (const row of input.entries) {
+    const entryDay = toDay(row.day);
+    if (entryDay >= day || entryDay < earliest) continue;
+    const key = `${row.slot}:${row.foodId}`;
+    if (alreadyLogged.has(key)) continue;
+    if (!catalogue.has(row.foodId)) continue;
+
+    const candidate = candidates.get(key) ?? { slot: row.slot, foodId: row.foodId, perDay: new Map() };
+    candidate.perDay.set(entryDay, (candidate.perDay.get(entryDay) ?? 0) + row.amount);
+    candidates.set(key, candidate);
+  }
+
+  const scored = [...candidates.values()].map((candidate) => {
+    const days = [...candidate.perDay.keys()].sort();
+    const lastDay = days[days.length - 1];
+    const score = days.reduce((sum, d) => sum + 1 / (1 + diffDays(d, day)), 0);
+    const food = catalogue.get(candidate.foodId) as Food;
+    const amount = candidate.perDay.get(lastDay) as number;
+
+    const suggestion: MealSuggestion = {
+      slot: candidate.slot,
+      foodId: candidate.foodId,
+      name: food.name,
+      brand: food.brand,
+      unit: food.unit,
+      amount,
+      servings: amountToServings(amount, food.servingSize),
+      totals: entryTotals(amount, food),
+      lastDay,
+      dayCount: days.length,
+    };
+    return { suggestion, score };
+  });
+
+  // Slot order first, so the caller can render each slot's offers without re-sorting.
+  return MEAL_SLOTS.flatMap((slot) =>
+    scored
+      .filter((row) => row.suggestion.slot === slot)
+      .sort(
+        (a, b) =>
+          b.score - a.score ||
+          b.suggestion.lastDay.localeCompare(a.suggestion.lastDay) ||
+          a.suggestion.name.localeCompare(b.suggestion.name),
+      )
+      .slice(0, perSlot)
+      .map((row) => row.suggestion),
+  );
 }
 
 // ------------------------------------------------------------------ body model

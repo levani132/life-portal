@@ -4,7 +4,7 @@ Answers two questions: *what have I eaten today, and what should I have eaten?* 
 prioritised queue of what to eat on the next cheat day.
 
 **Code:** `apps/api/src/nutrition/` · `apps/web/src/app/nutrition/page.tsx`
-**Domain logic:** `libs/shared/domain/src/lib/nutrition.ts` (61 unit tests)
+**Domain logic:** `libs/shared/domain/src/lib/nutrition.ts` (78 unit tests)
 **Contracts:** `libs/shared/types/src/lib/nutrition.ts`
 **Spec:** `specs/001-nutrition-tracking/`
 
@@ -67,7 +67,7 @@ All under `/api/nutrition`, all JWT-guarded and user-scoped.
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| `GET` | `/` | Everything the page renders. `?today=` from the browser's clock; `?day=` the day being viewed. |
+| `GET` | `/` | Everything the page renders, `suggestions` included. `?today=` from the browser's clock; `?day=` the day being viewed. |
 | `GET` | `/summary` | The dashboard card's figures. Consumed by `DashboardService`. |
 | `GET`/`POST` | `/foods` | List (picker order) / create. |
 | `PATCH`/`DELETE` | `/foods/:id` | Update / delete-or-archive. |
@@ -156,6 +156,22 @@ the server's day may not be the eater's. `defaultSlot(hour, minute)`: breakfast 
 Sunday) at or after today; today is zero days away. **Banked calories** are the sum of
 `target − eaten` over days *before today* that have at least one entry, clamped at zero. Counting
 unlogged days would hand out a fictional allowance every time logging is forgotten.
+
+**Per-slot suggestions.** `mealSuggestions({ entries, foods, day })` — what each slot offers for
+one tap, from the **fourteen days** of log before `day`. A candidate is a `(slot, food)` pair,
+scored by **recency-weighted frequency**: each distinct day it appeared adds `1 / (1 + age)`, age
+being whole days back from `day`. Yesterday is worth 0.5, a week ago 0.125, so five mornings of
+porridge outrank yesterday's one-off and yesterday's one-off outranks a fortnight-old meal. Ties
+break on the most recent day, then the name — never on input order. Four per slot, returned in menu
+order then rank.
+
+The amount offered is **that food's total in that slot on the most recent day it appeared** (two
+helpings at one breakfast are one breakfast's portion), and the totals are computed from the food's
+**current** facts, because logging one goes through the ordinary `POST /entries` and takes a fresh
+snapshot — see `docs/DECISIONS.md`. Left out: whatever is already logged in that slot on `day`,
+`day` itself and anything after it, and foods that have been deleted or archived. Nothing is
+stored, and there is no separate endpoint: the overview's fourteen-day window is the same query
+that serves the day being viewed.
 
 **Food picker order.** Favourites, then `lastUsedDay` descending, then `createdAt` descending.
 `lastUsedDay` and `useCount` come from one aggregation over `meal_entries` — never stored, because

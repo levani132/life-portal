@@ -530,3 +530,40 @@ counter that is not measuring anything is the sort of unlabelled fiction princip
 forbid. Under `prefers-reduced-motion` the animation stops and the mark falls back to the static
 logo.
 
+---
+
+## 2026-08-24 · Per-slot meal suggestions, ranked by recency-weighted frequency
+
+Logging the same breakfast every morning took a picker, a search and an amount. The slot itself now
+offers it: `mealSuggestions()` in `libs/shared/domain/src/lib/nutrition.ts` turns the last fourteen
+days of log into a short list per slot, and the API ships it on the overview as `suggestions`.
+
+**Ranked by recency-weighted frequency.** Each distinct day a `(slot, food)` pair appeared
+contributes `1 / (1 + age in days)`, so yesterday is worth 0.5 and a week ago 0.125. A food eaten
+five mornings running therefore outranks yesterday's one-off, and yesterday's one-off still
+outranks something eaten once a fortnight ago. Frequency alone would bury a new habit under an old
+one; recency alone would make the list flap every day. Ties break on the most recent day and then
+the name, so the order cannot depend on the order Mongo returned the log in.
+
+**Priced with the food's current facts, not with the old snapshot.** Logging one of these goes
+through the ordinary `POST /entries`, which takes a fresh snapshot — so pricing the button from a
+month-old snapshot would print a number the tap does not deliver. This is the mirror image of the
+snapshot rule rather than an exception to it: a *past* meal keeps the numbers it was eaten with, a
+*future* meal gets today's.
+
+**The amount is that food's total in that slot on the last day it appeared.** Two spoonfuls of oats
+at one breakfast were one breakfast's worth of oats, and repeating it should repeat the portion
+rather than half of it. Summing per day also makes the figure independent of input order, which the
+"most recent entry" reading is not.
+
+**Nothing is stored, and no endpoint was added.** The list is derived on every read (principle III)
+and rides along on the overview the page already fetches — the fourteen-day window it ranks over is
+the same query that now serves the day being viewed, so the round trip count did not change. The
+day is the one being *viewed*, not today, so filling in a missed evening is offered that evening's
+history and never suggests itself. Foods already logged in that slot on that day, and foods since
+deleted or archived, are left out — the first is a fact rather than a suggestion, and the second
+cannot be logged at all.
+
+The dashboard card was deliberately left alone: it already carries the one quick action a card is
+allowed under constitution 1.1.0, and a row of food buttons would be a second one.
+
