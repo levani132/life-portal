@@ -6,6 +6,7 @@ import type {
   WidgetTone,
 } from '@life-portal/shared-types';
 import {
+  arrangeWidgets,
   diffDays,
   formatCentsCompact,
   formatDay,
@@ -43,6 +44,10 @@ export class DashboardService {
    * Each widget contributes its own card from its own summary; nothing here reaches into
    * another widget's internals (constitution principle I). Adding a widget means adding one
    * `build*Card` method and listing it below.
+   *
+   * The order the cards come back in is the user's, not the list below: `arrangeWidgets`
+   * applies `settings.widgetOrder` — what they dragged the cards into — and falls back to each
+   * widget's own `order` for anything they have not arranged.
    */
   async build(userId: string, today: string): Promise<DashboardResponse> {
     const settings = await this.settings.get(userId);
@@ -79,7 +84,7 @@ export class DashboardService {
     return {
       generatedAt: new Date().toISOString(),
       today,
-      cards: cards.sort((a, b) => a.order - b.order),
+      cards: arrangeWidgets(cards, settings.widgetOrder),
       netPositionCents,
       displayCurrency: currency,
       summaries: { loans, cashflow, items, stocks, boards: boardSummaries, personal, nutrition },

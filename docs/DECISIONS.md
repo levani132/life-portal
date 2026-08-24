@@ -567,3 +567,66 @@ cannot be logged at all.
 The dashboard card was deliberately left alone: it already carries the one quick action a card is
 allowed under constitution 1.1.0, and a row of food buttons would be a second one.
 
+---
+
+## 2026-08-24 · The dashboard arrangement is a list of card ids on settings
+
+`user_settings.widgetOrder` holds the card ids in the order the user dragged them into.
+`arrangeWidgets` (`libs/shared/domain`) sorts the payload with it; a card the list does not mention
+sorts after the ones it does, by the widget's own `order`, and an id with no card is ignored.
+Written only by `PUT /api/dashboard/order` — `UpdateSettingsDto` deliberately refuses the field, so
+there is exactly one writer.
+
+**Why not a `position` on each card:** there is nothing to put it on. Cards are derived from each
+widget's summary on every read (principle III) — they are not rows. The set changes when a board is
+added or archived, so the arrangement has to be a list of *preferences* that tolerates ids it has
+never seen and ids that no longer exist. It does, which is why archiving a board needs no
+migration and leaves no hole.
+
+**Why the server sorts, not the browser:** one definition of the order, and a fresh page load is
+already correct before any JavaScript runs. The browser reuses the *same* function to reorder
+optimistically while a drag is in flight, then hands ownership back to the payload once the write
+has landed.
+
+**Cost:** a card added by a deploy lands at the end for anyone who has ever rearranged, rather than
+in the position its author picked. This is the home-screen convention and the alternative — moving
+cards somebody has positioned by hand — is worse.
+
+**On principle I** ("a card may carry one quick action and nothing more"): dragging is not a second
+control on the card. It belongs to the dashboard, which owns the arrangement of its cards; the card
+itself gained no button, and in edit mode it loses the one it had. Nothing in a `build*Card` method
+knows this feature exists.
+
+---
+
+## 2026-08-24 · Two things make long-press-to-drag work on a touch screen
+
+Both were found by driving the real gesture in a browser, and both look like tidying-up when read
+cold. `apps/web/src/components/sortable-grid.tsx` carries the same notes.
+
+**1. The `touchmove` listener is registered when the grid mounts, not when a card is picked up.**
+
+A browser decides at `touchstart` whether a gesture can be cancelled: if the hit test finds no
+non-passive `touchmove` listener, the pan is handed to the compositor and the first movement is
+answered with `pointercancel`. Adding the listener at pickup — 420 ms into the gesture — is far too
+late, and the symptom is exact: the card lifts, the dashboard enters edit mode, and the drag dies
+on the first millimetre with the page scrolling instead. The listener now lives on the grid for as
+long as it is mounted and does nothing at all unless a drag is in progress, so swiping the
+dashboard is untouched. It sits on the grid rather than the document so only touches that start on
+a card pay for the lost compositor fast path.
+
+**2. A card stays an `<a>` in edit mode. Its navigation is cancelled, its element is not replaced.**
+
+Rendering the card as a `div` while rearranging reads better — a link that navigates on the mouse-up
+of a drag is a bug waiting to happen — but the long press that turns edit mode on *removes the node
+the finger is touching*, and a browser answers that by cancelling the touch. Same dead drag, from a
+completely different cause. So the card is always a link, `onClick` calls `preventDefault()` while
+editing, and `tabIndex={-1}` keeps it out of the tab order in favour of its draggable slot.
+
+**Cost:** the tidier-looking version of both is wrong, and nothing in a type check or a lint pass
+says so. `npm run check` passed through both bugs.
+
+**Also load-bearing, less subtly:** `-webkit-touch-callout: none` on `.widget-slot` (otherwise iOS
+raises its link preview over the card being lifted), and swapping a card is locked until the finger
+leaves the card it just displaced — cards are different heights, so a swap moves the neighbour
+under the finger and the two would otherwise trade places every frame.

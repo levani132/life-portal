@@ -115,6 +115,12 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
 - **Don't set the `animation` shorthand where an `[animation-delay:*]` utility is used.** The
   shorthand resets the delay to zero — it is why the loader's bars use animation longhands
   (`components/portal-loader.tsx`, `global.css`).
+- **Two things keep long-press-to-drag alive on a touch screen**, and both look like tidying-up:
+  the grid's non-passive `touchmove` listener is registered when it *mounts* (a browser that finds
+  no cancellable listener at `touchstart` hands the gesture to the compositor and answers the first
+  move with `pointercancel`), and a card stays an `<a>` in edit mode with its click cancelled —
+  replacing the node the finger is touching cancels the touch. Either mistake gives the same
+  symptom: the card lifts and the drag dies immediately. `npm run check` passed through both.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for

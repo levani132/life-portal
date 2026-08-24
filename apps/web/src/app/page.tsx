@@ -2,16 +2,17 @@
 
 import clsx from 'clsx';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   DashboardResponse,
   FoodWithUsage,
   MealSlot,
   WidgetCard,
 } from '@life-portal/shared-types';
-import { formatCents, formatDay } from '@life-portal/shared-domain';
+import { arrangeWidgets, formatCents, formatDay } from '@life-portal/shared-domain';
 import { AppShell } from '../components/app-shell';
 import { LogFoodModal } from '../components/log-food-modal';
+import { SortableGrid, type SortableState } from '../components/sortable-grid';
 import {
   Chip,
   EmptyState,
@@ -21,7 +22,8 @@ import {
   Spinner,
   TONE_TEXT,
 } from '../components/ui';
-import { useApi } from '../lib/hooks';
+import { api } from '../lib/api';
+import { revalidate, useApi } from '../lib/hooks';
 import { mealContextNow } from '../lib/local-day';
 
 /**
@@ -69,6 +71,54 @@ function Dashboard() {
   // payload stays a summary.
   const [logging, setLogging] = useState<MealSlot | null>(null);
   const { data: food } = useApi<{ foods: FoodWithUsage[] }>(logging ? '/nutrition' : null);
+
+  const [editing, setEditing] = useState(false);
+  /**
+   * The arrangement while it is being dragged, before the server has it. `null` means "whatever
+   * the payload says", which is the normal state — the API already returns the cards in the
+   * user's order, so this only exists to keep a drag responsive.
+   */
+  const [pendingOrder, setPendingOrder] = useState<string[] | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const cards = useMemo(
+    () => (pendingOrder ? arrangeWidgets(data?.cards ?? [], pendingOrder) : (data?.cards ?? [])),
+    [data?.cards, pendingOrder],
+  );
+
+  const save = useCallback(async (order: string[]) => {
+    setSaveError(null);
+    try {
+      await api.put('/dashboard/order', { order });
+      // Only the dashboard changed, so only the dashboard is refetched. Clearing the local
+      // arrangement afterwards hands ownership back to the payload.
+      await revalidate('/dashboard');
+      setPendingOrder(null);
+    } catch {
+      setSaveError('Could not save the new arrangement. It will be back where it was on reload.');
+    }
+  }, []);
+
+  const reset = useCallback(async () => {
+    setPendingOrder(null);
+    setSaveError(null);
+    try {
+      await api.put('/dashboard/order', { order: [] });
+      await revalidate('/dashboard');
+    } catch {
+      setSaveError('Could not reset the arrangement.');
+    }
+  }, []);
+
+  // Escape is the way out of every other overlay in this app; edit mode is no different.
+  useEffect(() => {
+    if (!editing) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setEditing(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [editing]);
 
   if (isLoading) return <Spinner label="Working out where you stand…" />;
   if (error) return <ErrorNote message={(error as Error).message} />;
@@ -120,22 +170,79 @@ function Dashboard() {
         </ul>
       )}
 
-      {data.cards.length === 0 ? (
+      {saveError && (
+        <div className="mb-3">
+          <ErrorNote message={saveError} />
+        </div>
+      )}
+
+      {cards.length === 0 ? (
         <EmptyState message="No widgets yet. Run `npm run seed` to set up your boards and loan." />
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {data.cards.map((card) => (
-            <SummaryCard
-              key={card.id}
-              card={card}
-              onQuickAction={
-                card.quickAction?.kind === 'log-food'
-                  ? () => setLogging(mealContextNow().slot)
-                  : undefined
-              }
-            />
-          ))}
-        </div>
+        <>
+          {/*
+            One row, one button, the same height either way — a long press enters edit mode with a
+            finger already holding a card, and anything that changed the page's height at that
+            moment would pull the grid out from under it. The instructions live in a fixed bar
+            instead, for the same reason.
+          */}
+          <div className="mb-3 flex justify-end">
+            <button
+              type="button"
+              className={clsx(
+                'text-xs transition',
+                editing ? 'font-medium text-sky-300 hover:text-sky-200' : 'text-ink-faint hover:text-ink',
+              )}
+              onClick={() => setEditing(!editing)}
+            >
+              {editing ? 'Done' : 'Rearrange'}
+            </button>
+          </div>
+
+          <SortableGrid
+            items={cards}
+            getId={(card) => card.id}
+            getLabel={(card) => card.title}
+            editing={editing}
+            onEditingChange={setEditing}
+            onOrderChange={setPendingOrder}
+            onCommit={(order) => void save(order)}
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            {(card, state) => (
+              <SummaryCard
+                card={card}
+                state={state}
+                onQuickAction={
+                  card.quickAction?.kind === 'log-food'
+                    ? () => setLogging(mealContextNow().slot)
+                    : undefined
+                }
+              />
+            )}
+          </SortableGrid>
+
+          {/* Room for the floating bar, so it cannot sit permanently over the last card. */}
+          {editing && <div className="h-16" aria-hidden />}
+
+          {editing && (
+            <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+              <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-sky-500/40 bg-surface-raised/95 px-4 py-2 text-xs shadow-2xl shadow-black/50 backdrop-blur">
+                <span className="text-sky-200">Hold a card and drag it</span>
+                <span className="text-ink-faint" aria-hidden>
+                  ·
+                </span>
+                <button
+                  type="button"
+                  className="text-ink-muted transition hover:text-ink"
+                  onClick={() => void reset()}
+                >
+                  Reset order
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {logging && (
@@ -154,22 +261,26 @@ function Dashboard() {
 /**
  * The dashboard card: at most three numbers and a link, nothing interactive
  * (constitution principle I). Everything else lives on the detail page.
+ *
+ * It stays an `<a>` even while the dashboard is being rearranged, with its navigation cancelled
+ * rather than its element replaced. Swapping it for a `div` on entering edit mode looked tidier
+ * and broke the gesture outright: the long press that turns edit mode on removes the very node
+ * the finger is touching, and a browser answers that by cancelling the touch — the card lifted
+ * and then died on the first millimetre of movement. See docs/DECISIONS.md.
  */
 function SummaryCard({
   card,
+  state,
   onQuickAction,
 }: {
   card: WidgetCard;
+  state: SortableState;
   onQuickAction?: () => void;
 }) {
-  return (
-    <Link
-      href={card.href}
-      className={clsx(
-        'card group flex flex-col gap-4 p-5 transition',
-        ACCENT_RING[card.accent] ?? 'hover:border-ink-faint',
-      )}
-    >
+  const { editing, dragging, index } = state;
+
+  const body = (
+    <>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className={clsx('h-2 w-2 rounded-full', ACCENT_DOT[card.accent] ?? 'bg-ink-faint')} />
@@ -178,7 +289,9 @@ function SummaryCard({
             {card.subtitle && <p className="text-xs text-ink-faint">{card.subtitle}</p>}
           </div>
         </div>
-        {card.quickAction && onQuickAction ? (
+        {editing ? (
+          <GripIcon />
+        ) : card.quickAction && onQuickAction ? (
           <button
             type="button"
             aria-label={card.quickAction.label}
@@ -217,6 +330,51 @@ function SummaryCard({
           <Chip tone={card.tone}>{card.alert}</Chip>
         </div>
       )}
+    </>
+  );
+
+  return (
+    <Link
+      href={card.href}
+      draggable={false}
+      // Tab reaches the card through its slot while rearranging, so the link steps out of the
+      // order rather than offering a second stop that does nothing.
+      tabIndex={editing ? -1 : undefined}
+      onClick={(event) => {
+        if (editing) event.preventDefault();
+      }}
+      className={clsx(
+        'card group flex h-full flex-col gap-4 p-5',
+        !editing && `transition ${ACCENT_RING[card.accent] ?? 'hover:border-ink-faint'}`,
+        editing && !dragging && 'widget-jiggle cursor-grab',
+        dragging && 'scale-[1.02] cursor-grabbing border-sky-500/60 shadow-2xl shadow-black/50',
+      )}
+      // Staggered so the cards wobble independently rather than as one block.
+      style={editing && !dragging ? { animationDelay: `${(index % 4) * 90}ms` } : undefined}
+    >
+      {body}
     </Link>
+  );
+}
+
+/** The handle marks a card as draggable while the dashboard is being rearranged. */
+function GripIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      className="mt-0.5 shrink-0 text-ink-faint"
+      aria-hidden
+      focusable="false"
+    >
+      <circle cx="5" cy="3" r="1.4" />
+      <circle cx="11" cy="3" r="1.4" />
+      <circle cx="5" cy="8" r="1.4" />
+      <circle cx="11" cy="8" r="1.4" />
+      <circle cx="5" cy="13" r="1.4" />
+      <circle cx="11" cy="13" r="1.4" />
+    </svg>
   );
 }

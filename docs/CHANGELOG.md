@@ -2,6 +2,22 @@
 
 User-visible changes. Newest first.
 
+## 2026-08-24 — Put the widgets where you want them
+
+**Hold a card and drag it.** The dashboard's cards are no longer stuck in the order the app picked.
+Press and hold any card for a moment: the cards start to wobble, the one under your finger lifts,
+and dragging it moves it — the others slide out of the way, the same as rearranging icons on a
+phone. Let go and it stays there, on every device you sign in on.
+
+There is a **Rearrange** button above the cards for when a long press is not what you feel like
+doing, particularly with a mouse, and while rearranging a bar at the bottom offers **Reset order**
+to put everything back the way it shipped. **Done** — or Escape — leaves rearranging. With a
+keyboard, tab to a card and the arrow keys move it.
+
+A card you have never arranged — a board you add tomorrow — appears at the end rather than pushing
+its way into the middle of the order you set. Removing a board just removes its card; everything
+else keeps its place.
+
 ## 2026-08-24 — Yesterday's breakfast, one tap away
 
 **Every meal now offers what you usually eat then.** Under breakfast, lunch, dinner, snacks and

@@ -64,6 +64,10 @@ export interface WidgetCard {
   alert?: string;
   /** At most one. Present only where the widget earns it (see `WidgetQuickAction`). */
   quickAction?: WidgetQuickAction;
+  /**
+   * The rank the widget ships with. It decides where a card the user has never arranged
+   * lands, and nothing else: `DashboardResponse.cards` already arrives in display order.
+   */
   order: number;
 }
 
@@ -71,6 +75,7 @@ export interface DashboardResponse {
   generatedAt: IsoDate;
   /** Reference "today" used for every projection in this payload. */
   today: IsoDate;
+  /** Already sorted for display: the user's `widgetOrder` first, then unarranged cards. */
   cards: WidgetCard[];
   /** Headline net-worth-ish figure: cash + items + stocks − debts. */
   netPositionCents: Cents;

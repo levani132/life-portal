@@ -27,6 +27,14 @@ export class UserSettings {
 
   @Prop()
   fxRatesUpdatedAt?: string;
+
+  /**
+   * Dashboard card ids in the order the user dragged them into. A list of *preferences*, not
+   * positions: cards are derived on every read, so this has to tolerate ids that no longer
+   * exist and cards it has never seen (`arrangeWidgets` in `libs/shared/domain`).
+   */
+  @Prop({ type: [String], default: [] })
+  widgetOrder!: string[];
 }
 
 export const UserSettingsSchema = SchemaFactory.createForClass(UserSettings);
@@ -57,6 +65,7 @@ export const DEFAULT_SETTINGS = {
   salaryDayOfMonth: 7,
   capitalGainsTaxRate: 0,
   fxRates: {} as Record<string, number>,
+  widgetOrder: [] as string[],
 };
 
 @Injectable()
@@ -79,6 +88,22 @@ export class SettingsService {
   async update(userId: string, dto: UpdateSettingsDto): Promise<UserSettingsDto> {
     const patch: Record<string, unknown> = { ...dto };
     if (dto.fxRates) patch['fxRatesUpdatedAt'] = new Date().toISOString().slice(0, 10);
+    return this.write(userId, patch);
+  }
+
+  /**
+   * The dashboard arrangement, written by `PUT /dashboard/order`. Its own method rather than a
+   * field on `UpdateSettingsDto`, so the rearrange gesture has exactly one writer and cannot
+   * arrive bundled with a currency change.
+   */
+  setWidgetOrder(userId: string, widgetOrder: string[]): Promise<UserSettingsDto> {
+    return this.write(userId, { widgetOrder });
+  }
+
+  private async write(
+    userId: string,
+    patch: Record<string, unknown>,
+  ): Promise<UserSettingsDto> {
     // Upserting with the defaults means a first-ever write does not need a prior read — but a
     // path may not appear in `$set` and `$setOnInsert` at once: Mongo answers the whole update
     // with `ConflictingUpdateOperators` (a 500), so only untouched fields get a default.

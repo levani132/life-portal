@@ -57,6 +57,11 @@ seeded straight into Mongo still gets sane defaults.
 | `salaryDayOfMonth` | 7 | defaults in forms |
 | `capitalGainsTaxRate` | 0 | stock liquidation maths (Georgia: 0% on most personal share sales) |
 | `fxRates` | `{}` | `convertCents()`, keyed `USD_GEL` style |
+| `widgetOrder` | `[]` | the dashboard's card order — see below |
+
+`widgetOrder` is written only by `PUT /api/dashboard/order`, never by `PUT /api/settings`: the DTO
+there deliberately does not accept it, so the rearrange gesture has exactly one writer and cannot
+arrive bundled with a currency change. `SettingsService.setWidgetOrder()` is that writer.
 
 ---
 
@@ -79,6 +84,39 @@ renders the `est` marker (principle VI).
 
 Board cards are generated one per board from `boards.summaries()`, at `order` 10+, so the number
 of cards follows the data.
+
+## The card order is the user's
+
+`GET /api/dashboard` returns `cards` **already sorted for display**. `arrangeWidgets`
+(`libs/shared/domain/src/lib/widget-order.ts`) applies the user's `widgetOrder` — the list of card
+ids they dragged the cards into — and each card's own `order` decides only where a card they have
+never arranged goes.
+
+| Case | Result |
+| --- | --- |
+| id in `widgetOrder` | sits where the user put it |
+| card not in `widgetOrder` | after every arranged card, ranked among newcomers by `order` |
+| id in `widgetOrder` with no card | ignored |
+
+That third row is why the arrangement is a list of *preferences* rather than a `position` field per
+card: cards are derived on every read (principle III) and archiving a board must not need a
+migration or leave a hole.
+
+```
+PUT /api/dashboard/order   { "order": ["nutrition", "cashflow", "board:epam", ...] }
+→ { "order": [...] }       // an empty array resets to the widgets' own ranking
+```
+
+Ids are pattern-checked (`loans`, `board:epam` shaped) and capped at 64, so the field cannot be
+used as arbitrary storage. Unknown ids are *accepted* — an older client may still know a card this
+deploy removed, and `arrangeWidgets` ignores them rather than failing the write.
+
+The gesture itself is `apps/web/src/components/sortable-grid.tsx`: long-press a card to enter edit
+mode and lift it, drag to reorder, drop to save. Arrow keys move a focused card. The dashboard
+holds the in-flight order locally so a drag stays responsive, then hands ownership back to the
+payload once the `PUT` and its revalidation have landed. Two things in there are load-bearing and
+non-obvious — the up-front `touchmove` listener and the card staying an `<a>` in edit mode; both
+are written up in `docs/DECISIONS.md`.
 
 ## Net position
 

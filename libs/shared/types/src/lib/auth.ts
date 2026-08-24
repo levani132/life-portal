@@ -57,4 +57,10 @@ export interface UserSettings extends Timestamped {
   /** Static FX rates used for roll-ups; refreshed manually. Key is `USD_GEL` style. */
   fxRates: Record<string, number>;
   fxRatesUpdatedAt?: IsoDate;
+  /**
+   * The user's dashboard arrangement: card ids in the order they dragged them into. Empty
+   * means "however the widgets rank themselves". Ids the arrangement does not mention sort
+   * after the ones it does — see `arrangeWidgets` in `libs/shared/domain`.
+   */
+  widgetOrder: string[];
 }

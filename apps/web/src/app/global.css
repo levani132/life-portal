@@ -116,6 +116,42 @@
 }
 
 /*
+ * Rearranging the dashboard (`components/sortable-grid.tsx`).
+ *
+ * `-webkit-touch-callout` is the part that matters on iOS: without it, the long press that picks a
+ * card up also raises Safari's link preview over the top of it.
+ */
+.widget-slot {
+  -webkit-touch-callout: none;
+}
+
+/*
+ * The wobble that says "these can be moved". A rotation only — the cards are the width of a phone,
+ * so the few degrees a home-screen icon uses would swing them into their neighbours, and anything
+ * that changed their size would fight the drag's own measurements.
+ */
+@keyframes widget-jiggle {
+  0%,
+  100% {
+    transform: rotate(-0.35deg);
+  }
+  50% {
+    transform: rotate(0.35deg);
+  }
+}
+
+.widget-jiggle {
+  /*
+   * Longhands, not the `animation` shorthand: each card is staggered with its own
+   * `animation-delay`, and a shorthand here would reset that to zero and put them in lockstep.
+   */
+  animation-name: widget-jiggle;
+  animation-duration: 0.5s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+/*
  * The boot loader (`components/portal-loader.tsx`): the logo's gauge ring filling to 100%, holding,
  * then unwinding to 0%. `stroke-dasharray` is animated rather than `stroke-dashoffset`, because an
  * offset sweep would unwind from the wrong end — the arc has to shrink back to where it started,
@@ -177,7 +213,8 @@
 @media (prefers-reduced-motion: reduce) {
   /* No motion at all: the mark falls back to the static logo, gauge three-quarters filled. */
   .portal-sweep,
-  .portal-bar {
+  .portal-bar,
+  .widget-jiggle {
     animation: none;
   }
 

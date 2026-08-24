@@ -10,3 +10,4 @@ export * from './lib/target-price';
 export * from './lib/stock-positions';
 export * from './lib/summaries';
 export * from './lib/nutrition';
+export * from './lib/widget-order';
