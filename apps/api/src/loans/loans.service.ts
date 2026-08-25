@@ -11,15 +11,17 @@ import type {
 } from '@life-portal/shared-types';
 import {
   buildLoanScenarios,
-  loanBalance,
   isAfter,
+  loanBalance,
   loanProgressRatio,
   paidCents,
   remainingCents,
   resolveInflows,
+  toDisplayCents,
 } from '@life-portal/shared-domain';
 import { CashflowService } from '../cashflow/cashflow.service';
 import { ItemsService } from '../items/items.module';
+import { FxService } from '../fx/fx.module';
 import { SettingsService } from '../settings/settings.module';
 import { StocksService } from '../stocks/stocks.service';
 import { Loan, LoanPayment, RepaymentPlan } from './loans.schemas';
@@ -42,6 +44,7 @@ export class LoansService {
     private readonly items: ItemsService,
     private readonly stocks: StocksService,
     private readonly settings: SettingsService,
+    private readonly fx: FxService,
   ) {}
 
   // ---------------------------------------------------------------- loans
@@ -318,6 +321,11 @@ export class LoansService {
 
     const active = loans.filter((l) => l.status === 'active');
     const settings = await this.settings.get(userId);
+    // Debts can be denominated differently — a friend lending dollars, a bank lending lari —
+    // so each loan is restated before it joins a total.
+    const display = (settings.displayCurrency ?? 'GEL') as Currency;
+    const fx = await this.fx.context(display, today);
+    const conv = (cents: number, from: Currency) => toDisplayCents(cents, from, fx).cents;
 
     let totalPrincipal = 0;
     let totalPaid = 0;
@@ -325,9 +333,10 @@ export class LoansService {
     for (const loan of loans) {
       if (loan.status === 'archived') continue;
       const payments = paymentsByLoan.get(loan.id) ?? [];
-      totalPrincipal += loan.principalCents;
-      totalPaid += paidCents(payments);
-      totalRemaining += remainingCents(loan, payments);
+      const from = loan.currency as Currency;
+      totalPrincipal += conv(loan.principalCents, from);
+      totalPaid += conv(paidCents(payments), from);
+      totalRemaining += conv(remainingCents(loan, payments), from);
     }
 
     // The dashboard card headlines the highest-priority active debt, with its scenario dates.
@@ -356,7 +365,7 @@ export class LoansService {
       focus = {
         loanId: focusLoan.id,
         lender: focusLoan.lender,
-        remainingCents: remainingCents(focusLoan, payments),
+        remainingCents: conv(remainingCents(focusLoan, payments), focusLoan.currency as Currency),
         progressRatio: loanProgressRatio(focusLoan, payments),
         bestCasePayoffDate: scenarios.find((s) => s.key === 'best')?.payoffDate,
         worstCasePayoffDate: scenarios.find((s) => s.key === 'worst')?.payoffDate,
@@ -367,7 +376,7 @@ export class LoansService {
       totalPrincipalCents: totalPrincipal,
       totalPaidCents: totalPaid,
       totalRemainingCents: totalRemaining,
-      currency: (settings.displayCurrency ?? 'USD') as Currency,
+      currency: display,
       activeCount: active.length,
       focus,
     };

@@ -21,9 +21,12 @@ import {
   runwayDays,
   snapshotAt,
   toDay,
+  toDisplayCents,
 } from '@life-portal/shared-domain';
 import { ItemsService } from '../items/items.module';
 import { StocksService } from '../stocks/stocks.service';
+import { FxService } from '../fx/fx.module';
+import { SettingsService } from '../settings/settings.module';
 import { CashBalance, Expense, IncomeSource } from './cashflow.schemas';
 import type { SetBalanceDto, UpdateExpenseDto, UpdateIncomeDto, UpsertExpenseDto, UpsertIncomeDto } from './cashflow.dto';
 
@@ -35,7 +38,21 @@ export class CashflowService {
     @InjectModel(Expense.name) private readonly expenses: Model<Expense>,
     private readonly items: ItemsService,
     private readonly stocks: StocksService,
+    private readonly settings: SettingsService,
+    private readonly fx: FxService,
   ) {}
+
+  /**
+   * The currency to render in, and the rates to get there.
+   *
+   * Every figure this service returns goes through here. Rows keep the currency they were
+   * recorded in — a USD salary stays a USD salary — and only the presentation is unified.
+   */
+  private async display(userId: string, today: string) {
+    const settings = await this.settings.get(userId);
+    const currency = (settings.displayCurrency ?? 'GEL') as Currency;
+    return { currency, fx: await this.fx.context(currency, today) };
+  }
 
   // ---------------------------------------------------------------- balance
 
@@ -201,12 +218,17 @@ export class CashflowService {
       this.sales(userId),
     ]);
 
+    const display = await this.display(userId, today);
+
     return projectCash({
       today,
       to: options?.to ? toDay(options.to) : defaultHorizon(today),
       openingBalanceCents: balance.amountCents,
       balanceAsOf: balance.asOf,
-      currency: balance.currency as Currency,
+      // The projection reports in the *display* currency; the reconciliation keeps its own.
+      currency: display.currency,
+      openingCurrency: balance.currency as Currency,
+      fx: display.fx,
       incomes,
       expenses,
       sales,
@@ -218,6 +240,7 @@ export class CashflowService {
     const projection = await this.projection(userId, today);
     const balance = await this.currentBalance(userId, today);
     const incomes = await this.listIncomes(userId);
+    const display = await this.display(userId, today);
 
     const activeIncome = incomes.filter((i) => i.active);
     const nextDates = activeIncome
@@ -235,11 +258,17 @@ export class CashflowService {
       // What is in the account *today*, not what was in it when the user last checked. The
       // reconciliation is the anchor; everything since is already in the projection.
       currentBalanceCents: freeToday.projectedBalanceCents,
-      reconciledBalanceCents: balance.amountCents,
+      reconciledBalanceCents: toDisplayCents(
+        balance.amountCents,
+        balance.currency as Currency,
+        display.fx,
+      ).cents,
       balanceAsOf: balance.asOf,
-      currency: balance.currency as Currency,
+      currency: display.currency,
       nextIncomeDate: next?.date,
-      nextIncomeAmountCents: next?.income.amountCents,
+      nextIncomeAmountCents: next
+        ? toDisplayCents(next.income.amountCents, next.income.currency, display.fx).cents
+        : undefined,
       monthlyNetCents: projection.monthlyNetCents,
       freeTodayCents: freeToday.freeCents,
       freeAfterNextIncomeCents: afterIncome.freeCents,

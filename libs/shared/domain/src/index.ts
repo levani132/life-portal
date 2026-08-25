@@ -1,5 +1,6 @@
 export * from './lib/dates';
 export * from './lib/money';
+export * from './lib/fx';
 export * from './lib/recurrence';
 export * from './lib/cash-projection';
 export * from './lib/realised-sales';

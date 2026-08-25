@@ -10,6 +10,7 @@ import { LoansModule } from '../loans/loans.module';
 import { NutritionModule } from '../nutrition/nutrition.module';
 import { PersonalModule } from '../personal/personal.module';
 import { SettingsModule, SettingsService } from '../settings/settings.module';
+import { FxModule } from '../fx/fx.module';
 import { StocksModule } from '../stocks/stocks.module';
 import { DashboardService } from './dashboard.service';
 
@@ -65,6 +66,7 @@ export class DashboardController {
 
 @Module({
   imports: [
+    FxModule,
     LoansModule,
     CashflowModule,
     ItemsModule,

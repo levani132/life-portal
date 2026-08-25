@@ -152,6 +152,7 @@ describe('projectCash', () => {
 
 describe('realised sales as inflows', () => {
   const laptopSale: RealisedSale = {
+    currency: 'USD',
     id: 'item-laptop',
     label: 'MacBook Pro',
     amountCents: 80_000,
@@ -257,5 +258,105 @@ describe('snapshot free-money semantics', () => {
     const projection = projectCash(baseInput);
     const snapshot = snapshotAt(projection, '2027-06-01', '2026-08-03');
     expect(snapshot.date).toBe('2026-10-31');
+  });
+});
+
+describe('mixed currencies', () => {
+  // The real shape of this user's data: a salary paid in USD, card spending in GEL.
+  const fx = {
+    displayCurrency: 'GEL' as const,
+    rates: { USD_GEL: 2.6121, GEL_USD: 1 / 2.6121 },
+    rateDate: '2026-08-25',
+  };
+
+  const salary: IncomeSource = {
+    id: 'inc1',
+    userId: 'u1',
+    label: 'EPAM salary',
+    amountCents: 384_411,
+    currency: 'USD',
+    recurrence: { cadence: 'monthly', interval: 1, dayOfMonth: 7, startDate: '2026-01-07' },
+    active: true,
+    createdAt: '2026-01-07',
+    updatedAt: '2026-01-07',
+  };
+
+  const breakfast: Expense = {
+    id: 'exp1',
+    userId: 'u1',
+    label: 'Breakfast',
+    amountCents: 1_000,
+    currency: 'USD',
+    category: 'food',
+    kind: 'recurring',
+    recurrence: { cadence: 'daily', interval: 1, startDate: '2026-08-01' },
+    active: true,
+    createdAt: '2026-08-01',
+    updatedAt: '2026-08-01',
+  };
+
+  it('restates a foreign salary and expense in the display currency', () => {
+    const projection = projectCash({
+      today: '2026-08-25',
+      to: '2026-08-25',
+      openingBalanceCents: 100_000,
+      balanceAsOf: '2026-08-25',
+      currency: 'GEL',
+      openingCurrency: 'GEL',
+      fx,
+      incomes: [salary],
+      expenses: [breakfast],
+    });
+
+    const day = projection.days[0];
+    // $10 at 2.6121 is ₾26.12, not ₾10.
+    expect(day.outCents).toBe(2_612);
+    expect(day.events[0].originalAmountCents).toBe(1_000);
+    expect(day.events[0].originalCurrency).toBe('USD');
+    expect(projection.unconvertedCurrencies).toBeUndefined();
+  });
+
+  it('converts the reconciled balance out of its own currency', () => {
+    const projection = projectCash({
+      today: '2026-08-25',
+      to: '2026-08-25',
+      openingBalanceCents: 100_000,
+      balanceAsOf: '2026-08-25',
+      currency: 'GEL',
+      openingCurrency: 'USD',
+      fx,
+      incomes: [],
+      expenses: [],
+    });
+    expect(projection.openingCents).toBe(261_210);
+  });
+
+  it('flags a currency it has no rate for instead of pretending', () => {
+    const projection = projectCash({
+      today: '2026-08-25',
+      to: '2026-08-25',
+      openingBalanceCents: 0,
+      balanceAsOf: '2026-08-25',
+      currency: 'GEL',
+      fx: { displayCurrency: 'GEL', rates: {} },
+      incomes: [],
+      expenses: [{ ...breakfast, currency: 'EUR' }],
+    });
+    // Still counted — understating an outflow is the more dangerous error — but named.
+    expect(projection.days[0].outCents).toBe(1_000);
+    expect(projection.unconvertedCurrencies).toEqual(['EUR']);
+  });
+
+  it('adds dollars to lari when no rates are supplied, which is why fx is threaded through', () => {
+    const projection = projectCash({
+      today: '2026-08-25',
+      to: '2026-08-25',
+      openingBalanceCents: 0,
+      balanceAsOf: '2026-08-25',
+      currency: 'GEL',
+      incomes: [],
+      expenses: [breakfast],
+    });
+    expect(projection.days[0].outCents).toBe(1_000);
   });
 });

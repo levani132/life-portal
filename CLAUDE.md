@@ -31,7 +31,7 @@ sellable assets, share holdings, work obligations, side projects, personal plans
 apps/api          NestJS 11 · MongoDB via Mongoose 9 · JWT auth
 apps/web          Next.js 16 App Router · Tailwind · SWR · Recharts
 libs/shared/types Contracts shared by both. Zero runtime dependencies.
-libs/shared/domain Pure projection/scenario/valuation/nutrition logic. 182 unit tests.
+libs/shared/domain Pure projection/scenario/valuation/nutrition/fx logic. 238 unit tests.
 .specify/         Spec Kit: constitution, templates, /speckit-* skills
 docs/             Module docs, decisions, changelog
 ```
@@ -121,6 +121,12 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   move with `pointercancel`), and a card stays an `<a>` in edit mode with its click cancelled —
   replacing the node the finger is touching cancels the touch. Either mistake gives the same
   symptom: the card lifts and the drag dies immediately. `npm run check` passed through both.
+- **Money is stored in the currency it was recorded in and converted only on read.** A row's
+  `currency` is a fact about the amount (EPAM shares trade in USD); `settings.displayCurrency` is
+  only what it is *rendered* as. Never persist a converted amount, and never convert at today's
+  rate — `fx_rate_history` archives a rate per day so a past figure does not move when the lari
+  does. Pass `fx` into `projectCash()` and the summary functions; without it they add dollars to
+  lari. See `docs/modules/fx.md`.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for

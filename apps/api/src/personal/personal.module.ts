@@ -24,7 +24,7 @@ import {
 } from 'class-validator';
 import { isValidObjectId, Model } from 'mongoose';
 import { NotFoundException } from '@nestjs/common';
-import type { Currency, PersonalPlan as PersonalPlanDto, PersonalSummary } from '@life-portal/shared-types';
+import type { Currency, FxContext, PersonalPlan as PersonalPlanDto, PersonalSummary } from '@life-portal/shared-types';
 import {
   PERSONAL_PLAN_STATUSES,
   PLAN_COMPANY,
@@ -176,8 +176,13 @@ export class PersonalService {
     return plan;
   }
 
-  async summary(userId: string, today: string, currency: Currency = 'USD'): Promise<PersonalSummary> {
-    return summarisePersonal(await this.list(userId), today, currency);
+  async summary(
+    userId: string,
+    today: string,
+    currency: Currency = 'GEL',
+    fx?: FxContext,
+  ): Promise<PersonalSummary> {
+    return summarisePersonal(await this.list(userId), today, currency, fx);
   }
 
   private oid(id: string): string {

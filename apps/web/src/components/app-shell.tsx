@@ -17,6 +17,7 @@ const CORE_LINKS = [
   { href: '/stocks', label: 'Stocks' },
   { href: '/personal', label: 'Personal' },
   { href: '/nutrition', label: 'Food' },
+  { href: '/settings', label: 'Settings' },
 ];
 
 /**

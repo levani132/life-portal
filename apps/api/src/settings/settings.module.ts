@@ -12,7 +12,12 @@ export class UserSettings {
   @Prop({ required: true, index: true, unique: true })
   userId!: string;
 
-  @Prop({ default: 'USD' })
+  /**
+   * The currency every figure is *rendered* in. Amounts keep the currency they were
+   * recorded in; this only decides what they are converted to on the way out, so changing
+   * it never rewrites data (`libs/shared/domain/src/lib/fx.ts`).
+   */
+  @Prop({ default: 'GEL' })
   displayCurrency!: string;
 
   @Prop({ default: 7, min: 1, max: 31 })
@@ -61,7 +66,7 @@ export class UpdateSettingsDto {
 }
 
 export const DEFAULT_SETTINGS = {
-  displayCurrency: 'USD',
+  displayCurrency: 'GEL',
   salaryDayOfMonth: 7,
   capitalGainsTaxRate: 0,
   fxRates: {} as Record<string, number>,

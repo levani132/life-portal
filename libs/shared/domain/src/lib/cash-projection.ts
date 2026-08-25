@@ -1,5 +1,6 @@
 import type {
   CashEvent,
+  FxContext,
   CashProjection,
   CashProjectionDay,
   CashSnapshot,
@@ -11,6 +12,7 @@ import type {
 import { addDays, eachDay, isAfter, maxDay, minDay, toDay, type DayString } from './dates';
 import { monthlyEquivalentCents, occurrencesBetween } from './recurrence';
 import { sumCents } from './money';
+import { canConvert, toDisplayCents } from './fx';
 
 export interface CashProjectionInput {
   /** The reference "today". Passed explicitly so projections are deterministic. */
@@ -22,6 +24,8 @@ export interface CashProjectionInput {
   /** The day that reconciliation was true for. May be in the past. */
   balanceAsOf: string;
   currency: Currency;
+  /** Currency the reconciliation was recorded in. Defaults to `currency` when omitted. */
+  openingCurrency?: Currency;
   incomes: IncomeSource[];
   expenses: Expense[];
   /**
@@ -32,6 +36,47 @@ export interface CashProjectionInput {
   sales?: RealisedSale[];
   /** Day to compute the headline snapshot for. Defaults to `today`. */
   snapshotDate?: string;
+  /**
+   * Rates for folding rows recorded in another currency into `currency`.
+   *
+   * Omitted, every amount is summed as-is — which is only correct when every row already
+   * shares one currency. The salary is in USD and the card spending is in GEL, so leaving
+   * this out silently adds dollars to lari.
+   */
+  fx?: FxContext;
+}
+
+/**
+ * Restates one row's amount in the projection's currency, recording what it was before.
+ *
+ * `originalCurrency` is set only when a conversion actually happened, so a row that was
+ * already in the display currency stays free of misleading provenance.
+ */
+function inProjectionCurrency(
+  amountCents: number,
+  currency: Currency | undefined,
+  fx: FxContext | undefined,
+): Pick<CashEvent, 'amountCents' | 'originalAmountCents' | 'originalCurrency'> {
+  if (!fx || !currency) return { amountCents };
+  const converted = toDisplayCents(amountCents, currency, fx);
+  if (!converted.converted) return { amountCents };
+  return { amountCents: converted.cents, originalAmountCents: amountCents, originalCurrency: currency };
+}
+
+/** Currencies among the input rows that `fx` has no rate for. */
+function unconvertedCurrencies(
+  input: Pick<CashProjectionInput, 'incomes' | 'expenses' | 'sales'>,
+  fx: FxContext | undefined,
+): Currency[] {
+  if (!fx) return [];
+  const found = new Set<Currency>();
+  const check = (currency?: Currency) => {
+    if (currency && currency !== fx.displayCurrency && !canConvert(currency, fx)) found.add(currency);
+  };
+  for (const income of input.incomes) check(income.currency);
+  for (const expense of input.expenses) check(expense.currency);
+  for (const sale of input.sales ?? []) check(sale.currency);
+  return [...found].sort();
 }
 
 function expenseOccurrences(expense: Expense, from: string, to: string): DayString[] {
@@ -47,7 +92,7 @@ function expenseOccurrences(expense: Expense, from: string, to: string): DayStri
 
 /** Flattens income sources and expenses into individual dated cash movements. */
 export function buildCashEvents(
-  input: Pick<CashProjectionInput, 'incomes' | 'expenses' | 'sales'>,
+  input: Pick<CashProjectionInput, 'incomes' | 'expenses' | 'sales' | 'fx'>,
   from: string,
   to: string,
 ): CashEvent[] {
@@ -59,7 +104,7 @@ export function buildCashEvents(
       events.push({
         date,
         label: income.label,
-        amountCents: income.amountCents,
+        ...inProjectionCurrency(income.amountCents, income.currency, input.fx),
         direction: 'in',
         sourceKind: 'income',
         sourceId: income.id,
@@ -72,7 +117,7 @@ export function buildCashEvents(
       events.push({
         date,
         label: expense.label,
-        amountCents: expense.amountCents,
+        ...inProjectionCurrency(expense.amountCents, expense.currency, input.fx),
         direction: 'out',
         sourceKind: 'expense',
         sourceId: expense.id,
@@ -89,7 +134,7 @@ export function buildCashEvents(
     events.push({
       date,
       label: sale.label,
-      amountCents: sale.amountCents,
+      ...inProjectionCurrency(sale.amountCents, sale.currency, input.fx),
       direction: 'in',
       sourceKind: 'sale',
       sourceId: sale.id,
@@ -120,8 +165,14 @@ export function projectCash(input: CashProjectionInput): CashProjection {
     else byDate.set(event.date, [event]);
   }
 
+  const opening = inProjectionCurrency(
+    input.openingBalanceCents,
+    input.openingCurrency ?? input.currency,
+    input.fx,
+  );
+
   const days: CashProjectionDay[] = [];
-  let running = input.openingBalanceCents;
+  let running = opening.amountCents;
   let firstShortfallDate: string | undefined;
 
   for (const date of eachDay(from, to)) {
@@ -136,25 +187,40 @@ export function projectCash(input: CashProjectionInput): CashProjection {
     days.push({ date, openingCents: opening, inCents, outCents, closingCents: running, events: dayEvents });
   }
 
+  // Converted before the monthly equivalent is taken, not after: scaling then converting and
+  // converting then scaling agree, but only one of them rounds a single time.
   const monthlyRecurringInCents = sumCents(
-    input.incomes.filter((i) => i.active).map((i) => monthlyEquivalentCents(i.amountCents, i.recurrence)),
+    input.incomes
+      .filter((i) => i.active)
+      .map((i) =>
+        monthlyEquivalentCents(
+          inProjectionCurrency(i.amountCents, i.currency, input.fx).amountCents,
+          i.recurrence,
+        ),
+      ),
   );
   const monthlyRecurringOutCents = sumCents(
     input.expenses.map((expense) =>
       expense.active && expense.kind === 'recurring' && expense.recurrence
-        ? monthlyEquivalentCents(expense.amountCents, expense.recurrence)
+        ? monthlyEquivalentCents(
+            inProjectionCurrency(expense.amountCents, expense.currency, input.fx).amountCents,
+            expense.recurrence,
+          )
         : 0,
     ),
   );
 
+  const unconverted = unconvertedCurrencies(input, input.fx);
+
   return {
     from,
     to,
-    openingCents: input.openingBalanceCents,
+    openingCents: opening.amountCents,
     currency: input.currency,
     days,
     snapshot: snapshotFromDays(days, toDay(input.snapshotDate ?? today), today),
     firstShortfallDate,
+    ...(unconverted.length ? { unconvertedCurrencies: unconverted } : {}),
     monthlyRecurringInCents,
     monthlyRecurringOutCents,
     monthlyNetCents: monthlyRecurringInCents - monthlyRecurringOutCents,

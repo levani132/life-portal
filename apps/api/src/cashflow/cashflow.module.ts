@@ -1,5 +1,7 @@
 import { Body, Controller, Delete, Get, Module, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { FxModule } from '../fx/fx.module';
+import { SettingsModule } from '../settings/settings.module';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Today } from '../common/today';
 import { ItemsModule } from '../items/items.module';
@@ -123,6 +125,8 @@ export class CashflowController {
   imports: [
     ItemsModule,
     StocksModule,
+    SettingsModule,
+    FxModule,
     MongooseModule.forFeature([
       { name: CashBalance.name, schema: CashBalanceSchema },
       { name: IncomeSource.name, schema: IncomeSourceSchema },

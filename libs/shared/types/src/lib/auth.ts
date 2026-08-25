@@ -54,8 +54,15 @@ export interface UserSettings extends Timestamped {
   salaryDayOfMonth: number;
   /** Applied to modelled stock sale proceeds. 0 = no tax modelling. */
   capitalGainsTaxRate: number;
-  /** Static FX rates used for roll-ups; refreshed manually. Key is `USD_GEL` style. */
+  /**
+   * @deprecated Superseded by the `fx` module and no longer read.
+   *
+   * A single snapshot cannot keep history stable: every past figure would re-value itself
+   * whenever the lari moved. `fx_rate_history` archives a rate per day instead. Kept only so
+   * existing documents still validate. See `docs/modules/fx.md`.
+   */
   fxRates: Record<string, number>;
+  /** @deprecated See `fxRates`. */
   fxRatesUpdatedAt?: IsoDate;
   /**
    * The user's dashboard arrangement: card ids in the order they dragged them into. Empty

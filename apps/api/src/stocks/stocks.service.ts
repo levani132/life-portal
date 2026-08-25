@@ -5,6 +5,7 @@ import type {
   Currency,
   EsppPlan as EsppPlanDto,
   EsppProjection,
+  FxContext,
   StockFundamentals as StockFundamentalsDto,
   StockLot as StockLotDto,
   StockPosition,
@@ -24,6 +25,7 @@ import {
   projectEspp,
   suggestTargetPrice,
   toDay,
+  toDisplayCents,
 } from '@life-portal/shared-domain';
 import { FinnhubProvider } from './finnhub.provider';
 import {
@@ -437,7 +439,7 @@ export class StocksService {
   async summary(
     userId: string,
     today: string,
-    options: { taxRate: number; currency?: Currency },
+    options: { taxRate: number; currency?: Currency; fx?: FxContext },
   ): Promise<StocksSummary> {
     const positions = await this.positions(userId, today);
     const esppProjections = await this.esppProjections(userId, today, undefined, positions);
@@ -445,23 +447,42 @@ export class StocksService {
 
     const hasQuotes = positions.some((p) => p.currentPricePerShareCents != null);
 
+    /**
+     * Shares trade in the currency of their listing — EPAM in USD — while the dashboard
+     * reports in the user's display currency, so every figure below is restated on the way
+     * out. Positions themselves keep their listed currency.
+     */
+    const display = (options.currency ?? 'GEL') as Currency;
+    const conv = (cents: number | undefined, from: Currency): number | undefined =>
+      cents == null || !options.fx ? cents : toDisplayCents(cents, from, options.fx).cents;
+    const listed = (positions[0]?.currency ?? display) as Currency;
+
     return {
-      currency: options.currency ?? 'USD',
+      currency: display,
       positionCount: positions.length,
-      totalCostCents: positions.reduce((sum, p) => sum + p.totalCostCents, 0),
+      totalCostCents: conv(positions.reduce((sum, p) => sum + p.totalCostCents, 0), listed) ?? 0,
       totalMarketValueCents: hasQuotes
-        ? positions.reduce((sum, p) => sum + (p.marketValueCents ?? 0), 0)
+        ? conv(positions.reduce((sum, p) => sum + (p.marketValueCents ?? 0), 0), listed)
         : undefined,
       totalUnrealisedPnlCents: hasQuotes
-        ? positions.reduce((sum, p) => sum + (p.unrealisedPnlCents ?? 0), 0)
+        ? conv(positions.reduce((sum, p) => sum + (p.unrealisedPnlCents ?? 0), 0), listed)
         : undefined,
+      // A percentage is currency-free, so it is deliberately left alone.
       totalUnrealisedPnlPct: this.totalPnlPct(positions, hasQuotes),
-      totalValueAtTargetCents: positions.reduce((sum, p) => sum + (p.valueAtTargetCents ?? 0), 0),
+      totalValueAtTargetCents:
+        conv(positions.reduce((sum, p) => sum + (p.valueAtTargetCents ?? 0), 0), listed) ?? 0,
       liquidationNowCents: hasQuotes
-        ? liquidationValueCents({ positions, taxRate: options.taxRate, atTarget: false })
+        ? conv(liquidationValueCents({ positions, taxRate: options.taxRate, atTarget: false }), listed)
         : undefined,
-      liquidationAtTargetCents: liquidationValueCents({ positions, taxRate: options.taxRate, atTarget: true }),
-      earmarkedByLoan: earmarkedByLoan(positions, { taxRate: options.taxRate, atTarget: true }),
+      liquidationAtTargetCents: conv(
+        liquidationValueCents({ positions, taxRate: options.taxRate, atTarget: true }),
+        listed,
+      ),
+      earmarkedByLoan: Object.fromEntries(
+        Object.entries(earmarkedByLoan(positions, { taxRate: options.taxRate, atTarget: true })).map(
+          ([loanId, cents]) => [loanId, conv(cents, listed) ?? 0],
+        ),
+      ),
       nextEsppDate: nextGrant?.date,
       nextEsppEstimatedShares: nextGrant?.estimatedShares,
       quotesStale: positions.some((p) => p.quoteStale) || !hasQuotes,

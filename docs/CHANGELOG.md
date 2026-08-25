@@ -2,6 +2,21 @@
 
 User-visible changes. Newest first.
 
+## 2026-08-25 — Everything in lari
+
+**The app now reads in one currency, and it is yours to choose.** Figures recorded in dollars —
+the salary, the loans, the EPAM shares, the budget lines — are converted and shown in Georgian
+lari, so the dashboard's net position is finally one number rather than dollars and lari added
+together. Set it back to USD or EUR in settings whenever you like; nothing about your data changes,
+only what it is displayed as.
+
+**Rates come from the National Bank of Georgia**, refreshed each morning, and every amount is
+converted at the rate that applied *on its own day*. A figure you looked at last week still reads
+the same this week, even though the lari has moved since.
+
+Where a rate is genuinely unavailable, the amount is shown in the currency it was recorded in and
+marked as such, rather than quietly presented as though it had been converted.
+
 ## 2026-08-24 — Put the widgets where you want them
 
 **Hold a card and drag it.** The dashboard's cards are no longer stuck in the order the app picked.

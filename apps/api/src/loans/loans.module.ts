@@ -17,6 +17,7 @@ import { Today } from '../common/today';
 import { CashflowModule } from '../cashflow/cashflow.module';
 import { ItemsModule } from '../items/items.module';
 import { SettingsModule } from '../settings/settings.module';
+import { FxModule } from '../fx/fx.module';
 import { StocksModule } from '../stocks/stocks.module';
 import {
   CreateLoanDto,
@@ -144,6 +145,7 @@ export class LoansController {
 
 @Module({
   imports: [
+    FxModule,
     MongooseModule.forFeature([
       { name: Loan.name, schema: LoanSchema },
       { name: LoanPayment.name, schema: LoanPaymentSchema },

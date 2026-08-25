@@ -28,7 +28,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Model } from 'mongoose';
-import type { Currency, ItemsSummary, SellableItem as SellableItemDto } from '@life-portal/shared-types';
+import type { Currency, FxContext, ItemsSummary, SellableItem as SellableItemDto } from '@life-portal/shared-types';
 import { ITEM_STATUSES, SUPPORTED_CURRENCIES } from '@life-portal/shared-types';
 import { itemsProceedsForLoan, summariseItems } from '@life-portal/shared-domain';
 import { baseSchemaOptions, dayField, requiredCentsField, centsField } from '../common/mongoose';
@@ -179,8 +179,8 @@ export class ItemsService extends OwnedCrudService<SellableItem> {
     return updated as unknown as SellableItemDto;
   }
 
-  async summary(userId: string, currency: Currency = 'USD'): Promise<ItemsSummary> {
-    return summariseItems(await this.list(userId), currency);
+  async summary(userId: string, currency: Currency = 'GEL', fx?: FxContext): Promise<ItemsSummary> {
+    return summariseItems(await this.list(userId), currency, fx);
   }
 
   /** Proceeds earmarked for one loan, in all three price variants. */

@@ -61,7 +61,7 @@ async function main(): Promise<void> {
   await upsert(
     db.collection('user_settings'),
     { userId },
-    { userId, displayCurrency: 'USD', salaryDayOfMonth: SALARY_DAY, capitalGainsTaxRate: 0, fxRates: {} },
+    { userId, displayCurrency: 'GEL', salaryDayOfMonth: SALARY_DAY, capitalGainsTaxRate: 0, fxRates: {} },
   );
 
   // ---------------------------------------------------------------- cash & salary

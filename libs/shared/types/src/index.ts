@@ -1,4 +1,5 @@
 export * from './lib/common';
+export * from './lib/fx';
 export * from './lib/auth';
 export * from './lib/cashflow';
 export * from './lib/loans';

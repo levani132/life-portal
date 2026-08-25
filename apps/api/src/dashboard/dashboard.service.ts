@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type {
+  Currency,
   DashboardResponse,
   WidgetCard,
   WidgetStat,
@@ -19,6 +20,7 @@ import { ItemsService } from '../items/items.module';
 import { LoansService } from '../loans/loans.service';
 import { NutritionService } from '../nutrition/nutrition.service';
 import { PersonalService } from '../personal/personal.module';
+import { FxService } from '../fx/fx.module';
 import { SettingsService } from '../settings/settings.module';
 import { StocksService } from '../stocks/stocks.service';
 
@@ -36,6 +38,7 @@ export class DashboardService {
     private readonly personal: PersonalService,
     private readonly nutrition: NutritionService,
     private readonly settings: SettingsService,
+    private readonly fx: FxService,
   ) {}
 
   /**
@@ -51,15 +54,17 @@ export class DashboardService {
    */
   async build(userId: string, today: string): Promise<DashboardResponse> {
     const settings = await this.settings.get(userId);
-    const currency = settings.displayCurrency;
+    const currency = (settings.displayCurrency ?? 'GEL') as Currency;
+    // One rate lookup for the whole dashboard, so every card on it agrees.
+    const fx = await this.fx.context(currency, today);
 
     const [loans, cashflow, items, stocks, boardSummaries, personal, nutrition] = await Promise.all([
       this.loans.summary(userId, today),
       this.cashflow.summary(userId, today),
-      this.items.summary(userId),
-      this.stocks.summary(userId, today, { taxRate: settings.capitalGainsTaxRate }),
+      this.items.summary(userId, currency, fx),
+      this.stocks.summary(userId, today, { taxRate: settings.capitalGainsTaxRate, currency, fx }),
       this.boards.summaries(userId, today),
-      this.personal.summary(userId, today),
+      this.personal.summary(userId, today, currency, fx),
       this.nutrition.summary(userId, today),
     ]);
 
@@ -75,6 +80,8 @@ export class DashboardService {
 
     // Net position: what is mine, minus what is owed. Stocks are counted at market value
     // where a quote exists, at cost otherwise, so an unpriced holding is not counted as zero.
+    // Every term is already in `currency` because each summary converted its own rows — this
+    // used to add dollars to lari, which is what made the headline figure meaningless.
     const netPositionCents =
       cashflow.currentBalanceCents +
       items.expectedProceedsCents +

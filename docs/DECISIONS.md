@@ -630,3 +630,34 @@ says so. `npm run check` passed through both bugs.
 raises its link preview over the card being lifted), and swapping a card is locked until the finger
 leaves the card it just displaced — cards are different heights, so a swap moves the neighbour
 under the finger and the two would otherwise trade places every frame.
+
+## Converted money is never stored, and never converted at today's rate
+
+**2026-08-25.** Adding a display currency looked like a data migration: the owner's rows were all
+`USD`, the app was to read in `GEL`, so convert the rows and change the default. That would have
+been wrong twice over.
+
+**Converting the stored amounts destroys what the number is.** `stock_lots` and `stock_quotes` hold
+EPAM, which trades on NASDAQ in dollars; rewriting them as lari leaves the daily Finnhub refresh
+writing a USD quote back next to GEL lots, and every position, gain and ESPP projection silently
+becomes garbage. `income_sources` is an EPAM salary genuinely paid in dollars — as lari it would
+appear to change every time the exchange rate did. Denomination is a fact about the world, not a
+display preference.
+
+**And a converted amount is derived (principle III).** Persisting one bakes one day's rate into
+history permanently.
+
+So: rows keep their own currency, `settings.displayCurrency` decides what they are rendered as, and
+conversion happens on read. No migration ran; the only write was `displayCurrency: 'GEL'`.
+
+**The non-obvious half.** Converting on read is not enough on its own — it has to be at the rate in
+force on *the amount's own day*, which is why `fx_rate_history` exists rather than a flat table of
+current rates. The `fxRates: Record<string, number>` field already on `user_settings` was exactly
+the wrong shape: with a single snapshot, every past figure re-values itself whenever the lari moves,
+so a payment that filled Breakfast yesterday would fill Lunch tomorrow. An exchange rate is an
+*observation*, like a share price, so archiving one per day keeps principle III intact while making
+history stable. `fx.spec.ts` asserts a past conversion does not move when a newer rate is published.
+
+**Rates are floats.** Principle II says money is integer cents; a rate is a ratio, not an amount,
+and rounding 2.6121 to two decimals would put visible error into every conversion. The one
+exception, and the reason it is written down here.

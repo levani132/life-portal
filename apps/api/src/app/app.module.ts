@@ -9,6 +9,7 @@ import { CashflowModule } from '../cashflow/cashflow.module';
 import { ConfigModule } from '../config/config.module';
 import { loadConfig } from '../config/configuration';
 import { DashboardModule } from '../dashboard/dashboard.module';
+import { FxModule } from '../fx/fx.module';
 import { ItemsModule } from '../items/items.module';
 import { LoansModule } from '../loans/loans.module';
 import { NutritionModule } from '../nutrition/nutrition.module';
@@ -29,6 +30,7 @@ import { StocksModule } from '../stocks/stocks.module';
     ScheduleModule.forRoot(),
     AuthModule,
     SettingsModule,
+    FxModule,
     CashflowModule,
     LoansModule,
     ItemsModule,

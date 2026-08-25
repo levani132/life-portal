@@ -42,6 +42,7 @@ describe('saleFromItem', () => {
       label: 'MacBook Pro',
       amountCents: 85_000,
       grossCents: 85_000,
+      currency: 'USD',
       date: '2026-08-12',
       source: 'item',
       allocatedToLoanId: undefined,

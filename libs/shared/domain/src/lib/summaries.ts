@@ -1,6 +1,7 @@
 import type {
   Cents,
   Currency,
+  FxContext,
   Id,
   ItemsSummary,
   Loan,
@@ -12,6 +13,19 @@ import type {
 import { OPEN_ITEM_STATUSES } from '@life-portal/shared-types';
 import { diffDays, isAfter, minDay, toDay, yearOf } from './dates';
 import { clampPositive, ratio, scaleCents, sumCents } from './money';
+import { sumInDisplay, toDisplayCents } from './fx';
+
+/**
+ * Restates an amount in the summary's currency.
+ *
+ * Every summary in this file reports one currency, but the rows underneath it need not share
+ * it — a pool table priced in USD and a sofa priced in GEL are both sellable items. Without
+ * `fx` the amount is passed through, which is only correct when the rows already agree.
+ */
+function inSummaryCurrency(cents: Cents, currency: Currency | undefined, fx?: FxContext): Cents {
+  if (!fx || !currency) return cents;
+  return toDisplayCents(cents, currency, fx).cents;
+}
 
 /** Total actually repaid on a loan. */
 export function paidCents(payments: LoanPayment[]): Cents {
@@ -31,25 +45,32 @@ export function isOpenItem(item: SellableItem): boolean {
   return OPEN_ITEM_STATUSES.includes(item.status);
 }
 
-export function summariseItems(items: SellableItem[], currency: Currency): ItemsSummary {
+export function summariseItems(items: SellableItem[], currency: Currency, fx?: FxContext): ItemsSummary {
   const open = items.filter(isOpenItem);
   const sold = items.filter((i) => i.status === 'sold');
 
   const earmarkedByLoan: Record<Id, Cents> = {};
   for (const item of open) {
     if (!item.allocateToLoanId) continue;
+    // Scale by the earmarked share first, then convert: one rounding step rather than two.
     const share = scaleCents(item.expectedPriceCents, item.allocationRatio ?? 1);
-    earmarkedByLoan[item.allocateToLoanId] = (earmarkedByLoan[item.allocateToLoanId] ?? 0) + share;
+    const converted = inSummaryCurrency(share, item.currency, fx);
+    earmarkedByLoan[item.allocateToLoanId] = (earmarkedByLoan[item.allocateToLoanId] ?? 0) + converted;
   }
+
+  const amounts = (rows: SellableItem[], pick: (item: SellableItem) => Cents) =>
+    rows.map((item) => ({ amountCents: pick(item), currency: item.currency }));
+  const total = (rows: SellableItem[], pick: (item: SellableItem) => Cents) =>
+    fx ? sumInDisplay(amounts(rows, pick), fx).cents : sumCents(rows.map(pick));
 
   return {
     currency,
     openCount: open.length,
     soldCount: sold.length,
-    expectedProceedsCents: sumCents(open.map((i) => i.expectedPriceCents)),
-    pessimisticProceedsCents: sumCents(open.map((i) => i.minPriceCents ?? i.expectedPriceCents)),
-    optimisticProceedsCents: sumCents(open.map((i) => i.askingPriceCents)),
-    realisedProceedsCents: sumCents(sold.map((i) => i.soldPriceCents ?? i.expectedPriceCents)),
+    expectedProceedsCents: total(open, (i) => i.expectedPriceCents),
+    pessimisticProceedsCents: total(open, (i) => i.minPriceCents ?? i.expectedPriceCents),
+    optimisticProceedsCents: total(open, (i) => i.askingPriceCents),
+    realisedProceedsCents: total(sold, (i) => i.soldPriceCents ?? i.expectedPriceCents),
     earmarkedByLoan,
     nearlySoldCount: open.filter((i) => i.status === 'has_interest' || i.status === 'reserved').length,
   };
@@ -81,6 +102,7 @@ export function summarisePersonal(
   plans: PersonalPlan[],
   today: string,
   currency: Currency,
+  fx?: FxContext,
 ): PersonalSummary {
   const active = plans.filter((p) => p.status !== 'cancelled');
   const upcoming = active
@@ -113,17 +135,27 @@ export function summarisePersonal(
             date: toDay(nextDate),
             daysUntil: diffDays(today, nextDate),
             company: nextPlan.company,
-            estimatedCostCents: nextPlan.estimatedCostCents,
+            estimatedCostCents:
+              nextPlan.estimatedCostCents == null
+                ? undefined
+                : inSummaryCurrency(nextPlan.estimatedCostCents, nextPlan.currency, fx),
           }
         : undefined,
-    upcomingCommittedCents: sumCents(upcoming.map((p) => p.estimatedCostCents)),
+    upcomingCommittedCents: sumCents(
+      upcoming.map((p) =>
+        p.estimatedCostCents == null ? 0 : inSummaryCurrency(p.estimatedCostCents, p.currency, fx),
+      ),
+    ),
     spentThisYearCents: sumCents(
       done
         .filter((p) => {
           const date = personalPlanDate(p);
           return date != null && yearOf(date) === thisYear;
         })
-        .map((p) => p.actualCostCents ?? p.estimatedCostCents),
+        .map((p) => {
+          const cost = p.actualCostCents ?? p.estimatedCostCents;
+          return cost == null ? 0 : inSummaryCurrency(cost, p.currency, fx);
+        }),
     ),
     countriesVisited: unique(
       active.filter((p) => p.visited || p.status === 'done').map((p) => p.country),

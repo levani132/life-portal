@@ -103,6 +103,8 @@ export interface RealisedSale {
   amountCents: Cents;
   /** Full proceeds, before the earmark. */
   grossCents: Cents;
+  /** The currency the sale was priced in, which need not be the display currency. */
+  currency: Currency;
   date: IsoDate;
   source: 'item' | 'stock';
   /**
@@ -123,6 +125,12 @@ export interface CashEvent {
   sourceId: Id;
   category?: ExpenseCategory;
   linkedLoanId?: Id;
+  /**
+   * Set only when `amountCents` was converted. Carries what was actually recorded, so the UI
+   * can show "₾26.12 (from $10.00)" and mark the figure as derived (principle VI).
+   */
+  originalAmountCents?: Cents;
+  originalCurrency?: Currency;
 }
 
 export interface CashProjectionDay {
@@ -169,6 +177,12 @@ export interface CashProjection {
    * shortfall into the past says nothing useful and hides whether one is still coming.
    */
   firstShortfallDate?: IsoDate;
+  /**
+   * Currencies present in the underlying rows that no rate was available for. Their amounts
+   * are still counted — understating a balance is the more dangerous error — so a non-empty
+   * list means every figure here is approximate and must be labelled as such.
+   */
+  unconvertedCurrencies?: Currency[];
   monthlyRecurringInCents: Cents;
   monthlyRecurringOutCents: Cents;
   /** `monthlyRecurringInCents - monthlyRecurringOutCents`. */
