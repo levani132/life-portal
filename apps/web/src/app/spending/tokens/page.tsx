@@ -309,9 +309,13 @@ function SetupInstructions({ token }: { token?: string }) {
           </li>
           <li>
             Set <strong className="text-ink">Sender</strong> to{' '}
-            <code className="text-ink">4444</code> for Bank of Georgia, or{' '}
-            <code className="text-ink">TBC SMS</code> for TBC. One automation per bank — a single
-            automation cannot listen for both senders.
+            <code className="text-ink">4444</code> for Bank of Georgia. For TBC the sender is{' '}
+            <code className="text-ink">TBC SMS</code>, but iOS tends to strip the space when you
+            type it — if it becomes <code className="text-ink">TBCSMS</code>, skip the sender and
+            set <strong className="text-ink">Message Contains</strong> to{' '}
+            <code className="text-ink">Nashti</code> instead: every TBC payment message carries it,
+            and codes or marketing do not. The app never checks the sender — this filter only
+            decides when your phone fires. One automation per bank either way.
           </li>
           <li>
             Choose <strong className="text-ink">Run Immediately</strong> and turn{' '}

@@ -49,6 +49,14 @@ for tomorrow, or that one carton of milk covers four breakfasts.
 Two iOS Shortcuts "Message" automations POST the raw message to `POST /api/spending/ingest`, which
 authenticates with `X-Ingest-Token` rather than a JWT.
 
+The sender filter is entirely phone-side — the app never checks who a message came from; the
+`bank` field in the body picks the parser. That matters because iOS mangles TBC's alphanumeric
+sender when typed by hand (`TBC SMS` → `TBCSMS`), and whether the mangled form still matches is
+undocumented. The robust trigger is **Message Contains `Nashti`** with no sender at all: every TBC
+payment message carries it, OTPs and marketing do not. BOG's `4444` is numeric and safe to type.
+The token page's `lastUsedAt` is the empirical test either way — "not used yet" means the
+automation has never fired.
+
 **Three rules that look like bugs and are not:**
 
 1. **A duplicate is the same text within 120 seconds**, not the same text. BOG messages carry no
