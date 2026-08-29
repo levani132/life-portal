@@ -21,6 +21,7 @@ import { NutritionService } from '../nutrition/nutrition.service';
 import { PersonalService } from '../personal/personal.module';
 import { FxService } from '../fx/fx.module';
 import { SettingsService } from '../settings/settings.module';
+import { SpendingService } from '../spending/spending.service';
 import { StocksService } from '../stocks/stocks.service';
 
 /** Salary landing within this many days is worth a nudge on the dashboard. */
@@ -38,6 +39,7 @@ export class DashboardService {
     private readonly nutrition: NutritionService,
     private readonly settings: SettingsService,
     private readonly fx: FxService,
+    private readonly spending: SpendingService,
   ) {}
 
   /**
@@ -56,15 +58,17 @@ export class DashboardService {
     // One rate lookup for the whole dashboard, so every card on it agrees.
     const { currency, fx } = await this.fx.displayFor(userId, today);
 
-    const [loans, cashflow, items, stocks, boardSummaries, personal, nutrition] = await Promise.all([
-      this.loans.summary(userId, today),
-      this.cashflow.summary(userId, today),
-      this.items.summary(userId, currency, fx),
-      this.stocks.summary(userId, today, { taxRate: settings.capitalGainsTaxRate, currency, fx }),
-      this.boards.summaries(userId, today),
-      this.personal.summary(userId, today, currency, fx),
-      this.nutrition.summary(userId, today),
-    ]);
+    const [loans, cashflow, items, stocks, boardSummaries, personal, nutrition, spending] =
+      await Promise.all([
+        this.loans.summary(userId, today),
+        this.cashflow.summary(userId, today),
+        this.items.summary(userId, currency, fx),
+        this.stocks.summary(userId, today, { taxRate: settings.capitalGainsTaxRate, currency, fx }),
+        this.boards.summaries(userId, today),
+        this.personal.summary(userId, today, currency, fx),
+        this.nutrition.summary(userId, today),
+        this.spending.summary(userId, today),
+      ]);
 
     const cards: WidgetCard[] = [
       this.loansCard(loans, currency),
@@ -74,6 +78,7 @@ export class DashboardService {
       ...boardSummaries.map((board, index) => this.boardCard(board, index)),
       this.personalCard(personal, currency),
       this.nutritionCard(nutrition),
+      this.spendingCard(spending),
     ];
 
     // Net position: what is mine, minus what is owed. Stocks are counted at market value
@@ -134,9 +139,7 @@ export class DashboardService {
       stats,
       progress: focus?.progressRatio,
       alert:
-        focus && !focus.worstCasePayoffDate
-          ? 'No guaranteed repayment plan — add one'
-          : undefined,
+        focus && !focus.worstCasePayoffDate ? 'No guaranteed repayment plan — add one' : undefined,
       order: 1,
     };
   }
@@ -188,6 +191,60 @@ export class DashboardService {
     };
   }
 
+  /**
+   * Today's remaining allowance, and whether anything needs attention.
+   *
+   * One quick action only (principle I): adding a payment by hand, which is the thing that
+   * happens often and would otherwise start with a navigation.
+   */
+  private spendingCard(spending: Awaited<ReturnType<SpendingService['summary']>>): WidgetCard {
+    const { remainingTodayCents, dailyBudgetCents, currency } = spending;
+    const ratioLeft = dailyBudgetCents > 0 ? remainingTodayCents / dailyBudgetCents : 1;
+    const tone: WidgetTone = remainingTodayCents <= 0 ? 'bad' : ratioLeft < 0.25 ? 'warn' : 'good';
+
+    // A message the app could not read, or one it can prove never arrived, is money not counted.
+    const needsAttention = spending.unparsedCount + spending.gapCount;
+
+    return {
+      key: 'spending',
+      id: 'spending',
+      title: 'Spending',
+      subtitle: needsAttention
+        ? `${needsAttention} to look at`
+        : `${formatCentsCompact(spending.spentTodayCents, currency)} today`,
+      href: '/spending',
+      icon: 'wallet',
+      accent: 'sky',
+      tone,
+      stats: [
+        {
+          label: 'Left today',
+          value: formatCentsCompact(remainingTodayCents, currency),
+          raw: remainingTodayCents,
+          tone,
+          // Captured payments are a lower bound, so this is a best case (principle VI).
+          estimated: true,
+        },
+        {
+          label: 'Spent today',
+          value: formatCentsCompact(spending.spentTodayCents, currency),
+          raw: spending.spentTodayCents,
+          estimated: true,
+        },
+        {
+          label: 'Unplanned',
+          value: formatCentsCompact(spending.extraThisMonthCents, currency),
+          raw: spending.extraThisMonthCents,
+          tone: spending.extraThisMonthCents > 0 ? 'warn' : 'neutral',
+        },
+      ],
+      alert: needsAttention
+        ? 'Some messages are unread or may be missing, so today may be understated'
+        : undefined,
+      order: 3,
+    };
+  }
+
   private itemsCard(items: DashboardResponse['summaries']['items'], currency: string): WidgetCard {
     return {
       key: 'items',
@@ -218,7 +275,10 @@ export class DashboardService {
     };
   }
 
-  private stocksCard(stocks: DashboardResponse['summaries']['stocks'], currency: string): WidgetCard {
+  private stocksCard(
+    stocks: DashboardResponse['summaries']['stocks'],
+    currency: string,
+  ): WidgetCard {
     const pnl = stocks.totalUnrealisedPnlPct;
     const tone: WidgetTone = pnl == null ? 'neutral' : pnl >= 0 ? 'good' : 'bad';
 
@@ -263,7 +323,10 @@ export class DashboardService {
     };
   }
 
-  private boardCard(board: DashboardResponse['summaries']['boards'][number], index: number): WidgetCard {
+  private boardCard(
+    board: DashboardResponse['summaries']['boards'][number],
+    index: number,
+  ): WidgetCard {
     const stats: WidgetStat[] = [
       { label: 'Open', value: String(board.openTaskCount), raw: board.openTaskCount },
       {
@@ -309,7 +372,12 @@ export class DashboardService {
       title: board.name,
       subtitle: board.kind === 'employer' ? 'Talent Partner' : undefined,
       href: `/boards/${board.key}`,
-      icon: board.kind === 'employer' ? 'users' : board.kind === 'client_project' ? 'briefcase' : 'rocket',
+      icon:
+        board.kind === 'employer'
+          ? 'users'
+          : board.kind === 'client_project'
+            ? 'briefcase'
+            : 'rocket',
       accent: board.accent,
       tone: alerts.length ? 'warn' : 'neutral',
       stats,
@@ -382,7 +450,9 @@ export class DashboardService {
       key: 'nutrition',
       id: 'nutrition',
       title: 'Food',
-      subtitle: cheatNote ?? (nutrition.entryCount > 0 ? `${nutrition.entryCount} logged today` : 'nothing logged yet'),
+      subtitle:
+        cheatNote ??
+        (nutrition.entryCount > 0 ? `${nutrition.entryCount} logged today` : 'nothing logged yet'),
       href: '/nutrition',
       icon: 'utensils',
       accent: 'lime',
@@ -447,7 +517,11 @@ export class DashboardService {
       });
     }
 
-    if (input.loans.focus && !input.loans.focus.worstCasePayoffDate && input.loans.totalRemainingCents > 0) {
+    if (
+      input.loans.focus &&
+      !input.loans.focus.worstCasePayoffDate &&
+      input.loans.totalRemainingCents > 0
+    ) {
       out.push({
         tone: 'warn',
         message: `No guaranteed repayment plan for ${input.loans.focus.lender} — the debt has no end date.`,

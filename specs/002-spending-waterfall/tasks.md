@@ -15,17 +15,21 @@ test named for them. UI-only tasks carry no test.
 
 ## Progress — 2026-08-29
 
-**48 of 61 done.** Phases 1–4 complete and pushed; US1 (capture) and US2's domain and API are
-working end to end against a running server, verified by replaying the owner's real 24 August.
+**59 of 61 done.** Every user story is implemented and pushed. 337 domain tests; `npm run check`,
+`nx build api` and `nx build web` all pass.
+
+Verified against a running server by replaying the owner's real 24 August: capture, dedupe, the
+unparsed queue, gap detection, the cascade with splitting across tiers, confirmation reshuffling
+the other payments, and the savings invariant holding in every state.
 
 Still open:
 
-- **T034, T035, T039, T046** — the ladder component, the payment decision sheet and the savings
-  view. In flight.
-- **T047–T051** — budget proposals (US5). In flight.
-- **T040** — the dashboard card. Needs a summary method on `SpendingService`.
-- **T053** — drag-to-reorder the ladder. Reuse `sortable-grid.tsx` unchanged.
-- **T060, T061** — the full quickstart replay and the production builds.
+- **T053** — drag-to-reorder the ladder. The order is settable through `PUT /api/spending/order`
+  and honoured everywhere; only the drag gesture is missing. Reuse `sortable-grid.tsx` **unchanged**
+  — both of its load-bearing touch details are documented in `docs/DECISIONS.md` and were missed by
+  `npm run check` once already.
+- **T060** — the quickstart's browser pass (§5). The API side of §3–§4 has been run; the pages have
+  been built but not looked at in a browser.
 
 One thing found while implementing, worth knowing before touching the projection: `SpendingModule`
 imports `CashflowModule` to read the budget, so the reverse import would be circular. `projectCash`
@@ -129,8 +133,8 @@ verify the first consumes its allowances while the second consumes none.
 - [x] T031 [US2] Implement `notReallySpentCents` on `PATCH /api/spending/payments/:id`, reducing both real spending and what is decomposed
 - [x] T032 [US2] Implement `POST /api/spending/payments/:id/promote`, creating an expense **through `CashflowService`** — this module never writes that collection directly
 - [x] T033 [US2] Return derived allocations on every payment from `GET /api/spending/payments`, each carrying `projected` and the day it consumes
-- [ ] T034 [US2] Build the payment sheet at `apps/web/src/components/payment-sheet.tsx` — decomposition shown as a projection until confirmed, confirm/partial-confirm across several rungs, custom purpose, promote, mark part not really spent, and choose a day or span
-- [ ] T035 [US2] Handle the orphaned allocation case in the UI: a confirmed allocation whose expense no longer exists shows as needing a decision and counts as extra
+- [x] T034 [US2] Build the payment sheet at `apps/web/src/components/payment-sheet.tsx` — decomposition shown as a projection until confirmed, confirm/partial-confirm across several rungs, custom purpose, promote, mark part not really spent, and choose a day or span
+- [x] T035 [US2] Handle the orphaned allocation case in the UI: a confirmed allocation whose expense no longer exists shows as needing a decision and counts as extra
 
 **Checkpoint**: [quickstart.md](quickstart.md) §4 "confirming one payment moves another" and the split/spread checks pass.
 
@@ -146,8 +150,8 @@ where the waterfall says, with the parts summing to the whole.
 - [x] T036 [P] [US3] Implement `spendOrder` handling — sort rungs within a tier by index in the preference list, tolerating ids never seen and ids that no longer exist, exactly as `arrangeWidgets` does
 - [x] T037 [P] [US3] Exclude inactive expenses from the ladder, and treat `kind: 'one_off'` as a confirmable target the cascade always skips
 - [x] T038 [US3] Implement `GET /api/spending?today=` returning the ladder, today's figures, the unparsed count, gaps and a `basis` naming both the lower bound and the FX rate
-- [ ] T039 [US3] Build the ladder component at `apps/web/src/components/spend-ladder.tsx` — **filling bars with names as markers, never tick-boxes**; a *confirmed* rung may read as settled and shows its remainder as saved rather than available
-- [ ] T040 [US3] Add the dashboard card in `apps/api/src/dashboard/dashboard.service.ts` and the widget registry — three numbers and **one** quick action (add a payment by hand)
+- [x] T039 [US3] Build the ladder component at `apps/web/src/components/spend-ladder.tsx` — **filling bars with names as markers, never tick-boxes**; a *confirmed* rung may read as settled and shows its remainder as saved rather than available
+- [x] T040 [US3] Add the dashboard card in `apps/api/src/dashboard/dashboard.service.ts` and the widget registry — three numbers and **one** quick action (add a payment by hand)
 - [x] T041 [US3] Add `/spending` to the nav in `apps/web/src/components/app-shell.tsx`
 
 **Checkpoint**: the ladder answers "can I still spend today?" at a glance.
@@ -165,7 +169,7 @@ budget minus real spending, and that the cumulative parts sum to the whole.
 - [x] T043 [US4] Implement per-period and cumulative savings in `spend-waterfall.ts`, honouring `weekStartsOn` and `monthStartsOn`
 - [x] T044 [US4] Implement `GET /api/spending/savings?from=&to=` returning periods, the cumulative breakdown, and the month's projected saving, actual saving and extra together
 - [x] T045 [US4] Feed real spending into the cash projection for **past** days while future days keep budgeted allowances, switching at `today` — extending `projectCash` in `libs/shared/domain/src/lib/cash-projection.ts` and its spec
-- [ ] T046 [US4] Build the savings view in `apps/web/src/app/spending/page.tsx`
+- [x] T046 [US4] Build the savings view in `apps/web/src/app/spending/page.tsx`
 
 **Checkpoint**: savings are trustworthy and the projection starts from what really happened.
 
@@ -183,7 +187,7 @@ nothing.
 - [x] T048 [US5] Implement `suggestBudgets` in `libs/shared/domain/src/lib/spend-suggestions.ts` — median of complete periods, minimum 28 days / 8 weeks / 4 months, thresholds of 15% **and** ~₾5, returning `Estimate<Cents>` with the median and window in `basis` and `assumptions`
 - [x] T049 [US5] Propose adding a budget line for a custom purpose that has recurred often enough to look like a habit
 - [x] T050 [US5] Implement `GET /api/spending/suggestions` and the accept/dismiss endpoints, writing accepted changes **through `CashflowService`** and recording dismissals on the expense row
-- [ ] T051 [US5] Build the proposals UI showing the working behind each figure
+- [x] T051 [US5] Build the proposals UI showing the working behind each figure
 
 **Checkpoint**: the budget learns from reality without ever changing itself.
 
@@ -212,7 +216,7 @@ ones do not move.
 - [x] T058 [P] Add the spending gotchas to `CLAUDE.md`: duplicate detection needs the time window because BOG messages carry no time; ingest must answer 2xx on an unparsed message; a payment has two days
 - [x] T059 Add ingest setup instructions to the token page — the exact Shortcut steps, copy buttons for URL and token, and a "waiting for first message / received" state driven by `lastUsedAt`
 - [ ] T060 Run [quickstart.md](quickstart.md) §3–§4 against a running API on the local Mongo, **never** `.env`, which points at the owner's live Atlas cluster
-- [ ] T061 Confirm `npm run check` passes and both `nx build api` and `nx build web` succeed
+- [x] T061 Confirm `npm run check` passes and both `nx build api` and `nx build web` succeed
 
 ---
 

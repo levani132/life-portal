@@ -11,6 +11,7 @@ import { NutritionModule } from '../nutrition/nutrition.module';
 import { PersonalModule } from '../personal/personal.module';
 import { SettingsModule, SettingsService } from '../settings/settings.module';
 import { FxModule } from '../fx/fx.module';
+import { SpendingModule } from '../spending/spending.module';
 import { StocksModule } from '../stocks/stocks.module';
 import { DashboardService } from './dashboard.service';
 
@@ -67,6 +68,7 @@ export class DashboardController {
 @Module({
   imports: [
     FxModule,
+    SpendingModule,
     LoansModule,
     CashflowModule,
     ItemsModule,

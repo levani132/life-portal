@@ -458,6 +458,32 @@ export class SpendingService {
     };
   }
 
+  /**
+   * The three figures the dashboard card shows: what is left of today's allowances, what was
+   * really spent today, and whether anything needs the owner's attention.
+   */
+  async summary(userId: string, today: string) {
+    const result = await this.run(userId, today);
+    const ladder = result.ladderFor(today);
+    const daily = ladder.tiers.find((t) => t.cadence === 'daily');
+    const unparsed = await this.list(userId, undefined, undefined, 'unparsed');
+    const display = await this.fx.displayFor(userId, today);
+
+    const spentToday =
+      ladder.tiers.reduce((sum, t) => sum + t.consumedCents, 0) + ladder.extraCents;
+
+    return {
+      currency: display.currency,
+      // What is genuinely left of today's routine allowance — the question the card exists for.
+      remainingTodayCents: daily?.rungs.reduce((sum, r) => sum + r.remainingCents, 0) ?? 0,
+      dailyBudgetCents: daily?.budgetCents ?? 0,
+      spentTodayCents: spentToday,
+      extraThisMonthCents: ladder.extraCents,
+      unparsedCount: unparsed.length,
+      gapCount: detectMissedMessages(await this.list(userId)).length,
+    };
+  }
+
   /** Per-period and cumulative savings, plus the month read three ways. */
   async savings(userId: string, today: string, from?: string, to?: string) {
     const result = await this.run(userId, today, { from, to });

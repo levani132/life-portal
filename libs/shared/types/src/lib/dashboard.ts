@@ -14,6 +14,7 @@ import type { StocksSummary } from './stocks';
 export const WIDGET_KEYS = [
   'loans',
   'cashflow',
+  'spending',
   'items',
   'stocks',
   'board',
