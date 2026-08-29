@@ -121,6 +121,7 @@ $1,504.
 | --- | --- | --- |
 | `spendOrder` | `string[]` | Expense ids in the order the ladder fills. Same shape as `widgetOrder`: a preference list that tolerates ids it has never seen and ids that no longer exist. |
 | `weekStartsOn` | `number` | 0–6, default 1 (Monday). Needed because a week is a real boundary here. |
+| `monthStartsOn` | `number` | 1–28, default 1. The day a *financial* month begins. Taken now rather than later because the default reproduces calendar months exactly, while adding it afterwards would mean revisiting the waterfall, its tests, and anything already attributed by it. Collected by `003-onboarding`. |
 
 ---
 

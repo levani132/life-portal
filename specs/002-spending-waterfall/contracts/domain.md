@@ -54,6 +54,8 @@ export interface WaterfallInput {
   fx: FxContext;
   ratesByDay?: Record<string, FxContext>;
   weekStartsOn: number;
+  /** Day of month a financial month begins. 1 = calendar months. */
+  monthStartsOn: number;
 }
 
 export function spendWaterfall(input: WaterfallInput): WaterfallResult;
@@ -141,7 +143,9 @@ shopping is for tomorrow, or that one payment covers four breakfasts.
 - **Day** — `localDay(at, dayStartHour)`, written at ingest.
 - **Week** — starts on `weekStartsOn`. A week straddling a month end draws its monthly overflow
   from the month the **spending day** falls in, not the month the week began in.
-- **Month** — calendar month of the spending day.
+- **Month** — the financial month containing the spending day, which begins on `monthStartsOn`.
+  With `monthStartsOn: 7`, 3 September belongs to the month that began on 7 August. `1` gives
+  calendar months, which is the default and today's behaviour.
 
 ---
 

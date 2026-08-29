@@ -314,6 +314,8 @@ while confirmed ones do not move.
   ending, decided by the owner's day-start hour, not by the clock rolling over.
 - **A week straddling a month end.** Overflow out of the weekly tier draws on the month the
   *spending day* falls in, not the month the week began in.
+- **A financial month that does not start on the 1st.** With a month starting on the 7th, spending on
+  3 September belongs to the month that began on 7 August.
 - **The same message arrives twice.** A retried automation must not create a second payment.
 - **A payment in a currency with no known rate.** Still counted — understating spending is the more
   dangerous error — but shown in its own currency and marked unconverted.
@@ -452,6 +454,9 @@ while confirmed ones do not move.
 - **FR-026**: System MUST skip line items settled by hand when cascading, while still counting them
   towards their tier's budgeted total.
 - **FR-027**: System MUST restore each tier at the start of its own period.
+- **FR-027a**: System MUST take the day a financial month begins as a setting rather than assuming
+  the 1st, because a budget month that resets before the salary arrives reports an allowance the
+  account cannot fund. Defaulting it to the 1st keeps calendar months working unchanged.
 - **FR-028**: Users MUST be able to reorder line items within a tier, and to mark one as settled by
   hand.
 
