@@ -719,3 +719,35 @@ iOS Shortcuts has no error handling and no retry. Any non-2xx response means the
 permanently — the SMS stays on the phone, but nothing will ever send it again. Answering 201 with
 `status: 'unparsed'` is what makes a bank changing its wording a queue to work through rather than
 a silent hole in the record.
+
+## A budget proposal is the median, and a dismissal suppresses a figure rather than a line
+
+**2026-08-29.** Two decisions in `spend-suggestions.ts` that look like arbitrary statistics choices
+and are not.
+
+**The median, never the mean.** A budget funds a routine, so the statistic describing one has to
+survive the days that were not routine. Twenty-seven ordinary ₾20 days and one ₾500 dinner give a
+mean of ₾37.14 — 86% over the allowance, past both thresholds, and the app would confidently
+propose nearly doubling the food budget on the strength of a single evening. The median reports
+₾20 and proposes nothing. `spend-suggestions.spec.ts` asserts both halves of that: no proposal, and
+that a mean would have crossed the thresholds.
+
+**A minimum history, and a minimum deviation, and both thresholds.** 28 days / 8 weeks / 4 months
+(FR-037), because a proposal is a claim about a habit and a handful of days is not evidence of one
+— and because capture is incomplete at the start, so early periods read as thrift when they are
+really silence. That is also why `observedFrom` drops periods predating the first captured message.
+The deviation floor is 15% **and** ~₾5 together: 15% of a ₾10 daily line is ₾1.50 and ₾5 of a ₾900
+rent line is noise, so either alone is wrong in one direction. A permanent ±3% trickle of proposals
+is a notification that is never read, which costs more than the silence.
+
+**Dismissal is about the number, not the line.** Stored as `suggestionDismissedAt` +
+`suggestionDismissedCents` on the expense row rather than in a collection — a new collection has to
+buy something, and two fields on the row the proposal already concerns buy the same thing for less.
+Storing the *value* rather than a flag is what lets the proposal return once the median has moved
+materially (the same 15%-and-₾5 test) away from what was refused: refusing "cut breakfast to ₾4"
+must not silence "breakfast has become ₾20" for ever.
+
+A consequence worth naming: a proposal for a purpose that has no budget line yet has no row to
+record a dismissal on, so `POST /suggestions/purpose:…/dismiss` is a 400. Accepting one creates the
+expense through `CashflowService`; the alternative was a collection existing solely to remember a
+"no", which is what the whole design avoids.

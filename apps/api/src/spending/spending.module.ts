@@ -162,6 +162,38 @@ export class SpendingController {
     return this.settings.setSpendOrder(userId, dto.order);
   }
 
+  // ------------------------------------------------------------ budget proposals
+
+  /**
+   * Revised budgets the owner's own spending suggests, each carrying the working behind it.
+   *
+   * A read. Nothing here changes a budget — accepting one does, and only the owner can (FR-036).
+   */
+  @Get('suggestions')
+  suggestions(@CurrentUser('userId') userId: string, @Today() today: string) {
+    return this.spending.suggestions(userId, today);
+  }
+
+  /** Applies the proposal, through `CashflowService`, which owns the expense. */
+  @Post('suggestions/:expenseId/accept')
+  acceptSuggestion(
+    @CurrentUser('userId') userId: string,
+    @Param('expenseId') expenseId: string,
+    @Today() today: string,
+  ) {
+    return this.spending.acceptSuggestion(userId, expenseId, today);
+  }
+
+  /** Records the figure refused, so the same one is not proposed again immediately. */
+  @Post('suggestions/:expenseId/dismiss')
+  dismissSuggestion(
+    @CurrentUser('userId') userId: string,
+    @Param('expenseId') expenseId: string,
+    @Today() today: string,
+  ) {
+    return this.spending.dismissSuggestion(userId, expenseId, today);
+  }
+
   /** Messages the app can prove never arrived. Never a balance — see the module doc. */
   @Get('gaps')
   gaps(@CurrentUser('userId') userId: string) {

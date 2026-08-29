@@ -123,6 +123,47 @@ allowance entirely, without any of them being touched. And the total saved is id
 state — confirming moved which allowance bore the money and made the overspend visible, but not one
 tetri of the arithmetic.
 
+## Budget proposals
+
+`spend-suggestions.ts`. What the owner's real spending says an allowance ought to be. Derived on
+read, never applied: the endpoint returns proposals and a budget only changes when the owner
+accepts one (FR-036).
+
+The statistic is the **median of complete periods**, never the mean. A budget funds a routine, and
+the statistic describing a routine has to survive the days that were not routine — one holiday, one
+dentist, one broken phone. A single ₾500 evening inside a month of ₾20 days drags the mean to ₾37
+and would propose nearly doubling the food allowance on the strength of one dinner; the median does
+not move. There is a test asserting exactly that the mean would have proposed differently.
+
+**Minimum history** before anything is proposed (FR-037): 28 complete days, 8 complete weeks,
+4 complete months. Two reasons. A proposal is a claim about a habit, and three days of data is
+evidence of three days; and capture is incomplete at the start, so early periods read as
+under-spent for reasons that have nothing to do with behaviour. `observedFrom` — the first day
+anything was captured — drops periods that predate capture entirely, for the same reason.
+
+**Minimum deviation**: 15% **and** ~₾5 (500 minor units), both. One alone is wrong in one
+direction each — 15% of a ₾10 daily line is ₾1.50, and ₾5 of a ₾900 rent line is noise. Without a
+floor every line carries a permanent ±3% proposal, and a notification always present is never read.
+
+**Never proposed on**: a `manual` line (the cascade never observed it, so its consumption reads as
+zero and the loan repayment would be cut to nil), a planned one-off (an intention, not a habit),
+and a line held in a currency other than the display one (its median is in lari and its
+`amountCents` is in dollars).
+
+**Dismissal** is stored on the expense row as `suggestionDismissedAt` + `suggestionDismissedCents`
+rather than in a collection (research §10). It suppresses the *figure*, not the line: the proposal
+returns as soon as the median has moved materially — the same 15%-and-₾5 test — away from what was
+refused, so a habit that really is changing is put to the owner again.
+
+**New lines** (FR-049). A custom purpose consumes no allowance, so a recurring one is invisible to
+every budget. Once it has been paid at least 4 times, over at least 28 days, across at least 2
+complete calendar months, it is proposed as a monthly line at the median of its monthly totals.
+Months inside the span with no payments count as **zero** — dropping them would take the median of
+only the months the owner spent, which is how a twice-a-year insurance bill becomes a monthly line.
+Such a proposal carries a synthetic `expenseId` under the `purpose:` prefix (`isNewLineProposal`);
+accepting it creates the expense, and it cannot be dismissed because there is no row to record the
+dismissal on.
+
 ## Endpoints
 
 | Method | Path | Notes |
@@ -133,6 +174,9 @@ tetri of the arithmetic.
 | `PUT` | `/api/spending/payments/:id/decision` | `confirmed` (a list, possibly partial) · `custom` · `none` |
 | `POST` | `/api/spending/payments/:id/promote` | Custom purpose → budget line, via `CashflowService` |
 | `GET` | `/api/spending/gaps` | Suspected missed messages |
+| `GET` | `/api/spending/suggestions` | Budget proposals, each an `Estimate<Cents>` showing its working |
+| `POST` | `/api/spending/suggestions/:expenseId/accept` | Applies it through `CashflowService`; a `purpose:` id creates the line |
+| `POST` | `/api/spending/suggestions/:expenseId/dismiss` | Records the figure refused on the expense row |
 | `GET` `POST` `DELETE` | `/api/spending/tokens[/:id]` | The plain token exists in exactly one response |
 
 ## Cross-links

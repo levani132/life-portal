@@ -179,10 +179,10 @@ budget minus real spending, and that the cumulative parts sum to the whole.
 appears naming the observed figure and window; accepting changes the budget, dismissing changes
 nothing.
 
-- [ ] T047 [P] [US5] Write `libs/shared/domain/src/lib/spend-suggestions.spec.ts`: a consistently underspent line proposes lower; an overspent one proposes higher; too little history proposes nothing; a dismissal suppresses the same figure; the median resists one holiday where a mean would not
-- [ ] T048 [US5] Implement `suggestBudgets` in `libs/shared/domain/src/lib/spend-suggestions.ts` — median of complete periods, minimum 28 days / 8 weeks / 4 months, thresholds of 15% **and** ~₾5, returning `Estimate<Cents>` with the median and window in `basis` and `assumptions`
-- [ ] T049 [US5] Propose adding a budget line for a custom purpose that has recurred often enough to look like a habit
-- [ ] T050 [US5] Implement `GET /api/spending/suggestions` and the accept/dismiss endpoints, writing accepted changes **through `CashflowService`** and recording dismissals on the expense row
+- [x] T047 [P] [US5] Write `libs/shared/domain/src/lib/spend-suggestions.spec.ts`: a consistently underspent line proposes lower; an overspent one proposes higher; too little history proposes nothing; a dismissal suppresses the same figure; the median resists one holiday where a mean would not
+- [x] T048 [US5] Implement `suggestBudgets` in `libs/shared/domain/src/lib/spend-suggestions.ts` — median of complete periods, minimum 28 days / 8 weeks / 4 months, thresholds of 15% **and** ~₾5, returning `Estimate<Cents>` with the median and window in `basis` and `assumptions`
+- [x] T049 [US5] Propose adding a budget line for a custom purpose that has recurred often enough to look like a habit
+- [x] T050 [US5] Implement `GET /api/spending/suggestions` and the accept/dismiss endpoints, writing accepted changes **through `CashflowService`** and recording dismissals on the expense row
 - [ ] T051 [US5] Build the proposals UI showing the working behind each figure
 
 **Checkpoint**: the budget learns from reality without ever changing itself.

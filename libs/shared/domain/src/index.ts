@@ -15,3 +15,4 @@ export * from './lib/widget-order';
 export * from './lib/completeness';
 export * from './lib/sms-parsers';
 export * from './lib/spend-waterfall';
+export * from './lib/spend-suggestions';

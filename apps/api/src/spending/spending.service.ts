@@ -2,22 +2,37 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, isValidObjectId } from 'mongoose';
 import type {
+  BudgetProposal,
+  Cents,
   CompletenessGap,
+  Expense as ExpenseDto,
+  FxContext,
   SpendBank,
   SpendPayment as SpendPaymentDto,
 } from '@life-portal/shared-types';
 import {
+  NEW_LINE_PREFIX,
   addDays,
   arrangeWidgets,
   detectMissedMessages,
   eachDay,
+  fxContext,
+  isNewLineProposal,
   localDay,
   parseBankMessage,
   spendWaterfall,
   startOfFinancialMonth,
+  suggestBudgets,
+  sumCents,
   toDay,
 } from '@life-portal/shared-domain';
-import type { LadderTierBudget, WaterfallResult } from '@life-portal/shared-domain';
+import type {
+  BudgetDismissal,
+  CustomPurposeHistory,
+  LadderTierBudget,
+  LinePeriodSpend,
+  WaterfallResult,
+} from '@life-portal/shared-domain';
 import { CASHFLOW_CADENCES } from '@life-portal/shared-types';
 import { CashflowService } from '../cashflow/cashflow.service';
 import { FxService } from '../fx/fx.module';
@@ -41,6 +56,17 @@ import type {
  * to prevent. A retried automation fires seconds apart; a real second coffee does not.
  */
 const DUPLICATE_WINDOW_MS = 120_000;
+
+/**
+ * How far back a budget proposal looks.
+ *
+ * Driven by the longest minimum the domain enforces: four *complete* financial months, which
+ * needs a fifth partial one in front of it, plus a fortnight of margin so a `monthStartsOn` of
+ * 28 does not lose a month to the boundary. Daily and weekly lines are satisfied many times
+ * over by the same window, and one window keeps the periods of all three cadences drawn from
+ * the same run.
+ */
+const SUGGESTION_WINDOW_DAYS = 200;
 
 @Injectable()
 export class SpendingService {
@@ -375,9 +401,15 @@ export class SpendingService {
 
     // One rate lookup per day in the window, so a payment is never valued at a day it did not
     // happen on. `fx` is the fallback for any day the archive does not reach.
-    const ratesByDay: Record<string, Awaited<ReturnType<FxService['context']>>> = {};
+    //
+    // The archive is fetched **once** and the per-day contexts derived from it in memory. This
+    // is exactly what `fx.context` does internally, so the numbers are unchanged; doing it here
+    // is what makes the 200-day window a budget proposal needs one query rather than two
+    // hundred.
+    const archive = await this.fx.archive();
+    const ratesByDay: Record<string, FxContext> = {};
     for (const day of eachDay(from, to)) {
-      ratesByDay[day] = await this.fx.context(display.currency, day);
+      ratesByDay[day] = fxContext(archive, day, display.currency);
     }
 
     return spendWaterfall({
@@ -442,6 +474,190 @@ export class SpendingService {
         extraCents: month?.extraCents ?? 0,
       },
     };
+  }
+
+  // ---------------------------------------------------------------- budget proposals
+
+  /**
+   * What the owner's real spending says their allowances ought to be.
+   *
+   * Derived on every read like everything else (principle III) and **applied by nobody**: this
+   * only ever returns proposals, and a budget changes when the owner accepts one (FR-036).
+   */
+  async suggestions(userId: string, today: string): Promise<{ suggestions: BudgetProposal[] }> {
+    const day = toDay(today);
+    const from = addDays(day, -SUGGESTION_WINDOW_DAYS);
+
+    const [result, tiers, expenses, payments, display] = await Promise.all([
+      this.run(userId, day, { from, to: day }),
+      this.tiers(userId, from, day),
+      this.cashflow.listExpenses(userId),
+      this.list(userId),
+      this.fx.displayFor(userId, day),
+    ]);
+
+    // The waterfall reports each period's rungs; the proposal engine needs the same figures
+    // per line rather than per tier, so the ladder is re-read at each period's own first day.
+    // `ladderFor` memoises the rung states, so this is arithmetic already done.
+    const history: LinePeriodSpend[] = [];
+    for (const period of result.savings) {
+      const ladder = result.ladderFor(period.from);
+      const tier = ladder.tiers.find((t) => t.cadence === period.cadence);
+      for (const rung of tier?.rungs ?? []) {
+        history.push({
+          expenseId: rung.expenseId,
+          from: period.from,
+          to: period.to,
+          spentCents: rung.consumedCents,
+        });
+      }
+    }
+
+    return {
+      suggestions: suggestBudgets({
+        today: day,
+        tiers,
+        history,
+        // Before the first captured message every period reads as a perfect saving, which would
+        // propose cutting every line to nothing. Capture starting late is not thrift.
+        observedFrom: this.firstCapturedDay(payments) ?? day,
+        dismissals: this.dismissals(expenses),
+        purposes: this.customPurposes(payments, result, from, day),
+        currency: display.currency,
+      }),
+    };
+  }
+
+  /**
+   * Applies a proposal the owner accepted.
+   *
+   * Written through `CashflowService` because cash flow owns the expense (principle IV) — the
+   * loan's repayment plan and the projection both read that one row, so a second writer here
+   * would give two answers to "what is the budget".
+   */
+  async acceptSuggestion(userId: string, expenseId: string, today: string): Promise<ExpenseDto> {
+    const proposal = await this.proposalFor(userId, expenseId, today);
+
+    if (isNewLineProposal(proposal)) {
+      // A purpose with no line yet: accepting *creates* the line, at the median observed.
+      return this.cashflow.createExpense(userId, {
+        label: proposal.label,
+        amountCents: proposal.suggestedCents,
+        currency: (proposal.assumptions?.['currency'] as string) ?? 'GEL',
+        category: 'other',
+        kind: 'recurring',
+        recurrence: { cadence: proposal.cadence, interval: 1, startDate: toDay(today) },
+      } as never);
+    }
+
+    // Only the amount. A proposal is a claim about one number, so accepting must not quietly
+    // carry a cadence or a label along with it.
+    return this.cashflow.updateExpense(userId, expenseId, {
+      amountCents: proposal.suggestedCents,
+    } as never);
+  }
+
+  /**
+   * Records that the owner refused a proposal, so the same figure is not put to them again.
+   *
+   * The refusal is stored on the expense as the *value* dismissed rather than as a flag: the
+   * owner rejected a number, not the idea of ever revising the line, so the proposal returns
+   * as soon as the evidence has moved materially somewhere else (research §10).
+   */
+  async dismissSuggestion(userId: string, expenseId: string, today: string): Promise<ExpenseDto> {
+    if (expenseId.startsWith(NEW_LINE_PREFIX)) {
+      // A dismissal lives on the row the proposal concerns, and a line that does not exist has
+      // no row to hold it. Research §10 chose two fields over a new collection precisely to
+      // avoid one, so this case is a 400 rather than a new place to store state.
+      throw new BadRequestException(
+        'A proposal for a line that does not exist cannot be dismissed',
+      );
+    }
+    const proposal = await this.proposalFor(userId, expenseId, today);
+    return this.cashflow.recordSuggestionDismissal(
+      userId,
+      expenseId,
+      toDay(today),
+      proposal.suggestedCents,
+    );
+  }
+
+  /**
+   * The live proposal for one line.
+   *
+   * Recomputed rather than taken from the request, so accepting can only ever apply a figure
+   * the evidence still supports — a stale tab cannot post yesterday's number.
+   */
+  private async proposalFor(
+    userId: string,
+    expenseId: string,
+    today: string,
+  ): Promise<BudgetProposal> {
+    const { suggestions } = await this.suggestions(userId, today);
+    const found = suggestions.find((s) => s.expenseId === expenseId);
+    if (!found) throw new NotFoundException(`No current budget proposal for ${expenseId}`);
+    return found;
+  }
+
+  /** Dismissals as the domain wants them, from the two fields the expense row carries. */
+  private dismissals(expenses: ExpenseDto[]): Record<string, BudgetDismissal> {
+    const out: Record<string, BudgetDismissal> = {};
+    for (const expense of expenses) {
+      if (expense.suggestionDismissedAt == null || expense.suggestionDismissedCents == null) {
+        continue;
+      }
+      out[expense.id] = {
+        at: expense.suggestionDismissedAt,
+        cents: expense.suggestionDismissedCents,
+      };
+    }
+    return out;
+  }
+
+  /** The earliest day anything was captured, or `undefined` when nothing has been. */
+  private firstCapturedDay(payments: SpendPaymentDto[]): string | undefined {
+    let earliest: string | undefined;
+    for (const payment of payments) {
+      if (!earliest || payment.day < earliest) earliest = payment.day;
+    }
+    return earliest;
+  }
+
+  /**
+   * Custom purposes, grouped by what the owner typed, for new-line proposals (FR-049).
+   *
+   * The amounts come from the waterfall's own allocations rather than from `amountCents`, so
+   * they are already net of anything paid back and already converted at the rate of the day
+   * each payment was made — the same figures every other total on the screen is built from.
+   */
+  private customPurposes(
+    payments: SpendPaymentDto[],
+    result: WaterfallResult,
+    from: string,
+    to: string,
+  ): CustomPurposeHistory[] {
+    const byPurpose = new Map<string, CustomPurposeHistory>();
+
+    for (const payment of payments) {
+      const decision = payment.decision;
+      const purpose = decision?.kind === 'custom' ? decision.purpose?.trim() : undefined;
+      if (!purpose) continue;
+      if (payment.day < from || payment.day > to) continue;
+
+      const key = purpose.toLowerCase();
+      const entry = byPurpose.get(key) ?? { purpose, occurrences: [] };
+      const amountCents: Cents = sumCents(
+        (result.allocationsByPayment[payment.id] ?? [])
+          .filter((allocation) => allocation.target === 'extra')
+          .map((allocation) => allocation.amountCents),
+      );
+      entry.occurrences.push({ day: payment.day, amountCents });
+      // One promotion is enough: the line exists, so the purpose is never proposed again.
+      if (decision?.promotedToExpenseId) entry.promotedToExpenseId = decision.promotedToExpenseId;
+      byPurpose.set(key, entry);
+    }
+
+    return [...byPurpose.values()];
   }
 
   // ---------------------------------------------------------------- completeness

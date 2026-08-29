@@ -28,7 +28,13 @@ import { StocksService } from '../stocks/stocks.service';
 import { FxService } from '../fx/fx.module';
 import { SettingsService } from '../settings/settings.module';
 import { CashBalance, Expense, IncomeSource } from './cashflow.schemas';
-import type { SetBalanceDto, UpdateExpenseDto, UpdateIncomeDto, UpsertExpenseDto, UpsertIncomeDto } from './cashflow.dto';
+import type {
+  SetBalanceDto,
+  UpdateExpenseDto,
+  UpdateIncomeDto,
+  UpsertExpenseDto,
+  UpsertIncomeDto,
+} from './cashflow.dto';
 
 @Injectable()
 export class CashflowService {
@@ -100,13 +106,20 @@ export class CashflowService {
   }
 
   async updateIncome(userId: string, id: string, dto: UpdateIncomeDto): Promise<IncomeSourceDto> {
-    const updated = await this.incomes.findOneAndUpdate({ _id: this.oid(id, 'Income source'), userId }, { $set: dto }, { new: true });
+    const updated = await this.incomes.findOneAndUpdate(
+      { _id: this.oid(id, 'Income source'), userId },
+      { $set: dto },
+      { new: true },
+    );
     if (!updated) throw new NotFoundException(`Income source ${id} not found`);
     return updated.toJSON() as unknown as IncomeSourceDto;
   }
 
   async removeIncome(userId: string, id: string) {
-    const deleted = await this.incomes.findOneAndDelete({ _id: this.oid(id, 'Income source'), userId });
+    const deleted = await this.incomes.findOneAndDelete({
+      _id: this.oid(id, 'Income source'),
+      userId,
+    });
     if (!deleted) throw new NotFoundException(`Income source ${id} not found`);
     return { id, deleted: true as const };
   }
@@ -124,7 +137,35 @@ export class CashflowService {
   }
 
   async updateExpense(userId: string, id: string, dto: UpdateExpenseDto): Promise<ExpenseDto> {
-    const updated = await this.expenses.findOneAndUpdate({ _id: this.oid(id, 'Expense'), userId }, { $set: dto }, { new: true });
+    const updated = await this.expenses.findOneAndUpdate(
+      { _id: this.oid(id, 'Expense'), userId },
+      { $set: dto },
+      { new: true },
+    );
+    if (!updated) throw new NotFoundException(`Expense ${id} not found`);
+    return updated.toJSON() as unknown as ExpenseDto;
+  }
+
+  /**
+   * Records that the owner refused a budget proposal for this line.
+   *
+   * Lives here rather than in the spending module because cash flow owns the expenses
+   * collection and nothing else may write it (principle IV). It is deliberately *not* part of
+   * `UpdateExpenseDto`: a dismissal is a decision about a proposal, not an editable property of
+   * the budget, and exposing it on the PATCH route would let one arrive bundled with an amount
+   * change — which is exactly the pair that must not be settable together.
+   */
+  async recordSuggestionDismissal(
+    userId: string,
+    id: string,
+    at: string,
+    cents: number,
+  ): Promise<ExpenseDto> {
+    const updated = await this.expenses.findOneAndUpdate(
+      { _id: this.oid(id, 'Expense'), userId },
+      { $set: { suggestionDismissedAt: at, suggestionDismissedCents: cents } },
+      { new: true },
+    );
     if (!updated) throw new NotFoundException(`Expense ${id} not found`);
     return updated.toJSON() as unknown as ExpenseDto;
   }
@@ -137,7 +178,11 @@ export class CashflowService {
 
   /** Amounts of loan-linked expenses, keyed by expense id — the loan engine's source of truth. */
   async linkedExpenseAmounts(userId: string): Promise<Record<string, number>> {
-    const rows = await this.expenses.find({ userId, linkedLoanId: { $exists: true, $ne: null }, active: true });
+    const rows = await this.expenses.find({
+      userId,
+      linkedLoanId: { $exists: true, $ne: null },
+      active: true,
+    });
     return Object.fromEntries(rows.map((r) => [String(r._id), r.amountCents]));
   }
 
@@ -153,7 +198,13 @@ export class CashflowService {
    */
   async syncPersonalPlanExpense(
     userId: string,
-    plan: { id: string; title: string; estimatedCostCents?: number; date?: string; currency: string },
+    plan: {
+      id: string;
+      title: string;
+      estimatedCostCents?: number;
+      date?: string;
+      currency: string;
+    },
   ): Promise<string | undefined> {
     const existing = await this.expenses.findOne({ userId, linkedPersonalPlanId: plan.id });
 
