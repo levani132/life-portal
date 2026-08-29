@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import type {
-  Currency,
   DashboardResponse,
   WidgetCard,
   WidgetStat,
@@ -54,9 +53,8 @@ export class DashboardService {
    */
   async build(userId: string, today: string): Promise<DashboardResponse> {
     const settings = await this.settings.get(userId);
-    const currency = (settings.displayCurrency ?? 'GEL') as Currency;
     // One rate lookup for the whole dashboard, so every card on it agrees.
-    const fx = await this.fx.context(currency, today);
+    const { currency, fx } = await this.fx.displayFor(userId, today);
 
     const [loans, cashflow, items, stocks, boardSummaries, personal, nutrition] = await Promise.all([
       this.loans.summary(userId, today),

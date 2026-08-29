@@ -27,6 +27,7 @@ import {
 } from '@life-portal/shared-domain';
 import { CONFIG, type AppConfig } from '../config/configuration';
 import { Today } from '../common/today';
+import { SettingsModule, SettingsService } from '../settings/settings.module';
 import { FX_BASE_CURRENCY, NbgProvider } from './nbg.provider';
 import { FxRateHistory, FxRateHistorySchema } from './fx.schemas';
 
@@ -38,6 +39,7 @@ export class FxService {
     @InjectModel(FxRateHistory.name)
     private readonly history: Model<FxRateHistory>,
     private readonly nbg: NbgProvider,
+    private readonly settings: SettingsService,
   ) {}
 
   /** The whole archive for the base currency, or `null` before the first successful fetch. */
@@ -46,15 +48,27 @@ export class FxService {
     return found ? (found.toJSON() as unknown as FxRateHistoryDto) : null;
   }
 
-  /**
-   * The rates to render `day` with, in `displayCurrency`.
-   *
-   * Takes the currency rather than a `userId` on purpose: every caller already has the user's
-   * settings in hand, and reaching for `SettingsService` here would make two modules import
-   * each other.
-   */
+  /** The rates to render `day` with, in a currency the caller already knows. */
   async context(displayCurrency: Currency, day: string): Promise<FxContext> {
     return fxContext(await this.archive(), day, displayCurrency);
+  }
+
+  /**
+   * The currency to render in, and the rates to get there — the whole job in one call.
+   *
+   * Every module that returns a summary needs exactly this pair, and doing it by hand meant
+   * five copies of "fetch the settings, build the context". Three of them were simply missing,
+   * which is how `/stocks`, `/items` and `/personal` came to label USD amounts as GEL.
+   *
+   * The dependency runs one way — settings knows nothing of fx — so there is no cycle.
+   */
+  async displayFor(
+    userId: string,
+    day: string,
+  ): Promise<{ currency: Currency; fx: FxContext }> {
+    const settings = await this.settings.get(userId);
+    const currency = (settings.displayCurrency ?? 'GEL') as Currency;
+    return { currency, fx: await this.context(currency, day) };
   }
 
   /**
@@ -63,9 +77,7 @@ export class FxService {
    * Idempotent: re-running on the same day corrects that day's point rather than appending a
    * second one, the same way `stock_price_history` is grown.
    */
-  async refresh(
-    day?: string,
-  ): Promise<{
+  async refresh(day?: string): Promise<{
     refreshed: boolean;
     date?: string;
     rates?: Record<string, number>;
@@ -253,6 +265,7 @@ export class FxController {
     MongooseModule.forFeature([
       { name: FxRateHistory.name, schema: FxRateHistorySchema },
     ]),
+    SettingsModule,
   ],
   controllers: [FxController],
   providers: [FxService, NbgProvider, FxRefreshJob],

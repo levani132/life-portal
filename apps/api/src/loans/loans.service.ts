@@ -323,8 +323,7 @@ export class LoansService {
     const settings = await this.settings.get(userId);
     // Debts can be denominated differently — a friend lending dollars, a bank lending lari —
     // so each loan is restated before it joins a total.
-    const display = (settings.displayCurrency ?? 'GEL') as Currency;
-    const fx = await this.fx.context(display, today);
+    const { currency: display, fx } = await this.fx.displayFor(userId, today);
     const conv = (cents: number, from: Currency) => toDisplayCents(cents, from, fx).cents;
 
     let totalPrincipal = 0;

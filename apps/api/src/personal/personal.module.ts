@@ -10,7 +10,13 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { InjectModel, MongooseModule, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import {
+  InjectModel,
+  MongooseModule,
+  Prop,
+  Schema,
+  SchemaFactory,
+} from '@nestjs/mongoose';
 import {
   IsArray,
   IsBoolean,
@@ -24,16 +30,25 @@ import {
 } from 'class-validator';
 import { isValidObjectId, Model } from 'mongoose';
 import { NotFoundException } from '@nestjs/common';
-import type { Currency, FxContext, PersonalPlan as PersonalPlanDto, PersonalSummary } from '@life-portal/shared-types';
+import type {
+  Currency,
+  FxContext,
+  PersonalPlan as PersonalPlanDto,
+  PersonalSummary,
+} from '@life-portal/shared-types';
 import {
   PERSONAL_PLAN_STATUSES,
   PLAN_COMPANY,
   PLAN_TYPES,
   SUPPORTED_CURRENCIES,
 } from '@life-portal/shared-types';
-import { personalPlanDate, summarisePersonal } from '@life-portal/shared-domain';
+import {
+  personalPlanDate,
+  summarisePersonal,
+} from '@life-portal/shared-domain';
 import { baseSchemaOptions, centsField, dayField } from '../common/mongoose';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { FxModule, FxService } from '../fx/fx.module';
 import { Today } from '../common/today';
 import { CashflowModule } from '../cashflow/cashflow.module';
 import { CashflowService } from '../cashflow/cashflow.service';
@@ -53,9 +68,17 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 export class PersonalPlan {
   @Prop({ required: true, index: true }) userId!: string;
   @Prop({ required: true, trim: true }) title!: string;
-  @Prop({ required: true, enum: PLAN_TYPES, default: 'activity' }) type!: string;
-  @Prop({ required: true, enum: PLAN_COMPANY, default: 'alone' }) company!: string;
-  @Prop({ required: true, enum: PERSONAL_PLAN_STATUSES, default: 'idea', index: true }) status!: string;
+  @Prop({ required: true, enum: PLAN_TYPES, default: 'activity' })
+  type!: string;
+  @Prop({ required: true, enum: PLAN_COMPANY, default: 'alone' })
+  company!: string;
+  @Prop({
+    required: true,
+    enum: PERSONAL_PLAN_STATUSES,
+    default: 'idea',
+    index: true,
+  })
+  status!: string;
   @Prop() description?: string;
   @Prop(dayField) targetDate?: string;
   @Prop(dayField) startDate?: string;
@@ -64,7 +87,8 @@ export class PersonalPlan {
   @Prop() country?: string;
   @Prop(centsField) estimatedCostCents?: number;
   @Prop(centsField) actualCostCents?: number;
-  @Prop({ required: true, enum: SUPPORTED_CURRENCIES, default: 'USD' }) currency!: string;
+  @Prop({ required: true, enum: SUPPORTED_CURRENCIES, default: 'USD' })
+  currency!: string;
   @Prop({ default: 3, min: 1 }) priority!: number;
   @Prop({ default: false }) autoExpense!: boolean;
   @Prop() linkedExpenseId?: string;
@@ -123,21 +147,34 @@ export class PersonalService {
 
   async create(userId: string, dto: CreatePlanDto): Promise<PersonalPlanDto> {
     const created = await this.plans.create({ ...dto, userId });
-    return this.syncExpense(userId, created.toJSON() as unknown as PersonalPlanDto);
+    return this.syncExpense(
+      userId,
+      created.toJSON() as unknown as PersonalPlanDto,
+    );
   }
 
-  async update(userId: string, id: string, dto: UpdatePlanDto): Promise<PersonalPlanDto> {
+  async update(
+    userId: string,
+    id: string,
+    dto: UpdatePlanDto,
+  ): Promise<PersonalPlanDto> {
     const updated = await this.plans.findOneAndUpdate(
       { _id: this.oid(id), userId },
       { $set: dto },
       { new: true, runValidators: true },
     );
     if (!updated) throw new NotFoundException(`Plan ${id} not found`);
-    return this.syncExpense(userId, updated.toJSON() as unknown as PersonalPlanDto);
+    return this.syncExpense(
+      userId,
+      updated.toJSON() as unknown as PersonalPlanDto,
+    );
   }
 
   async remove(userId: string, id: string) {
-    const deleted = await this.plans.findOneAndDelete({ _id: this.oid(id), userId });
+    const deleted = await this.plans.findOneAndDelete({
+      _id: this.oid(id),
+      userId,
+    });
     if (!deleted) throw new NotFoundException(`Plan ${id} not found`);
     // The mirrored expense goes with it — unlike a loan repayment, the money was only ever
     // going to be spent because of this plan.
@@ -149,7 +186,10 @@ export class PersonalService {
    * Creates, updates or removes the mirrored cash-flow expense to match the plan's current
    * state. Called after every write so the two can never drift.
    */
-  private async syncExpense(userId: string, plan: PersonalPlanDto): Promise<PersonalPlanDto> {
+  private async syncExpense(
+    userId: string,
+    plan: PersonalPlanDto,
+  ): Promise<PersonalPlanDto> {
     const shouldMirror =
       plan.autoExpense &&
       plan.status !== 'cancelled' &&
@@ -170,7 +210,10 @@ export class PersonalService {
           .then(() => undefined);
 
     if (plan.linkedExpenseId !== expenseId) {
-      await this.plans.updateOne({ _id: plan.id }, { $set: { linkedExpenseId: expenseId } });
+      await this.plans.updateOne(
+        { _id: plan.id },
+        { $set: { linkedExpenseId: expenseId } },
+      );
       return { ...plan, linkedExpenseId: expenseId };
     }
     return plan;
@@ -186,7 +229,8 @@ export class PersonalService {
   }
 
   private oid(id: string): string {
-    if (!isValidObjectId(id)) throw new NotFoundException(`Plan ${id} not found`);
+    if (!isValidObjectId(id))
+      throw new NotFoundException(`Plan ${id} not found`);
     return id;
   }
 }
@@ -195,7 +239,10 @@ export class PersonalService {
 
 @Controller('personal')
 export class PersonalController {
-  constructor(private readonly personal: PersonalService) {}
+  constructor(
+    private readonly personal: PersonalService,
+    private readonly fx: FxService,
+  ) {}
 
   @Get()
   async overview(
@@ -203,16 +250,18 @@ export class PersonalController {
     @Today() today: string,
     @Query('status') status?: string,
   ) {
+    const display = await this.fx.displayFor(userId, today);
     const [plans, summary] = await Promise.all([
       this.personal.list(userId, status),
-      this.personal.summary(userId, today),
+      this.personal.summary(userId, today, display.currency, display.fx),
     ]);
     return { today, plans, summary };
   }
 
   @Get('summary')
-  summary(@CurrentUser('userId') userId: string, @Today() today: string) {
-    return this.personal.summary(userId, today);
+  async summary(@CurrentUser('userId') userId: string, @Today() today: string) {
+    const display = await this.fx.displayFor(userId, today);
+    return this.personal.summary(userId, today, display.currency, display.fx);
   }
 
   @Post()
@@ -221,7 +270,11 @@ export class PersonalController {
   }
 
   @Patch(':id')
-  update(@CurrentUser('userId') userId: string, @Param('id') id: string, @Body() dto: UpdatePlanDto) {
+  update(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdatePlanDto,
+  ) {
     return this.personal.update(userId, id, dto);
   }
 
@@ -233,8 +286,11 @@ export class PersonalController {
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: PersonalPlan.name, schema: PersonalPlanSchema }]),
+    MongooseModule.forFeature([
+      { name: PersonalPlan.name, schema: PersonalPlanSchema },
+    ]),
     CashflowModule,
+    FxModule,
   ],
   controllers: [PersonalController],
   providers: [PersonalService],

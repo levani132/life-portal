@@ -2,6 +2,15 @@
 
 User-visible changes. Newest first.
 
+## 2026-08-29 — The currency setting now reaches every page
+
+**Fixed:** the Stocks, Items and Personal pages showed their totals with a lari sign over dollar
+amounts, and changing the display currency in settings did nothing to them. Only the dashboard had
+been converting. All three now honour the setting, as does every figure they show.
+
+Individual rows still read in the currency they were recorded in — a share bought at $114 says
+$114, because that is what was paid. It is the totals that follow your display currency.
+
 ## 2026-08-25 — Everything in lari
 
 **The app now reads in one currency, and it is yours to choose.** Figures recorded in dollars —

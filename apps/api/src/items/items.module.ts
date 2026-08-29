@@ -10,7 +10,13 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { InjectModel, MongooseModule, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import {
+  InjectModel,
+  MongooseModule,
+  Prop,
+  Schema,
+  SchemaFactory,
+} from '@nestjs/mongoose';
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -28,12 +34,27 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Model } from 'mongoose';
-import type { Currency, FxContext, ItemsSummary, SellableItem as SellableItemDto } from '@life-portal/shared-types';
+import type {
+  Currency,
+  FxContext,
+  ItemsSummary,
+  SellableItem as SellableItemDto,
+} from '@life-portal/shared-types';
 import { ITEM_STATUSES, SUPPORTED_CURRENCIES } from '@life-portal/shared-types';
-import { itemsProceedsForLoan, summariseItems } from '@life-portal/shared-domain';
-import { baseSchemaOptions, dayField, requiredCentsField, centsField } from '../common/mongoose';
+import {
+  itemsProceedsForLoan,
+  summariseItems,
+} from '@life-portal/shared-domain';
+import {
+  baseSchemaOptions,
+  dayField,
+  requiredCentsField,
+  centsField,
+} from '../common/mongoose';
 import { OwnedCrudService } from '../common/owned-crud.service';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { resolveToday } from '../common/today';
+import { FxModule, FxService } from '../fx/fx.module';
 import { Today } from '../common/today';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -55,7 +76,8 @@ export class BuyerInterestSub {
   @Prop(centsField) offeredPriceCents?: number;
   @Prop({ required: true, match: DAY }) at!: string;
   @Prop() note?: string;
-  @Prop({ enum: ['open', 'negotiating', 'lost', 'won'], default: 'open' }) status!: string;
+  @Prop({ enum: ['open', 'negotiating', 'lost', 'won'], default: 'open' })
+  status!: string;
 }
 
 @Schema({ ...baseSchemaOptions, collection: 'sellable_items' })
@@ -64,15 +86,20 @@ export class SellableItem {
   @Prop({ required: true, trim: true }) name!: string;
   @Prop() description?: string;
   @Prop() category?: string;
-  @Prop({ required: true, enum: SUPPORTED_CURRENCIES, default: 'USD' }) currency!: string;
+  @Prop({ required: true, enum: SUPPORTED_CURRENCIES, default: 'USD' })
+  currency!: string;
   @Prop(requiredCentsField) askingPriceCents!: number;
   /** What projections use: the realistic price after haggling. */
   @Prop(requiredCentsField) expectedPriceCents!: number;
   @Prop(centsField) minPriceCents?: number;
-  @Prop({ required: true, enum: ITEM_STATUSES, default: 'draft', index: true }) status!: string;
-  @Prop({ enum: ['new', 'like_new', 'good', 'fair', 'poor'] }) condition?: string;
-  @Prop({ type: [SchemaFactory.createForClass(ItemListingSub)], default: [] }) listings!: ItemListingSub[];
-  @Prop({ type: [SchemaFactory.createForClass(BuyerInterestSub)], default: [] }) interests!: BuyerInterestSub[];
+  @Prop({ required: true, enum: ITEM_STATUSES, default: 'draft', index: true })
+  status!: string;
+  @Prop({ enum: ['new', 'like_new', 'good', 'fair', 'poor'] })
+  condition?: string;
+  @Prop({ type: [SchemaFactory.createForClass(ItemListingSub)], default: [] })
+  listings!: ItemListingSub[];
+  @Prop({ type: [SchemaFactory.createForClass(BuyerInterestSub)], default: [] })
+  interests!: BuyerInterestSub[];
   @Prop(centsField) soldPriceCents?: number;
   @Prop(dayField) soldAt?: string;
   @Prop({ index: true }) allocateToLoanId?: string;
@@ -111,9 +138,19 @@ export class CreateItemDto {
   @IsOptional() @IsInt() @Min(0) expectedPriceCents?: number;
   @IsOptional() @IsInt() @Min(0) minPriceCents?: number;
   @IsOptional() @IsIn(ITEM_STATUSES) status?: string;
-  @IsOptional() @IsIn(['new', 'like_new', 'good', 'fair', 'poor']) condition?: string;
-  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => ItemListingDto) listings?: ItemListingDto[];
-  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => BuyerInterestDto) interests?: BuyerInterestDto[];
+  @IsOptional()
+  @IsIn(['new', 'like_new', 'good', 'fair', 'poor'])
+  condition?: string;
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ItemListingDto)
+  listings?: ItemListingDto[];
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BuyerInterestDto)
+  interests?: BuyerInterestDto[];
   @IsOptional() @IsInt() @Min(0) soldPriceCents?: number;
   @IsOptional() @Matches(DAY) soldAt?: string;
   @IsOptional() @IsMongoId() allocateToLoanId?: string;
@@ -159,7 +196,10 @@ export class ItemsService extends OwnedCrudService<SellableItem> {
    * any partial and this one requires a full DTO — narrowing a parameter would break
    * substitutability.
    */
-  async createItem(userId: string, dto: CreateItemDto): Promise<SellableItemDto> {
+  async createItem(
+    userId: string,
+    dto: CreateItemDto,
+  ): Promise<SellableItemDto> {
     // Expected price defaults to the asking price so projections are never zero just because
     // the user has not thought about haggling yet.
     const created = await this.model.create({
@@ -170,7 +210,12 @@ export class ItemsService extends OwnedCrudService<SellableItem> {
     return this.serialize(created) as unknown as SellableItemDto;
   }
 
-  async markSold(userId: string, id: string, dto: MarkSoldDto, today: string): Promise<SellableItemDto> {
+  async markSold(
+    userId: string,
+    id: string,
+    dto: MarkSoldDto,
+    today: string,
+  ): Promise<SellableItemDto> {
     const updated = await this.update(userId, id, {
       status: 'sold',
       soldPriceCents: dto.soldPriceCents,
@@ -179,7 +224,11 @@ export class ItemsService extends OwnedCrudService<SellableItem> {
     return updated as unknown as SellableItemDto;
   }
 
-  async summary(userId: string, currency: Currency = 'GEL', fx?: FxContext): Promise<ItemsSummary> {
+  async summary(
+    userId: string,
+    currency: Currency = 'GEL',
+    fx?: FxContext,
+  ): Promise<ItemsSummary> {
     return summariseItems(await this.list(userId), currency, fx);
   }
 
@@ -193,20 +242,28 @@ export class ItemsService extends OwnedCrudService<SellableItem> {
 
 @Controller('items')
 export class ItemsController {
-  constructor(private readonly items: ItemsService) {}
+  constructor(
+    private readonly items: ItemsService,
+    private readonly fx: FxService,
+  ) {}
 
   @Get()
-  async overview(@CurrentUser('userId') userId: string, @Query('status') status?: string) {
+  async overview(
+    @CurrentUser('userId') userId: string,
+    @Query('status') status?: string,
+  ) {
+    const display = await this.fx.displayFor(userId, resolveToday());
     const [items, summary] = await Promise.all([
       this.items.list(userId, status),
-      this.items.summary(userId),
+      this.items.summary(userId, display.currency, display.fx),
     ]);
     return { items, summary };
   }
 
   @Get('summary')
-  summary(@CurrentUser('userId') userId: string) {
-    return this.items.summary(userId);
+  async summary(@CurrentUser('userId') userId: string) {
+    const display = await this.fx.displayFor(userId, resolveToday());
+    return this.items.summary(userId, display.currency, display.fx);
   }
 
   @Get(':id')
@@ -220,7 +277,11 @@ export class ItemsController {
   }
 
   @Patch(':id')
-  update(@CurrentUser('userId') userId: string, @Param('id') id: string, @Body() dto: UpdateItemDto) {
+  update(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateItemDto,
+  ) {
     return this.items.update(userId, id, dto as Partial<SellableItem>);
   }
 
@@ -241,7 +302,12 @@ export class ItemsController {
 }
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: SellableItem.name, schema: SellableItemSchema }])],
+  imports: [
+    MongooseModule.forFeature([
+      { name: SellableItem.name, schema: SellableItemSchema },
+    ]),
+    FxModule,
+  ],
   controllers: [ItemsController],
   providers: [ItemsService],
   exports: [ItemsService],

@@ -18,6 +18,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Today } from '../common/today';
 import { CONFIG, type AppConfig } from '../config/configuration';
+import { FxModule, FxService } from '../fx/fx.module';
 import { SettingsModule, SettingsService } from '../settings/settings.module';
 import { FinnhubProvider } from './finnhub.provider';
 import {
@@ -66,7 +67,9 @@ export class QuoteRefreshJob {
     if (this.config.disableSchedules) return;
     const result = await this.stocks.refreshAll();
     const refreshed = result.results.filter((r) => r.refreshed).length;
-    this.logger.log(`Quote refresh: ${refreshed}/${result.results.length} symbols updated`);
+    this.logger.log(
+      `Quote refresh: ${refreshed}/${result.results.length} symbols updated`,
+    );
   }
 }
 
@@ -76,6 +79,7 @@ export class StocksController {
     private readonly stocks: StocksService,
     private readonly settings: SettingsService,
     private readonly finnhub: FinnhubProvider,
+    private readonly fx: FxService,
   ) {}
 
   /** Everything the detail page needs in one round trip. */
@@ -86,9 +90,13 @@ export class StocksController {
     @Query('esppThrough') esppThrough?: string,
   ) {
     const settings = await this.settings.get(userId);
+    const display = await this.fx.displayFor(userId, today);
     const positions = await this.stocks.positions(userId, today);
     const [summary, espp, esppPlans, targets] = await Promise.all([
-      this.stocks.summary(userId, today, { taxRate: settings.capitalGainsTaxRate }),
+      this.stocks.summary(userId, today, {
+        taxRate: settings.capitalGainsTaxRate,
+        ...display,
+      }),
       this.stocks.esppProjections(userId, today, esppThrough, positions),
       this.stocks.listEsppPlans(userId),
       this.stocks.listTargets(userId),
@@ -112,7 +120,11 @@ export class StocksController {
   @Get('summary')
   async summary(@CurrentUser('userId') userId: string, @Today() today: string) {
     const settings = await this.settings.get(userId);
-    return this.stocks.summary(userId, today, { taxRate: settings.capitalGainsTaxRate });
+    const display = await this.fx.displayFor(userId, today);
+    return this.stocks.summary(userId, today, {
+      taxRate: settings.capitalGainsTaxRate,
+      ...display,
+    });
   }
 
   @Get('positions')
@@ -126,7 +138,11 @@ export class StocksController {
   }
 
   @Post('history/:symbol')
-  importHistory(@Param('symbol') symbol: string, @Body() dto: ImportHistoryDto, @Today() today: string) {
+  importHistory(
+    @Param('symbol') symbol: string,
+    @Body() dto: ImportHistoryDto,
+    @Today() today: string,
+  ) {
     return this.stocks.importHistory(symbol, dto.points, today);
   }
 
@@ -141,7 +157,11 @@ export class StocksController {
   }
 
   @Patch('lots/:id')
-  updateLot(@CurrentUser('userId') userId: string, @Param('id') id: string, @Body() dto: UpdateLotDto) {
+  updateLot(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateLotDto,
+  ) {
     return this.stocks.updateLot(userId, id, dto);
   }
 
@@ -166,12 +186,18 @@ export class StocksController {
   }
 
   @Put('targets')
-  upsertTarget(@CurrentUser('userId') userId: string, @Body() dto: UpsertTargetDto) {
+  upsertTarget(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: UpsertTargetDto,
+  ) {
     return this.stocks.upsertTarget(userId, dto);
   }
 
   @Delete('targets/:symbol')
-  removeTarget(@CurrentUser('userId') userId: string, @Param('symbol') symbol: string) {
+  removeTarget(
+    @CurrentUser('userId') userId: string,
+    @Param('symbol') symbol: string,
+  ) {
     return this.stocks.removeTarget(userId, symbol);
   }
 
@@ -207,7 +233,10 @@ export class StocksController {
   }
 
   @Put('espp')
-  upsertEspp(@CurrentUser('userId') userId: string, @Body() dto: UpsertEsppPlanDto) {
+  upsertEspp(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: UpsertEsppPlanDto,
+  ) {
     return this.stocks.upsertEsppPlan(userId, dto);
   }
 }
@@ -223,6 +252,7 @@ export class StocksController {
       { name: EsppPlan.name, schema: EsppPlanSchema },
     ]),
     SettingsModule,
+    FxModule,
   ],
   controllers: [StocksController],
   providers: [StocksService, FinnhubProvider, QuoteRefreshJob],

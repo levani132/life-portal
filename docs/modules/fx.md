@@ -92,13 +92,20 @@ are skipped.
 ## Using it from another module
 
 ```ts
-const currency = (settings.displayCurrency ?? 'GEL') as Currency;
-const fx = await this.fx.context(currency, today);   // FxContext: a flat FROM_TO table
+const { currency, fx } = await this.fx.displayFor(userId, today);
 ```
 
-`FxService.context()` takes the currency rather than a `userId` on purpose — every caller already
-holds the user's settings, and reaching for `SettingsService` here would make two modules import
-each other.
+`displayFor()` is the one every summary wants. Doing it by hand meant five copies of "fetch the
+settings, build the context", and **three of them were simply missing** — which is how `/stocks`,
+`/items` and `/personal` came to report `currency: 'GEL'` over unconverted USD amounts while the
+dashboard was correct. If you are writing a summary, call `displayFor`.
+
+`context(currency, day)` remains for callers that already know the currency. The dependency runs one
+way — settings knows nothing of fx — so there is no cycle.
+
+**Rows keep their own currency; only summaries convert.** The web pages already rely on this: a
+stock lot renders at `position.currency`, an item at `item.currency`, while every total renders at
+`summary.currency`. A row showing a converted price would be a lie about what was paid.
 
 Then, in the domain layer: `toDisplayCents(cents, from, fx)` for one amount, `sumInDisplay(rows, fx)`
 for a mixed-currency total. `rateTable()` pre-computes the **cross rates**, so `USD_EUR` is present
@@ -119,6 +126,9 @@ number is recoverable; a wrongly converted one is not. Two consequences callers 
 
 - **cashflow** — `projectCash()` takes `fx` and an `openingCurrency`. Without them it adds dollars
   to lari; there is a test named for that.
+- **Every controller returning a summary** must call `displayFor`. A summary that reports a
+  `currency` it did not convert to is worse than one that reports nothing: the figure looks
+  authoritative and is wrong by a factor of the exchange rate.
 - **loans**, **items**, **stocks**, **personal** — each summary converts its own rows and reports
   `displayCurrency`. That is what makes the dashboard's `netPositionCents` a single-currency sum.
 - **settings** — owns `displayCurrency`, changed at `/settings` in the web app, which also shows

@@ -48,10 +48,8 @@ export class CashflowService {
    * Every figure this service returns goes through here. Rows keep the currency they were
    * recorded in — a USD salary stays a USD salary — and only the presentation is unified.
    */
-  private async display(userId: string, today: string) {
-    const settings = await this.settings.get(userId);
-    const currency = (settings.displayCurrency ?? 'GEL') as Currency;
-    return { currency, fx: await this.fx.context(currency, today) };
+  private display(userId: string, today: string) {
+    return this.fx.displayFor(userId, today);
   }
 
   // ---------------------------------------------------------------- balance
