@@ -219,10 +219,21 @@ export class SpendingService {
   async update(userId: string, id: string, dto: UpdatePaymentDto): Promise<SpendPaymentDto> {
     const existing = await this.byId(userId, id);
     const amountCents = dto.amountCents ?? existing.amountCents;
-    this.assertNotOverRefunded(
-      amountCents,
-      dto.notReallySpentCents ?? existing.notReallySpentCents,
-    );
+    const notReallySpent = dto.notReallySpentCents ?? existing.notReallySpentCents;
+    this.assertNotOverRefunded(amountCents, notReallySpent);
+
+    // A confirmation is the owner's statement of where this money went, denominated in the
+    // payment's own currency. Shrinking the payment underneath it would leave a statement
+    // claiming money that no longer exists — so the confirmation has to be adjusted first,
+    // rather than silently capped into something the owner never said.
+    if (existing.decision?.kind === 'confirmed' && existing.decision.allocations?.length) {
+      const claimed = existing.decision.allocations.reduce((sum, a) => sum + a.amountCents, 0);
+      if (claimed > amountCents - (notReallySpent ?? 0)) {
+        throw new BadRequestException(
+          'This payment is confirmed for more than the new amount — lower the confirmation first',
+        );
+      }
+    }
 
     const patch: Record<string, unknown> = { ...dto };
     if (dto.day) patch['day'] = toDay(dto.day);

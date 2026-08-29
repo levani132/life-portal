@@ -88,6 +88,37 @@ export function PaymentSheet({
   /** Complaints about the form itself, which never reach the server. */
   const [notice, setNotice] = useState<string | null>(null);
 
+  /**
+   * Editing the payment itself — amount, currency, merchant — in place.
+   *
+   * This exists because a mistyped currency is otherwise a delete-and-retype: the payment's own
+   * facts were only editable from the payments panel, not from the sheet where the mistake is
+   * actually noticed. Held as one object so Cancel is a single state reset.
+   */
+  const [editing, setEditing] = useState(false);
+  const [edit, setEdit] = useState({
+    amountCents: payment.amountCents as number | undefined,
+    currency: payment.currency as Currency,
+    merchant: payment.merchant ?? '',
+  });
+
+  const savePayment = async () => {
+    setNotice(null);
+    if (edit.amountCents == null || edit.amountCents <= 0) {
+      setNotice('The amount has to be more than nothing.');
+      return;
+    }
+    const ok = await run(async () => {
+      await api.patch(`/spending/payments/${payment.id}`, {
+        amountCents: edit.amountCents,
+        currency: edit.currency,
+        merchant: edit.merchant.trim() || undefined,
+      });
+      await onChanged();
+    });
+    if (ok) setEditing(false);
+  };
+
   const allocatedCents = rows.reduce((sum, row) => sum + (row.amountCents ?? 0), 0);
   const leftoverCents = spendableCents - allocatedCents;
   const orphaned = (payment.allocations ?? []).filter(isOrphan);
@@ -166,26 +197,88 @@ export function PaymentSheet({
       wide
       onClose={onClose}
       title={payment.merchant ?? 'This payment'}
-      submitLabel={SUBMIT_LABEL[mode]}
+      submitLabel={
+        mode === 'confirm' && decision?.kind === 'confirmed' ? 'Save changes' : SUBMIT_LABEL[mode]
+      }
       pending={pending}
       error={error ?? notice}
       onSubmit={() => void submit()}
     >
       <header className="rounded-lg border border-border bg-surface px-3 py-2.5">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-          <p className="tabular text-lg font-semibold text-ink">
-            {formatCents(payment.amountCents, payment.currency)}
-          </p>
-          <p className="shrink-0 text-xs text-ink-faint">
-            {formatDay(payment.day)}
-            {payment.cardLast4 ? ` · card ••${payment.cardLast4}` : ''}
-          </p>
-        </div>
-        {payment.notReallySpentCents != null && payment.notReallySpentCents > 0 && (
-          <p className="tabular mt-0.5 text-[11px] text-ink-faint">
-            {formatCents(payment.notReallySpentCents, payment.currency)} of it was paid back, so{' '}
-            {formatCents(spendableCents, payment.currency)} counts as spending.
-          </p>
+        {editing ? (
+          <div className="space-y-2">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Field label="Amount">
+                <MoneyInput
+                  required
+                  valueCents={edit.amountCents}
+                  onChangeCents={(cents) => setEdit({ ...edit, amountCents: cents })}
+                  currency={edit.currency}
+                  onChangeCurrency={(currency) => setEdit({ ...edit, currency })}
+                />
+              </Field>
+              <Field label="Where">
+                <Input
+                  value={edit.merchant}
+                  onChange={(e) => setEdit({ ...edit, merchant: e.target.value })}
+                />
+              </Field>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="btn-primary text-xs"
+                disabled={pending}
+                onClick={() => void savePayment()}
+              >
+                Save payment
+              </button>
+              <button
+                type="button"
+                className="btn-ghost text-xs"
+                disabled={pending}
+                onClick={() => {
+                  setEditing(false);
+                  setEdit({
+                    amountCents: payment.amountCents,
+                    currency: payment.currency as Currency,
+                    merchant: payment.merchant ?? '',
+                  });
+                }}
+              >
+                Cancel
+              </button>
+              <p className="text-[11px] text-ink-faint">
+                Changing this re-derives everything the payment touched.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+              <p className="tabular text-lg font-semibold text-ink">
+                {formatCents(payment.amountCents, payment.currency)}
+              </p>
+              <p className="shrink-0 text-xs text-ink-faint">
+                {formatDay(payment.day)}
+                {payment.cardLast4 ? ` · card ••${payment.cardLast4}` : ''}
+                {' · '}
+                <button
+                  type="button"
+                  className="underline hover:text-ink"
+                  onClick={() => setEditing(true)}
+                >
+                  edit
+                </button>
+              </p>
+            </div>
+            {payment.notReallySpentCents != null && payment.notReallySpentCents > 0 && (
+              <p className="tabular mt-0.5 text-[11px] text-ink-faint">
+                {formatCents(payment.notReallySpentCents, payment.currency)} of it was paid back, so{' '}
+                {formatCents(spendableCents, payment.currency)} counts as spending.
+              </p>
+            )}
+          </>
         )}
       </header>
 
@@ -206,7 +299,9 @@ export function PaymentSheet({
       {decision && (
         <div className="flex flex-wrap items-center gap-2">
           <Chip tone="good">
-            {decision.kind === 'custom' ? 'given its own purpose' : 'confirmed by you'}
+            {decision.kind === 'custom'
+              ? 'given its own purpose'
+              : 'confirmed by you — the rows below are editable'}
           </Chip>
           <button
             type="button"
