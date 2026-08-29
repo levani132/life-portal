@@ -29,6 +29,22 @@ Still open:
   that is the check that actually catches things, so it is the one piece of the definition of done
   still outstanding.
 
+## Post-spec evolution — 2026-08-30
+
+The owner merged the spending UI into the Free money page after using both ("in the end they kind
+of have the same goal"). `/spending` as a page is gone; `/spending/tokens` remains; the module
+boundary, collections and API namespace are untouched. Recorded as a deliberate amendment to the
+one-route half of principle I in `docs/DECISIONS.md`.
+
+With that came the composition T045 left open: the projection now takes real spending for past
+days, with actuals replacing only the auto card-spending budget — manual-settlement lines and
+one-offs survive beside them, and captured credits never feed it (the salary arrives as a message
+too). `CashflowService` reads `spend_payments` directly, the documented exception to
+service-mediated access, because the reverse module import would be a cycle.
+
+The quickstart's §5 expectations should be read against the merged page: the ladder is the cadence
+panels on `/cashflow`, and the payment sheet opens from the Payments panel and the day panel.
+
 One thing found while implementing, worth knowing before touching the projection: `SpendingModule`
 imports `CashflowModule` to read the budget, so the reverse import would be circular. `projectCash`
 now accepts `actualOutByDay` (T045) but nothing supplies it yet — the composition belongs above
