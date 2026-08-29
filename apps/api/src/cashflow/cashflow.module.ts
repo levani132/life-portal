@@ -11,7 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { FxModule } from '../fx/fx.module';
+import { FxModule, FxService } from '../fx/fx.module';
 import { SettingsModule } from '../settings/settings.module';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Today } from '../common/today';
@@ -37,7 +37,10 @@ import { CashflowService } from './cashflow.service';
 
 @Controller('cashflow')
 export class CashflowController {
-  constructor(private readonly cashflow: CashflowService) {}
+  constructor(
+    private readonly cashflow: CashflowService,
+    private readonly fx: FxService,
+  ) {}
 
   /** Everything the detail page needs in one round trip. */
   @Get()
@@ -47,6 +50,7 @@ export class CashflowController {
     @Query('to') to?: string,
     @Query('snapshotDate') snapshotDate?: string,
   ) {
+    const display = await this.fx.displayFor(userId, today);
     const [summary, projection, incomes, expenses, sales, breakdown, balanceHistory] =
       await Promise.all([
         this.cashflow.summary(userId, today),
@@ -57,12 +61,24 @@ export class CashflowController {
         this.cashflow.listIncomes(userId),
         this.cashflow.listExpenses(userId),
         this.cashflow.sales(userId),
-        this.cashflow.monthlyBreakdown(userId),
+        this.cashflow.monthlyBreakdown(userId, today),
         this.cashflow.balanceHistory(userId),
       ]);
     // `sales` ships with the payload so the page can rebuild any day's events, including days
-    // before the projection window, without another round trip.
-    return { today, summary, projection, incomes, expenses, sales, breakdown, balanceHistory };
+    // before the projection window, without another round trip. `fx` ships so the page can fold
+    // rows recorded in another currency into display totals with the same pure helpers the API
+    // uses — a client-side sum of mixed raw cents is how a lari lunch became dollars.
+    return {
+      today,
+      summary,
+      projection,
+      incomes,
+      expenses,
+      sales,
+      breakdown,
+      balanceHistory,
+      fx: display.fx,
+    };
   }
 
   @Get('summary')

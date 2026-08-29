@@ -23,6 +23,7 @@ import type {
   CompletenessGap,
   Currency,
   Expense,
+  FxContext,
   IncomeSource,
   LadderRung,
   PeriodSaving,
@@ -48,6 +49,7 @@ import {
   salesOnDay,
   snapshotAt,
   sumCents,
+  toDisplayCents,
 } from '@life-portal/shared-domain';
 import { AppShell, PageHeader } from '../../components/app-shell';
 import { PaymentSheet, type SheetPayment } from '../../components/payment-sheet';
@@ -87,6 +89,8 @@ interface CashflowOverview {
   sales: RealisedSale[];
   breakdown: { category: string; monthlyCents: number }[];
   balanceHistory: CashBalance[];
+  /** Today's rate table, so mixed-currency rows can be folded into display totals client-side. */
+  fx: FxContext;
 }
 
 /** Everything the spending side needs in one round trip: ladder, figures, payments, gaps. */
@@ -379,6 +383,7 @@ function Cashflow() {
       <RecurringSpending
         expenses={data.expenses}
         currency={summary.currency}
+        fx={data.fx}
         displayCurrency={displayCurrency}
         ladder={overview.data?.ladder}
         suggestions={suggestionByExpense}
@@ -398,6 +403,7 @@ function Cashflow() {
           expenses={data.expenses}
           today={data.today}
           currency={summary.currency}
+          fx={data.fx}
           displayCurrency={displayCurrency}
           extraCents={overview.data?.ladder.extraCents}
           unplannedPayments={unplannedPayments}
@@ -1321,12 +1327,20 @@ const PERIOD_WORD: Record<Cadence, string> = {
   yearly: 'this year',
 };
 
-/** Paused rows are out of the projection, so they are out of the monthly figure too. */
-function monthlyTotalCents(expenses: Expense[]): number {
+/**
+ * Paused rows are out of the projection, so they are out of the monthly figure too. Each row is
+ * converted into the display currency before it joins the sum — the rows can disagree about
+ * their currency, and adding raw lari to raw dollars produced a figure that meant nothing.
+ */
+function monthlyTotalCents(expenses: Expense[], displayCurrency: string, fx: FxContext): number {
   return sumCents(
     expenses.map((expense) =>
       expense.active && expense.recurrence
-        ? monthlyEquivalentCents(expense.amountCents, expense.recurrence)
+        ? toDisplayCents(
+            monthlyEquivalentCents(expense.amountCents, expense.recurrence),
+            expense.currency,
+            fx,
+          ).cents
         : 0,
     ),
   );
@@ -1350,6 +1364,7 @@ function sortByPreference(rows: Expense[], preferred: string[]): Expense[] {
 function RecurringSpending({
   expenses,
   currency,
+  fx,
   displayCurrency,
   ladder,
   suggestions,
@@ -1363,6 +1378,7 @@ function RecurringSpending({
 }: {
   expenses: Expense[];
   currency: string;
+  fx: FxContext;
   displayCurrency: string;
   ladder?: SpendLadder;
   suggestions: Map<string, BudgetProposal>;
@@ -1408,7 +1424,7 @@ function RecurringSpending({
         <div className="flex items-center gap-3">
           {everything.length > 0 && (
             <p className="tabular text-xs text-ink-muted">
-              ≈ {formatCents(monthlyTotalCents(everything), currency)}/month in total
+              ≈ {formatCents(monthlyTotalCents(everything, currency, fx), currency)}/month in total
               <EstimateMark basis={MONTHLY_EQUIVALENT_BASIS} />
             </p>
           )}
@@ -1433,7 +1449,7 @@ function RecurringSpending({
           const preferred =
             pendingOrder[group.key] ?? tier?.rungs.map((rung) => rung.expenseId) ?? [];
           const rows = sortByPreference(groups.get(group.key) ?? [], preferred);
-          const monthlyCents = monthlyTotalCents(rows);
+          const monthlyCents = monthlyTotalCents(rows, currency, fx);
           const renderRow = (expense: Expense) => (
             <ExpenseRow
               expense={expense}
@@ -1614,13 +1630,16 @@ function ExpenseRow({
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <div className="text-right">
-            <Money cents={expense.amountCents} currency={currency} />
+            {/* The row's own currency, not the display one: 8.28 lari printed with a dollar
+                sign is not a smaller mistake than the wrong number. The converted view lives
+                on the rung line below, which is already in the display currency. */}
+            <Money cents={expense.amountCents} currency={expense.currency} />
             {showMonthlyEquivalent && expense.recurrence && (
               <p className="tabular text-[11px] text-ink-faint">
                 ≈{' '}
                 {formatCents(
                   monthlyEquivalentCents(expense.amountCents, expense.recurrence),
-                  currency,
+                  expense.currency,
                 )}
                 /mo
               </p>
@@ -1728,6 +1747,7 @@ function OneOffSpending({
   expenses,
   today,
   currency,
+  fx,
   displayCurrency,
   extraCents,
   unplannedPayments,
@@ -1739,6 +1759,7 @@ function OneOffSpending({
   expenses: Expense[];
   today: string;
   currency: string;
+  fx: FxContext;
   displayCurrency: string;
   /** The ladder's unplanned total for the running month, when the spending side has loaded. */
   extraCents?: number;
@@ -1760,8 +1781,13 @@ function OneOffSpending({
   const [month, setMonth] = useState(thisMonth);
 
   const rows = oneOffs.filter((expense) => expense.date?.startsWith(month));
-  // Paused rows are out of the projections, so they stay out of the total too.
-  const totalCents = sumCents(rows.map((expense) => (expense.active ? expense.amountCents : 0)));
+  // Paused rows are out of the projections, so they stay out of the total too. Each row joins
+  // the total in the display currency — the rows can disagree about their own.
+  const totalCents = sumCents(
+    rows.map((expense) =>
+      expense.active ? toDisplayCents(expense.amountCents, expense.currency, fx).cents : 0,
+    ),
+  );
   const pausedCount = rows.filter((expense) => !expense.active).length;
   const monthsWithEntries = [
     ...new Set(oneOffs.map((expense) => (expense.date ?? '').slice(0, 7))),
@@ -2042,7 +2068,7 @@ function ExpenseList({
             </div>
             <div className="flex shrink-0 items-center gap-3">
               <div className="text-right">
-                <Money cents={expense.amountCents} currency={currency} />
+                <Money cents={expense.amountCents} currency={expense.currency} />
               </div>
               <button
                 type="button"
@@ -2080,7 +2106,8 @@ function IncomeRow({ income, currency }: { income: IncomeSource; currency: strin
         <p className="text-xs text-ink-faint">{describeRecurrence(income.recurrence)}</p>
       </div>
       <div className="shrink-0 text-right">
-        <Money cents={income.amountCents} currency={currency} tone="good" />
+        {/* The income's own currency — the salary is genuinely paid in dollars. */}
+        <Money cents={income.amountCents} currency={income.currency} tone="good" />
         {income.amountCents === 0 && (
           <p className="text-[11px] text-amber-400">set the real amount</p>
         )}

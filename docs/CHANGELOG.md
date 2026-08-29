@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-08-30 — A lari lunch no longer wears a dollar sign
+
+**Fixed:** a budget line entered in one currency was shown with the display currency's symbol on
+its raw number — a ₾8.28 lunch read as $8.28 — and the "≈ /month" totals on the spending panels
+and the per-category breakdown added raw lari to raw dollars, producing figures that meant
+nothing. Every row now shows its own currency (the converted view lives on the bar beneath it),
+and every total converts each line at today's rate before summing.
+
 ## 2026-08-30 — A day now says what it spent, not just what it paid
 
 The date panel used to answer only the bank's question — how much money left the account that day.

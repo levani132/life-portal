@@ -374,12 +374,22 @@ export class CashflowService {
   }
 
   /** Monthly cost of every active recurring expense, for the "where it goes" breakdown. */
-  async monthlyBreakdown(userId: string): Promise<{ category: string; monthlyCents: number }[]> {
+  async monthlyBreakdown(
+    userId: string,
+    today: string,
+  ): Promise<{ category: string; monthlyCents: number }[]> {
     const expenses = await this.listExpenses(userId);
+    const display = await this.display(userId, today);
     const totals = new Map<string, number>();
     for (const expense of expenses) {
       if (!expense.active || expense.kind !== 'recurring' || !expense.recurrence) continue;
-      const monthly = monthlyEquivalentCents(expense.amountCents, expense.recurrence);
+      // Converted before it joins the total: a category can hold a dollar line and a lari line,
+      // and summing their raw cents is how a breakdown quietly stops meaning anything.
+      const monthly = toDisplayCents(
+        monthlyEquivalentCents(expense.amountCents, expense.recurrence),
+        expense.currency as Currency,
+        display.fx,
+      ).cents;
       totals.set(expense.category, (totals.get(expense.category) ?? 0) + monthly);
     }
     return [...totals.entries()]
