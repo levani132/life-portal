@@ -19,7 +19,7 @@ import { Today } from '../common/today';
 import { CashflowModule } from '../cashflow/cashflow.module';
 import { FxModule } from '../fx/fx.module';
 import { NutritionModule } from '../nutrition/nutrition.module';
-import { SettingsModule } from '../settings/settings.module';
+import { SettingsModule, SettingsService } from '../settings/settings.module';
 import { IngestTokenGuard, type IngestContext } from './ingest-token.guard';
 import { IngestTokenService } from './ingest-token.service';
 import {
@@ -28,6 +28,7 @@ import {
   IngestDto,
   PromotePurposeDto,
   SetDecisionDto,
+  SetSpendOrderDto,
   UpdatePaymentDto,
 } from './spending.dto';
 import {
@@ -76,6 +77,7 @@ export class SpendingController {
   constructor(
     private readonly spending: SpendingService,
     private readonly tokens: IngestTokenService,
+    private readonly settings: SettingsService,
   ) {}
 
   @Get('payments')
@@ -129,6 +131,18 @@ export class SpendingController {
     @Body() dto: PromotePurposeDto,
   ) {
     return this.spending.promote(userId, id, today, dto);
+  }
+
+  /**
+   * The order the ladder fills its rungs.
+   *
+   * Ids across every tier in one list; within a tier, rungs sort by their index. Unknown ids are
+   * tolerated and unlisted expenses fall to the end — the same preference-list behaviour as
+   * `widgetOrder`, because expenses come and go.
+   */
+  @Put('order')
+  setOrder(@CurrentUser('userId') userId: string, @Body() dto: SetSpendOrderDto) {
+    return this.settings.setSpendOrder(userId, dto.order);
   }
 
   /** Messages the app can prove never arrived. Never a balance — see the module doc. */

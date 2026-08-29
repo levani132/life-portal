@@ -25,10 +25,7 @@ import type {
   IncomeSource,
   RealisedSale,
 } from '@life-portal/shared-types';
-import {
-  CASHFLOW_CADENCES,
-  EXPENSE_CATEGORIES,
-} from '@life-portal/shared-types';
+import { CASHFLOW_CADENCES, EXPENSE_CATEGORIES } from '@life-portal/shared-types';
 import {
   addMonths,
   buildCashEvents,
@@ -86,9 +83,7 @@ function Cashflow() {
 
   const [editingBalance, setEditingBalance] = useState(false);
   const [addingIncome, setAddingIncome] = useState(false);
-  const [addingExpense, setAddingExpense] = useState<ExpensePreset | null>(
-    null,
-  );
+  const [addingExpense, setAddingExpense] = useState<ExpensePreset | null>(null);
 
   // Only block on the very first load: a revalidation after a write must not tear the page
   // down to a spinner and lose every panel's local state.
@@ -110,27 +105,17 @@ function Cashflow() {
         subtitle={`Balance last reconciled ${formatDay(summary.balanceAsOf)} at ${formatCents(summary.reconciledBalanceCents, summary.currency)}`}
         actions={
           <>
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={() => setAddingIncome(true)}
-            >
+            <button type="button" className="btn-ghost" onClick={() => setAddingIncome(true)}>
               Add income
             </button>
             <button
               type="button"
               className="btn-ghost"
-              onClick={() =>
-                setAddingExpense({ kind: 'recurring', cadence: 'monthly' })
-              }
+              onClick={() => setAddingExpense({ kind: 'recurring', cadence: 'monthly' })}
             >
               Add spending
             </button>
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => setEditingBalance(true)}
-            >
+            <button type="button" className="btn-primary" onClick={() => setEditingBalance(true)}>
               Update balance
             </button>
           </>
@@ -152,11 +137,7 @@ function Cashflow() {
           label="Free to spend"
           value={formatCents(summary.freeTodayCents, summary.currency)}
           tone={
-            summary.freeTodayCents < 0
-              ? 'bad'
-              : summary.freeTodayCents < 20_000
-                ? 'warn'
-                : 'good'
+            summary.freeTodayCents < 0 ? 'bad' : summary.freeTodayCents < 20_000 ? 'warn' : 'good'
           }
           hint="after everything due before payday"
           estimated
@@ -165,10 +146,7 @@ function Cashflow() {
           label="Next salary"
           value={
             summary.nextIncomeDate
-              ? formatCents(
-                  summary.nextIncomeAmountCents ?? 0,
-                  summary.currency,
-                )
+              ? formatCents(summary.nextIncomeAmountCents ?? 0, summary.currency)
               : 'not set'
           }
           hint={
@@ -237,9 +215,8 @@ function Cashflow() {
             </div>
 
             <p className="mt-4 text-xs text-ink-faint">
-              Money due <em>on</em> payday is paid from that salary, so it is
-              not counted against the balance beforehand. The lowest point
-              between now and then is{' '}
+              Money due <em>on</em> payday is paid from that salary, so it is not counted against
+              the balance beforehand. The lowest point between now and then is{' '}
               <span className="text-ink-muted">
                 {formatCents(snapshot.lowestBalanceCents, summary.currency)} on{' '}
                 {formatDay(snapshot.lowestBalanceDate)}
@@ -275,20 +252,13 @@ function Cashflow() {
             ) : (
               <ul className="space-y-2">
                 {data.incomes.map((income) => (
-                  <IncomeRow
-                    key={income.id}
-                    income={income}
-                    currency={summary.currency}
-                  />
+                  <IncomeRow key={income.id} income={income} currency={summary.currency} />
                 ))}
               </ul>
             )}
           </Panel>
 
-          <Panel
-            title="Where it goes each month"
-            description="Recurring spending by category."
-          >
+          <Panel title="Where it goes each month" description="Recurring spending by category.">
             {data.breakdown.length === 0 ? (
               <EmptyState message="No recurring spending recorded." />
             ) : (
@@ -298,22 +268,14 @@ function Cashflow() {
                     ? row.monthlyCents /
                       Math.max(
                         1,
-                        data.breakdown.reduce(
-                          (sum, r) => sum + r.monthlyCents,
-                          0,
-                        ),
+                        data.breakdown.reduce((sum, r) => sum + r.monthlyCents, 0),
                       )
                     : 0;
                   return (
                     <li key={row.category}>
                       <div className="mb-1 flex justify-between text-sm">
-                        <span className="capitalize text-ink-muted">
-                          {row.category}
-                        </span>
-                        <Money
-                          cents={row.monthlyCents}
-                          currency={summary.currency}
-                        />
+                        <span className="capitalize text-ink-muted">{row.category}</span>
+                        <Money cents={row.monthlyCents} currency={summary.currency} />
                       </div>
                       <div className="h-1 overflow-hidden rounded-full bg-border">
                         <div
@@ -334,9 +296,7 @@ function Cashflow() {
                 {summary.runway.value} days
                 <EstimateMark basis={summary.runway.basis} />
               </p>
-              <p className="mt-1 text-xs text-ink-faint">
-                {summary.runway.basis}
-              </p>
+              <p className="mt-1 text-xs text-ink-faint">{summary.runway.basis}</p>
             </Panel>
           )}
         </div>
@@ -376,11 +336,7 @@ function Cashflow() {
           asOf: summary.balanceAsOf,
         }}
       />
-      <IncomeModal
-        open={addingIncome}
-        onClose={() => setAddingIncome(false)}
-        today={data.today}
-      />
+      <IncomeModal open={addingIncome} onClose={() => setAddingIncome(false)} today={data.today} />
       {/* Mounted only while open, so each preset starts from a clean form. */}
       {addingExpense && (
         <ExpenseModal
@@ -418,9 +374,7 @@ function BigStat({
         )}
       >
         {value}
-        {estimated && (
-          <EstimateMark basis="Projected from your income and planned spending." />
-        )}
+        {estimated && <EstimateMark basis="Projected from your income and planned spending." />}
       </p>
       {hint && <p className="mt-0.5 text-[11px] text-ink-faint">{hint}</p>}
     </div>
@@ -473,23 +427,15 @@ function ProjectionChart({
     [projection.days, today],
   );
 
-  if (points.length === 0)
-    return <EmptyState message="Nothing to project yet." />;
+  if (points.length === 0) return <EmptyState message="Nothing to project yet." />;
 
   return (
     <div className="h-60">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart
-          data={points}
-          margin={{ top: 5, right: 5, bottom: 0, left: 0 }}
-        >
+        <AreaChart data={points} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
           <defs>
             <linearGradient id="balanceFill" x1="0" y1="0" x2="0" y2="1">
-              <stop
-                offset="0%"
-                stopColor="rgb(56 189 248)"
-                stopOpacity={0.35}
-              />
+              <stop offset="0%" stopColor="rgb(56 189 248)" stopOpacity={0.35} />
               <stop offset="100%" stopColor="rgb(56 189 248)" stopOpacity={0} />
             </linearGradient>
           </defs>
@@ -516,14 +462,12 @@ function ProjectionChart({
               borderRadius: 8,
               fontSize: 12,
             }}
-            labelFormatter={(label) =>
-              typeof label === 'string' ? formatDay(label) : ''
-            }
+            labelFormatter={(label) => (typeof label === 'string' ? formatDay(label) : '')}
             formatter={(value) =>
-              [
-                formatCents(Math.round(Number(value) * 100), currency),
-                'Balance',
-              ] as [string, string]
+              [formatCents(Math.round(Number(value) * 100), currency), 'Balance'] as [
+                string,
+                string,
+              ]
             }
           />
           <Area
@@ -539,21 +483,13 @@ function ProjectionChart({
   );
 }
 
-function IncomeRow({
-  income,
-  currency,
-}: {
-  income: IncomeSource;
-  currency: string;
-}) {
+function IncomeRow({ income, currency }: { income: IncomeSource; currency: string }) {
   const { run, pending } = useAction();
   return (
     <li className="flex items-start justify-between gap-3 rounded-lg border border-border px-3 py-2">
       <div className="min-w-0">
         <p className="truncate text-sm">{income.label}</p>
-        <p className="text-xs text-ink-faint">
-          {describeRecurrence(income.recurrence)}
-        </p>
+        <p className="text-xs text-ink-faint">{describeRecurrence(income.recurrence)}</p>
       </div>
       <div className="shrink-0 text-right">
         <Money cents={income.amountCents} currency={currency} tone="good" />
@@ -564,9 +500,7 @@ function IncomeRow({
           type="button"
           className="mt-0.5 block w-full text-[11px] text-ink-faint hover:text-rose-400"
           disabled={pending}
-          onClick={() =>
-            void run(() => api.delete(`/cashflow/incomes/${income.id}`))
-          }
+          onClick={() => void run(() => api.delete(`/cashflow/incomes/${income.id}`))}
         >
           remove
         </button>
@@ -640,8 +574,7 @@ function RecurringSpending({
     const buckets = new Map<RecurringGroupKey, Expense[]>();
     for (const expense of expenses) {
       if (expense.kind !== 'recurring') continue;
-      const key: RecurringGroupKey =
-        expense.recurrence?.cadence ?? 'unscheduled';
+      const key: RecurringGroupKey = expense.recurrence?.cadence ?? 'unscheduled';
       const bucket = buckets.get(key);
       if (bucket) bucket.push(expense);
       else buckets.set(key, [expense]);
@@ -651,9 +584,7 @@ function RecurringSpending({
 
   // The malformed-row panel only exists when there is something in it.
   const visible = RECURRING_GROUPS.filter(
-    (group) =>
-      group.key !== 'unscheduled' ||
-      (groups.get('unscheduled')?.length ?? 0) > 0,
+    (group) => group.key !== 'unscheduled' || (groups.get('unscheduled')?.length ?? 0) > 0,
   );
   const everything = [...groups.values()].flat();
 
@@ -663,14 +594,12 @@ function RecurringSpending({
         <div>
           <h2 className="text-sm font-semibold text-ink">Recurring spending</h2>
           <p className="mt-0.5 text-xs text-ink-faint">
-            One view per cadence, because a daily cost and a yearly one are not
-            the same problem.
+            One view per cadence, because a daily cost and a yearly one are not the same problem.
           </p>
         </div>
         {everything.length > 0 && (
           <p className="tabular text-xs text-ink-muted">
-            ≈ {formatCents(monthlyTotalCents(everything), currency)}/month in
-            total
+            ≈ {formatCents(monthlyTotalCents(everything), currency)}/month in total
             <EstimateMark basis={MONTHLY_EQUIVALENT_BASIS} />
           </p>
         )}
@@ -748,9 +677,7 @@ function OneOffSpending({
   const oneOffs = useMemo(
     () =>
       expenses
-        .filter(
-          (expense) => expense.kind === 'one_off' && Boolean(expense.date),
-        )
+        .filter((expense) => expense.kind === 'one_off' && Boolean(expense.date))
         .sort((a, b) => ((a.date ?? '') < (b.date ?? '') ? -1 : 1)),
     [expenses],
   );
@@ -759,16 +686,13 @@ function OneOffSpending({
 
   const rows = oneOffs.filter((expense) => expense.date?.startsWith(month));
   // Paused rows are out of the projections, so they stay out of the total too.
-  const totalCents = sumCents(
-    rows.map((expense) => (expense.active ? expense.amountCents : 0)),
-  );
+  const totalCents = sumCents(rows.map((expense) => (expense.active ? expense.amountCents : 0)));
   const pausedCount = rows.filter((expense) => !expense.active).length;
   const monthsWithEntries = [
     ...new Set(oneOffs.map((expense) => (expense.date ?? '').slice(0, 7))),
   ];
 
-  const shift = (delta: number) =>
-    setMonth(addMonths(`${month}-01`, delta).slice(0, 7));
+  const shift = (delta: number) => setMonth(addMonths(`${month}-01`, delta).slice(0, 7));
 
   return (
     <Panel
@@ -809,11 +733,7 @@ function OneOffSpending({
         <EmptyState
           message={`Nothing one-off in ${formatMonth(month)}.`}
           action={
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={() => onAdd(`${month}-01`)}
-            >
+            <button type="button" className="btn-ghost" onClick={() => onAdd(`${month}-01`)}>
               Add one
             </button>
           }
@@ -833,9 +753,7 @@ function OneOffSpending({
 
       {monthsWithEntries.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border pt-3">
-          <span className="mr-1 text-[11px] uppercase tracking-wide text-ink-faint">
-            Jump to
-          </span>
+          <span className="mr-1 text-[11px] uppercase tracking-wide text-ink-faint">Jump to</span>
           {monthsWithEntries.map((key) => (
             <button
               key={key}
@@ -901,9 +819,7 @@ function eventMeta(
       : 'one-off';
   return {
     note: event.category ? `${event.category} · ${schedule}` : schedule,
-    chip: event.linkedLoanId
-      ? { label: 'debt', href: '/loans', tone: 'warn' }
-      : undefined,
+    chip: event.linkedLoanId ? { label: 'debt', href: '/loans', tone: 'warn' } : undefined,
   };
 }
 
@@ -943,15 +859,9 @@ function DayState({
     [sales, date],
   );
 
-  const day: CashProjectionDay | undefined = projection.days.find(
-    (row) => row.date === date,
-  );
-  const inCents = sumCents(
-    events.filter((e) => e.direction === 'in').map((e) => e.amountCents),
-  );
-  const outCents = sumCents(
-    events.filter((e) => e.direction === 'out').map((e) => e.amountCents),
-  );
+  const day: CashProjectionDay | undefined = projection.days.find((row) => row.date === date);
+  const inCents = sumCents(events.filter((e) => e.direction === 'in').map((e) => e.amountCents));
+  const outCents = sumCents(events.filter((e) => e.direction === 'out').map((e) => e.amountCents));
 
   return (
     <Panel
@@ -968,11 +878,7 @@ function DayState({
       }
     >
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <DayFigure
-          label="Opening"
-          cents={day?.openingCents}
-          currency={currency}
-        />
+        <DayFigure label="Opening" cents={day?.openingCents} currency={currency} />
         <DayFigure
           label="In"
           cents={inCents}
@@ -995,21 +901,17 @@ function DayState({
 
       {!day && (
         <p className="mt-2 text-xs text-ink-faint">
-          Balances are only projected from the last reconciliation (
-          {formatDay(projection.from)}) onward, so this day shows what moved,
-          not what was in the account.
+          Balances are only projected from the last reconciliation ({formatDay(projection.from)})
+          onward, so this day shows what moved, not what was in the account.
         </p>
       )}
 
       <div className="mt-4 border-t border-border pt-3">
-        <p className="mb-1 text-[11px] uppercase tracking-wide text-ink-faint">
-          {formatDay(date)}
-        </p>
+        <p className="mb-1 text-[11px] uppercase tracking-wide text-ink-faint">{formatDay(date)}</p>
 
         {events.length === 0 && earmarkedSales.length === 0 ? (
           <p className="py-2 text-xs text-ink-faint">
-            Nothing on this date — no salary, no recurring payment, no one-off,
-            nothing sold.
+            Nothing on this date — no salary, no recurring payment, no one-off, nothing sold.
           </p>
         ) : (
           <ul className="divide-y divide-border">
@@ -1031,17 +933,13 @@ function DayState({
                         </Link>
                       )}
                     </div>
-                    <p className="text-xs capitalize text-ink-faint">
-                      {meta.note}
-                    </p>
+                    <p className="text-xs capitalize text-ink-faint">{meta.note}</p>
                   </div>
                   <span className="shrink-0">
                     <span
                       className={clsx(
                         'mr-0.5 text-xs',
-                        event.direction === 'in'
-                          ? 'text-emerald-400'
-                          : 'text-ink-faint',
+                        event.direction === 'in' ? 'text-emerald-400' : 'text-ink-faint',
                       )}
                     >
                       {event.direction === 'in' ? '+' : '−'}
@@ -1063,10 +961,7 @@ function DayState({
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <p
-                      className="truncate text-sm text-ink-muted"
-                      title={sale.label}
-                    >
+                    <p className="truncate text-sm text-ink-muted" title={sale.label}>
                       {sale.label}
                     </p>
                     <Link href="/loans">
@@ -1074,8 +969,8 @@ function DayState({
                     </Link>
                   </div>
                   <p className="text-xs text-ink-faint">
-                    sold for {formatCents(sale.grossCents, currency)}, all of it
-                    earmarked for a debt
+                    sold for {formatCents(sale.grossCents, currency)}, all of it earmarked for a
+                    debt
                   </p>
                 </div>
                 <Money cents={0} currency={currency} className="shrink-0" />
@@ -1101,9 +996,7 @@ function DayFigure({
 }) {
   return (
     <div>
-      <p className="text-[11px] uppercase tracking-wide text-ink-faint">
-        {label}
-      </p>
+      <p className="text-[11px] uppercase tracking-wide text-ink-faint">{label}</p>
       <p
         className={clsx(
           'tabular mt-0.5 text-sm font-semibold',
@@ -1131,17 +1024,13 @@ function ExpenseList({
   const { run, pending } = useAction();
   const [editing, setEditing] = useState<Expense | null>(null);
 
-  if (expenses.length === 0)
-    return <EmptyState message="No spending recorded yet." />;
+  if (expenses.length === 0) return <EmptyState message="No spending recorded yet." />;
 
   return (
     <>
       <ul className="divide-y divide-border">
         {expenses.map((expense) => (
-          <li
-            key={expense.id}
-            className="flex items-center justify-between gap-3 py-2.5"
-          >
+          <li key={expense.id} className="flex items-center justify-between gap-3 py-2.5">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <p className="truncate text-sm" title={expense.label}>
@@ -1176,10 +1065,7 @@ function ExpenseList({
                   <p className="tabular text-[11px] text-ink-faint">
                     ≈{' '}
                     {formatCents(
-                      monthlyEquivalentCents(
-                        expense.amountCents,
-                        expense.recurrence,
-                      ),
+                      monthlyEquivalentCents(expense.amountCents, expense.recurrence),
                       currency,
                     )}
                     /mo
@@ -1197,9 +1083,7 @@ function ExpenseList({
                 type="button"
                 className="text-[11px] text-ink-faint hover:text-rose-400"
                 disabled={pending}
-                onClick={() =>
-                  void run(() => api.delete(`/cashflow/expenses/${expense.id}`))
-                }
+                onClick={() => void run(() => api.delete(`/cashflow/expenses/${expense.id}`))}
               >
                 ✕
               </button>
@@ -1209,11 +1093,7 @@ function ExpenseList({
       </ul>
 
       {editing && (
-        <EditExpenseModal
-          expense={editing}
-          onClose={() => setEditing(null)}
-          currency={currency}
-        />
+        <EditExpenseModal expense={editing} onClose={() => setEditing(null)} currency={currency} />
       )}
     </>
   );
@@ -1232,13 +1112,10 @@ function EditExpenseModal({
   onClose: () => void;
   currency: string;
 }) {
-  const [amountCents, setAmountCents] = useState<number | undefined>(
-    expense.amountCents,
-  );
+  const [amountCents, setAmountCents] = useState<number | undefined>(expense.amountCents);
   const [label, setLabel] = useState(expense.label);
-  const [currencyValue, setCurrencyValue] = useState(
-    expense.currency as Currency,
-  );
+  const [currencyValue, setCurrencyValue] = useState(expense.currency as Currency);
+  const [settlement, setSettlement] = useState(expense.settlement ?? 'auto');
   const [active, setActive] = useState(expense.active);
   const { run, pending, error } = useAction();
 
@@ -1255,6 +1132,7 @@ function EditExpenseModal({
             label,
             amountCents,
             currency: currencyValue,
+            settlement,
             active,
           }),
         );
@@ -1263,16 +1141,12 @@ function EditExpenseModal({
     >
       {expense.linkedLoanId && (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-          This funds a debt repayment. Changing the amount here also changes the
-          payoff dates on the Debts screen — it is the same figure, stored once.
+          This funds a debt repayment. Changing the amount here also changes the payoff dates on the
+          Debts screen — it is the same figure, stored once.
         </p>
       )}
       <Field label="Label">
-        <Input
-          required
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-        />
+        <Input required value={label} onChange={(e) => setLabel(e.target.value)} />
       </Field>
       <Field label="Amount">
         <MoneyInput
@@ -1283,11 +1157,7 @@ function EditExpenseModal({
         />
       </Field>
       <label className="flex items-center gap-2 text-sm text-ink-muted">
-        <input
-          type="checkbox"
-          checked={active}
-          onChange={(e) => setActive(e.target.checked)}
-        />
+        <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
         Include in projections
       </label>
     </Modal>
@@ -1310,9 +1180,7 @@ function BalanceModal({
   currentCents: number;
   reconciled: { cents: number; asOf: string };
 }) {
-  const [amountCents, setAmountCents] = useState<number | undefined>(
-    currentCents,
-  );
+  const [amountCents, setAmountCents] = useState<number | undefined>(currentCents);
   const [balanceCurrency, setBalanceCurrency] = useState(currency as Currency);
   const [asOf, setAsOf] = useState(today);
   const { run, pending, error } = useAction();
@@ -1337,14 +1205,14 @@ function BalanceModal({
       }}
     >
       <p className="text-xs text-ink-muted">
-        Enter what is actually in your account. Everything on this page is
-        projected forward from this figure and this date.
+        Enter what is actually in your account. Everything on this page is projected forward from
+        this figure and this date.
       </p>
       {reconciled.asOf !== today && (
         <p className="text-xs text-ink-faint">
           You last confirmed {formatCents(reconciled.cents, currency)} on{' '}
-          {formatDay(reconciled.asOf)}. The amount below is what the projection
-          expects you to have today — correct it if the real figure differs.
+          {formatDay(reconciled.asOf)}. The amount below is what the projection expects you to have
+          today — correct it if the real figure differs.
         </p>
       )}
       <Field label="Balance">
@@ -1356,16 +1224,8 @@ function BalanceModal({
           onChangeCurrency={setBalanceCurrency}
         />
       </Field>
-      <Field
-        label="True as of"
-        hint="Spending since this date is treated as still to come."
-      >
-        <Input
-          type="date"
-          required
-          value={asOf}
-          onChange={(e) => setAsOf(e.target.value)}
-        />
+      <Field label="True as of" hint="Spending since this date is treated as still to come.">
+        <Input type="date" required value={asOf} onChange={(e) => setAsOf(e.target.value)} />
       </Field>
     </Modal>
   );
@@ -1539,10 +1399,7 @@ function ExpenseModal({
           </Select>
         </Field>
         <Field label="How often">
-          <Select
-            value={form.kind}
-            onChange={(e) => setForm({ ...form, kind: e.target.value })}
-          >
+          <Select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
             <option value="recurring">Repeats</option>
             <option value="one_off">Just once</option>
           </Select>
@@ -1570,9 +1427,7 @@ function ExpenseModal({
                 min="1"
                 max="31"
                 value={form.dayOfMonth}
-                onChange={(e) =>
-                  setForm({ ...form, dayOfMonth: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, dayOfMonth: e.target.value })}
               />
             </Field>
           )}

@@ -146,10 +146,17 @@ export class SettingsService {
     return this.write(userId, { widgetOrder });
   }
 
-  private async write(
-    userId: string,
-    patch: Record<string, unknown>,
-  ): Promise<UserSettingsDto> {
+  /**
+   * The order the spending ladder fills its rungs, written by `PUT /api/spending/order`.
+   *
+   * Its own method for the same reason `setWidgetOrder` has one: reordering the ladder has exactly
+   * one writer and cannot arrive bundled with a currency change.
+   */
+  setSpendOrder(userId: string, spendOrder: string[]): Promise<UserSettingsDto> {
+    return this.write(userId, { spendOrder });
+  }
+
+  private async write(userId: string, patch: Record<string, unknown>): Promise<UserSettingsDto> {
     // Upserting with the defaults means a first-ever write does not need a prior read — but a
     // path may not appear in `$set` and `$setOnInsert` at once: Mongo answers the whole update
     // with `ConflictingUpdateOperators` (a 500), so only untouched fields get a default.
