@@ -360,3 +360,52 @@ describe('mixed currencies', () => {
     expect(projection.days[0].outCents).toBe(1_000);
   });
 });
+
+describe('actual spending replaces the budget for days already past', () => {
+  const breakfast: Expense = {
+    id: 'exp1',
+    userId: 'u1',
+    label: 'Breakfast',
+    amountCents: 3_000,
+    currency: 'GEL',
+    category: 'food',
+    kind: 'recurring',
+    recurrence: { cadence: 'daily', interval: 1, startDate: '2026-08-01' },
+    active: true,
+    createdAt: '2026-08-01',
+    updatedAt: '2026-08-01',
+  };
+
+  const base = {
+    today: '2026-08-25',
+    to: '2026-08-26',
+    openingBalanceCents: 100_000,
+    balanceAsOf: '2026-08-24',
+    currency: 'GEL' as const,
+    incomes: [],
+    expenses: [breakfast],
+  };
+
+  it('uses what was really spent on a past day rather than what was budgeted', () => {
+    const projection = projectCash({ ...base, actualOutByDay: { '2026-08-24': 1_822 } });
+    expect(projection.days.find((d) => d.date === '2026-08-24')?.outCents).toBe(1_822);
+  });
+
+  it('leaves a future day on its budget, because nothing has happened on it yet', () => {
+    const projection = projectCash({ ...base, actualOutByDay: { '2026-08-26': 1 } });
+    expect(projection.days.find((d) => d.date === '2026-08-26')?.outCents).toBe(3_000);
+  });
+
+  it('falls back to the budget for a past day with nothing captured, never to zero', () => {
+    // No payments captured is not evidence that no money was spent. Treating it as zero would
+    // quietly inflate every balance after it.
+    const projection = projectCash({ ...base, actualOutByDay: { '2026-08-25': 500 } });
+    expect(projection.days.find((d) => d.date === '2026-08-24')?.outCents).toBe(3_000);
+  });
+
+  it('behaves exactly as before when no actuals are supplied', () => {
+    const withMap = projectCash({ ...base, actualOutByDay: {} });
+    const without = projectCash(base);
+    expect(withMap.days.map((d) => d.outCents)).toEqual(without.days.map((d) => d.outCents));
+  });
+});

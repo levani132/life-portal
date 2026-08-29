@@ -37,6 +37,19 @@ export interface CashProjectionInput {
   /** Day to compute the headline snapshot for. Defaults to `today`. */
   snapshotDate?: string;
   /**
+   * What was **really** spent on each past day, keyed `YYYY-MM-DD`, in `currency`.
+   *
+   * Supplied, a day at or before `today` uses this figure instead of expanding its budgeted
+   * expenses — the budget said what was *meant* to happen, and for a day that has already
+   * happened the captured payments say what did. Days after `today` keep their budget, because
+   * nothing has happened on them yet.
+   *
+   * A past day absent from this map falls back to its budget rather than to zero: no payments
+   * captured is not evidence that no money was spent, and treating it as zero would quietly
+   * inflate every balance downstream.
+   */
+  actualOutByDay?: Record<string, number>;
+  /**
    * Rates for folding rows recorded in another currency into `currency`.
    *
    * Omitted, every amount is summed as-is — which is only correct when every row already
@@ -60,7 +73,11 @@ function inProjectionCurrency(
   if (!fx || !currency) return { amountCents };
   const converted = toDisplayCents(amountCents, currency, fx);
   if (!converted.converted) return { amountCents };
-  return { amountCents: converted.cents, originalAmountCents: amountCents, originalCurrency: currency };
+  return {
+    amountCents: converted.cents,
+    originalAmountCents: amountCents,
+    originalCurrency: currency,
+  };
 }
 
 /** Currencies among the input rows that `fx` has no rate for. */
@@ -71,7 +88,8 @@ function unconvertedCurrencies(
   if (!fx) return [];
   const found = new Set<Currency>();
   const check = (currency?: Currency) => {
-    if (currency && currency !== fx.displayCurrency && !canConvert(currency, fx)) found.add(currency);
+    if (currency && currency !== fx.displayCurrency && !canConvert(currency, fx))
+      found.add(currency);
   };
   for (const income of input.incomes) check(income.currency);
   for (const expense of input.expenses) check(expense.currency);
@@ -142,7 +160,9 @@ export function buildCashEvents(
     });
   }
 
-  return events.sort((a, b) => (a.date === b.date ? a.direction.localeCompare(b.direction) : a.date < b.date ? -1 : 1));
+  return events.sort((a, b) =>
+    a.date === b.date ? a.direction.localeCompare(b.direction) : a.date < b.date ? -1 : 1,
+  );
 }
 
 /**
@@ -177,14 +197,29 @@ export function projectCash(input: CashProjectionInput): CashProjection {
 
   for (const date of eachDay(from, to)) {
     const dayEvents = byDate.get(date) ?? [];
-    const inCents = sumCents(dayEvents.filter((e) => e.direction === 'in').map((e) => e.amountCents));
-    const outCents = sumCents(dayEvents.filter((e) => e.direction === 'out').map((e) => e.amountCents));
+    const inCents = sumCents(
+      dayEvents.filter((e) => e.direction === 'in').map((e) => e.amountCents),
+    );
+    const budgetedOut = sumCents(
+      dayEvents.filter((e) => e.direction === 'out').map((e) => e.amountCents),
+    );
+    // A day that has already happened is a fact, not a forecast — provided anything was captured
+    // for it. Absent from the map, it keeps its budget: silence is not evidence of thrift.
+    const actual = input.actualOutByDay?.[date];
+    const outCents = actual != null && date <= today ? actual : budgetedOut;
     const opening = running;
     running = opening + inCents - outCents;
     // Only from today onward: the stretch between the last reconciliation and today already
     // happened, so a "you run out on the 3rd" for a date in the past is noise.
     if (running < 0 && !firstShortfallDate && date >= today) firstShortfallDate = date;
-    days.push({ date, openingCents: opening, inCents, outCents, closingCents: running, events: dayEvents });
+    days.push({
+      date,
+      openingCents: opening,
+      inCents,
+      outCents,
+      closingCents: running,
+      events: dayEvents,
+    });
   }
 
   // Converted before the monthly equivalent is taken, not after: scaling then converting and
@@ -258,9 +293,7 @@ export function snapshotFromDays(
     ? sumCents(incomeDay.events.filter(isSalary).map((e) => e.amountCents))
     : undefined;
 
-  const committedWindow = nextIncomeDate
-    ? future.filter((d) => d.date < nextIncomeDate)
-    : future;
+  const committedWindow = nextIncomeDate ? future.filter((d) => d.date < nextIncomeDate) : future;
   const committedBeforeNextIncomeCents = sumCents(committedWindow.map((d) => d.outCents));
 
   // Lowest point between today and the target date catches a mid-period dip that the
@@ -295,7 +328,8 @@ export function snapshotAt(projection: CashProjection, date: string, today: stri
  */
 export function runwayDays(projection: CashProjection, today: string): number | undefined {
   const start = toDay(today);
-  let running = projection.days.find((d) => d.date === start)?.openingCents ?? projection.openingCents;
+  let running =
+    projection.days.find((d) => d.date === start)?.openingCents ?? projection.openingCents;
   for (const day of projection.days) {
     if (isAfter(start, day.date)) continue;
     running -= day.outCents;
