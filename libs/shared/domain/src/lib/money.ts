@@ -92,3 +92,36 @@ export function convertCents(
   if (inverse) return scaleCents(cents, 1 / inverse);
   return cents;
 }
+
+/**
+ * Divides `total` into `parts` whole cents that sum back to `total` exactly.
+ *
+ * The indivisible remainder goes to the earliest parts, so 1001 over 3 is `[334, 334, 333]`
+ * rather than three 333s and a lost tetri. This lives here, beside `scaleCents`, for the
+ * reason at the top of the file: three lots of `Math.round(1001 / 3)` is 1002 and three lots
+ * of `Math.floor` is 999, so spreading is exactly the kind of rounding that must be decided
+ * once rather than improvised at each call site.
+ *
+ * Used by the spending waterfall to spread one payment across the days it covers (FR-014e).
+ *
+ * `parts` below 1 yields `[]` — a span of no days consumes nothing. A negative `total`
+ * throws instead: money paid back is not something this app spreads across days, so a
+ * negative here is a caller's mistake and silence would hide it.
+ */
+export function splitCentsEvenly(total: Cents, parts: number): Cents[] {
+  if (total < 0) {
+    throw new RangeError(
+      `splitCentsEvenly needs a total of zero or more, got ${total}`,
+    );
+  }
+  const count = Math.floor(parts);
+  if (!Number.isFinite(count) || count < 1) return [];
+
+  const whole = Math.floor(total);
+  const base = Math.floor(whole / count);
+  const remainder = whole - base * count;
+  return Array.from(
+    { length: count },
+    (_, i) => base + (i < remainder ? 1 : 0),
+  );
+}

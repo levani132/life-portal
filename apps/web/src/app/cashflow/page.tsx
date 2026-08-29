@@ -1156,6 +1156,19 @@ function EditExpenseModal({
           onChangeCurrency={setCurrencyValue}
         />
       </Field>
+      <Field
+        label="How it gets paid"
+        hint={
+          settlement === 'manual'
+            ? 'Counted in the budget, but card spending is never charged against it — you tick it off yourself.'
+            : 'Card spending fills this up as it happens.'
+        }
+      >
+        <Select value={settlement} onChange={(e) => setSettlement(e.target.value as 'auto' | 'manual')}>
+          <option value="auto">By card</option>
+          <option value="manual">By transfer or direct debit</option>
+        </Select>
+      </Field>
       <label className="flex items-center gap-2 text-sm text-ink-muted">
         <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
         Include in projections

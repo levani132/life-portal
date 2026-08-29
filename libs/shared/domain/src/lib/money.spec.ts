@@ -1,4 +1,13 @@
-import { clampPositive, convertCents, formatCents, ratio, scaleCents, sumCents, toCents } from './money';
+import {
+  clampPositive,
+  convertCents,
+  formatCents,
+  ratio,
+  scaleCents,
+  splitCentsEvenly,
+  sumCents,
+  toCents,
+} from './money';
 
 describe('money', () => {
   it('rounds to whole cents rather than carrying a fraction', () => {
@@ -49,6 +58,52 @@ describe('money', () => {
     it('ignores a zero rate instead of zeroing the amount', () => {
       // A rate table seeded with 0 must not silently destroy money.
       expect(convertCents(1000, 'USD', 'GEL', { USD_GEL: 0 })).toBe(1000);
+    });
+  });
+
+  describe('splitCentsEvenly', () => {
+    it('gives the indivisible remainder to the earliest parts', () => {
+      // The worked example from research §13: ₾10.01 over three days.
+      expect(splitCentsEvenly(1001, 3)).toEqual([334, 334, 333]);
+    });
+
+    it('divides evenly when it can', () => {
+      expect(splitCentsEvenly(1000, 4)).toEqual([250, 250, 250, 250]);
+      expect(splitCentsEvenly(0, 3)).toEqual([0, 0, 0]);
+      expect(splitCentsEvenly(500, 1)).toEqual([500]);
+    });
+
+    it('spreads a remainder larger than one cent one cent at a time', () => {
+      expect(splitCentsEvenly(7, 5)).toEqual([2, 2, 1, 1, 1]);
+      // Less money than days: the early days get the cent, the late ones get nothing.
+      expect(splitCentsEvenly(2, 5)).toEqual([1, 1, 0, 0, 0]);
+    });
+
+    it('always produces parts that sum back to the total exactly', () => {
+      // The property is the whole point of the helper — no lost or invented tetri, for any
+      // amount over any span. Exhaustive over a range wide enough to hit every remainder.
+      for (let total = 0; total <= 400; total += 7) {
+        for (let parts = 1; parts <= 31; parts += 1) {
+          const split = splitCentsEvenly(total, parts);
+          expect(split).toHaveLength(parts);
+          expect(sumCents(split)).toBe(total);
+          // Never more than a cent between the largest and the smallest part.
+          expect(Math.max(...split) - Math.min(...split)).toBeLessThanOrEqual(
+            1,
+          );
+        }
+      }
+    });
+
+    it('returns no parts for a span of no days rather than inventing one', () => {
+      expect(splitCentsEvenly(1000, 0)).toEqual([]);
+      expect(splitCentsEvenly(1000, -3)).toEqual([]);
+    });
+
+    it('refuses a negative total rather than spreading a refund', () => {
+      // A negative here means a caller has confused a repayment for spending; silence would
+      // hide it, and this file exists to make rounding decisions explicit.
+      expect(() => splitCentsEvenly(-100, 2)).toThrow(RangeError);
     });
   });
 });
