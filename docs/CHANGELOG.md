@@ -2,6 +2,19 @@
 
 User-visible changes. Newest first.
 
+## 2026-08-29 — Choose the currency when you enter an amount
+
+**Every amount you enter now has a currency picker**, sitting inside the amount box. Spending,
+income, your balance, items to sell, debts and personal plans all have one, and it starts on your
+display currency so most of the time there is nothing to change.
+
+Until now no form offered the choice, so everything was recorded as dollars whatever you meant —
+which is why a lari expense could end up stored as a dollar one. Existing records keep whatever
+they were saved as; correct any that are wrong by editing them and picking the right currency.
+
+Share lots deliberately have no picker: a share's currency is set by the exchange it trades on,
+not by preference, and choosing the wrong one would quietly corrupt every position figure.
+
 ## 2026-08-29 — The currency setting now reaches every page
 
 **Fixed:** the Stocks, Items and Personal pages showed their totals with a lari sign over dollar

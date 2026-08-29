@@ -2,13 +2,21 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import type { PersonalPlan, PersonalSummary } from '@life-portal/shared-types';
+import type {
+  Currency,
+  PersonalPlan,
+  PersonalSummary,
+} from '@life-portal/shared-types';
 import {
   PERSONAL_PLAN_STATUSES,
   PLAN_COMPANY,
   PLAN_TYPES,
 } from '@life-portal/shared-types';
-import { formatCents, formatDay, relativeDays } from '@life-portal/shared-domain';
+import {
+  formatCents,
+  formatDay,
+  relativeDays,
+} from '@life-portal/shared-domain';
 import { AppShell, PageHeader } from '../../components/app-shell';
 import {
   Chip,
@@ -25,7 +33,7 @@ import {
   Textarea,
 } from '../../components/ui';
 import { api } from '../../lib/api';
-import { useAction, useApi } from '../../lib/hooks';
+import { useAction, useApi, useDefaultCurrency } from '../../lib/hooks';
 
 interface PersonalOverview {
   today: string;
@@ -33,7 +41,10 @@ interface PersonalOverview {
   summary: PersonalSummary;
 }
 
-const STATUS_META: Record<string, { label: string; tone: 'neutral' | 'good' | 'warn' }> = {
+const STATUS_META: Record<
+  string,
+  { label: string; tone: 'neutral' | 'good' | 'warn' }
+> = {
   idea: { label: 'idea', tone: 'neutral' },
   planned: { label: 'planned', tone: 'warn' },
   booked: { label: 'booked', tone: 'good' },
@@ -67,7 +78,9 @@ function Personal() {
   if (!data) return null;
 
   const { summary } = data;
-  const upcoming = data.plans.filter((plan) => plan.status === 'planned' || plan.status === 'booked');
+  const upcoming = data.plans.filter(
+    (plan) => plan.status === 'planned' || plan.status === 'booked',
+  );
   const ideas = data.plans.filter((plan) => plan.status === 'idea');
   const past = data.plans.filter((plan) => plan.status === 'done');
 
@@ -81,7 +94,11 @@ function Personal() {
             : 'Nothing booked yet'
         }
         actions={
-          <button type="button" className="btn-primary" onClick={() => setAdding(true)}>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => setAdding(true)}
+          >
             Add a plan
           </button>
         }
@@ -108,7 +125,11 @@ function Personal() {
               <EmptyState
                 message="Nothing planned. That is worth fixing."
                 action={
-                  <button type="button" className="btn-primary" onClick={() => setAdding(true)}>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => setAdding(true)}
+                  >
                     Plan something
                   </button>
                 }
@@ -116,29 +137,50 @@ function Personal() {
             ) : (
               <ul className="divide-y divide-border">
                 {upcoming.map((plan) => (
-                  <PlanRow key={plan.id} plan={plan} today={data.today} onEdit={() => setEditing(plan)} />
+                  <PlanRow
+                    key={plan.id}
+                    plan={plan}
+                    today={data.today}
+                    onEdit={() => setEditing(plan)}
+                  />
                 ))}
               </ul>
             )}
           </Panel>
 
-          <Panel title="Ideas" description="No date yet, but worth remembering.">
+          <Panel
+            title="Ideas"
+            description="No date yet, but worth remembering."
+          >
             {ideas.length === 0 ? (
               <EmptyState message="No ideas saved." />
             ) : (
               <ul className="divide-y divide-border">
                 {ideas.map((plan) => (
-                  <PlanRow key={plan.id} plan={plan} today={data.today} onEdit={() => setEditing(plan)} />
+                  <PlanRow
+                    key={plan.id}
+                    plan={plan}
+                    today={data.today}
+                    onEdit={() => setEditing(plan)}
+                  />
                 ))}
               </ul>
             )}
           </Panel>
 
           {past.length > 0 && (
-            <Panel title="Been there, done that" description={`${past.length} finished`}>
+            <Panel
+              title="Been there, done that"
+              description={`${past.length} finished`}
+            >
               <ul className="divide-y divide-border">
                 {past.map((plan) => (
-                  <PlanRow key={plan.id} plan={plan} today={data.today} onEdit={() => setEditing(plan)} />
+                  <PlanRow
+                    key={plan.id}
+                    plan={plan}
+                    today={data.today}
+                    onEdit={() => setEditing(plan)}
+                  />
                 ))}
               </ul>
             </Panel>
@@ -146,7 +188,10 @@ function Personal() {
         </div>
 
         <div className="space-y-5">
-          <Panel title="Places you have been" description={`${summary.countriesVisited.length} countries`}>
+          <Panel
+            title="Places you have been"
+            description={`${summary.countriesVisited.length} countries`}
+          >
             {summary.countriesVisited.length === 0 ? (
               <EmptyState message="Nothing recorded yet." />
             ) : (
@@ -160,7 +205,10 @@ function Personal() {
             )}
           </Panel>
 
-          <Panel title="Still want to go" description={`${summary.countriesWishlist.length} on the list`}>
+          <Panel
+            title="Still want to go"
+            description={`${summary.countriesWishlist.length} on the list`}
+          >
             {summary.countriesWishlist.length === 0 ? (
               <EmptyState message="No destinations on the list." />
             ) : (
@@ -174,26 +222,44 @@ function Personal() {
 
           <Panel title="How this touches your money">
             <p className="text-xs text-ink-muted">
-              Tick &ldquo;add to my budget&rdquo; on a plan with a cost and a date, and it appears as
-              one-off spending on the{' '}
+              Tick &ldquo;add to my budget&rdquo; on a plan with a cost and a
+              date, and it appears as one-off spending on the{' '}
               <Link href="/cashflow" className="text-sky-400 hover:underline">
                 Free money
               </Link>{' '}
-              page. Change the cost here and the budget follows — it is stored once.
+              page. Change the cost here and the budget follows — it is stored
+              once.
             </p>
           </Panel>
         </div>
       </div>
 
-      <PlanModal open={adding} onClose={() => setAdding(false)} today={data.today} />
+      <PlanModal
+        open={adding}
+        onClose={() => setAdding(false)}
+        today={data.today}
+      />
       {editing && (
-        <PlanModal open onClose={() => setEditing(null)} today={data.today} existing={editing} />
+        <PlanModal
+          open
+          onClose={() => setEditing(null)}
+          today={data.today}
+          existing={editing}
+        />
       )}
     </>
   );
 }
 
-function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Tile({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
   return (
     <div className="card p-4">
       <p className="text-xs uppercase tracking-wide text-ink-faint">{label}</p>
@@ -230,7 +296,10 @@ function PlanRow({
           )}
         </div>
         <p className="mt-0.5 text-xs text-ink-faint">
-          {[COMPANY_LABEL[plan.company], [plan.city, plan.country].filter(Boolean).join(', ')]
+          {[
+            COMPANY_LABEL[plan.company],
+            [plan.city, plan.country].filter(Boolean).join(', '),
+          ]
             .filter(Boolean)
             .join(' · ')}
         </p>
@@ -241,16 +310,24 @@ function PlanRow({
             {plan.status !== 'done' && ` · ${relativeDays(today, date)}`}
           </p>
         )}
-        {plan.description && <p className="mt-1 text-xs text-ink-faint">{plan.description}</p>}
+        {plan.description && (
+          <p className="mt-1 text-xs text-ink-faint">{plan.description}</p>
+        )}
       </div>
 
       <div className="shrink-0 text-right">
         <Money
-          cents={plan.status === 'done' ? (plan.actualCostCents ?? plan.estimatedCostCents) : plan.estimatedCostCents}
+          cents={
+            plan.status === 'done'
+              ? (plan.actualCostCents ?? plan.estimatedCostCents)
+              : plan.estimatedCostCents
+          }
           currency={plan.currency}
         />
         <p className="text-[11px] text-ink-faint">
-          {plan.status === 'done' && plan.actualCostCents != null ? 'actually cost' : 'estimated'}
+          {plan.status === 'done' && plan.actualCostCents != null
+            ? 'actually cost'
+            : 'estimated'}
         </p>
         <div className="mt-1 flex justify-end gap-2">
           {plan.status !== 'done' && (
@@ -258,12 +335,20 @@ function PlanRow({
               type="button"
               className="text-[11px] text-emerald-400 hover:underline"
               disabled={pending}
-              onClick={() => void run(() => api.patch(`/personal/${plan.id}`, { status: 'done' }))}
+              onClick={() =>
+                void run(() =>
+                  api.patch(`/personal/${plan.id}`, { status: 'done' }),
+                )
+              }
             >
               did it
             </button>
           )}
-          <button type="button" className="text-[11px] text-ink-faint hover:text-ink" onClick={onEdit}>
+          <button
+            type="button"
+            className="text-[11px] text-ink-faint hover:text-ink"
+            onClick={onEdit}
+          >
             edit
           </button>
           <button
@@ -304,9 +389,13 @@ function PlanModal({
     country: existing?.country ?? '',
     estimatedCostCents: existing?.estimatedCostCents as number | undefined,
     actualCostCents: existing?.actualCostCents as number | undefined,
+    currency: existing?.currency as Currency | undefined,
     autoExpense: existing?.autoExpense ?? true,
     visited: existing?.visited ?? false,
   });
+  const defaultCurrency = useDefaultCurrency();
+  // One plan, one currency — a trip budgeted in euros is paid for in euros.
+  const currency = form.currency ?? defaultCurrency;
   const { run, pending, error } = useAction();
   const isTrip = form.type === 'trip';
 
@@ -331,12 +420,15 @@ function PlanModal({
           city: form.city || undefined,
           country: form.country || undefined,
           estimatedCostCents: form.estimatedCostCents,
+          currency,
           actualCostCents: form.actualCostCents,
           autoExpense: form.autoExpense,
           visited: form.visited,
         };
         const ok = await run(() =>
-          existing ? api.patch(`/personal/${existing.id}`, body) : api.post('/personal', body),
+          existing
+            ? api.patch(`/personal/${existing.id}`, body)
+            : api.post('/personal', body),
         );
         if (ok) onClose();
       }}
@@ -352,7 +444,10 @@ function PlanModal({
 
       <div className="grid grid-cols-3 gap-3">
         <Field label="Kind">
-          <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+          <Select
+            value={form.type}
+            onChange={(e) => setForm({ ...form, type: e.target.value })}
+          >
             {PLAN_TYPES.map((option) => (
               <option key={option} value={option}>
                 {option.replace(/_/g, ' ')}
@@ -361,7 +456,10 @@ function PlanModal({
           </Select>
         </Field>
         <Field label="With who">
-          <Select value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })}>
+          <Select
+            value={form.company}
+            onChange={(e) => setForm({ ...form, company: e.target.value })}
+          >
             {PLAN_COMPANY.map((option) => (
               <option key={option} value={option}>
                 {option}
@@ -370,7 +468,10 @@ function PlanModal({
           </Select>
         </Field>
         <Field label="Status">
-          <Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+          <Select
+            value={form.status}
+            onChange={(e) => setForm({ ...form, status: e.target.value })}
+          >
             {PERSONAL_PLAN_STATUSES.map((option) => (
               <option key={option} value={option}>
                 {option}
@@ -410,10 +511,16 @@ function PlanModal({
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="City">
-          <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+          <Input
+            value={form.city}
+            onChange={(e) => setForm({ ...form, city: e.target.value })}
+          />
         </Field>
         <Field label="Country" hint="Feeds the places-been list.">
-          <Input value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
+          <Input
+            value={form.country}
+            onChange={(e) => setForm({ ...form, country: e.target.value })}
+          />
         </Field>
       </div>
 
@@ -421,14 +528,21 @@ function PlanModal({
         <Field label="Estimated cost">
           <MoneyInput
             valueCents={form.estimatedCostCents}
-            onChangeCents={(cents) => setForm({ ...form, estimatedCostCents: cents })}
+            onChangeCents={(cents) =>
+              setForm({ ...form, estimatedCostCents: cents })
+            }
+            currency={currency}
+            onChangeCurrency={(next) => setForm({ ...form, currency: next })}
           />
         </Field>
         {form.status === 'done' && (
           <Field label="What it actually cost">
             <MoneyInput
               valueCents={form.actualCostCents}
-              onChangeCents={(cents) => setForm({ ...form, actualCostCents: cents })}
+              onChangeCents={(cents) =>
+                setForm({ ...form, actualCostCents: cents })
+              }
+              currency={currency}
             />
           </Field>
         )}
@@ -442,8 +556,8 @@ function PlanModal({
           onChange={(e) => setForm({ ...form, autoExpense: e.target.checked })}
         />
         <span className="text-xs text-ink-muted">
-          Add to my budget, so it shows up as one-off spending in Free money. Needs a cost and a
-          date.
+          Add to my budget, so it shows up as one-off spending in Free money.
+          Needs a cost and a date.
         </span>
       </label>
 

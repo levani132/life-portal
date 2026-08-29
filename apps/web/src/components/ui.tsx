@@ -11,7 +11,8 @@ import {
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from 'react';
-import type { WidgetTone } from '@life-portal/shared-types';
+import type { Currency, WidgetTone } from '@life-portal/shared-types';
+import { SUPPORTED_CURRENCIES } from '@life-portal/shared-types';
 import { formatCents } from '@life-portal/shared-domain';
 
 /** Tone → colour, in one place so "warn" looks the same on every screen. */
@@ -47,10 +48,16 @@ export function Panel({
       {(title || actions) && (
         <header className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
           <div className="min-w-0 flex-1">
-            {title && <h2 className="text-sm font-semibold text-ink">{title}</h2>}
-            {description && <p className="mt-0.5 text-xs text-ink-faint">{description}</p>}
+            {title && (
+              <h2 className="text-sm font-semibold text-ink">{title}</h2>
+            )}
+            {description && (
+              <p className="mt-0.5 text-xs text-ink-faint">{description}</p>
+            )}
           </div>
-          {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+          {actions && (
+            <div className="flex shrink-0 items-center gap-2">{actions}</div>
+          )}
         </header>
       )}
       {children}
@@ -58,7 +65,13 @@ export function Panel({
   );
 }
 
-export function Chip({ tone = 'neutral', children }: { tone?: WidgetTone; children: ReactNode }) {
+export function Chip({
+  tone = 'neutral',
+  children,
+}: {
+  tone?: WidgetTone;
+  children: ReactNode;
+}) {
   return <span className={clsx('chip', TONE_CHIP[tone])}>{children}</span>;
 }
 
@@ -77,8 +90,12 @@ export function Field({
     <label className="block">
       <span className="label">{label}</span>
       {children}
-      {hint && !error && <span className="mt-1 block text-xs text-ink-faint">{hint}</span>}
-      {error && <span className="mt-1 block text-xs text-rose-400">{error}</span>}
+      {hint && !error && (
+        <span className="mt-1 block text-xs text-ink-faint">{hint}</span>
+      )}
+      {error && (
+        <span className="mt-1 block text-xs text-rose-400">{error}</span>
+      )}
     </label>
   );
 }
@@ -88,7 +105,13 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
 }
 
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={clsx('field', props.className)} rows={props.rows ?? 3} />;
+  return (
+    <textarea
+      {...props}
+      className={clsx('field', props.className)}
+      rows={props.rows ?? 3}
+    />
+  );
 }
 
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
@@ -104,6 +127,7 @@ export function MoneyInput({
   valueCents,
   onChangeCents,
   currency = 'USD',
+  onChangeCurrency,
   placeholder,
   required,
   id,
@@ -111,11 +135,22 @@ export function MoneyInput({
   valueCents: number | undefined;
   onChangeCents: (cents: number | undefined) => void;
   currency?: string;
+  /**
+   * Supply this and the field grows a currency picker.
+   *
+   * An amount is stored in the currency it was recorded in and only converted for display, so
+   * anything that *creates* a record has to let the user say which currency that is. Without a
+   * picker every form silently took the schema default, which is how a lari expense came to be
+   * stored as dollars.
+   */
+  onChangeCurrency?: (currency: Currency) => void;
   placeholder?: string;
   required?: boolean;
   id?: string;
 }) {
-  const [text, setText] = useState(valueCents == null ? '' : String(valueCents / 100));
+  const [text, setText] = useState(
+    valueCents == null ? '' : String(valueCents / 100),
+  );
   const lastEmitted = useRef(valueCents);
 
   // Re-sync when the value changes from outside (a fetch landing, a form reset) but not
@@ -130,11 +165,11 @@ export function MoneyInput({
   return (
     <div className="relative">
       <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-faint">
-        {currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '₾'}
+        {CURRENCY_SIGN[currency] ?? currency}
       </span>
       <input
         id={id}
-        className="field pl-7 tabular"
+        className={clsx('field tabular pl-7', onChangeCurrency && 'pr-20')}
         inputMode="decimal"
         placeholder={placeholder ?? '0'}
         required={required}
@@ -143,14 +178,31 @@ export function MoneyInput({
           const next = event.target.value;
           if (next !== '' && !/^\d*\.?\d{0,2}$/.test(next)) return;
           setText(next);
-          const cents = next === '' ? undefined : Math.round(Number(next) * 100);
+          const cents =
+            next === '' ? undefined : Math.round(Number(next) * 100);
           lastEmitted.current = cents;
           onChangeCents(Number.isFinite(cents as number) ? cents : undefined);
         }}
       />
+      {onChangeCurrency && (
+        <select
+          aria-label="Currency"
+          className="field absolute right-1 top-1/2 w-auto -translate-y-1/2 border-none bg-transparent py-1 pl-1 pr-6 text-ink-muted"
+          value={currency}
+          onChange={(event) => onChangeCurrency(event.target.value as Currency)}
+        >
+          {SUPPORTED_CURRENCIES.map((code) => (
+            <option key={code} value={code}>
+              {code}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }
+
+const CURRENCY_SIGN: Record<string, string> = { USD: '$', EUR: '€', GEL: '₾' };
 
 /** Right-aligned, tabular money for tables and stat rows. */
 export function Money({
@@ -172,7 +224,13 @@ export function Money({
   );
 }
 
-export function ProgressBar({ ratio, tone = 'good' }: { ratio: number; tone?: WidgetTone }) {
+export function ProgressBar({
+  ratio,
+  tone = 'good',
+}: {
+  ratio: number;
+  tone?: WidgetTone;
+}) {
   const pct = Math.round(Math.min(1, Math.max(0, ratio)) * 100);
   const fill = {
     neutral: 'bg-ink-faint',
@@ -181,8 +239,15 @@ export function ProgressBar({ ratio, tone = 'good' }: { ratio: number; tone?: Wi
     bad: 'bg-rose-500',
   }[tone];
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-border" role="progressbar" aria-valuenow={pct}>
-      <div className={clsx('h-full rounded-full transition-all', fill)} style={{ width: `${pct}%` }} />
+    <div
+      className="h-1.5 w-full overflow-hidden rounded-full bg-border"
+      role="progressbar"
+      aria-valuenow={pct}
+    >
+      <div
+        className={clsx('h-full rounded-full transition-all', fill)}
+        style={{ width: `${pct}%` }}
+      />
     </div>
   );
 }
@@ -224,14 +289,22 @@ export function Modal({
       {/* Backdrop click closes; the dialog stops propagation so inner clicks do not. */}
       <div className="absolute inset-0" onClick={onClose} aria-hidden />
       <div
-        className={clsx('card relative w-full p-5 shadow-2xl', wide ? 'max-w-2xl' : 'max-w-md')}
+        className={clsx(
+          'card relative w-full p-5 shadow-2xl',
+          wide ? 'max-w-2xl' : 'max-w-md',
+        )}
         role="dialog"
         aria-modal="true"
         aria-label={title}
       >
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-semibold">{title}</h3>
-          <button type="button" className="text-ink-faint hover:text-ink" onClick={onClose} aria-label="Close">
+          <button
+            type="button"
+            className="text-ink-faint hover:text-ink"
+            onClick={onClose}
+            aria-label="Close"
+          >
             ✕
           </button>
         </div>
@@ -263,7 +336,13 @@ export function Modal({
   );
 }
 
-export function EmptyState({ message, action }: { message: string; action?: ReactNode }) {
+export function EmptyState({
+  message,
+  action,
+}: {
+  message: string;
+  action?: ReactNode;
+}) {
   return (
     <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center">
       <p className="text-sm text-ink-faint">{message}</p>

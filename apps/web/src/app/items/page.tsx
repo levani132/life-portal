@@ -1,7 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import type { ItemsSummary, SellableItem } from '@life-portal/shared-types';
+import type {
+  Currency,
+  ItemsSummary,
+  SellableItem,
+} from '@life-portal/shared-types';
 import { ITEM_STATUSES } from '@life-portal/shared-types';
 import { formatCents, formatDay } from '@life-portal/shared-domain';
 import { AppShell, PageHeader } from '../../components/app-shell';
@@ -21,7 +25,7 @@ import {
   Textarea,
 } from '../../components/ui';
 import { api } from '../../lib/api';
-import { useAction, useApi } from '../../lib/hooks';
+import { useAction, useApi, useDefaultCurrency } from '../../lib/hooks';
 import type { Loan } from '@life-portal/shared-types';
 
 interface ItemsOverview {
@@ -30,7 +34,10 @@ interface ItemsOverview {
 }
 
 /** Status → chip tone and label, so the list reads at a glance. */
-const STATUS_META: Record<string, { tone: 'neutral' | 'good' | 'warn' | 'bad'; label: string }> = {
+const STATUS_META: Record<
+  string,
+  { tone: 'neutral' | 'good' | 'warn' | 'bad'; label: string }
+> = {
   draft: { tone: 'neutral', label: 'not listed' },
   listed: { tone: 'warn', label: 'listed' },
   has_interest: { tone: 'good', label: 'buyer interested' },
@@ -59,8 +66,12 @@ function Items() {
 
   const { summary } = data;
   const loans = (loansData?.loans ?? []).map((entry) => entry.loan);
-  const open = data.items.filter((item) => !['sold', 'abandoned'].includes(item.status));
-  const closed = data.items.filter((item) => ['sold', 'abandoned'].includes(item.status));
+  const open = data.items.filter(
+    (item) => !['sold', 'abandoned'].includes(item.status),
+  );
+  const closed = data.items.filter((item) =>
+    ['sold', 'abandoned'].includes(item.status),
+  );
 
   return (
     <>
@@ -68,7 +79,11 @@ function Items() {
         title="Items to sell"
         subtitle={`${summary.openCount} still to sell · ${formatCents(summary.expectedProceedsCents, summary.currency)} expected`}
         actions={
-          <button type="button" className="btn-primary" onClick={() => setAdding(true)}>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => setAdding(true)}
+          >
             Add an item
           </button>
         }
@@ -88,7 +103,10 @@ function Items() {
         />
         <Tile
           label="If you have to haggle hard"
-          value={formatCents(summary.pessimisticProceedsCents, summary.currency)}
+          value={formatCents(
+            summary.pessimisticProceedsCents,
+            summary.currency,
+          )}
           estimated
         />
         <Tile
@@ -104,7 +122,11 @@ function Items() {
             <EmptyState
               message="Nothing waiting to be sold."
               action={
-                <button type="button" className="btn-primary" onClick={() => setAdding(true)}>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => setAdding(true)}
+                >
                   Add an item
                 </button>
               }
@@ -136,7 +158,11 @@ function Items() {
 
       <ItemModal open={adding} onClose={() => setAdding(false)} loans={loans} />
       {selling && (
-        <SellModal item={selling} loans={loans} onClose={() => setSelling(null)} />
+        <SellModal
+          item={selling}
+          loans={loans}
+          onClose={() => setSelling(null)}
+        />
       )}
     </>
   );
@@ -158,7 +184,9 @@ function Tile({
       <p className="text-xs uppercase tracking-wide text-ink-faint">{label}</p>
       <p className="tabular mt-1 text-xl font-semibold">
         {value}
-        {estimated && <EstimateMark basis="Based on the prices you entered, not on offers received." />}
+        {estimated && (
+          <EstimateMark basis="Based on the prices you entered, not on offers received." />
+        )}
       </p>
       {hint && <p className="mt-0.5 text-[11px] text-ink-faint">{hint}</p>}
     </div>
@@ -189,13 +217,16 @@ function ItemRow({
             {earmarked && <Chip tone="warn">→ {earmarked.lender}</Chip>}
           </div>
           {item.description && (
-            <p className="mt-0.5 line-clamp-1 text-xs text-ink-faint">{item.description}</p>
+            <p className="mt-0.5 line-clamp-1 text-xs text-ink-faint">
+              {item.description}
+            </p>
           )}
           <p className="mt-1 text-xs text-ink-faint">
             asking {formatCents(item.askingPriceCents, item.currency)}
             {item.minPriceCents != null &&
               ` · walk away below ${formatCents(item.minPriceCents, item.currency)}`}
-            {item.expectedSaleDate && ` · expect to sell by ${formatDay(item.expectedSaleDate)}`}
+            {item.expectedSaleDate &&
+              ` · expect to sell by ${formatDay(item.expectedSaleDate)}`}
             {item.soldAt && ` · sold ${formatDay(item.soldAt)}`}
           </p>
           {item.interests.length > 0 && (
@@ -208,15 +239,25 @@ function ItemRow({
 
         <div className="shrink-0 text-right">
           <Money
-            cents={item.status === 'sold' ? item.soldPriceCents : item.expectedPriceCents}
+            cents={
+              item.status === 'sold'
+                ? item.soldPriceCents
+                : item.expectedPriceCents
+            }
             currency={item.currency}
             tone={item.status === 'sold' ? 'good' : undefined}
             className="text-sm font-medium"
           />
-          <p className="text-[11px] text-ink-faint">{item.status === 'sold' ? 'sold for' : 'realistic'}</p>
+          <p className="text-[11px] text-ink-faint">
+            {item.status === 'sold' ? 'sold for' : 'realistic'}
+          </p>
           <div className="mt-1 flex justify-end gap-2">
             {onSell && (
-              <button type="button" className="text-[11px] text-emerald-400 hover:underline" onClick={onSell}>
+              <button
+                type="button"
+                className="text-[11px] text-emerald-400 hover:underline"
+                onClick={onSell}
+              >
                 mark sold
               </button>
             )}
@@ -240,7 +281,12 @@ function ItemRow({
       </div>
 
       {editing && (
-        <ItemModal open onClose={() => setEditing(false)} loans={loans} existing={item} />
+        <ItemModal
+          open
+          onClose={() => setEditing(false)}
+          loans={loans}
+          existing={item}
+        />
       )}
     </li>
   );
@@ -263,10 +309,14 @@ function ItemModal({
     askingPriceCents: existing?.askingPriceCents as number | undefined,
     expectedPriceCents: existing?.expectedPriceCents as number | undefined,
     minPriceCents: existing?.minPriceCents as number | undefined,
+    currency: existing?.currency as Currency | undefined,
     status: (existing?.status ?? 'draft') as string,
     allocateToLoanId: existing?.allocateToLoanId ?? '',
     expectedSaleDate: existing?.expectedSaleDate ?? '',
   });
+  const defaultCurrency = useDefaultCurrency();
+  // One item, one currency: the picker sits on the asking price and the other two follow it.
+  const currency = form.currency ?? defaultCurrency;
   const { run, pending, error } = useAction();
 
   return (
@@ -282,14 +332,18 @@ function ItemModal({
           name: form.name,
           description: form.description || undefined,
           askingPriceCents: form.askingPriceCents ?? 0,
-          expectedPriceCents: form.expectedPriceCents ?? form.askingPriceCents ?? 0,
+          expectedPriceCents:
+            form.expectedPriceCents ?? form.askingPriceCents ?? 0,
           minPriceCents: form.minPriceCents,
+          currency,
           status: form.status,
           allocateToLoanId: form.allocateToLoanId || undefined,
           expectedSaleDate: form.expectedSaleDate || undefined,
         };
         const ok = await run(() =>
-          existing ? api.patch(`/items/${existing.id}`, body) : api.post('/items', body),
+          existing
+            ? api.patch(`/items/${existing.id}`, body)
+            : api.post('/items', body),
         );
         if (ok) onClose();
       }}
@@ -314,28 +368,42 @@ function ItemModal({
           <MoneyInput
             required
             valueCents={form.askingPriceCents}
-            onChangeCents={(cents) => setForm({ ...form, askingPriceCents: cents })}
+            onChangeCents={(cents) =>
+              setForm({ ...form, askingPriceCents: cents })
+            }
+            currency={currency}
+            onChangeCurrency={(next) => setForm({ ...form, currency: next })}
           />
         </Field>
         <Field label="Realistic">
           <MoneyInput
             valueCents={form.expectedPriceCents}
-            onChangeCents={(cents) => setForm({ ...form, expectedPriceCents: cents })}
+            onChangeCents={(cents) =>
+              setForm({ ...form, expectedPriceCents: cents })
+            }
+            currency={currency}
           />
         </Field>
         <Field label="Walk away">
           <MoneyInput
             valueCents={form.minPriceCents}
-            onChangeCents={(cents) => setForm({ ...form, minPriceCents: cents })}
+            onChangeCents={(cents) =>
+              setForm({ ...form, minPriceCents: cents })
+            }
+            currency={currency}
           />
         </Field>
       </div>
       <p className="text-xs text-ink-faint">
-        The realistic price is what projections use. Leave it blank to use the asking price.
+        The realistic price is what projections use. Leave it blank to use the
+        asking price.
       </p>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Status">
-          <Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+          <Select
+            value={form.status}
+            onChange={(e) => setForm({ ...form, status: e.target.value })}
+          >
             {ITEM_STATUSES.map((option) => (
               <option key={option} value={option}>
                 {STATUS_META[option]?.label ?? option}
@@ -347,14 +415,21 @@ function ItemModal({
           <Input
             type="date"
             value={form.expectedSaleDate}
-            onChange={(e) => setForm({ ...form, expectedSaleDate: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, expectedSaleDate: e.target.value })
+            }
           />
         </Field>
       </div>
-      <Field label="Put the money towards" hint="Earmarking feeds the debt payoff scenarios.">
+      <Field
+        label="Put the money towards"
+        hint="Earmarking feeds the debt payoff scenarios."
+      >
         <Select
           value={form.allocateToLoanId}
-          onChange={(e) => setForm({ ...form, allocateToLoanId: e.target.value })}
+          onChange={(e) =>
+            setForm({ ...form, allocateToLoanId: e.target.value })
+          }
         >
           <option value="">Nothing in particular</option>
           {loans.map((loan) => (
@@ -381,8 +456,12 @@ function SellModal({
   loans: Loan[];
   onClose: () => void;
 }) {
-  const [soldPriceCents, setSoldPriceCents] = useState<number | undefined>(item.expectedPriceCents);
-  const [recordPayment, setRecordPayment] = useState(Boolean(item.allocateToLoanId));
+  const [soldPriceCents, setSoldPriceCents] = useState<number | undefined>(
+    item.expectedPriceCents,
+  );
+  const [recordPayment, setRecordPayment] = useState(
+    Boolean(item.allocateToLoanId),
+  );
   const { run, pending, error } = useAction();
   const loan = loans.find((entry) => entry.id === item.allocateToLoanId);
 

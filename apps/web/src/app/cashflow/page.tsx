@@ -20,11 +20,15 @@ import type {
   CashProjection,
   CashProjectionDay,
   CashflowSummary,
+  Currency,
   Expense,
   IncomeSource,
   RealisedSale,
 } from '@life-portal/shared-types';
-import { CASHFLOW_CADENCES, EXPENSE_CATEGORIES } from '@life-portal/shared-types';
+import {
+  CASHFLOW_CADENCES,
+  EXPENSE_CATEGORIES,
+} from '@life-portal/shared-types';
 import {
   addMonths,
   buildCashEvents,
@@ -54,7 +58,7 @@ import {
   Spinner,
 } from '../../components/ui';
 import { api } from '../../lib/api';
-import { useAction, useApi } from '../../lib/hooks';
+import { useAction, useApi, useDefaultCurrency } from '../../lib/hooks';
 
 interface CashflowOverview {
   today: string;
@@ -82,7 +86,9 @@ function Cashflow() {
 
   const [editingBalance, setEditingBalance] = useState(false);
   const [addingIncome, setAddingIncome] = useState(false);
-  const [addingExpense, setAddingExpense] = useState<ExpensePreset | null>(null);
+  const [addingExpense, setAddingExpense] = useState<ExpensePreset | null>(
+    null,
+  );
 
   // Only block on the very first load: a revalidation after a write must not tear the page
   // down to a spinner and lose every panel's local state.
@@ -93,7 +99,9 @@ function Cashflow() {
   const { summary, projection } = data;
   // Picking a date is arithmetic over the projection we already hold, not a new request —
   // `snapshotAt` is the same pure function the API calls, so the numbers cannot diverge.
-  const snapshot = snapshotDate ? snapshotAt(projection, snapshotDate, data.today) : projection.snapshot;
+  const snapshot = snapshotDate
+    ? snapshotAt(projection, snapshotDate, data.today)
+    : projection.snapshot;
 
   return (
     <>
@@ -102,17 +110,27 @@ function Cashflow() {
         subtitle={`Balance last reconciled ${formatDay(summary.balanceAsOf)} at ${formatCents(summary.reconciledBalanceCents, summary.currency)}`}
         actions={
           <>
-            <button type="button" className="btn-ghost" onClick={() => setAddingIncome(true)}>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setAddingIncome(true)}
+            >
               Add income
             </button>
             <button
               type="button"
               className="btn-ghost"
-              onClick={() => setAddingExpense({ kind: 'recurring', cadence: 'monthly' })}
+              onClick={() =>
+                setAddingExpense({ kind: 'recurring', cadence: 'monthly' })
+              }
             >
               Add spending
             </button>
-            <button type="button" className="btn-primary" onClick={() => setEditingBalance(true)}>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => setEditingBalance(true)}
+            >
               Update balance
             </button>
           </>
@@ -133,7 +151,13 @@ function Cashflow() {
         <BigStat
           label="Free to spend"
           value={formatCents(summary.freeTodayCents, summary.currency)}
-          tone={summary.freeTodayCents < 0 ? 'bad' : summary.freeTodayCents < 20_000 ? 'warn' : 'good'}
+          tone={
+            summary.freeTodayCents < 0
+              ? 'bad'
+              : summary.freeTodayCents < 20_000
+                ? 'warn'
+                : 'good'
+          }
           hint="after everything due before payday"
           estimated
         />
@@ -141,7 +165,10 @@ function Cashflow() {
           label="Next salary"
           value={
             summary.nextIncomeDate
-              ? formatCents(summary.nextIncomeAmountCents ?? 0, summary.currency)
+              ? formatCents(
+                  summary.nextIncomeAmountCents ?? 0,
+                  summary.currency,
+                )
               : 'not set'
           }
           hint={
@@ -164,7 +191,11 @@ function Cashflow() {
             title="What happens to your money"
             description="Projected balance, day by day. Pick a date to see what is free then."
           >
-            <ProjectionChart projection={projection} today={data.today} currency={summary.currency} />
+            <ProjectionChart
+              projection={projection}
+              today={data.today}
+              currency={summary.currency}
+            />
           </Panel>
 
           <Panel
@@ -206,8 +237,9 @@ function Cashflow() {
             </div>
 
             <p className="mt-4 text-xs text-ink-faint">
-              Money due <em>on</em> payday is paid from that salary, so it is not counted against
-              the balance beforehand. The lowest point between now and then is{' '}
+              Money due <em>on</em> payday is paid from that salary, so it is
+              not counted against the balance beforehand. The lowest point
+              between now and then is{' '}
               <span className="text-ink-muted">
                 {formatCents(snapshot.lowestBalanceCents, summary.currency)} on{' '}
                 {formatDay(snapshot.lowestBalanceDate)}
@@ -223,7 +255,6 @@ function Cashflow() {
               </div>
             )}
           </Panel>
-
         </div>
 
         <div className="space-y-5">
@@ -232,7 +263,11 @@ function Cashflow() {
               <EmptyState
                 message="No income set up. Add your salary so projections mean something."
                 action={
-                  <button type="button" className="btn-primary" onClick={() => setAddingIncome(true)}>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => setAddingIncome(true)}
+                  >
                     Add income
                   </button>
                 }
@@ -240,13 +275,20 @@ function Cashflow() {
             ) : (
               <ul className="space-y-2">
                 {data.incomes.map((income) => (
-                  <IncomeRow key={income.id} income={income} currency={summary.currency} />
+                  <IncomeRow
+                    key={income.id}
+                    income={income}
+                    currency={summary.currency}
+                  />
                 ))}
               </ul>
             )}
           </Panel>
 
-          <Panel title="Where it goes each month" description="Recurring spending by category.">
+          <Panel
+            title="Where it goes each month"
+            description="Recurring spending by category."
+          >
             {data.breakdown.length === 0 ? (
               <EmptyState message="No recurring spending recorded." />
             ) : (
@@ -254,13 +296,24 @@ function Cashflow() {
                 {data.breakdown.map((row) => {
                   const share = summary.monthlyNetCents
                     ? row.monthlyCents /
-                      Math.max(1, data.breakdown.reduce((sum, r) => sum + r.monthlyCents, 0))
+                      Math.max(
+                        1,
+                        data.breakdown.reduce(
+                          (sum, r) => sum + r.monthlyCents,
+                          0,
+                        ),
+                      )
                     : 0;
                   return (
                     <li key={row.category}>
                       <div className="mb-1 flex justify-between text-sm">
-                        <span className="capitalize text-ink-muted">{row.category}</span>
-                        <Money cents={row.monthlyCents} currency={summary.currency} />
+                        <span className="capitalize text-ink-muted">
+                          {row.category}
+                        </span>
+                        <Money
+                          cents={row.monthlyCents}
+                          currency={summary.currency}
+                        />
                       </div>
                       <div className="h-1 overflow-hidden rounded-full bg-border">
                         <div
@@ -281,7 +334,9 @@ function Cashflow() {
                 {summary.runway.value} days
                 <EstimateMark basis={summary.runway.basis} />
               </p>
-              <p className="mt-1 text-xs text-ink-faint">{summary.runway.basis}</p>
+              <p className="mt-1 text-xs text-ink-faint">
+                {summary.runway.basis}
+              </p>
             </Panel>
           )}
         </div>
@@ -316,9 +371,16 @@ function Cashflow() {
         today={data.today}
         currency={summary.currency}
         currentCents={summary.currentBalanceCents}
-        reconciled={{ cents: summary.reconciledBalanceCents, asOf: summary.balanceAsOf }}
+        reconciled={{
+          cents: summary.reconciledBalanceCents,
+          asOf: summary.balanceAsOf,
+        }}
       />
-      <IncomeModal open={addingIncome} onClose={() => setAddingIncome(false)} today={data.today} />
+      <IncomeModal
+        open={addingIncome}
+        onClose={() => setAddingIncome(false)}
+        today={data.today}
+      />
       {/* Mounted only while open, so each preset starts from a clean form. */}
       {addingExpense && (
         <ExpenseModal
@@ -356,7 +418,9 @@ function BigStat({
         )}
       >
         {value}
-        {estimated && <EstimateMark basis="Projected from your income and planned spending." />}
+        {estimated && (
+          <EstimateMark basis="Projected from your income and planned spending." />
+        )}
       </p>
       {hint && <p className="mt-0.5 text-[11px] text-ink-faint">{hint}</p>}
     </div>
@@ -409,15 +473,23 @@ function ProjectionChart({
     [projection.days, today],
   );
 
-  if (points.length === 0) return <EmptyState message="Nothing to project yet." />;
+  if (points.length === 0)
+    return <EmptyState message="Nothing to project yet." />;
 
   return (
     <div className="h-60">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={points} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+        <AreaChart
+          data={points}
+          margin={{ top: 5, right: 5, bottom: 0, left: 0 }}
+        >
           <defs>
             <linearGradient id="balanceFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="rgb(56 189 248)" stopOpacity={0.35} />
+              <stop
+                offset="0%"
+                stopColor="rgb(56 189 248)"
+                stopOpacity={0.35}
+              />
               <stop offset="100%" stopColor="rgb(56 189 248)" stopOpacity={0} />
             </linearGradient>
           </defs>
@@ -444,9 +516,14 @@ function ProjectionChart({
               borderRadius: 8,
               fontSize: 12,
             }}
-            labelFormatter={(label) => (typeof label === 'string' ? formatDay(label) : '')}
+            labelFormatter={(label) =>
+              typeof label === 'string' ? formatDay(label) : ''
+            }
             formatter={(value) =>
-              [formatCents(Math.round(Number(value) * 100), currency), 'Balance'] as [string, string]
+              [
+                formatCents(Math.round(Number(value) * 100), currency),
+                'Balance',
+              ] as [string, string]
             }
           />
           <Area
@@ -462,13 +539,21 @@ function ProjectionChart({
   );
 }
 
-function IncomeRow({ income, currency }: { income: IncomeSource; currency: string }) {
+function IncomeRow({
+  income,
+  currency,
+}: {
+  income: IncomeSource;
+  currency: string;
+}) {
   const { run, pending } = useAction();
   return (
     <li className="flex items-start justify-between gap-3 rounded-lg border border-border px-3 py-2">
       <div className="min-w-0">
         <p className="truncate text-sm">{income.label}</p>
-        <p className="text-xs text-ink-faint">{describeRecurrence(income.recurrence)}</p>
+        <p className="text-xs text-ink-faint">
+          {describeRecurrence(income.recurrence)}
+        </p>
       </div>
       <div className="shrink-0 text-right">
         <Money cents={income.amountCents} currency={currency} tone="good" />
@@ -479,7 +564,9 @@ function IncomeRow({ income, currency }: { income: IncomeSource; currency: strin
           type="button"
           className="mt-0.5 block w-full text-[11px] text-ink-faint hover:text-rose-400"
           disabled={pending}
-          onClick={() => void run(() => api.delete(`/cashflow/incomes/${income.id}`))}
+          onClick={() =>
+            void run(() => api.delete(`/cashflow/incomes/${income.id}`))
+          }
         >
           remove
         </button>
@@ -510,12 +597,20 @@ function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
  */
 type RecurringGroupKey = Cadence | 'unscheduled';
 
-const RECURRING_GROUPS: { key: RecurringGroupKey; label: string; empty: string }[] = [
+const RECURRING_GROUPS: {
+  key: RecurringGroupKey;
+  label: string;
+  empty: string;
+}[] = [
   { key: 'daily', label: 'Daily', empty: 'Nothing repeats daily.' },
   { key: 'weekly', label: 'Weekly', empty: 'Nothing repeats weekly.' },
   { key: 'monthly', label: 'Monthly', empty: 'Nothing repeats monthly.' },
   { key: 'yearly', label: 'Yearly', empty: 'Nothing repeats yearly.' },
-  { key: 'unscheduled', label: 'No schedule', empty: 'Nothing without a schedule.' },
+  {
+    key: 'unscheduled',
+    label: 'No schedule',
+    empty: 'Nothing without a schedule.',
+  },
 ];
 
 const MONTHLY_EQUIVALENT_BASIS =
@@ -545,7 +640,8 @@ function RecurringSpending({
     const buckets = new Map<RecurringGroupKey, Expense[]>();
     for (const expense of expenses) {
       if (expense.kind !== 'recurring') continue;
-      const key: RecurringGroupKey = expense.recurrence?.cadence ?? 'unscheduled';
+      const key: RecurringGroupKey =
+        expense.recurrence?.cadence ?? 'unscheduled';
       const bucket = buckets.get(key);
       if (bucket) bucket.push(expense);
       else buckets.set(key, [expense]);
@@ -555,7 +651,9 @@ function RecurringSpending({
 
   // The malformed-row panel only exists when there is something in it.
   const visible = RECURRING_GROUPS.filter(
-    (group) => group.key !== 'unscheduled' || (groups.get('unscheduled')?.length ?? 0) > 0,
+    (group) =>
+      group.key !== 'unscheduled' ||
+      (groups.get('unscheduled')?.length ?? 0) > 0,
   );
   const everything = [...groups.values()].flat();
 
@@ -565,12 +663,14 @@ function RecurringSpending({
         <div>
           <h2 className="text-sm font-semibold text-ink">Recurring spending</h2>
           <p className="mt-0.5 text-xs text-ink-faint">
-            One view per cadence, because a daily cost and a yearly one are not the same problem.
+            One view per cadence, because a daily cost and a yearly one are not
+            the same problem.
           </p>
         </div>
         {everything.length > 0 && (
           <p className="tabular text-xs text-ink-muted">
-            ≈ {formatCents(monthlyTotalCents(everything), currency)}/month in total
+            ≈ {formatCents(monthlyTotalCents(everything), currency)}/month in
+            total
             <EstimateMark basis={MONTHLY_EQUIVALENT_BASIS} />
           </p>
         )}
@@ -648,7 +748,9 @@ function OneOffSpending({
   const oneOffs = useMemo(
     () =>
       expenses
-        .filter((expense) => expense.kind === 'one_off' && Boolean(expense.date))
+        .filter(
+          (expense) => expense.kind === 'one_off' && Boolean(expense.date),
+        )
         .sort((a, b) => ((a.date ?? '') < (b.date ?? '') ? -1 : 1)),
     [expenses],
   );
@@ -657,11 +759,16 @@ function OneOffSpending({
 
   const rows = oneOffs.filter((expense) => expense.date?.startsWith(month));
   // Paused rows are out of the projections, so they stay out of the total too.
-  const totalCents = sumCents(rows.map((expense) => (expense.active ? expense.amountCents : 0)));
+  const totalCents = sumCents(
+    rows.map((expense) => (expense.active ? expense.amountCents : 0)),
+  );
   const pausedCount = rows.filter((expense) => !expense.active).length;
-  const monthsWithEntries = [...new Set(oneOffs.map((expense) => (expense.date ?? '').slice(0, 7)))];
+  const monthsWithEntries = [
+    ...new Set(oneOffs.map((expense) => (expense.date ?? '').slice(0, 7))),
+  ];
 
-  const shift = (delta: number) => setMonth(addMonths(`${month}-01`, delta).slice(0, 7));
+  const shift = (delta: number) =>
+    setMonth(addMonths(`${month}-01`, delta).slice(0, 7));
 
   return (
     <Panel
@@ -702,7 +809,11 @@ function OneOffSpending({
         <EmptyState
           message={`Nothing one-off in ${formatMonth(month)}.`}
           action={
-            <button type="button" className="btn-ghost" onClick={() => onAdd(`${month}-01`)}>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => onAdd(`${month}-01`)}
+            >
               Add one
             </button>
           }
@@ -722,7 +833,9 @@ function OneOffSpending({
 
       {monthsWithEntries.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border pt-3">
-          <span className="mr-1 text-[11px] uppercase tracking-wide text-ink-faint">Jump to</span>
+          <span className="mr-1 text-[11px] uppercase tracking-wide text-ink-faint">
+            Jump to
+          </span>
           {monthsWithEntries.map((key) => (
             <button
               key={key}
@@ -747,8 +860,15 @@ function OneOffSpending({
 /** What to say about an event beyond its amount: where it came from, and why it is there. */
 function eventMeta(
   event: CashEvent,
-  context: { expenses: Expense[]; incomes: IncomeSource[]; sales: RealisedSale[] },
-): { note: string; chip?: { label: string; href: string; tone: 'good' | 'warn' } } {
+  context: {
+    expenses: Expense[];
+    incomes: IncomeSource[];
+    sales: RealisedSale[];
+  },
+): {
+  note: string;
+  chip?: { label: string; href: string; tone: 'good' | 'warn' };
+} {
   if (event.sourceKind === 'income') {
     const income = context.incomes.find((row) => row.id === event.sourceId);
     return { note: income ? describeRecurrence(income.recurrence) : 'income' };
@@ -781,7 +901,9 @@ function eventMeta(
       : 'one-off';
   return {
     note: event.category ? `${event.category} · ${schedule}` : schedule,
-    chip: event.linkedLoanId ? { label: 'debt', href: '/loans', tone: 'warn' } : undefined,
+    chip: event.linkedLoanId
+      ? { label: 'debt', href: '/loans', tone: 'warn' }
+      : undefined,
   };
 }
 
@@ -821,9 +943,15 @@ function DayState({
     [sales, date],
   );
 
-  const day: CashProjectionDay | undefined = projection.days.find((row) => row.date === date);
-  const inCents = sumCents(events.filter((e) => e.direction === 'in').map((e) => e.amountCents));
-  const outCents = sumCents(events.filter((e) => e.direction === 'out').map((e) => e.amountCents));
+  const day: CashProjectionDay | undefined = projection.days.find(
+    (row) => row.date === date,
+  );
+  const inCents = sumCents(
+    events.filter((e) => e.direction === 'in').map((e) => e.amountCents),
+  );
+  const outCents = sumCents(
+    events.filter((e) => e.direction === 'out').map((e) => e.amountCents),
+  );
 
   return (
     <Panel
@@ -840,9 +968,23 @@ function DayState({
       }
     >
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <DayFigure label="Opening" cents={day?.openingCents} currency={currency} />
-        <DayFigure label="In" cents={inCents} currency={currency} tone={inCents ? 'good' : undefined} />
-        <DayFigure label="Out" cents={outCents} currency={currency} tone={outCents ? 'warn' : undefined} />
+        <DayFigure
+          label="Opening"
+          cents={day?.openingCents}
+          currency={currency}
+        />
+        <DayFigure
+          label="In"
+          cents={inCents}
+          currency={currency}
+          tone={inCents ? 'good' : undefined}
+        />
+        <DayFigure
+          label="Out"
+          cents={outCents}
+          currency={currency}
+          tone={outCents ? 'warn' : undefined}
+        />
         <DayFigure
           label="Closing"
           cents={day?.closingCents}
@@ -853,8 +995,9 @@ function DayState({
 
       {!day && (
         <p className="mt-2 text-xs text-ink-faint">
-          Balances are only projected from the last reconciliation ({formatDay(projection.from)})
-          onward, so this day shows what moved, not what was in the account.
+          Balances are only projected from the last reconciliation (
+          {formatDay(projection.from)}) onward, so this day shows what moved,
+          not what was in the account.
         </p>
       )}
 
@@ -865,7 +1008,8 @@ function DayState({
 
         {events.length === 0 && earmarkedSales.length === 0 ? (
           <p className="py-2 text-xs text-ink-faint">
-            Nothing on this date — no salary, no recurring payment, no one-off, nothing sold.
+            Nothing on this date — no salary, no recurring payment, no one-off,
+            nothing sold.
           </p>
         ) : (
           <ul className="divide-y divide-border">
@@ -887,10 +1031,19 @@ function DayState({
                         </Link>
                       )}
                     </div>
-                    <p className="text-xs capitalize text-ink-faint">{meta.note}</p>
+                    <p className="text-xs capitalize text-ink-faint">
+                      {meta.note}
+                    </p>
                   </div>
                   <span className="shrink-0">
-                    <span className={clsx('mr-0.5 text-xs', event.direction === 'in' ? 'text-emerald-400' : 'text-ink-faint')}>
+                    <span
+                      className={clsx(
+                        'mr-0.5 text-xs',
+                        event.direction === 'in'
+                          ? 'text-emerald-400'
+                          : 'text-ink-faint',
+                      )}
+                    >
                       {event.direction === 'in' ? '+' : '−'}
                     </span>
                     <Money
@@ -904,10 +1057,16 @@ function DayState({
             })}
 
             {earmarkedSales.map((sale) => (
-              <li key={`earmarked-${sale.id}`} className="flex items-center justify-between gap-3 py-2">
+              <li
+                key={`earmarked-${sale.id}`}
+                className="flex items-center justify-between gap-3 py-2"
+              >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="truncate text-sm text-ink-muted" title={sale.label}>
+                    <p
+                      className="truncate text-sm text-ink-muted"
+                      title={sale.label}
+                    >
                       {sale.label}
                     </p>
                     <Link href="/loans">
@@ -915,7 +1074,8 @@ function DayState({
                     </Link>
                   </div>
                   <p className="text-xs text-ink-faint">
-                    sold for {formatCents(sale.grossCents, currency)}, all of it earmarked for a debt
+                    sold for {formatCents(sale.grossCents, currency)}, all of it
+                    earmarked for a debt
                   </p>
                 </div>
                 <Money cents={0} currency={currency} className="shrink-0" />
@@ -941,7 +1101,9 @@ function DayFigure({
 }) {
   return (
     <div>
-      <p className="text-[11px] uppercase tracking-wide text-ink-faint">{label}</p>
+      <p className="text-[11px] uppercase tracking-wide text-ink-faint">
+        {label}
+      </p>
       <p
         className={clsx(
           'tabular mt-0.5 text-sm font-semibold',
@@ -969,13 +1131,17 @@ function ExpenseList({
   const { run, pending } = useAction();
   const [editing, setEditing] = useState<Expense | null>(null);
 
-  if (expenses.length === 0) return <EmptyState message="No spending recorded yet." />;
+  if (expenses.length === 0)
+    return <EmptyState message="No spending recorded yet." />;
 
   return (
     <>
       <ul className="divide-y divide-border">
         {expenses.map((expense) => (
-          <li key={expense.id} className="flex items-center justify-between gap-3 py-2.5">
+          <li
+            key={expense.id}
+            className="flex items-center justify-between gap-3 py-2.5"
+          >
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <p className="truncate text-sm" title={expense.label}>
@@ -1008,7 +1174,14 @@ function ExpenseList({
                 <Money cents={expense.amountCents} currency={currency} />
                 {showMonthlyEquivalent && expense.recurrence && (
                   <p className="tabular text-[11px] text-ink-faint">
-                    ≈ {formatCents(monthlyEquivalentCents(expense.amountCents, expense.recurrence), currency)}
+                    ≈{' '}
+                    {formatCents(
+                      monthlyEquivalentCents(
+                        expense.amountCents,
+                        expense.recurrence,
+                      ),
+                      currency,
+                    )}
                     /mo
                   </p>
                 )}
@@ -1024,7 +1197,9 @@ function ExpenseList({
                 type="button"
                 className="text-[11px] text-ink-faint hover:text-rose-400"
                 disabled={pending}
-                onClick={() => void run(() => api.delete(`/cashflow/expenses/${expense.id}`))}
+                onClick={() =>
+                  void run(() => api.delete(`/cashflow/expenses/${expense.id}`))
+                }
               >
                 ✕
               </button>
@@ -1034,7 +1209,11 @@ function ExpenseList({
       </ul>
 
       {editing && (
-        <EditExpenseModal expense={editing} onClose={() => setEditing(null)} currency={currency} />
+        <EditExpenseModal
+          expense={editing}
+          onClose={() => setEditing(null)}
+          currency={currency}
+        />
       )}
     </>
   );
@@ -1053,8 +1232,13 @@ function EditExpenseModal({
   onClose: () => void;
   currency: string;
 }) {
-  const [amountCents, setAmountCents] = useState<number | undefined>(expense.amountCents);
+  const [amountCents, setAmountCents] = useState<number | undefined>(
+    expense.amountCents,
+  );
   const [label, setLabel] = useState(expense.label);
+  const [currencyValue, setCurrencyValue] = useState(
+    expense.currency as Currency,
+  );
   const [active, setActive] = useState(expense.active);
   const { run, pending, error } = useAction();
 
@@ -1067,25 +1251,43 @@ function EditExpenseModal({
       error={error}
       onSubmit={async () => {
         const ok = await run(() =>
-          api.patch(`/cashflow/expenses/${expense.id}`, { label, amountCents, active }),
+          api.patch(`/cashflow/expenses/${expense.id}`, {
+            label,
+            amountCents,
+            currency: currencyValue,
+            active,
+          }),
         );
         if (ok) onClose();
       }}
     >
       {expense.linkedLoanId && (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-          This funds a debt repayment. Changing the amount here also changes the payoff dates on
-          the Debts screen — it is the same figure, stored once.
+          This funds a debt repayment. Changing the amount here also changes the
+          payoff dates on the Debts screen — it is the same figure, stored once.
         </p>
       )}
       <Field label="Label">
-        <Input required value={label} onChange={(e) => setLabel(e.target.value)} />
+        <Input
+          required
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+        />
       </Field>
       <Field label="Amount">
-        <MoneyInput valueCents={amountCents} onChangeCents={setAmountCents} currency={currency} />
+        <MoneyInput
+          valueCents={amountCents}
+          onChangeCents={setAmountCents}
+          currency={currencyValue}
+          onChangeCurrency={setCurrencyValue}
+        />
       </Field>
       <label className="flex items-center gap-2 text-sm text-ink-muted">
-        <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+        <input
+          type="checkbox"
+          checked={active}
+          onChange={(e) => setActive(e.target.checked)}
+        />
         Include in projections
       </label>
     </Modal>
@@ -1108,7 +1310,10 @@ function BalanceModal({
   currentCents: number;
   reconciled: { cents: number; asOf: string };
 }) {
-  const [amountCents, setAmountCents] = useState<number | undefined>(currentCents);
+  const [amountCents, setAmountCents] = useState<number | undefined>(
+    currentCents,
+  );
+  const [balanceCurrency, setBalanceCurrency] = useState(currency as Currency);
   const [asOf, setAsOf] = useState(today);
   const { run, pending, error } = useAction();
 
@@ -1121,34 +1326,64 @@ function BalanceModal({
       pending={pending}
       error={error}
       onSubmit={async () => {
-        const ok = await run(() => api.put('/cashflow/balance', { amountCents, asOf }));
+        const ok = await run(() =>
+          api.put('/cashflow/balance', {
+            amountCents,
+            currency: balanceCurrency,
+            asOf,
+          }),
+        );
         if (ok) onClose();
       }}
     >
       <p className="text-xs text-ink-muted">
-        Enter what is actually in your account. Everything on this page is projected forward from
-        this figure and this date.
+        Enter what is actually in your account. Everything on this page is
+        projected forward from this figure and this date.
       </p>
       {reconciled.asOf !== today && (
         <p className="text-xs text-ink-faint">
           You last confirmed {formatCents(reconciled.cents, currency)} on{' '}
-          {formatDay(reconciled.asOf)}. The amount below is what the projection expects you to
-          have today — correct it if the real figure differs.
+          {formatDay(reconciled.asOf)}. The amount below is what the projection
+          expects you to have today — correct it if the real figure differs.
         </p>
       )}
       <Field label="Balance">
-        <MoneyInput required valueCents={amountCents} onChangeCents={setAmountCents} currency={currency} />
+        <MoneyInput
+          required
+          valueCents={amountCents}
+          onChangeCents={setAmountCents}
+          currency={balanceCurrency}
+          onChangeCurrency={setBalanceCurrency}
+        />
       </Field>
-      <Field label="True as of" hint="Spending since this date is treated as still to come.">
-        <Input type="date" required value={asOf} onChange={(e) => setAsOf(e.target.value)} />
+      <Field
+        label="True as of"
+        hint="Spending since this date is treated as still to come."
+      >
+        <Input
+          type="date"
+          required
+          value={asOf}
+          onChange={(e) => setAsOf(e.target.value)}
+        />
       </Field>
     </Modal>
   );
 }
 
-function IncomeModal({ open, onClose, today }: { open: boolean; onClose: () => void; today: string }) {
+function IncomeModal({
+  open,
+  onClose,
+  today,
+}: {
+  open: boolean;
+  onClose: () => void;
+  today: string;
+}) {
+  const defaultCurrency = useDefaultCurrency();
   const [label, setLabel] = useState('');
   const [amountCents, setAmountCents] = useState<number | undefined>(undefined);
+  const [currency, setCurrency] = useState<Currency | undefined>(undefined);
   const [dayOfMonth, setDayOfMonth] = useState('7');
   const { run, pending, error } = useAction();
 
@@ -1165,6 +1400,7 @@ function IncomeModal({ open, onClose, today }: { open: boolean; onClose: () => v
           api.post('/cashflow/incomes', {
             label,
             amountCents,
+            currency: currency ?? defaultCurrency,
             recurrence: {
               cadence: 'monthly',
               interval: 1,
@@ -1177,10 +1413,21 @@ function IncomeModal({ open, onClose, today }: { open: boolean; onClose: () => v
       }}
     >
       <Field label="Label">
-        <Input required placeholder="EPAM salary" value={label} onChange={(e) => setLabel(e.target.value)} />
+        <Input
+          required
+          placeholder="EPAM salary"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+        />
       </Field>
       <Field label="Net amount" hint="What actually lands in the account.">
-        <MoneyInput required valueCents={amountCents} onChangeCents={setAmountCents} />
+        <MoneyInput
+          required
+          valueCents={amountCents}
+          onChangeCents={setAmountCents}
+          currency={currency ?? defaultCurrency}
+          onChangeCurrency={setCurrency}
+        />
       </Field>
       <Field label="Day of the month">
         <Input
@@ -1213,15 +1460,18 @@ function ExpenseModal({
   onClose: () => void;
   today: string;
 }) {
+  const defaultCurrency = useDefaultCurrency();
   const [form, setForm] = useState({
     label: '',
     amountCents: undefined as number | undefined,
+    currency: undefined as Currency | undefined,
     category: 'other',
     kind: preset.kind as string,
     cadence: (preset.cadence ?? 'monthly') as string,
     dayOfMonth: '1',
     date: preset.date ?? today,
   });
+  const currency = form.currency ?? defaultCurrency;
   const { run, pending, error } = useAction();
 
   return (
@@ -1237,6 +1487,7 @@ function ExpenseModal({
           api.post('/cashflow/expenses', {
             label: form.label,
             amountCents: form.amountCents,
+            currency,
             category: form.category,
             kind: form.kind,
             recurrence:
@@ -1244,9 +1495,10 @@ function ExpenseModal({
                 ? {
                     cadence: form.cadence,
                     interval: 1,
-                    dayOfMonth: form.cadence === 'monthly' || form.cadence === 'yearly'
-                      ? Number(form.dayOfMonth)
-                      : undefined,
+                    dayOfMonth:
+                      form.cadence === 'monthly' || form.cadence === 'yearly'
+                        ? Number(form.dayOfMonth)
+                        : undefined,
                     startDate: today,
                   }
                 : undefined,
@@ -1269,11 +1521,16 @@ function ExpenseModal({
           required
           valueCents={form.amountCents}
           onChangeCents={(cents) => setForm({ ...form, amountCents: cents })}
+          currency={currency}
+          onChangeCurrency={(next) => setForm({ ...form, currency: next })}
         />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Category">
-          <Select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+          <Select
+            value={form.category}
+            onChange={(e) => setForm({ ...form, category: e.target.value })}
+          >
             {EXPENSE_CATEGORIES.map((option) => (
               <option key={option} value={option}>
                 {option}
@@ -1282,7 +1539,10 @@ function ExpenseModal({
           </Select>
         </Field>
         <Field label="How often">
-          <Select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
+          <Select
+            value={form.kind}
+            onChange={(e) => setForm({ ...form, kind: e.target.value })}
+          >
             <option value="recurring">Repeats</option>
             <option value="one_off">Just once</option>
           </Select>
@@ -1292,7 +1552,10 @@ function ExpenseModal({
       {form.kind === 'recurring' ? (
         <div className="grid grid-cols-2 gap-3">
           <Field label="Repeats">
-            <Select value={form.cadence} onChange={(e) => setForm({ ...form, cadence: e.target.value })}>
+            <Select
+              value={form.cadence}
+              onChange={(e) => setForm({ ...form, cadence: e.target.value })}
+            >
               {CASHFLOW_CADENCES.map((option) => (
                 <option key={option} value={option}>
                   {option}
@@ -1307,7 +1570,9 @@ function ExpenseModal({
                 min="1"
                 max="31"
                 value={form.dayOfMonth}
-                onChange={(e) => setForm({ ...form, dayOfMonth: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, dayOfMonth: e.target.value })
+                }
               />
             </Field>
           )}

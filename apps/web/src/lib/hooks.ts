@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import useSWR, { mutate as globalMutate, type SWRConfiguration } from 'swr';
+import type { Currency, UserSettings } from '@life-portal/shared-types';
 import { api, ApiError } from './api';
 
 /**
@@ -19,9 +20,23 @@ export function useApi<T>(path: string | null, config?: SWRConfiguration<T>) {
   });
 }
 
+/**
+ * The currency a new record should default to.
+ *
+ * Records are stored in the currency they were entered in, so a form has to pick a starting
+ * point; the user's display currency is the one they are thinking in. SWR dedupes the request,
+ * so a page with six forms still fetches settings once.
+ */
+export function useDefaultCurrency(): Currency {
+  const { data } = useApi<UserSettings>('/settings');
+  return (data?.displayCurrency as Currency) ?? 'GEL';
+}
+
 /** Refetches every query whose key starts with `prefix`. */
 export function revalidate(prefix: string): Promise<unknown> {
-  return globalMutate((key) => typeof key === 'string' && key.startsWith(prefix));
+  return globalMutate(
+    (key) => typeof key === 'string' && key.startsWith(prefix),
+  );
 }
 
 /**
@@ -35,9 +50,16 @@ export function revalidateLinked(): Promise<unknown> {
   return globalMutate(
     (key) =>
       typeof key === 'string' &&
-      ['/dashboard', '/loans', '/cashflow', '/items', '/stocks', '/personal', '/boards', '/nutrition'].some((root) =>
-        key.startsWith(root),
-      ),
+      [
+        '/dashboard',
+        '/loans',
+        '/cashflow',
+        '/items',
+        '/stocks',
+        '/personal',
+        '/boards',
+        '/nutrition',
+      ].some((root) => key.startsWith(root)),
   );
 }
 
@@ -49,20 +71,30 @@ export function useAction() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const run = useCallback(async (fn: () => Promise<unknown>, options?: { revalidate?: boolean }) => {
-    setPending(true);
-    setError(null);
-    try {
-      await fn();
-      if (options?.revalidate !== false) await revalidateLinked();
-      return true;
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
-      return false;
-    } finally {
-      setPending(false);
-    }
-  }, []);
+  const run = useCallback(
+    async (fn: () => Promise<unknown>, options?: { revalidate?: boolean }) => {
+      setPending(true);
+      setError(null);
+      try {
+        await fn();
+        if (options?.revalidate !== false) await revalidateLinked();
+        return true;
+      } catch (caught) {
+        setError(
+          caught instanceof ApiError ? caught.message : 'Something went wrong.',
+        );
+        return false;
+      } finally {
+        setPending(false);
+      }
+    },
+    [],
+  );
 
-  return { run, pending, error, clearError: useCallback(() => setError(null), []) };
+  return {
+    run,
+    pending,
+    error,
+    clearError: useCallback(() => setError(null), []),
+  };
 }
