@@ -237,8 +237,6 @@ interface RungDef extends LadderRungBudget {
 }
 
 interface RungState {
-  def: RungDef;
-  periodStart: IsoDate;
   budgetCents: Cents;
   consumedCents: Cents;
   /** True once *anything* has been confirmed against this rung in this period. */
@@ -327,8 +325,6 @@ export function spendWaterfall(input: WaterfallInput): WaterfallResult {
     let state = states.get(key);
     if (!state) {
       state = {
-        def,
-        periodStart: start,
         budgetCents: inDisplay(def.budgetCents, def.currency, start),
         consumedCents: 0,
         confirmed: false,
@@ -393,7 +389,6 @@ export function spendWaterfall(input: WaterfallInput): WaterfallResult {
         inDisplay(allocation.amountCents, payment.currency, payment.day),
       );
       const amount = Math.min(converted, entry.spendableCents - placed);
-      if (amount < 0) break;
       placed += amount;
 
       // ---- step 3: expand the span, each part consuming its own day's period ------------
@@ -507,7 +502,6 @@ export function spendWaterfall(input: WaterfallInput): WaterfallResult {
         forDay: day,
         projected: true,
       });
-      left = 0;
     }
   }
 

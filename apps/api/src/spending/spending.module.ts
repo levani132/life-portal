@@ -80,6 +80,23 @@ export class SpendingController {
     private readonly settings: SettingsService,
   ) {}
 
+  /** Everything the detail page needs in one round trip: ladder, figures, payments, gaps. */
+  @Get()
+  overview(@CurrentUser('userId') userId: string, @Today() today: string) {
+    return this.spending.overview(userId, today);
+  }
+
+  /** Per-period and cumulative savings, plus the month's projected, actual and extra together. */
+  @Get('savings')
+  savings(
+    @CurrentUser('userId') userId: string,
+    @Today() today: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.spending.savings(userId, today, from, to);
+  }
+
   @Get('payments')
   payments(
     @CurrentUser('userId') userId: string,

@@ -7,13 +7,22 @@ import type {
   SpendPayment as SpendPaymentDto,
 } from '@life-portal/shared-types';
 import {
+  addDays,
+  arrangeWidgets,
   detectMissedMessages,
+  eachDay,
   localDay,
   parseBankMessage,
+  spendWaterfall,
+  startOfFinancialMonth,
   toDay,
 } from '@life-portal/shared-domain';
+import type { LadderTierBudget, WaterfallResult } from '@life-portal/shared-domain';
+import { CASHFLOW_CADENCES } from '@life-portal/shared-types';
 import { CashflowService } from '../cashflow/cashflow.service';
+import { FxService } from '../fx/fx.module';
 import { NutritionService } from '../nutrition/nutrition.service';
+import { SettingsService } from '../settings/settings.module';
 import { SpendPayment } from './spending.schemas';
 import type {
   CreatePaymentDto,
@@ -39,6 +48,8 @@ export class SpendingService {
     @InjectModel(SpendPayment.name) private readonly payments: Model<SpendPayment>,
     private readonly cashflow: CashflowService,
     private readonly nutrition: NutritionService,
+    private readonly settings: SettingsService,
+    private readonly fx: FxService,
   ) {}
 
   /** Every read funnels through here, so the owner clause can never be omitted. */
@@ -280,6 +291,157 @@ export class SpendingService {
       $set: { 'decision.promotedToExpenseId': (expense as { id: string }).id },
     });
     return expense;
+  }
+
+  // ---------------------------------------------------------------- the ladder
+
+  /**
+   * The budgeted lines, grouped into tiers and ordered as the owner arranged them.
+   *
+   * Built from the cash-flow expenses rather than a copy of them (principle IV), so editing a
+   * budget on the Free money screen changes the ladder with no second write.
+   */
+  private async tiers(userId: string, from: string, to: string): Promise<LadderTierBudget[]> {
+    const [expenses, settings] = await Promise.all([
+      this.cashflow.listExpenses(userId),
+      this.settings.get(userId),
+    ]);
+
+    // An inactive line is not a budget, so it is no rung.
+    const usable = expenses.filter((e) => e.active !== false);
+
+    return CASHFLOW_CADENCES.map((cadence) => {
+      const forCadence = usable.filter((e) => {
+        if (e.kind === 'recurring') return e.recurrence?.cadence === cadence;
+        // A planned one-off belongs to the single period its date falls in — not to every month
+        // for ever. Without this filter a credit-card payment made in June inflates the monthly
+        // budget of every month after it, and therefore overstates every month's saving.
+        if (cadence !== 'monthly' || !e.date) return false;
+        const day = toDay(e.date);
+        return day >= toDay(from) && day <= toDay(to);
+      });
+      // `spendOrder` is a preference list, not a set of positions: it has to tolerate ids it has
+      // never seen and ids that no longer exist, exactly as `widgetOrder` does.
+      const arranged = arrangeWidgets(
+        forCadence.map((e, index) => ({ id: e.id, order: index })),
+        settings.spendOrder ?? [],
+      );
+      const byId = new Map(forCadence.map((e) => [e.id, e]));
+
+      return {
+        cadence,
+        rungs: arranged
+          .map((slot) => byId.get(slot.id))
+          .filter((e): e is NonNullable<typeof e> => Boolean(e))
+          .map((e) => ({
+            expenseId: e.id,
+            label: e.label,
+            budgetCents: e.amountCents,
+            currency: e.currency,
+            settlement: e.settlement ?? 'auto',
+            kind: e.kind as 'recurring' | 'one_off',
+          })),
+      };
+    });
+  }
+
+  /**
+   * Runs the waterfall over a window wide enough to know monthly consumption.
+   *
+   * Every day converts at its own rate, so a lari payment is measured against that day's worth of
+   * a dollar allowance rather than today's.
+   */
+  private async run(
+    userId: string,
+    today: string,
+    options?: { from?: string; to?: string },
+  ): Promise<WaterfallResult> {
+    const settings = await this.settings.get(userId);
+    const monthStart = startOfFinancialMonth(today, settings.monthStartsOn ?? 1);
+    const from = options?.from ?? monthStart;
+    const to = options?.to ?? today;
+
+    // One-offs are judged against the whole financial month, not the month so far, so one
+    // planned for the 28th still shows as budgeted on the 24th.
+    const monthEnd = addDays(
+      startOfFinancialMonth(addDays(monthStart, 45), settings.monthStartsOn ?? 1),
+      -1,
+    );
+    const [payments, tiers] = await Promise.all([
+      this.list(userId),
+      this.tiers(userId, options?.from ?? monthStart, options?.to ?? monthEnd),
+    ]);
+    const display = await this.fx.displayFor(userId, today);
+
+    // One rate lookup per day in the window, so a payment is never valued at a day it did not
+    // happen on. `fx` is the fallback for any day the archive does not reach.
+    const ratesByDay: Record<string, Awaited<ReturnType<FxService['context']>>> = {};
+    for (const day of eachDay(from, to)) {
+      ratesByDay[day] = await this.fx.context(display.currency, day);
+    }
+
+    return spendWaterfall({
+      today,
+      from,
+      to,
+      payments,
+      tiers,
+      fx: display.fx,
+      ratesByDay,
+      weekStartsOn: settings.weekStartsOn ?? 1,
+      monthStartsOn: settings.monthStartsOn ?? 1,
+    });
+  }
+
+  /** Everything the detail page needs in one round trip. */
+  async overview(userId: string, today: string) {
+    const result = await this.run(userId, today);
+    const ladder = result.ladderFor(today);
+    const payments = await this.list(userId, addDays(today, -30), today);
+    const gaps = detectMissedMessages(await this.list(userId));
+    const unparsed = await this.list(userId, undefined, undefined, 'unparsed');
+
+    const spent = ladder.tiers.reduce((sum, t) => sum + t.consumedCents, 0) + ladder.extraCents;
+    const saved = ladder.tiers.reduce((sum, t) => sum + t.savingCents, 0);
+
+    return {
+      today,
+      ladder,
+      todayFigures: {
+        spentCents: spent,
+        savedCents: saved,
+        extraCents: ladder.extraCents,
+        netCents: saved - ladder.extraCents,
+      },
+      payments: payments.map((p) => ({
+        ...p,
+        allocations: result.allocationsByPayment[p.id] ?? [],
+      })),
+      unparsedCount: unparsed.length,
+      gaps,
+      orphans: result.orphanedAllocations,
+      basis:
+        'Reflects captured payments only, so it is a lower bound. Amounts are converted at the ' +
+        'National Bank of Georgia rate for the day each payment was made.',
+    };
+  }
+
+  /** Per-period and cumulative savings, plus the month read three ways. */
+  async savings(userId: string, today: string, from?: string, to?: string) {
+    const result = await this.run(userId, today, { from, to });
+    const cashflow = await this.cashflow.summary(userId, today);
+    const month = result.savings.find((p) => p.cadence === 'monthly');
+
+    return {
+      periods: result.savings,
+      cumulative: result.cumulative,
+      month: {
+        // Already known from income less budgeted spending — the figure the projection assumed.
+        projectedSavingCents: cashflow.monthlyNetCents,
+        actualSavingCents: month?.savingCents ?? 0,
+        extraCents: month?.extraCents ?? 0,
+      },
+    };
   }
 
   // ---------------------------------------------------------------- completeness
