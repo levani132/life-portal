@@ -3,6 +3,7 @@
 import clsx from 'clsx';
 import type { Cadence, LadderRung, LadderTier, SpendLadder } from '@life-portal/shared-types';
 import { formatCents } from '@life-portal/shared-domain';
+import { SortableGrid } from './sortable-grid';
 import { Chip, EmptyState, EstimateMark, Panel, ProgressBar } from './ui';
 
 /**
@@ -35,10 +36,13 @@ export function SpendLadderView({
   ladder,
   currency,
   className,
+  reorder,
 }: {
   ladder: SpendLadder;
   currency: string;
   className?: string;
+  /** Supply this and each tier's rungs become draggable. */
+  reorder?: LadderReorder;
 }) {
   const approximate = ladder.unconvertedCurrencies ?? [];
 
@@ -53,7 +57,7 @@ export function SpendLadderView({
       ) : (
         <div className="space-y-6">
           {ladder.tiers.map((tier) => (
-            <Tier key={tier.cadence} tier={tier} currency={currency} />
+            <Tier key={tier.cadence} tier={tier} currency={currency} reorder={reorder} />
           ))}
         </div>
       )}
@@ -75,7 +79,28 @@ export function SpendLadderView({
   );
 }
 
-function Tier({ tier, currency }: { tier: LadderTier; currency: string }) {
+/**
+ * How the ladder is reordered.
+ *
+ * One order list covers every tier, so a commit merges each tier's arrangement back into a
+ * single flat list of expense ids — the same preference-list shape as `widgetOrder`.
+ */
+export interface LadderReorder {
+  editing: boolean;
+  onEditingChange: (editing: boolean) => void;
+  onOrderChange: (cadence: Cadence, order: string[]) => void;
+  onCommit: (cadence: Cadence, order: string[]) => void;
+}
+
+function Tier({
+  tier,
+  currency,
+  reorder,
+}: {
+  tier: LadderTier;
+  currency: string;
+  reorder?: LadderReorder;
+}) {
   const overspent = tier.savingCents < 0;
   const ratio = tier.budgetCents > 0 ? tier.consumedCents / tier.budgetCents : 0;
 
@@ -109,6 +134,19 @@ function Tier({ tier, currency }: { tier: LadderTier; currency: string }) {
 
       {tier.rungs.length === 0 ? (
         <p className="mt-2 text-xs text-ink-faint">Nothing budgeted at this cadence.</p>
+      ) : reorder ? (
+        <SortableGrid
+          items={tier.rungs}
+          getId={(rung) => rung.expenseId}
+          getLabel={(rung) => rung.label}
+          editing={reorder.editing}
+          onEditingChange={reorder.onEditingChange}
+          onOrderChange={(order) => reorder.onOrderChange(tier.cadence, order)}
+          onCommit={(order) => reorder.onCommit(tier.cadence, order)}
+          className="mt-3 grid grid-cols-1 gap-3"
+        >
+          {(rung) => <Rung rung={rung} currency={currency} />}
+        </SortableGrid>
       ) : (
         <ul className="mt-3 space-y-3">
           {tier.rungs.map((rung) => (

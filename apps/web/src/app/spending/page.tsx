@@ -97,6 +97,26 @@ function Spending() {
   const [editing, setEditing] = useState<SpendPayment | null>(null);
   const [sheetId, setSheetId] = useState<string | null>(null);
   const [visibleDays, setVisibleDays] = useState(DAY_PAGE);
+  const [reordering, setReordering] = useState(false);
+  /**
+   * The order a drag is producing, per tier.
+   *
+   * Held per cadence and merged on commit, because `spendOrder` is one flat list across every
+   * tier while a drag only ever rearranges within one of them.
+   */
+  const [pendingOrder, setPendingOrder] = useState<Record<string, string[]>>({});
+
+  /**
+   * Saves the ladder's order.
+   *
+   * Optimistic in the sense that the drag has already moved the bar — this only persists it, and
+   * a refetch afterwards re-derives every projection against the new order, which is the point:
+   * reordering re-attributes past days too.
+   */
+  const saveOrder = async (order: string[]) => {
+    await api.put('/spending/order', { order });
+    await refresh();
+  };
 
   // Writes here change nothing on the dashboard roots `revalidateLinked` knows about, so each
   // one refetches this page's own queries.
@@ -169,7 +189,26 @@ function Spending() {
               />
             )}
 
-            <SpendLadderView ladder={overview.data.ladder} currency={currency} />
+            <SpendLadderView
+              ladder={overview.data.ladder}
+              currency={currency}
+              reorder={{
+                editing: reordering,
+                onEditingChange: setReordering,
+                onOrderChange: (cadence, order) =>
+                  setPendingOrder((prev) => ({ ...prev, [cadence]: order })),
+                onCommit: (cadence, order) => {
+                  const merged = { ...pendingOrder, [cadence]: order };
+                  // Tiers are walked in the order the ladder reports them, so the flat list keeps
+                  // daily before weekly before monthly — which is also the cascade's order.
+                  const flat = (overview.data?.ladder.tiers ?? []).flatMap(
+                    (t) => merged[t.cadence] ?? t.rungs.map((r) => r.expenseId),
+                  );
+                  setPendingOrder(merged);
+                  void saveOrder(flat);
+                },
+              }}
+            />
           </>
         )}
 

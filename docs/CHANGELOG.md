@@ -2,6 +2,43 @@
 
 User-visible changes. Newest first.
 
+## 2026-08-29 — Spending: see where the money went, and what you saved
+
+Building on the capture below, the app now works out **what each payment was probably for** and
+keeps score.
+
+**Your budget becomes a ladder.** The spending you already planned — daily meals, weekly fuel and
+chores, the monthly lines — fills up in the order you choose. A payment fills the first allowance,
+then the next; when the day's allowances are used up it draws on the week's, then the month's, and
+anything past that is unplanned spending you can sort out later. One payment can split across
+several allowances, so the bars always add up to what you actually spent.
+
+**The app guesses; you decide.** Every payment shows where it probably went, marked plainly as a
+guess. Confirm it and it becomes fact — across several allowances if one shop trip was part dinner
+and part household, or only partly if you only know some of it. Say it was something else entirely
+and it stops touching your budget at all, and one button turns it into a new budget line if it
+turns out to happen every month.
+
+**Confirming one payment rearranges the guesses around it.** Say the morning shop was the whole
+day's food and the evening one moves to your weekly allowance by itself. And once you have said
+what an allowance went on, no guess may quietly fill the rest of it — that unspent part is a saving
+you earned, and it stays visible.
+
+**Two things you can now say that most budget apps cannot.** That tonight's shopping was for
+tomorrow, and that one carton of milk covers the next four breakfasts — the cost spreads evenly
+across those days, so tomorrow correctly shows as already partly paid for. And where part of a
+payment was never really yours — a shared dinner someone paid you back for — you can mark that part
+as not really spent.
+
+**It keeps score.** For any day, week or month: what you saved against your allowances, what you
+spent outside them, and the net. Across all time: how much you have saved in total and how much of
+it came from your daily, weekly and monthly allowances. Overspending shows as overspending, not as
+zero.
+
+**And over time it will tell you when your budget is wrong.** Once there is enough history — four
+weeks for a daily line — it proposes a figure that matches what you actually spend, always saying
+what it is based on. Nothing changes until you accept it.
+
 ## 2026-08-29 — Your card payments arrive on their own
 
 **Your bank already texts you every time you pay. The app now listens.** Set up a shortcut on your

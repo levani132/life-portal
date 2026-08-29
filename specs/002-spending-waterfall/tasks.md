@@ -15,7 +15,7 @@ test named for them. UI-only tasks carry no test.
 
 ## Progress — 2026-08-29
 
-**59 of 61 done.** Every user story is implemented and pushed. 337 domain tests; `npm run check`,
+**60 of 61 done.** Every user story is implemented and pushed. 337 domain tests; `npm run check`,
 `nx build api` and `nx build web` all pass.
 
 Verified against a running server by replaying the owner's real 24 August: capture, dedupe, the
@@ -24,12 +24,10 @@ the other payments, and the savings invariant holding in every state.
 
 Still open:
 
-- **T053** — drag-to-reorder the ladder. The order is settable through `PUT /api/spending/order`
-  and honoured everywhere; only the drag gesture is missing. Reuse `sortable-grid.tsx` **unchanged**
-  — both of its load-bearing touch details are documented in `docs/DECISIONS.md` and were missed by
-  `npm run check` once already.
-- **T060** — the quickstart's browser pass (§5). The API side of §3–§4 has been run; the pages have
-  been built but not looked at in a browser.
+- **T060** — the quickstart's browser pass (§5). The API side of §3–§4 has been run against a live
+  server and passes; both apps build; but nothing has been looked at in a browser. Per CLAUDE.md
+  that is the check that actually catches things, so it is the one piece of the definition of done
+  still outstanding.
 
 One thing found while implementing, worth knowing before touching the projection: `SpendingModule`
 imports `CashflowModule` to read the budget, so the reverse import would be circular. `projectCash`
@@ -201,7 +199,7 @@ nothing.
 ones do not move.
 
 - [x] T052 [US6] Implement `PUT /api/spending/order` writing `spendOrder`, with exactly one writer so a reorder cannot arrive bundled with another settings change
-- [ ] T053 [US6] Add drag-to-reorder to the ladder, **reusing `apps/web/src/components/sortable-grid.tsx` unchanged** — both of its load-bearing details (the non-passive `touchmove` registered at mount, and the node not being replaced mid-gesture) are documented in `docs/DECISIONS.md` and were missed by `npm run check` once already
+- [x] T053 [US6] Add drag-to-reorder to the ladder, **reusing `apps/web/src/components/sortable-grid.tsx` unchanged** — both of its load-bearing details (the non-passive `touchmove` registered at mount, and the node not being replaced mid-gesture) are documented in `docs/DECISIONS.md` and were missed by `npm run check` once already
 - [x] T054 [P] [US6] Add a settlement toggle to the expense edit form in `apps/web/src/app/cashflow/page.tsx`, explaining that a manual rung is never charged by the cascade
 
 **Checkpoint**: all six stories work independently.
