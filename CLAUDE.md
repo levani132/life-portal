@@ -111,7 +111,10 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
 - **Zoom is locked off, and form controls are 16px on coarse pointers.** `maximumScale`/
   `user-scalable=no` are ignored by iOS Safari in a browser tab; the `@media (pointer: coarse)`
   rule making `.field` 16px is what actually stops iOS zooming in when an input takes focus. If you
-  add a text control, route it through `Input`/`Select`/`Textarea` so it inherits that.
+  add a text control, route it through `Input`/`Select`/`Textarea` so it inherits that. The same
+  applies to decimal fields for a second reason: on Georgian (and many other) keyboard locales the
+  iOS decimal pad offers a **comma**, not a dot, and `Number(',5')` is `NaN` — `Input` (when
+  `inputMode="decimal"`) and `MoneyInput` convert it, so fractions are typeable at all.
 - **Don't set the `animation` shorthand where an `[animation-delay:*]` utility is used.** The
   shorthand resets the delay to zero — it is why the loader's bars use animation longhands
   (`components/portal-loader.tsx`, `global.css`).

@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-08-30 — The comma key now types fractions
+
+On a Georgian keyboard the iPhone's number pad offers a comma where the decimal point should be,
+which made fractions impossible to type into any amount field. Typing a comma now simply becomes a
+decimal point, everywhere — money, portions, body weight.
+
 ## 2026-08-30 — One money page
 
 **The Spending page has merged into Free money.** They were always the same question — where is my

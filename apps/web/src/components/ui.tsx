@@ -48,16 +48,10 @@ export function Panel({
       {(title || actions) && (
         <header className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
           <div className="min-w-0 flex-1">
-            {title && (
-              <h2 className="text-sm font-semibold text-ink">{title}</h2>
-            )}
-            {description && (
-              <p className="mt-0.5 text-xs text-ink-faint">{description}</p>
-            )}
+            {title && <h2 className="text-sm font-semibold text-ink">{title}</h2>}
+            {description && <p className="mt-0.5 text-xs text-ink-faint">{description}</p>}
           </div>
-          {actions && (
-            <div className="flex shrink-0 items-center gap-2">{actions}</div>
-          )}
+          {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
         </header>
       )}
       {children}
@@ -65,13 +59,7 @@ export function Panel({
   );
 }
 
-export function Chip({
-  tone = 'neutral',
-  children,
-}: {
-  tone?: WidgetTone;
-  children: ReactNode;
-}) {
+export function Chip({ tone = 'neutral', children }: { tone?: WidgetTone; children: ReactNode }) {
   return <span className={clsx('chip', TONE_CHIP[tone])}>{children}</span>;
 }
 
@@ -90,28 +78,34 @@ export function Field({
     <label className="block">
       <span className="label">{label}</span>
       {children}
-      {hint && !error && (
-        <span className="mt-1 block text-xs text-ink-faint">{hint}</span>
-      )}
-      {error && (
-        <span className="mt-1 block text-xs text-rose-400">{error}</span>
-      )}
+      {hint && !error && <span className="mt-1 block text-xs text-ink-faint">{hint}</span>}
+      {error && <span className="mt-1 block text-xs text-rose-400">{error}</span>}
     </label>
   );
 }
 
+/**
+ * On several keyboard locales — Georgian included — the iOS decimal pad has a comma where the
+ * dot should be, and `Number(',5')` is `NaN`, so fractions simply could not be typed. Every
+ * decimal field in the app goes through this component, so the comma is turned into a dot here,
+ * once, rather than at ten call sites that would each forget it eventually.
+ */
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={clsx('field', props.className)} />;
+  const { onChange, ...rest } = props;
+  const handleChange =
+    props.inputMode === 'decimal' && onChange
+      ? (event: React.ChangeEvent<HTMLInputElement>) => {
+          if (event.target.value.includes(',')) {
+            event.target.value = event.target.value.replace(/,/g, '.');
+          }
+          onChange(event);
+        }
+      : onChange;
+  return <input {...rest} onChange={handleChange} className={clsx('field', props.className)} />;
 }
 
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return (
-    <textarea
-      {...props}
-      className={clsx('field', props.className)}
-      rows={props.rows ?? 3}
-    />
-  );
+  return <textarea {...props} className={clsx('field', props.className)} rows={props.rows ?? 3} />;
 }
 
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
@@ -148,9 +142,7 @@ export function MoneyInput({
   required?: boolean;
   id?: string;
 }) {
-  const [text, setText] = useState(
-    valueCents == null ? '' : String(valueCents / 100),
-  );
+  const [text, setText] = useState(valueCents == null ? '' : String(valueCents / 100));
   const lastEmitted = useRef(valueCents);
 
   // Re-sync when the value changes from outside (a fetch landing, a form reset) but not
@@ -175,11 +167,11 @@ export function MoneyInput({
         required={required}
         value={text}
         onChange={(event) => {
-          const next = event.target.value;
+          // The iOS decimal pad offers a comma on many keyboard locales — same rule as `Input`.
+          const next = event.target.value.replace(/,/g, '.');
           if (next !== '' && !/^\d*\.?\d{0,2}$/.test(next)) return;
           setText(next);
-          const cents =
-            next === '' ? undefined : Math.round(Number(next) * 100);
+          const cents = next === '' ? undefined : Math.round(Number(next) * 100);
           lastEmitted.current = cents;
           onChangeCents(Number.isFinite(cents as number) ? cents : undefined);
         }}
@@ -224,13 +216,7 @@ export function Money({
   );
 }
 
-export function ProgressBar({
-  ratio,
-  tone = 'good',
-}: {
-  ratio: number;
-  tone?: WidgetTone;
-}) {
+export function ProgressBar({ ratio, tone = 'good' }: { ratio: number; tone?: WidgetTone }) {
   const pct = Math.round(Math.min(1, Math.max(0, ratio)) * 100);
   const fill = {
     neutral: 'bg-ink-faint',
@@ -289,10 +275,7 @@ export function Modal({
       {/* Backdrop click closes; the dialog stops propagation so inner clicks do not. */}
       <div className="absolute inset-0" onClick={onClose} aria-hidden />
       <div
-        className={clsx(
-          'card relative w-full p-5 shadow-2xl',
-          wide ? 'max-w-2xl' : 'max-w-md',
-        )}
+        className={clsx('card relative w-full p-5 shadow-2xl', wide ? 'max-w-2xl' : 'max-w-md')}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -336,13 +319,7 @@ export function Modal({
   );
 }
 
-export function EmptyState({
-  message,
-  action,
-}: {
-  message: string;
-  action?: ReactNode;
-}) {
+export function EmptyState({ message, action }: { message: string; action?: ReactNode }) {
   return (
     <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center">
       <p className="text-sm text-ink-faint">{message}</p>
