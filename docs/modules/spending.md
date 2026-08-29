@@ -103,6 +103,26 @@ confirmation. That is what stops one expensive evening being charged against the
 ₾10 from weekly" or "daily ₾10 overspent". Confirming moves attribution, never arithmetic. There is
 a test named for it, and it is what makes the daily/weekly/monthly breakdown trustworthy.
 
+### Verified against a running server
+
+One day, four payments, a ₾78.38 daily allowance (a $30 budget at 2.6125) and a ₾130 weekly one:
+
+```
+all projected           Big evening 60.00 -> Lunch + Dinner 19.11 + Breakfast 26.13 + Fuel 14.76
+                        daily consumed 78.38  saving   0.00 | weekly consumed 14.76 | saved 3475.95
+
+confirmed as breakfast  Big evening 60.00 -> Breakfast 60.00
+                        daily consumed 93.14  saving -14.76 | weekly consumed  0.00 | saved 3475.95
+
+undone                  back to the first row exactly
+```
+
+Three things to read out of it. One payment splits across three rungs and two tiers, and the parts
+sum to it. Confirming the evening payment pushed the *other* payments' proposals off the weekly
+allowance entirely, without any of them being touched. And the total saved is identical in every
+state — confirming moved which allowance bore the money and made the overspend visible, but not one
+tetri of the arithmetic.
+
 ## Endpoints
 
 | Method | Path | Notes |
