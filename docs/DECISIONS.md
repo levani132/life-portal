@@ -661,3 +661,61 @@ history stable. `fx.spec.ts` asserts a past conversion does not move when a newe
 **Rates are floats.** Principle II says money is integer cents; a rate is a ratio, not an amount,
 and rounding 2.6121 to two decimals would put visible error into every conversion. The one
 exception, and the reason it is written down here.
+
+## A payment's day is written, not derived — and the server decides it
+
+**2026-08-29.** Two deliberate inconsistencies in the spending module, both of which look like
+mistakes and would be "fixed" by a future session that did not know why.
+
+**1. `spend_payments.day` is stored.** Everywhere else in this codebase a day is computed on read
+(principle III). Here it is written once at ingest and never recomputed, because deriving it needs
+`dayStartHour` — *a setting the owner can change*. Recompute it later and every historic payment
+made between midnight and 4am silently moves to a different day, changing what past periods spent
+and what they saved. Writing it freezes the answer that was true when the payment happened, which
+is the only stable choice.
+
+**2. The server applies `dayStartHour`, unlike meals, where the browser does.** A meal is logged by
+the browser, which knows the profile, so it sends `?today=`. A payment is submitted by an iOS
+Shortcut, which cannot read anything: it can only report the moment. `localDay` is reused, so the
+4am rule still has exactly one implementation — only the caller differs.
+
+## The ingest route is `@TokenAuth()`, deliberately not `@Public()`
+
+**2026-08-29.** `POST /api/spending/ingest` cannot use a JWT: a phone automation has no way to hold
+a session or refresh a token. It carries a long-lived ingest credential instead.
+
+The obvious way to let it past the global guard is `@Public()`, and that is wrong here — not
+technically, but as documentation. This route writes the collection holding **every payment the
+owner makes**. A future reader grepping for unauthenticated routes must not find it and conclude
+the app leaks financial data. So `@TokenAuth()` is a separate marker meaning "authenticated, just
+not by a session", and `JwtAuthGuard` honours both while the two stay legible apart.
+
+**Found by running it.** With only `@UseGuards(IngestTokenGuard)`, every submission returned 401:
+the global guard rejects before a route-level guard runs. `npm run check` was green throughout.
+
+## Duplicate messages are matched on text *and* time
+
+**2026-08-29.** The natural design — a unique index on `hash(userId + raw)` — silently loses money
+here, and the owner's own data shows why. A BOG message carries no time, only a date:
+
+```
+გადახდა: GEL4.00
+Card:***9582
+NILE
+24.08.2026
+```
+
+Two ₾4.00 coffees at the same shop on the same day are **byte-identical**. A content hash would
+discard the second, under-reporting spending — precisely the failure the whole feature exists to
+prevent. A retried automation fires seconds apart; a real second coffee does not. So a duplicate is
+the same text arriving within **120 seconds**, and the same text an hour later is a second payment.
+
+## An unreadable message answers 201
+
+**2026-08-29.** `POST /api/spending/ingest` returns success even when the parser cannot read the
+message, storing the raw text and queueing it. This looks like swallowing an error.
+
+iOS Shortcuts has no error handling and no retry. Any non-2xx response means the message is gone
+permanently — the SMS stays on the phone, but nothing will ever send it again. Answering 201 with
+`status: 'unparsed'` is what makes a bank changing its wording a queue to work through rather than
+a silent hole in the record.

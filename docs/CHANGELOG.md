@@ -2,6 +2,25 @@
 
 User-visible changes. Newest first.
 
+## 2026-08-29 — Your card payments arrive on their own
+
+**Your bank already texts you every time you pay. The app now listens.** Set up a shortcut on your
+phone once — there are step-by-step instructions and copy buttons on the new Spending screen — and
+from then on every card payment appears within a minute, with the amount, the shop and the card,
+without you opening anything.
+
+Anything it cannot read confidently is **kept exactly as it arrived and queued** rather than
+guessed at, so a bank changing its wording is a short list to work through rather than a hole in
+your records. Cash and anything your bank did not text about can be added by hand in seconds.
+
+It also **checks its own arithmetic**. One of your banks prints the account balance in every
+message, so when the balance and the payments disagree, the app can tell you a message went
+missing and exactly how much it was for — rather than letting a lost text quietly look like a
+cheap day.
+
+Loyalty points, cashback and account balances are read but never counted as money, and a transfer
+into your account is never mistaken for spending.
+
 ## 2026-08-29 — Choose the currency when you enter an amount
 
 **Every amount you enter now has a currency picker**, sitting inside the amount box. Spending,

@@ -121,6 +121,18 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   move with `pointercancel`), and a card stays an `<a>` in edit mode with its click cancelled —
   replacing the node the finger is touching cancels the touch. Either mistake gives the same
   symptom: the card lifts and the drag dies immediately. `npm run check` passed through both.
+- **A payment's `day` is stored, and the *server* applies `dayStartHour`** — both deliberate, both
+  the opposite of how meals work. Deriving the day later would move historic payments when the
+  setting changed; a Shortcut cannot read the profile, so only the server can apply the rule. See
+  `docs/DECISIONS.md`.
+- **A duplicate bank message is matched on text *and* arrival time.** BOG messages carry no time, so
+  two identical coffees on one day are byte-identical — a content hash alone silently deletes the
+  second and under-reports spending. 120-second window.
+- **`POST /api/spending/ingest` must answer 2xx even when it cannot parse.** A Shortcut has no error
+  handling, so any 4xx loses the message for good. Unreadable ones are stored raw and queued.
+- **`@TokenAuth()` is not `@Public()`.** The ingest route is authenticated, just not by a session.
+  Keeping the markers separate means grepping for unauthenticated routes never turns up the one
+  that writes every payment.
 - **Money is stored in the currency it was recorded in and converted only on read.** A row's
   `currency` is a fact about the amount (EPAM shares trade in USD); `settings.displayCurrency` is
   only what it is *rendered* as. Never persist a converted amount, and never convert at today's
