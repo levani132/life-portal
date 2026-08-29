@@ -409,3 +409,84 @@ describe('actual spending replaces the budget for days already past', () => {
     expect(withMap.days.map((d) => d.outCents)).toEqual(without.days.map((d) => d.outCents));
   });
 });
+
+describe('actuals never displace money SMS capture cannot see', () => {
+  const loan: Expense = {
+    id: 'loan1',
+    userId: 'u1',
+    label: 'Loan repayment to friend',
+    amountCents: 100_000,
+    currency: 'GEL',
+    category: 'loan',
+    kind: 'recurring',
+    settlement: 'manual',
+    recurrence: { cadence: 'monthly', interval: 1, dayOfMonth: 24, startDate: '2026-01-24' },
+    active: true,
+    createdAt: '2026-01-24',
+    updatedAt: '2026-01-24',
+  };
+  const food: Expense = {
+    id: 'food1',
+    userId: 'u1',
+    label: 'Breakfast',
+    amountCents: 3_000,
+    currency: 'GEL',
+    category: 'food',
+    kind: 'recurring',
+    recurrence: { cadence: 'daily', interval: 1, startDate: '2026-08-01' },
+    active: true,
+    createdAt: '2026-08-01',
+    updatedAt: '2026-08-01',
+  };
+  const gift: Expense = {
+    id: 'gift1',
+    userId: 'u1',
+    label: "Beka's grandma passing away",
+    amountCents: 8_000,
+    currency: 'GEL',
+    category: 'family',
+    kind: 'one_off',
+    date: '2026-08-24',
+    active: true,
+    createdAt: '2026-08-01',
+    updatedAt: '2026-08-01',
+  };
+
+  const base = {
+    today: '2026-08-25',
+    to: '2026-08-25',
+    openingBalanceCents: 500_000,
+    balanceAsOf: '2026-08-24',
+    currency: 'GEL' as const,
+    incomes: [],
+  };
+
+  it('keeps a manual-settlement transfer counted beside the captured card spending', () => {
+    // The loan repayment is a transfer no SMS reports. Replacing the whole day with captured
+    // payments would silently delete it from the projection.
+    const projection = projectCash({
+      ...base,
+      expenses: [loan, food],
+      actualOutByDay: { '2026-08-24': 1_822 },
+    });
+    expect(projection.days.find((d) => d.date === '2026-08-24')?.outCents).toBe(101_822);
+  });
+
+  it('keeps a one-off record counted beside the captured card spending', () => {
+    const projection = projectCash({
+      ...base,
+      expenses: [gift, food],
+      actualOutByDay: { '2026-08-24': 1_822 },
+    });
+    expect(projection.days.find((d) => d.date === '2026-08-24')?.outCents).toBe(9_822);
+  });
+
+  it('still replaces the auto card-spending budget with the actuals', () => {
+    const projection = projectCash({
+      ...base,
+      expenses: [food],
+      actualOutByDay: { '2026-08-24': 1_822 },
+    });
+    expect(projection.days.find((d) => d.date === '2026-08-24')?.outCents).toBe(1_822);
+  });
+});

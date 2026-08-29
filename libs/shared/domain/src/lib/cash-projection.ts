@@ -37,16 +37,24 @@ export interface CashProjectionInput {
   /** Day to compute the headline snapshot for. Defaults to `today`. */
   snapshotDate?: string;
   /**
-   * What was **really** spent on each past day, keyed `YYYY-MM-DD`, in `currency`.
+   * What was **really** spent by card on each past day, keyed `YYYY-MM-DD`, in `currency`.
    *
-   * Supplied, a day at or before `today` uses this figure instead of expanding its budgeted
-   * expenses — the budget said what was *meant* to happen, and for a day that has already
-   * happened the captured payments say what did. Days after `today` keep their budget, because
-   * nothing has happened on them yet.
+   * Supplied, a day at or before `today` uses this figure instead of its `auto`-settled
+   * recurring budget — the budget said what was *meant* to happen, and for a day that has
+   * already happened the captured payments say what did. Days after `today` keep their budget,
+   * because nothing has happened on them yet.
    *
-   * A past day absent from this map falls back to its budget rather than to zero: no payments
-   * captured is not evidence that no money was spent, and treating it as zero would quietly
-   * inflate every balance downstream.
+   * Two classes of outflow survive alongside the actuals rather than being replaced, because
+   * SMS capture never sees them and dropping them would silently delete real money from the
+   * projection:
+   *
+   * - `settlement: 'manual'` lines — the loan repayment, the utilities — are transfers and
+   *   direct debits;
+   * - `one_off` expenses are recorded facts with a date, not repeating budget.
+   *
+   * A past day absent from this map falls back to its budget entirely: no payments captured is
+   * not evidence that no money was spent, and treating silence as thrift would quietly inflate
+   * every balance downstream.
    */
   actualOutByDay?: Record<string, number>;
   /**
@@ -141,6 +149,8 @@ export function buildCashEvents(
         sourceId: expense.id,
         category: expense.category,
         linkedLoanId: expense.linkedLoanId,
+        settlement: expense.settlement ?? 'auto',
+        expenseKind: expense.kind,
       });
     }
   }
@@ -205,8 +215,18 @@ export function projectCash(input: CashProjectionInput): CashProjection {
     );
     // A day that has already happened is a fact, not a forecast — provided anything was captured
     // for it. Absent from the map, it keeps its budget: silence is not evidence of thrift.
+    // Actuals replace only the auto card-spending budget; transfers, direct debits and one-off
+    // records are money SMS capture cannot see, so they stay counted beside the actuals.
     const actual = input.actualOutByDay?.[date];
-    const outCents = actual != null && date <= today ? actual : budgetedOut;
+    const uncapturedOut = sumCents(
+      dayEvents
+        .filter(
+          (e) =>
+            e.direction === 'out' && (e.settlement === 'manual' || e.expenseKind === 'one_off'),
+        )
+        .map((e) => e.amountCents),
+    );
+    const outCents = actual != null && date <= today ? actual + uncapturedOut : budgetedOut;
     const opening = running;
     running = opening + inCents - outCents;
     // Only from today onward: the stretch between the last reconciliation and today already

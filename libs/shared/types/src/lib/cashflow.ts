@@ -135,6 +135,14 @@ export interface CashEvent {
   category?: ExpenseCategory;
   linkedLoanId?: Id;
   /**
+   * How the expense behind this event is settled, copied from the row so the projection can
+   * tell which outflows captured card payments replace. A `manual` line — a transfer, a direct
+   * debit — is invisible to SMS capture, so actual payments must never displace it.
+   */
+  settlement?: 'auto' | 'manual';
+  /** `one_off` events are recorded facts, not repeating budget — actuals never displace them. */
+  expenseKind?: 'recurring' | 'one_off';
+  /**
    * Set only when `amountCents` was converted. Carries what was actually recorded, so the UI
    * can show "₾26.12 (from $10.00)" and mark the figure as derived (principle VI).
    */

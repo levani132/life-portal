@@ -751,3 +751,24 @@ A consequence worth naming: a proposal for a purpose that has no budget line yet
 record a dismissal on, so `POST /suggestions/purpose:…/dismiss` is a 400. Accepting one creates the
 expense through `CashflowService`; the alternative was a collection existing solely to remember a
 "no", which is what the whole design avoids.
+
+## Cashflow reads `spend_payments` directly, and actuals replace only the card budget
+
+**2026-08-30.** The projection now prefers what was really spent on days already past. Two
+decisions inside that, both of which look wrong from one side or the other.
+
+**1. `CashflowService` reads the `spend_payments` collection itself** instead of asking
+`SpendingService`, which owns it. `SpendingModule` already imports `CashflowModule` to read the
+budget, so the reverse import is a cycle, and a `forwardRef` would couple the two modules'
+lifecycles to save one collection read. A scoped, read-only query of another widget's rows is the
+same trade `realisedSales()` already makes with `sellable_items` and `stock_lots`. Writes still
+have exactly one owner.
+
+**2. Captured payments replace only the `auto` card-spending budget.** The loan repayment and the
+utilities are transfers and direct debits — SMS capture never sees them — and a one-off expense is
+a dated record of money that left, not a repeating plan. Replacing a whole past day with its
+captured payments would silently delete the ₾2,600 loan repayment from the projection on every
+repayment day. So for a past day with actuals: `out = captured + manual-settlement occurrences +
+one-off records`. The same reasoning keeps **captured credits out of the projection entirely**:
+the salary arrives as a `ჩარიცხვა` message, and counting the capture *and* the budgeted income
+source would double every payday.

@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Module, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Module,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { FxModule } from '../fx/fx.module';
 import { SettingsModule } from '../settings/settings.module';
@@ -13,6 +24,7 @@ import {
   UpsertExpenseDto,
   UpsertIncomeDto,
 } from './cashflow.dto';
+import { SpendPayment, SpendPaymentSchema } from '../spending/spending.schemas';
 import {
   CashBalance,
   CashBalanceSchema,
@@ -38,7 +50,10 @@ export class CashflowController {
     const [summary, projection, incomes, expenses, sales, breakdown, balanceHistory] =
       await Promise.all([
         this.cashflow.summary(userId, today),
-        this.cashflow.projection(userId, today, { to: to ?? this.cashflow.defaultTo(today), snapshotDate }),
+        this.cashflow.projection(userId, today, {
+          to: to ?? this.cashflow.defaultTo(today),
+          snapshotDate,
+        }),
         this.cashflow.listIncomes(userId),
         this.cashflow.listExpenses(userId),
         this.cashflow.sales(userId),
@@ -76,7 +91,11 @@ export class CashflowController {
   }
 
   @Put('balance')
-  setBalance(@CurrentUser('userId') userId: string, @Today() today: string, @Body() dto: SetBalanceDto) {
+  setBalance(
+    @CurrentUser('userId') userId: string,
+    @Today() today: string,
+    @Body() dto: SetBalanceDto,
+  ) {
     return this.cashflow.setBalance(userId, today, dto);
   }
 
@@ -91,7 +110,11 @@ export class CashflowController {
   }
 
   @Patch('incomes/:id')
-  updateIncome(@CurrentUser('userId') userId: string, @Param('id') id: string, @Body() dto: UpdateIncomeDto) {
+  updateIncome(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateIncomeDto,
+  ) {
     return this.cashflow.updateIncome(userId, id, dto);
   }
 
@@ -111,7 +134,11 @@ export class CashflowController {
   }
 
   @Patch('expenses/:id')
-  updateExpense(@CurrentUser('userId') userId: string, @Param('id') id: string, @Body() dto: UpdateExpenseDto) {
+  updateExpense(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateExpenseDto,
+  ) {
     return this.cashflow.updateExpense(userId, id, dto);
   }
 
@@ -131,6 +158,9 @@ export class CashflowController {
       { name: CashBalance.name, schema: CashBalanceSchema },
       { name: IncomeSource.name, schema: IncomeSourceSchema },
       { name: Expense.name, schema: ExpenseSchema },
+      // Read-only here: the projection needs what was really spent on past days, and going
+      // through SpendingService would be a module cycle. See the note on `actualOutByDay`.
+      { name: SpendPayment.name, schema: SpendPaymentSchema },
     ]),
   ],
   controllers: [CashflowController],

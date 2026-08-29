@@ -212,7 +212,9 @@ export class DashboardService {
       subtitle: needsAttention
         ? `${needsAttention} to look at`
         : `${formatCentsCompact(spending.spentTodayCents, currency)} today`,
-      href: '/spending',
+      // The spending view lives inside the Free money page — the owner merged the two, since
+      // both answer one question. The module keeps its own API namespace; only the route merged.
+      href: '/cashflow',
       icon: 'wallet',
       accent: 'sky',
       tone,

@@ -14,6 +14,7 @@ import {
   addDays,
   addMonths,
   defaultHorizon,
+  fxContext,
   monthlyEquivalentCents,
   nextOccurrence,
   projectCash,
@@ -27,6 +28,7 @@ import { ItemsService } from '../items/items.module';
 import { StocksService } from '../stocks/stocks.service';
 import { FxService } from '../fx/fx.module';
 import { SettingsService } from '../settings/settings.module';
+import { SpendPayment } from '../spending/spending.schemas';
 import { CashBalance, Expense, IncomeSource } from './cashflow.schemas';
 import type {
   SetBalanceDto,
@@ -42,6 +44,7 @@ export class CashflowService {
     @InjectModel(CashBalance.name) private readonly balances: Model<CashBalance>,
     @InjectModel(IncomeSource.name) private readonly incomes: Model<IncomeSource>,
     @InjectModel(Expense.name) private readonly expenses: Model<Expense>,
+    @InjectModel(SpendPayment.name) private readonly spendPayments: Model<SpendPayment>,
     private readonly items: ItemsService,
     private readonly stocks: StocksService,
     private readonly settings: SettingsService,
@@ -56,6 +59,42 @@ export class CashflowService {
    */
   private display(userId: string, today: string) {
     return this.fx.displayFor(userId, today);
+  }
+
+  /**
+   * What was really spent by card on each past day, in the display currency.
+   *
+   * Read straight off the `spend_payments` collection rather than through `SpendingService`,
+   * which is the one deliberate exception to going through the owning module's service:
+   * `SpendingModule` already imports this module to read the budget, so the reverse import
+   * would be a cycle. A scoped read of another widget's rows is the same trade `realisedSales()`
+   * already makes with items and lots. See `docs/DECISIONS.md`.
+   *
+   * Only days with at least one captured payment appear — the projection treats an absent day
+   * as "nothing captured, keep the budget", never as "nothing spent". Each payment converts at
+   * the rate in force on its own day, and money the owner marked as paid back is not spending.
+   */
+  private async actualOutByDay(
+    userId: string,
+    displayCurrency: Currency,
+  ): Promise<Record<string, number>> {
+    const rows = await this.spendPayments.find({
+      userId,
+      direction: 'out',
+      status: 'recorded',
+    });
+    if (!rows.length) return {};
+
+    const archive = await this.fx.archive();
+    const byDay: Record<string, number> = {};
+    for (const row of rows) {
+      const spendable = row.amountCents - (row.notReallySpentCents ?? 0);
+      if (spendable <= 0) continue;
+      const fx = fxContext(archive, row.day, displayCurrency);
+      byDay[row.day] =
+        (byDay[row.day] ?? 0) + toDisplayCents(spendable, row.currency as Currency, fx).cents;
+    }
+    return byDay;
   }
 
   // ---------------------------------------------------------------- balance
@@ -268,8 +307,10 @@ export class CashflowService {
     ]);
 
     const display = await this.display(userId, today);
+    const actualOutByDay = await this.actualOutByDay(userId, display.currency);
 
     return projectCash({
+      actualOutByDay,
       today,
       to: options?.to ? toDay(options.to) : defaultHorizon(today),
       openingBalanceCents: balance.amountCents,
