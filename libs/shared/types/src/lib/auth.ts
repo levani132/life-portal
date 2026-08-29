@@ -54,6 +54,12 @@ export interface UserSettings extends Timestamped {
   salaryDayOfMonth: number;
   /** Applied to modelled stock sale proceeds. 0 = no tax modelling. */
   capitalGainsTaxRate: number;
+  /** 0 = Sunday .. 6 = Saturday. The budgeting week's boundary. */
+  weekStartsOn: number;
+  /** Day of month a *financial* month begins. 1 gives calendar months. */
+  monthStartsOn: number;
+  /** Budgeted expense ids in the order the spending ladder fills them. */
+  spendOrder: string[];
   /**
    * @deprecated Superseded by the `fx` module and no longer read.
    *

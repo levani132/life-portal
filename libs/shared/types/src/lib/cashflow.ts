@@ -73,6 +73,15 @@ export interface Expense extends Timestamped {
   amountCents: Cents;
   currency: Currency;
   category: ExpenseCategory;
+  /**
+   * Whether the spending ladder may charge card payments against this line. `manual` lines are
+   * settled by hand — a loan repayment, a direct debit — and are skipped by the cascade while
+   * still counting towards their tier's budget.
+   */
+  settlement?: 'auto' | 'manual';
+  /** A dismissed budget proposal, kept so the same figure is not proposed again immediately. */
+  suggestionDismissedAt?: IsoDate;
+  suggestionDismissedCents?: Cents;
   kind: 'recurring' | 'one_off';
   /** Present when `kind === 'recurring'`. */
   recurrence?: Recurrence;

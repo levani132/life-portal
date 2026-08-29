@@ -23,6 +23,32 @@ export class UserSettings {
   @Prop({ default: 7, min: 1, max: 31 })
   salaryDayOfMonth!: number;
 
+  /** 0 = Sunday .. 6 = Saturday. A week is a real budgeting boundary, so it has to be explicit. */
+  @Prop({ default: 1, min: 0, max: 6 })
+  weekStartsOn!: number;
+
+  /**
+   * The day a *financial* month begins, which need not be the 1st.
+   *
+   * A budget month that resets before the salary arrives reports an allowance the account cannot
+   * fund — with money landing on the 7th, a month starting on the 1st leaves six days each month
+   * where the app and the bank disagree. Defaults to 1, which is ordinary calendar months.
+   *
+   * Capped at 28 so every month has the day.
+   */
+  @Prop({ default: 1, min: 1, max: 28 })
+  monthStartsOn!: number;
+
+  /**
+   * Budgeted expense ids in the order the spending ladder fills them.
+   *
+   * A list of *preferences*, not positions — the same shape as `widgetOrder`, and for the same
+   * reason: expenses are created and deleted, so this has to tolerate ids it has never seen and
+   * ids that no longer exist.
+   */
+  @Prop({ type: [String], default: [] })
+  spendOrder!: string[];
+
   /** Applied to modelled stock-sale proceeds. Georgia taxes most personal share sales at 0%. */
   @Prop({ default: 0, min: 0, max: 1 })
   capitalGainsTaxRate!: number;
@@ -62,6 +88,18 @@ export class UpdateSettingsDto {
   capitalGainsTaxRate?: number;
 
   @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(6)
+  weekStartsOn?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(28)
+  monthStartsOn?: number;
+
+  @IsOptional()
   fxRates?: Record<string, number>;
 }
 
@@ -69,8 +107,11 @@ export const DEFAULT_SETTINGS = {
   displayCurrency: 'GEL',
   salaryDayOfMonth: 7,
   capitalGainsTaxRate: 0,
+  weekStartsOn: 1,
+  monthStartsOn: 1,
   fxRates: {} as Record<string, number>,
   widgetOrder: [] as string[],
+  spendOrder: [] as string[],
 };
 
 @Injectable()

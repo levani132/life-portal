@@ -15,6 +15,7 @@ import { LoansModule } from '../loans/loans.module';
 import { NutritionModule } from '../nutrition/nutrition.module';
 import { PersonalModule } from '../personal/personal.module';
 import { SettingsModule } from '../settings/settings.module';
+import { SpendingModule } from '../spending/spending.module';
 import { StocksModule } from '../stocks/stocks.module';
 
 @Module({
@@ -38,6 +39,7 @@ import { StocksModule } from '../stocks/stocks.module';
     BoardsModule,
     PersonalModule,
     NutritionModule,
+    SpendingModule,
     DashboardModule,
   ],
   providers: [

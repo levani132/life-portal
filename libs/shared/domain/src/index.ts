@@ -12,3 +12,5 @@ export * from './lib/stock-positions';
 export * from './lib/summaries';
 export * from './lib/nutrition';
 export * from './lib/widget-order';
+export * from './lib/completeness';
+export * from './lib/sms-parsers';

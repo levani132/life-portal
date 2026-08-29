@@ -1,5 +1,10 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { CASHFLOW_CADENCES, EXPENSE_CATEGORIES, SUPPORTED_CURRENCIES } from '@life-portal/shared-types';
+import {
+  CASHFLOW_CADENCES,
+  EXPENSE_CATEGORIES,
+  SPEND_SETTLEMENTS,
+  SUPPORTED_CURRENCIES,
+} from '@life-portal/shared-types';
 import {
   baseSchemaOptions,
   centsField,
@@ -128,6 +133,23 @@ export class Expense {
 
   @Prop()
   note?: string;
+  /**
+   * Whether this line is paid by card or settled by hand.
+   *
+   * `manual` — a loan repayment, a utility direct debit — still counts towards its tier's budget
+   * but is skipped by the spending cascade, so one expensive evening cannot be charged against
+   * the loan repayment.
+   */
+  @Prop({ required: true, enum: SPEND_SETTLEMENTS, default: 'auto' })
+  settlement!: string;
+
+  /** With the amount below, gives a dismissed budget proposal a cooldown without a collection. */
+  @Prop(dayField)
+  suggestionDismissedAt?: string;
+
+  @Prop(centsField)
+  suggestionDismissedCents?: number;
+
 }
 
 export const ExpenseSchema = SchemaFactory.createForClass(Expense);

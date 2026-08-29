@@ -11,11 +11,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import {
-  CASHFLOW_CADENCES,
-  EXPENSE_CATEGORIES,
-  SUPPORTED_CURRENCIES,
-} from '@life-portal/shared-types';
+import { CASHFLOW_CADENCES, EXPENSE_CATEGORIES, SPEND_SETTLEMENTS, SUPPORTED_CURRENCIES } from '@life-portal/shared-types';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MESSAGE = { message: 'Must be a calendar date in YYYY-MM-DD form' };
@@ -129,6 +125,10 @@ export class UpsertExpenseDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsIn(SPEND_SETTLEMENTS)
+  settlement?: string;
 
   @IsOptional()
   @IsMongoId()

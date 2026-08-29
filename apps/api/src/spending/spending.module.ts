@@ -1,0 +1,178 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Module,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
+import type { Request } from 'express';
+import { CurrentUser, TokenAuth } from '../auth/current-user.decorator';
+import { Today } from '../common/today';
+import { CashflowModule } from '../cashflow/cashflow.module';
+import { FxModule } from '../fx/fx.module';
+import { NutritionModule } from '../nutrition/nutrition.module';
+import { SettingsModule } from '../settings/settings.module';
+import { IngestTokenGuard, type IngestContext } from './ingest-token.guard';
+import { IngestTokenService } from './ingest-token.service';
+import {
+  CreateIngestTokenDto,
+  CreatePaymentDto,
+  IngestDto,
+  PromotePurposeDto,
+  SetDecisionDto,
+  UpdatePaymentDto,
+} from './spending.dto';
+import {
+  IngestToken,
+  IngestTokenSchema,
+  SpendPayment,
+  SpendPaymentSchema,
+} from './spending.schemas';
+import { SpendingService } from './spending.service';
+
+/**
+ * The one route a phone automation calls.
+ *
+ * Its own controller so the header-authenticated route cannot accidentally acquire a JWT-guarded
+ * neighbour, or the reverse.
+ */
+@Controller('spending')
+export class SpendingIngestController {
+  constructor(
+    private readonly spending: SpendingService,
+    private readonly tokens: IngestTokenService,
+  ) {}
+
+  /**
+   * Always answers 2xx, even for a message it cannot read.
+   *
+   * A Shortcut has no error handling: anything other than success means the message is lost for
+   * good. An unreadable one is stored verbatim and queued for the owner instead.
+   */
+  @Post('ingest')
+  @TokenAuth()
+  @UseGuards(IngestTokenGuard)
+  async ingest(@Req() request: Request & { ingest?: IngestContext }, @Body() dto: IngestDto) {
+    const { userId, tokenId } = request.ingest as IngestContext;
+    const receivedAt = new Date().toISOString();
+    const result = await this.spending.ingest(userId, dto, receivedAt);
+    // Stamped only once a submission is accepted, so "capture is working" means a message really
+    // landed rather than that something once presented a credential.
+    await this.tokens.markUsed(tokenId, receivedAt);
+    return result;
+  }
+}
+
+@Controller('spending')
+export class SpendingController {
+  constructor(
+    private readonly spending: SpendingService,
+    private readonly tokens: IngestTokenService,
+  ) {}
+
+  @Get('payments')
+  payments(
+    @CurrentUser('userId') userId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.spending.list(userId, from, to, status);
+  }
+
+  @Post('payments')
+  create(
+    @CurrentUser('userId') userId: string,
+    @Today() today: string,
+    @Body() dto: CreatePaymentDto,
+  ) {
+    return this.spending.create(userId, today, dto);
+  }
+
+  @Patch('payments/:id')
+  update(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdatePaymentDto,
+  ) {
+    return this.spending.update(userId, id, dto);
+  }
+
+  @Delete('payments/:id')
+  remove(@CurrentUser('userId') userId: string, @Param('id') id: string) {
+    return this.spending.remove(userId, id);
+  }
+
+  @Put('payments/:id/decision')
+  decide(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Today() today: string,
+    @Body() dto: SetDecisionDto,
+  ) {
+    return this.spending.setDecision(userId, id, today, dto);
+  }
+
+  @Post('payments/:id/promote')
+  promote(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Today() today: string,
+    @Body() dto: PromotePurposeDto,
+  ) {
+    return this.spending.promote(userId, id, today, dto);
+  }
+
+  /** Messages the app can prove never arrived. Never a balance — see the module doc. */
+  @Get('gaps')
+  gaps(@CurrentUser('userId') userId: string) {
+    return this.spending.gaps(userId);
+  }
+
+  // ---------------------------------------------------------------- tokens
+
+  @Get('tokens')
+  listTokens(@CurrentUser('userId') userId: string) {
+    return this.tokens.list(userId);
+  }
+
+  /** The only response that ever carries a plain token value. */
+  @Post('tokens')
+  createToken(@CurrentUser('userId') userId: string, @Body() dto: CreateIngestTokenDto) {
+    return this.tokens.create(userId, dto.label, dto.expiresAt);
+  }
+
+  @Delete('tokens/:id')
+  revokeToken(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Today() today: string,
+  ) {
+    return this.tokens.revoke(userId, id, today);
+  }
+}
+
+@Module({
+  imports: [
+    MongooseModule.forFeature([
+      { name: SpendPayment.name, schema: SpendPaymentSchema },
+      { name: IngestToken.name, schema: IngestTokenSchema },
+    ]),
+    CashflowModule,
+    SettingsModule,
+    FxModule,
+    NutritionModule,
+  ],
+  controllers: [SpendingIngestController, SpendingController],
+  providers: [SpendingService, IngestTokenService, IngestTokenGuard],
+  exports: [SpendingService],
+})
+export class SpendingModule {}
