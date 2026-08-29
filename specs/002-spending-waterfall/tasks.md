@@ -13,6 +13,29 @@ description: "Task list for the spending waterfall"
 domain branch, and [contracts/domain.md](contracts/domain.md) names ten invariants that each get a
 test named for them. UI-only tasks carry no test.
 
+## Progress — 2026-08-29
+
+**48 of 61 done.** Phases 1–4 complete and pushed; US1 (capture) and US2's domain and API are
+working end to end against a running server, verified by replaying the owner's real 24 August.
+
+Still open:
+
+- **T034, T035, T039, T046** — the ladder component, the payment decision sheet and the savings
+  view. In flight.
+- **T047–T051** — budget proposals (US5). In flight.
+- **T040** — the dashboard card. Needs a summary method on `SpendingService`.
+- **T053** — drag-to-reorder the ladder. Reuse `sortable-grid.tsx` unchanged.
+- **T060, T061** — the full quickstart replay and the production builds.
+
+One thing found while implementing, worth knowing before touching the projection: `SpendingModule`
+imports `CashflowModule` to read the budget, so the reverse import would be circular. `projectCash`
+now accepts `actualOutByDay` (T045) but nothing supplies it yet — the composition belongs above
+both modules, in the spending overview or the dashboard, not in a `forwardRef`.
+
+A second: `SavingsBreakdown` has no `yearly` field, so a yearly tier's saving is folded into
+`monthly` to keep the parts summing to the total. Harmless today (the yearly tier is empty) and
+commented at the site, but it needs a fourth field if a yearly line ever becomes real.
+
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel — different files, no dependency on an incomplete task
@@ -29,10 +52,10 @@ Web and API both import the shared libraries; neither imports the other.
 
 **Purpose**: The types and stored fields every later phase refers to.
 
-- [ ] T001 [P] Create the shared contracts — `SpendPayment`, `SpendDecision`, `ConfirmedAllocation`, `SpendAllocation`, `LadderRung`, `LadderTier`, `SpendLadder`, `PeriodSaving`, `SavingsBreakdown`, `CompletenessGap`, `BudgetProposal`, `IngestTokenSummary` — in `libs/shared/types/src/lib/spending.ts`, and export it from `libs/shared/types/src/index.ts`
-- [ ] T002 [P] Add `weekStartsOn` (0–6, default 1), `monthStartsOn` (1–28, default 1) and `spendOrder` (`string[]`) to `UserSettings` in `apps/api/src/settings/settings.module.ts` and to `libs/shared/types/src/lib/auth.ts`, with `weekStartsOn` and `monthStartsOn` accepted by `UpdateSettingsDto`
-- [ ] T003 [P] Add `settlement: 'auto' | 'manual'` (default `auto`), `suggestionDismissedAt` and `suggestionDismissedCents` (`centsField`, **no `default: 0`**) to the `Expense` schema in `apps/api/src/cashflow/cashflow.schemas.ts`, to `Expense` in `libs/shared/types/src/lib/cashflow.ts`, and to `UpsertExpenseDto`/`UpdateExpenseDto` in `apps/api/src/cashflow/cashflow.dto.ts`
-- [ ] T004 Scaffold the module — `apps/api/src/spending/spending.module.ts` with an empty controller and service — and register it in `apps/api/src/app/app.module.ts`
+- [x] T001 [P] Create the shared contracts — `SpendPayment`, `SpendDecision`, `ConfirmedAllocation`, `SpendAllocation`, `LadderRung`, `LadderTier`, `SpendLadder`, `PeriodSaving`, `SavingsBreakdown`, `CompletenessGap`, `BudgetProposal`, `IngestTokenSummary` — in `libs/shared/types/src/lib/spending.ts`, and export it from `libs/shared/types/src/index.ts`
+- [x] T002 [P] Add `weekStartsOn` (0–6, default 1), `monthStartsOn` (1–28, default 1) and `spendOrder` (`string[]`) to `UserSettings` in `apps/api/src/settings/settings.module.ts` and to `libs/shared/types/src/lib/auth.ts`, with `weekStartsOn` and `monthStartsOn` accepted by `UpdateSettingsDto`
+- [x] T003 [P] Add `settlement: 'auto' | 'manual'` (default `auto`), `suggestionDismissedAt` and `suggestionDismissedCents` (`centsField`, **no `default: 0`**) to the `Expense` schema in `apps/api/src/cashflow/cashflow.schemas.ts`, to `Expense` in `libs/shared/types/src/lib/cashflow.ts`, and to `UpsertExpenseDto`/`UpdateExpenseDto` in `apps/api/src/cashflow/cashflow.dto.ts`
+- [x] T004 Scaffold the module — `apps/api/src/spending/spending.module.ts` with an empty controller and service — and register it in `apps/api/src/app/app.module.ts`
 
 **Checkpoint**: `npm run check` passes and the API boots with an empty `/api/spending` route.
 
@@ -42,9 +65,9 @@ Web and API both import the shared libraries; neither imports the other.
 
 **⚠️ No user story work can begin until this phase is complete.**
 
-- [ ] T005 Create `apps/api/src/spending/spending.schemas.ts` — `spend_payments` (indexes `{userId, day}` and `{userId, cardLast4, at}`; `notReallySpentCents`/`cashbackCents`/`reportedBalanceCents` use `centsField`; embedded `Decision` and `ConfirmedAllocation` sub-schemas) and `ingest_tokens`, per [data-model.md](data-model.md)
-- [ ] T006 Create `apps/api/src/spending/spending.dto.ts` with `class-validator` DTOs for ingest, manual entry, patch, decision and token creation — including the rule that `decision.allocations` sum to **at most** the spendable amount and that `throughDay >= forDay`
-- [ ] T007 Create `SpendingService` in `apps/api/src/spending/spending.service.ts` with scoped reads only, injecting `CashflowService`, `SettingsService` and `FxService`; import `CashflowModule`, `SettingsModule` and `FxModule` in the module
+- [x] T005 Create `apps/api/src/spending/spending.schemas.ts` — `spend_payments` (indexes `{userId, day}` and `{userId, cardLast4, at}`; `notReallySpentCents`/`cashbackCents`/`reportedBalanceCents` use `centsField`; embedded `Decision` and `ConfirmedAllocation` sub-schemas) and `ingest_tokens`, per [data-model.md](data-model.md)
+- [x] T006 Create `apps/api/src/spending/spending.dto.ts` with `class-validator` DTOs for ingest, manual entry, patch, decision and token creation — including the rule that `decision.allocations` sum to **at most** the spendable amount and that `throughDay >= forDay`
+- [x] T007 Create `SpendingService` in `apps/api/src/spending/spending.service.ts` with scoped reads only, injecting `CashflowService`, `SettingsService` and `FxService`; import `CashflowModule`, `SettingsModule` and `FxModule` in the module
 
 **Checkpoint**: schemas registered, API boots, every read scoped to `userId`.
 
@@ -59,25 +82,25 @@ with the right amount, currency, merchant, card and day — with no budgeting be
 
 ### Tests for User Story 1
 
-- [ ] T008 [P] [US1] Write `libs/shared/domain/src/lib/sms-parsers.spec.ts` with the owner's real messages as fixtures: BOG `გადახდა`/`ჩარიცხვა`, TBC with `Nashti`/`dagibrunda`/`Ertgul kulabashi`, and the loyalty-line trap (`სულ: 1,939.70 PLUS` must never read as money)
-- [ ] T009 [P] [US1] Write `libs/shared/domain/src/lib/completeness.spec.ts` asserting the owner's verified chain (1472.30 → 1285.82 → 1278.87 → 1264.42 → 1242.23) reports no gap, and that withholding one message reports a gap of exactly its amount
+- [x] T008 [P] [US1] Write `libs/shared/domain/src/lib/sms-parsers.spec.ts` with the owner's real messages as fixtures: BOG `გადახდა`/`ჩარიცხვა`, TBC with `Nashti`/`dagibrunda`/`Ertgul kulabashi`, and the loyalty-line trap (`სულ: 1,939.70 PLUS` must never read as money)
+- [x] T009 [P] [US1] Write `libs/shared/domain/src/lib/completeness.spec.ts` asserting the owner's verified chain (1472.30 → 1285.82 → 1278.87 → 1264.42 → 1242.23) reports no gap, and that withholding one message reports a gap of exactly its amount
 
 ### Implementation for User Story 1
 
-- [ ] T010 [P] [US1] Implement `parseBogMessage`, `parseTbcMessage` and `parseBankMessage` in `libs/shared/domain/src/lib/sms-parsers.ts` — keyword-anchored, returning `null` rather than a half-filled object
-- [ ] T011 [P] [US1] Implement `detectMissedMessages` in `libs/shared/domain/src/lib/completeness.ts`, chaining `reportedBalanceCents` per `cardLast4` in `at` order
-- [ ] T012 [US1] Export both from `libs/shared/domain/src/index.ts`
-- [ ] T013 [P] [US1] Implement `IngestTokenService` in `apps/api/src/spending/ingest-token.service.ts` — mint `lp_<tokenId>_<secret>` from `crypto.randomBytes(32)`, hash the secret with `bcryptjs`, verify with exactly one comparison by looking the row up by id, and stamp `lastUsedAt`
-- [ ] T014 [US1] Implement `IngestTokenGuard` in `apps/api/src/spending/ingest-token.guard.ts` — reads `X-Ingest-Token`, rejects missing/expired/revoked with `401`, and applies an in-memory fixed-window limit of 60 accepted submissions per token per hour returning `429`
-- [ ] T015 [US1] Implement `POST /api/spending/ingest` in the controller — guarded by `IngestTokenGuard` and **never** `@Public()`; stores `raw` for every submission; applies `localDay(at, dayStartHour)` server-side to derive and persist `day`
-- [ ] T016 [US1] Implement duplicate detection in `SpendingService`: a submission matching an existing payment's `raw` **within 120 seconds** is ignored and answered `duplicate: true`; outside that window it records a second payment
-- [ ] T017 [US1] Make an unrecognised message answer **`201` with `status: 'unparsed'`**, never a 4xx — a Shortcut cannot handle an error, so any non-2xx loses the message permanently
-- [ ] T018 [P] [US1] Implement `POST`, `PATCH` and `DELETE /api/spending/payments` for manual entry and for completing an `unparsed` row (supplying an amount flips it to `recorded`)
-- [ ] T019 [P] [US1] Implement `GET /api/spending/payments` with a day range and status filter
-- [ ] T020 [P] [US1] Implement the token endpoints — `GET`/`POST /api/spending/tokens` and `DELETE /api/spending/tokens/:id` — returning the plain token **exactly once** on create and never again
-- [ ] T021 [P] [US1] Build the token page at `apps/web/src/app/spending/tokens/page.tsx` — create with label and expiry, one-time reveal with a copy button, list with last-used and revoke
-- [ ] T022 [US1] Build the payments list at `apps/web/src/app/spending/page.tsx` with the unparsed queue surfaced and a manual-entry form using `MoneyInput` with its currency picker
-- [ ] T023 [US1] Surface completeness gaps beside the unparsed queue, worded as a possible missed message and **never** as a balance
+- [x] T010 [P] [US1] Implement `parseBogMessage`, `parseTbcMessage` and `parseBankMessage` in `libs/shared/domain/src/lib/sms-parsers.ts` — keyword-anchored, returning `null` rather than a half-filled object
+- [x] T011 [P] [US1] Implement `detectMissedMessages` in `libs/shared/domain/src/lib/completeness.ts`, chaining `reportedBalanceCents` per `cardLast4` in `at` order
+- [x] T012 [US1] Export both from `libs/shared/domain/src/index.ts`
+- [x] T013 [P] [US1] Implement `IngestTokenService` in `apps/api/src/spending/ingest-token.service.ts` — mint `lp_<tokenId>_<secret>` from `crypto.randomBytes(32)`, hash the secret with `bcryptjs`, verify with exactly one comparison by looking the row up by id, and stamp `lastUsedAt`
+- [x] T014 [US1] Implement `IngestTokenGuard` in `apps/api/src/spending/ingest-token.guard.ts` — reads `X-Ingest-Token`, rejects missing/expired/revoked with `401`, and applies an in-memory fixed-window limit of 60 accepted submissions per token per hour returning `429`
+- [x] T015 [US1] Implement `POST /api/spending/ingest` in the controller — guarded by `IngestTokenGuard` and **never** `@Public()`; stores `raw` for every submission; applies `localDay(at, dayStartHour)` server-side to derive and persist `day`
+- [x] T016 [US1] Implement duplicate detection in `SpendingService`: a submission matching an existing payment's `raw` **within 120 seconds** is ignored and answered `duplicate: true`; outside that window it records a second payment
+- [x] T017 [US1] Make an unrecognised message answer **`201` with `status: 'unparsed'`**, never a 4xx — a Shortcut cannot handle an error, so any non-2xx loses the message permanently
+- [x] T018 [P] [US1] Implement `POST`, `PATCH` and `DELETE /api/spending/payments` for manual entry and for completing an `unparsed` row (supplying an amount flips it to `recorded`)
+- [x] T019 [P] [US1] Implement `GET /api/spending/payments` with a day range and status filter
+- [x] T020 [P] [US1] Implement the token endpoints — `GET`/`POST /api/spending/tokens` and `DELETE /api/spending/tokens/:id` — returning the plain token **exactly once** on create and never again
+- [x] T021 [P] [US1] Build the token page at `apps/web/src/app/spending/tokens/page.tsx` — create with label and expiry, one-time reveal with a copy button, list with last-used and revoke
+- [x] T022 [US1] Build the payments list at `apps/web/src/app/spending/page.tsx` with the unparsed queue surfaced and a manual-entry form using `MoneyInput` with its currency picker
+- [x] T023 [US1] Surface completeness gaps beside the unparsed queue, worded as a possible missed message and **never** as a balance
 
 **Checkpoint**: capture works end to end. [quickstart.md](quickstart.md) §2–§3 pass.
 
@@ -93,19 +116,19 @@ verify the first consumes its allowances while the second consumes none.
 
 ### Tests for User Story 2
 
-- [ ] T024 [P] [US2] Add `splitCentsEvenly` tests to `libs/shared/domain/src/lib/money.spec.ts` — 1001 over 3 is `[334, 334, 333]`, and parts always sum to the total for any amount and count
-- [ ] T025 [P] [US2] Write `libs/shared/domain/src/lib/spend-waterfall.spec.ts` covering: allocations sum to the spendable amount; a payment splitting across two rungs; a confirmation placed before projections regardless of clock order; **confirming payment A re-proposes payment B in both directions**; a partly confirmed payment's remainder cascading; a confirmed rung closed to the cascade but open to a second confirmation; un-confirming reopening it; a spread across four days; a span crossing a week and a month boundary; a `manual` rung and a planned one-off never receiving a cascade allocation
-- [ ] T026 [P] [US2] Add the invariant test named for it: **the total saved for a window is identical however its payments were decided** — the 40.00-against-30.00 case both ways, and the 35.00 case with 20.00 confirmed
+- [x] T024 [P] [US2] Add `splitCentsEvenly` tests to `libs/shared/domain/src/lib/money.spec.ts` — 1001 over 3 is `[334, 334, 333]`, and parts always sum to the total for any amount and count
+- [x] T025 [P] [US2] Write `libs/shared/domain/src/lib/spend-waterfall.spec.ts` covering: allocations sum to the spendable amount; a payment splitting across two rungs; a confirmation placed before projections regardless of clock order; **confirming payment A re-proposes payment B in both directions**; a partly confirmed payment's remainder cascading; a confirmed rung closed to the cascade but open to a second confirmation; un-confirming reopening it; a spread across four days; a span crossing a week and a month boundary; a `manual` rung and a planned one-off never receiving a cascade allocation
+- [x] T026 [P] [US2] Add the invariant test named for it: **the total saved for a window is identical however its payments were decided** — the 40.00-against-30.00 case both ways, and the 35.00 case with 20.00 confirmed
 
 ### Implementation for User Story 2
 
-- [ ] T027 [P] [US2] Implement `splitCentsEvenly(total, parts)` in `libs/shared/domain/src/lib/money.ts`, giving the indivisible remainder to the earliest parts
-- [ ] T028 [US2] Implement `spendWaterfall` in `libs/shared/domain/src/lib/spend-waterfall.ts` following the eight ordered steps in [contracts/domain.md](contracts/domain.md): resolve → place confirmed → **close touched rungs** → expand spans → route custom to extra → cascade the rest → split → surface orphans
-- [ ] T029 [US2] Export it from `libs/shared/domain/src/index.ts` and have `SpendingService` load a window of payments, build the tiers from `CashflowService`, and call it
-- [ ] T030 [US2] Implement `PUT /api/spending/payments/:id/decision` accepting `confirmed` with an allocation list (optionally partial, optionally with `forDay`/`throughDay`), `custom` with a purpose, and `none`
-- [ ] T031 [US2] Implement `notReallySpentCents` on `PATCH /api/spending/payments/:id`, reducing both real spending and what is decomposed
-- [ ] T032 [US2] Implement `POST /api/spending/payments/:id/promote`, creating an expense **through `CashflowService`** — this module never writes that collection directly
-- [ ] T033 [US2] Return derived allocations on every payment from `GET /api/spending/payments`, each carrying `projected` and the day it consumes
+- [x] T027 [P] [US2] Implement `splitCentsEvenly(total, parts)` in `libs/shared/domain/src/lib/money.ts`, giving the indivisible remainder to the earliest parts
+- [x] T028 [US2] Implement `spendWaterfall` in `libs/shared/domain/src/lib/spend-waterfall.ts` following the eight ordered steps in [contracts/domain.md](contracts/domain.md): resolve → place confirmed → **close touched rungs** → expand spans → route custom to extra → cascade the rest → split → surface orphans
+- [x] T029 [US2] Export it from `libs/shared/domain/src/index.ts` and have `SpendingService` load a window of payments, build the tiers from `CashflowService`, and call it
+- [x] T030 [US2] Implement `PUT /api/spending/payments/:id/decision` accepting `confirmed` with an allocation list (optionally partial, optionally with `forDay`/`throughDay`), `custom` with a purpose, and `none`
+- [x] T031 [US2] Implement `notReallySpentCents` on `PATCH /api/spending/payments/:id`, reducing both real spending and what is decomposed
+- [x] T032 [US2] Implement `POST /api/spending/payments/:id/promote`, creating an expense **through `CashflowService`** — this module never writes that collection directly
+- [x] T033 [US2] Return derived allocations on every payment from `GET /api/spending/payments`, each carrying `projected` and the day it consumes
 - [ ] T034 [US2] Build the payment sheet at `apps/web/src/components/payment-sheet.tsx` — decomposition shown as a projection until confirmed, confirm/partial-confirm across several rungs, custom purpose, promote, mark part not really spent, and choose a day or span
 - [ ] T035 [US2] Handle the orphaned allocation case in the UI: a confirmed allocation whose expense no longer exists shows as needing a decision and counts as extra
 
@@ -120,12 +143,12 @@ verify the first consumes its allowances while the second consumes none.
 **Independent Test**: Enter several payments against a known ladder and confirm each is proposed
 where the waterfall says, with the parts summing to the whole.
 
-- [ ] T036 [P] [US3] Implement `spendOrder` handling — sort rungs within a tier by index in the preference list, tolerating ids never seen and ids that no longer exist, exactly as `arrangeWidgets` does
-- [ ] T037 [P] [US3] Exclude inactive expenses from the ladder, and treat `kind: 'one_off'` as a confirmable target the cascade always skips
-- [ ] T038 [US3] Implement `GET /api/spending?today=` returning the ladder, today's figures, the unparsed count, gaps and a `basis` naming both the lower bound and the FX rate
+- [x] T036 [P] [US3] Implement `spendOrder` handling — sort rungs within a tier by index in the preference list, tolerating ids never seen and ids that no longer exist, exactly as `arrangeWidgets` does
+- [x] T037 [P] [US3] Exclude inactive expenses from the ladder, and treat `kind: 'one_off'` as a confirmable target the cascade always skips
+- [x] T038 [US3] Implement `GET /api/spending?today=` returning the ladder, today's figures, the unparsed count, gaps and a `basis` naming both the lower bound and the FX rate
 - [ ] T039 [US3] Build the ladder component at `apps/web/src/components/spend-ladder.tsx` — **filling bars with names as markers, never tick-boxes**; a *confirmed* rung may read as settled and shows its remainder as saved rather than available
 - [ ] T040 [US3] Add the dashboard card in `apps/api/src/dashboard/dashboard.service.ts` and the widget registry — three numbers and **one** quick action (add a payment by hand)
-- [ ] T041 [US3] Add `/spending` to the nav in `apps/web/src/components/app-shell.tsx`
+- [x] T041 [US3] Add `/spending` to the nav in `apps/web/src/components/app-shell.tsx`
 
 **Checkpoint**: the ladder answers "can I still spend today?" at a glance.
 
@@ -138,10 +161,10 @@ where the waterfall says, with the parts summing to the whole.
 **Independent Test**: Run known payments across a known ladder and confirm each period's saving is
 budget minus real spending, and that the cumulative parts sum to the whole.
 
-- [ ] T042 [P] [US4] Add savings tests to `spend-waterfall.spec.ts`: a day saving 11.78 from 30.00 less 18.22; a day reporting three figures (saved, extra, net); a projected tier never negative while a confirmed rung may be; `cumulative.daily + weekly + monthly === totalCents`
-- [ ] T043 [US4] Implement per-period and cumulative savings in `spend-waterfall.ts`, honouring `weekStartsOn` and `monthStartsOn`
-- [ ] T044 [US4] Implement `GET /api/spending/savings?from=&to=` returning periods, the cumulative breakdown, and the month's projected saving, actual saving and extra together
-- [ ] T045 [US4] Feed real spending into the cash projection for **past** days while future days keep budgeted allowances, switching at `today` — extending `projectCash` in `libs/shared/domain/src/lib/cash-projection.ts` and its spec
+- [x] T042 [P] [US4] Add savings tests to `spend-waterfall.spec.ts`: a day saving 11.78 from 30.00 less 18.22; a day reporting three figures (saved, extra, net); a projected tier never negative while a confirmed rung may be; `cumulative.daily + weekly + monthly === totalCents`
+- [x] T043 [US4] Implement per-period and cumulative savings in `spend-waterfall.ts`, honouring `weekStartsOn` and `monthStartsOn`
+- [x] T044 [US4] Implement `GET /api/spending/savings?from=&to=` returning periods, the cumulative breakdown, and the month's projected saving, actual saving and extra together
+- [x] T045 [US4] Feed real spending into the cash projection for **past** days while future days keep budgeted allowances, switching at `today` — extending `projectCash` in `libs/shared/domain/src/lib/cash-projection.ts` and its spec
 - [ ] T046 [US4] Build the savings view in `apps/web/src/app/spending/page.tsx`
 
 **Checkpoint**: savings are trustworthy and the projection starts from what really happened.
@@ -173,9 +196,9 @@ nothing.
 **Independent Test**: Reorder two rungs and confirm unconfirmed payments re-propose while confirmed
 ones do not move.
 
-- [ ] T052 [US6] Implement `PUT /api/spending/order` writing `spendOrder`, with exactly one writer so a reorder cannot arrive bundled with another settings change
+- [x] T052 [US6] Implement `PUT /api/spending/order` writing `spendOrder`, with exactly one writer so a reorder cannot arrive bundled with another settings change
 - [ ] T053 [US6] Add drag-to-reorder to the ladder, **reusing `apps/web/src/components/sortable-grid.tsx` unchanged** — both of its load-bearing details (the non-passive `touchmove` registered at mount, and the node not being replaced mid-gesture) are documented in `docs/DECISIONS.md` and were missed by `npm run check` once already
-- [ ] T054 [P] [US6] Add a settlement toggle to the expense edit form in `apps/web/src/app/cashflow/page.tsx`, explaining that a manual rung is never charged by the cascade
+- [x] T054 [P] [US6] Add a settlement toggle to the expense edit form in `apps/web/src/app/cashflow/page.tsx`, explaining that a manual rung is never charged by the cascade
 
 **Checkpoint**: all six stories work independently.
 
@@ -183,11 +206,11 @@ ones do not move.
 
 ## Phase 9: Polish and cross-cutting
 
-- [ ] T055 [P] Write `docs/modules/spending.md` — purpose, schema, endpoints, derived formulas, cross-links, open questions. **Required by the constitution in the same change as the schema.**
-- [ ] T056 [P] Append the two DECISIONS entries this feature owes to `docs/DECISIONS.md`: **`day` is written, not derived** (recomputing it when `dayStartHour` changes would silently move payments between days) and **the server applies `dayStartHour`, unlike meals where the browser does** (a Shortcut cannot read the profile)
-- [ ] T057 [P] Append a user-facing entry to `docs/CHANGELOG.md`
-- [ ] T058 [P] Add the spending gotchas to `CLAUDE.md`: duplicate detection needs the time window because BOG messages carry no time; ingest must answer 2xx on an unparsed message; a payment has two days
-- [ ] T059 Add ingest setup instructions to the token page — the exact Shortcut steps, copy buttons for URL and token, and a "waiting for first message / received" state driven by `lastUsedAt`
+- [x] T055 [P] Write `docs/modules/spending.md` — purpose, schema, endpoints, derived formulas, cross-links, open questions. **Required by the constitution in the same change as the schema.**
+- [x] T056 [P] Append the two DECISIONS entries this feature owes to `docs/DECISIONS.md`: **`day` is written, not derived** (recomputing it when `dayStartHour` changes would silently move payments between days) and **the server applies `dayStartHour`, unlike meals where the browser does** (a Shortcut cannot read the profile)
+- [x] T057 [P] Append a user-facing entry to `docs/CHANGELOG.md`
+- [x] T058 [P] Add the spending gotchas to `CLAUDE.md`: duplicate detection needs the time window because BOG messages carry no time; ingest must answer 2xx on an unparsed message; a payment has two days
+- [x] T059 Add ingest setup instructions to the token page — the exact Shortcut steps, copy buttons for URL and token, and a "waiting for first message / received" state driven by `lastUsedAt`
 - [ ] T060 Run [quickstart.md](quickstart.md) §3–§4 against a running API on the local Mongo, **never** `.env`, which points at the owner's live Atlas cluster
 - [ ] T061 Confirm `npm run check` passes and both `nx build api` and `nx build web` succeed
 
