@@ -54,8 +54,8 @@ function IngestTokens() {
         subtitle="One token per phone. It is how a Shortcut proves a forwarded message is yours."
         actions={
           <>
-            <Link href="/spending" className="btn-ghost">
-              Back to spending
+            <Link href="/cashflow" className="btn-ghost">
+              Back to free money
             </Link>
             <button type="button" className="btn-primary" onClick={() => setCreating(true)}>
               New token
@@ -367,8 +367,8 @@ function SetupInstructions({ token }: { token?: string }) {
 
         <p className="text-xs text-ink-faint">
           The next bank message that arrives will show up on the{' '}
-          <Link href="/spending" className="text-sky-400 hover:underline">
-            spending page
+          <Link href="/cashflow" className="text-sky-400 hover:underline">
+            free money page
           </Link>{' '}
           and stamp this token&rsquo;s last-used. A message the parser cannot read is still kept —
           it queues there for you rather than being dropped.
