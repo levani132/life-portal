@@ -3,7 +3,8 @@
 Answers four questions: *what did I really spend, what did I save, where did the money go, and is
 my budget still the right shape?*
 
-**Code:** `apps/api/src/spending/` · `apps/web/src/app/spending/`
+**Code:** `apps/api/src/spending/` · UI merged into `apps/web/src/app/cashflow/page.tsx` — see
+DECISIONS; only the capture-setup page remains at `/spending/tokens`
 **Domain logic:** `libs/shared/domain/src/lib/sms-parsers.ts`, `spend-waterfall.ts`,
 `completeness.ts`, `spend-suggestions.ts`
 **Spec:** `specs/002-spending-waterfall/`
@@ -182,7 +183,10 @@ dismissal on.
 ## Cross-links
 
 - **cashflow** owns the ladder. This module reads expenses through `CashflowService` and never
-  touches that collection, exactly as `LoansService` does for `linkedExpenseAmounts`.
+  touches that collection, exactly as `LoansService` does for `linkedExpenseAmounts`. The reverse
+  read exists too, and is the one deliberate exception to service-mediated access:
+  `CashflowService` reads `spend_payments` directly to feed real spending into the projection,
+  because importing `SpendingModule` back would be a cycle. Writes keep one owner.
 - **fx** converts payments to the display currency at the rate in force on each payment's own day.
 - **nutrition** owns `dayStartHour`, read to decide which day a payment belongs to.
 - **settings** owns `spendOrder`, `weekStartsOn` and `monthStartsOn`.

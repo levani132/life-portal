@@ -16,6 +16,16 @@ and how much is genuinely mine to spend?*
 
 Realised sales are **not** a collection — see below.
 
+## Real spending feeds the projection
+
+Days at or before *today* prefer what was actually spent — captured card payments from the
+spending module — over the budgeted figure, with one rule that keeps it safe: **actuals replace
+only the `auto` card-spending budget.** Manual-settlement lines (the loan repayment, utilities)
+and one-off expenses are money SMS capture cannot see, so they stay counted beside the actuals; a
+past day with nothing captured keeps its whole budget, because silence is not evidence of thrift.
+Captured *credits* never feed the projection at all — the salary arrives as a bank message too,
+and counting both it and the budgeted income source would double every payday.
+
 ## Projection
 
 **`currentBalanceCents` is derived, not read.** `summary()` returns the projection's closing

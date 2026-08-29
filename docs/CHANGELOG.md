@@ -2,6 +2,27 @@
 
 User-visible changes. Newest first.
 
+## 2026-08-30 — One money page
+
+**The Spending page has merged into Free money.** They were always the same question — where is my
+money, where is it going, what have I kept — and now one page answers it.
+
+What changed, walking down the page: the four headline tiles are now *on hand now*, *used against
+allowances*, *saved this month* (with your all-time saving underneath) and *monthly net*. The chart
+lets you choose how far ahead to look, marks today, and draws the past from your **actual**
+payments and the future from your plan. Picking a date now works for past days too, and shows the
+real payments of that day — labelled confirmed, projected or planned — beside the transfers and
+one-offs. "Where it goes" shows what you have actually spent per category against what you
+budgeted. Your daily, weekly, monthly and yearly spending panels now fill up as real payments
+arrive (x of y on every line), can be dragged into the order the money should drain in, and carry
+the app's budget suggestions inline. One-off spending keeps its month view and gains the unplanned
+overflow — anything past every allowance lands there. Payments and capture health live in compact
+side panels, and the projection itself is now anchored to reality: past days use what you really
+spent, while transfers and one-offs the messages cannot see stay counted.
+
+Runway is gone (never looked at), and "free to spend" folded into the date picker where it always
+made more sense.
+
 ## 2026-08-29 — Spending: see where the money went, and what you saved
 
 Building on the capture below, the app now works out **what each payment was probably for** and

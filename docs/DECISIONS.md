@@ -772,3 +772,21 @@ repayment day. So for a past day with actuals: `out = captured + manual-settleme
 one-off records`. The same reasoning keeps **captured credits out of the projection entirely**:
 the salary arrives as a `ჩარიცხვა` message, and counting the capture *and* the budgeted income
 source would double every payday.
+
+## The spending UI lives inside the Free money page
+
+**2026-08-30.** Principle I says one module, one route — and the spending widget shipped that way:
+its own `/spending` page beside `/cashflow`. The owner merged them after using both: *"in the end
+they kind of have the same goal"*, and they are right — budget, balance, spending and savings are
+one question asked four ways, and answering it across two pages meant the best view of each half
+was missing the other.
+
+So the **module boundary stays** — `apps/api/src/spending/` keeps its own collections, endpoints
+and service, and reads the budget through `CashflowService` exactly as before — but its **UI
+renders inside the Free money page**: the cadence panels are the ladder, the one-off panel carries
+the waterfall's overflow, the day panel shows captured payments beside planned lines, and payments
+and capture-health sit in compact side panels. `/spending` as a page is gone; `/spending/tokens`
+(capture setup) remains.
+
+Read this as a deliberate, owner-decided amendment to the "one Next route" half of principle I,
+not drift: the API namespace separation that principle exists for is untouched.
