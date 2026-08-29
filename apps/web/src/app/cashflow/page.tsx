@@ -28,6 +28,7 @@ import type {
   PeriodSaving,
   RealisedSale,
   SavingsBreakdown,
+  SpendDayView,
   SpendLadder,
   SpendPayment,
 } from '@life-portal/shared-types';
@@ -110,6 +111,10 @@ interface SavingsView {
   cumulative: SavingsBreakdown;
   month: { projectedSavingCents: number; actualSavingCents: number; extraCents: number };
 }
+
+const SPENT_VS_PAID_BASIS =
+  'What this day consumed, whichever day paid for it: allowance slices landing on this day, ' +
+  'plus transfers and one-offs due on it. A lower bound, like everything from captured payments.';
 
 const LOWER_BOUND_BASIS =
   'Counts captured payments only, so it is a lower bound. Cash, a message your phone did not ' +
@@ -752,6 +757,12 @@ function DatePanel({
       ).filter((payment) => payment.status === 'recorded')
     : [];
 
+  // The allowance view of the same day: what was spent on it, whichever day paid for it.
+  // A payment spread across four breakfasts pays once and spends four times, so this is a
+  // different number from the projection's out.
+  const dayView = useApi<SpendDayView>(`/spending/day?date=${date}`);
+  const slices = dayView.data?.slices ?? [];
+
   const events = day?.events ?? [];
   // On a past day the card allowances have been replaced by what was captured, so only the
   // budget lines actuals can never displace — manual settlements and one-off facts — still list.
@@ -772,8 +783,26 @@ function DatePanel({
     [data.sales, date],
   );
 
+  // Manual settlements and one-offs are spending on their day even though no message captures
+  // them; a future day's are still only plans, so they join the figure once the day has come.
+  const uncapturedSpentCents = sumCents(
+    (date <= data.today ? events : [])
+      .filter(
+        (event) =>
+          event.direction === 'out' &&
+          event.sourceKind === 'expense' &&
+          (event.settlement === 'manual' || event.expenseKind === 'one_off'),
+      )
+      .map((event) => event.amountCents),
+  );
+  const spentCents =
+    dayView.data == null ? undefined : dayView.data.spentCents + uncapturedSpentCents;
+
   const nothingListed =
-    captured.length === 0 && listedEvents.length === 0 && earmarkedSales.length === 0;
+    captured.length === 0 &&
+    listedEvents.length === 0 &&
+    earmarkedSales.length === 0 &&
+    slices.length === 0;
 
   return (
     <Panel
@@ -814,7 +843,7 @@ function DatePanel({
         />
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-4 sm:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-4 sm:grid-cols-5">
         <DayFigure label="Opening" cents={day?.openingCents} currency={summary.currency} />
         <DayFigure
           label="In"
@@ -823,11 +852,18 @@ function DatePanel({
           tone={day?.inCents ? 'good' : undefined}
         />
         <DayFigure
-          label="Out"
+          label="Paid out"
           cents={day?.outCents}
           currency={summary.currency}
           tone={day?.outCents ? 'warn' : undefined}
           estimated={isPast ? LOWER_BOUND_BASIS : undefined}
+        />
+        <DayFigure
+          label="Spent"
+          cents={spentCents}
+          currency={summary.currency}
+          tone={spentCents ? 'warn' : undefined}
+          estimated={SPENT_VS_PAID_BASIS}
         />
         <DayFigure
           label="Closing"
@@ -836,6 +872,13 @@ function DatePanel({
           tone={day && day.closingCents < 0 ? 'bad' : undefined}
         />
       </div>
+
+      {spentCents != null && day != null && spentCents !== day.outCents && (
+        <p className="mt-2 text-[11px] text-ink-faint">
+          Paid and spent differ when a payment covers other days — milk bought once spends across
+          every breakfast it covers, and yesterday&rsquo;s shopping can be today&rsquo;s spending.
+        </p>
+      )}
 
       <p className="mt-4 text-xs text-ink-faint">
         Money due <em>on</em> payday is paid from that salary, so it is not counted against the
@@ -867,6 +910,67 @@ function DatePanel({
 
         {dayQuery.isLoading && (
           <p className="py-2 text-xs text-ink-faint">Fetching what was captured…</p>
+        )}
+
+        {slices.length > 0 && (
+          <>
+            <p className="mb-1 mt-1 text-[11px] uppercase tracking-wide text-ink-faint">
+              Spent this day
+            </p>
+            <ul className="mb-3 divide-y divide-border">
+              {slices.map((slice, index) => {
+                const source = (overview?.payments ?? []).find(
+                  (payment) => payment.id === slice.paymentId,
+                );
+                const crossDay = slice.paidDay !== date;
+                const chip =
+                  slice.decided === 'confirmed'
+                    ? { label: 'confirmed', tone: 'good' as const }
+                    : slice.decided === 'custom'
+                      ? { label: 'own purpose', tone: 'good' as const }
+                      : { label: 'projected', tone: 'neutral' as const };
+                const body = (
+                  <>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm" title={slice.label}>
+                          {slice.target === 'extra' ? 'Unplanned' : slice.label}
+                        </p>
+                        <Chip tone={chip.tone}>{chip.label}</Chip>
+                      </div>
+                      <p className="text-xs text-ink-faint">
+                        {crossDay
+                          ? `from ${slice.merchant ?? 'a payment'} · paid ${formatDay(slice.paidDay)}`
+                          : (slice.merchant ?? 'entered by hand')}
+                      </p>
+                    </div>
+                    <span className="shrink-0">
+                      <span className="mr-0.5 text-xs text-ink-faint">−</span>
+                      <Money cents={slice.amountCents} currency={summary.currency} />
+                    </span>
+                  </>
+                );
+                return (
+                  <li key={`${slice.paymentId}-${index}`}>
+                    {source ? (
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between gap-3 py-2 text-left"
+                        onClick={() => onOpenPayment(source)}
+                      >
+                        {body}
+                      </button>
+                    ) : (
+                      <div className="flex items-center justify-between gap-3 py-2">{body}</div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="mb-1 text-[11px] uppercase tracking-wide text-ink-faint">
+              Paid or planned this day
+            </p>
+          </>
         )}
 
         {nothingListed && !dayQuery.isLoading ? (

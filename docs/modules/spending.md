@@ -182,6 +182,7 @@ dismissal on.
 | `POST` `PATCH` `DELETE` | `/api/spending/payments[/:id]` | Manual entry; PATCH also completes an unparsed row |
 | `PUT` | `/api/spending/payments/:id/decision` | `confirmed` (a list, possibly partial) · `custom` · `none` |
 | `POST` | `/api/spending/payments/:id/promote` | Custom purpose → budget line, via `CashflowService` |
+| `GET` | `/api/spending/day` | `?date=` — the day read allowance-first: what it consumed, whichever day paid |
 | `GET` | `/api/spending/gaps` | Suspected missed messages |
 | `GET` | `/api/spending/suggestions` | Budget proposals, each an `Estimate<Cents>` showing its working |
 | `POST` | `/api/spending/suggestions/:expenseId/accept` | Applies it through `CashflowService`; a `purpose:` id creates the line |

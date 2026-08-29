@@ -15,7 +15,7 @@ import {
 import { MongooseModule } from '@nestjs/mongoose';
 import type { Request } from 'express';
 import { CurrentUser, TokenAuth } from '../auth/current-user.decorator';
-import { Today } from '../common/today';
+import { resolveToday, Today } from '../common/today';
 import { CashflowModule } from '../cashflow/cashflow.module';
 import { FxModule } from '../fx/fx.module';
 import { NutritionModule } from '../nutrition/nutrition.module';
@@ -84,6 +84,12 @@ export class SpendingController {
   @Get()
   overview(@CurrentUser('userId') userId: string, @Today() today: string) {
     return this.spending.overview(userId, today);
+  }
+
+  /** One day read allowance-first: what was spent on it, whichever day paid for it. */
+  @Get('day')
+  day(@CurrentUser('userId') userId: string, @Today() today: string, @Query('date') date?: string) {
+    return this.spending.day(userId, today, resolveToday(date));
   }
 
   /** Per-period and cumulative savings, plus the month's projected, actual and extra together. */

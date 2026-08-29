@@ -8,6 +8,8 @@ import type {
   Expense as ExpenseDto,
   FxContext,
   SpendBank,
+  SpendDaySlice,
+  SpendDayView,
   SpendPayment as SpendPaymentDto,
 } from '@life-portal/shared-types';
 import {
@@ -492,6 +494,51 @@ export class SpendingService {
       extraThisMonthCents: ladder.extraCents,
       unparsedCount: unparsed.length,
       gapCount: detectMissedMessages(await this.list(userId)).length,
+    };
+  }
+
+  /**
+   * One day read allowance-first: what was actually spent on `date`, whichever day paid for it.
+   *
+   * A different question from the projection's "out", which follows the money. A payment spread
+   * across four breakfasts pays on one day and spends on four, so the slices here are collected
+   * by each allocation's `forDay` — including slices whose payment left the account on another
+   * day entirely.
+   */
+  async day(userId: string, today: string, date: string): Promise<SpendDayView> {
+    const settings = await this.settings.get(userId);
+    // The window must cover both the asked-for day's financial month and today's, because the
+    // waterfall reports periods inside it — but the payments themselves are never windowed, so
+    // a span reaching `date` from an older payment is found regardless.
+    const earlier = date < today ? date : today;
+    const later = date > today ? date : today;
+    const [result, payments] = await Promise.all([
+      this.run(userId, today, {
+        from: startOfFinancialMonth(earlier, settings.monthStartsOn ?? 1),
+        to: later,
+      }),
+      this.list(userId),
+    ]);
+
+    const slices: SpendDaySlice[] = [];
+    for (const payment of payments) {
+      for (const allocation of result.allocationsByPayment[payment.id] ?? []) {
+        if (allocation.forDay !== date) continue;
+        slices.push({
+          ...allocation,
+          paymentId: payment.id,
+          merchant: payment.merchant,
+          paidDay: payment.day,
+          decided: payment.decision?.kind,
+        });
+      }
+    }
+    slices.sort((a, b) => b.amountCents - a.amountCents);
+
+    return {
+      date,
+      spentCents: slices.reduce((sum, slice) => sum + slice.amountCents, 0),
+      slices,
     };
   }
 

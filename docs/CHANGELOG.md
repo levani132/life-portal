@@ -2,6 +2,15 @@
 
 User-visible changes. Newest first.
 
+## 2026-08-30 — A day now says what it spent, not just what it paid
+
+The date panel used to answer only the bank's question — how much money left the account that day.
+It now also answers yours: **how much that day actually consumed**, whichever day paid for it. Milk
+bought once spends across every breakfast it covers, so a quiet day can still have spending, and a
+₾7.67 shopping day can have spent only its own slice. The two figures sit side by side as *paid
+out* and *spent*, with the day's slices listed underneath — each saying which payment it came from
+and when that was paid.
+
 ## 2026-08-30 — The comma key now types fractions
 
 On a Georgian keyboard the iPhone's number pad offers a comma where the decimal point should be,

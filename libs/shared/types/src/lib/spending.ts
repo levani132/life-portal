@@ -191,6 +191,30 @@ export interface SavingsBreakdown {
 }
 
 /**
+ * One allocation slice as seen from the day whose allowance it consumed, carrying enough of its
+ * source payment to say "¼ of the milk you paid for on the 29th".
+ *
+ * This is the answer to "what did I actually spend today", which is a different question from
+ * "what did I pay today": a payment spread across four breakfasts spends on four days while
+ * paying on one, and yesterday's shopping can be today's spending.
+ */
+export interface SpendDaySlice extends SpendAllocation {
+  paymentId: Id;
+  merchant?: string;
+  /** The day the money left the account, which need not be `forDay`. */
+  paidDay: IsoDate;
+  /** How settled the slice is: absent = a projection, otherwise the owner's decision. */
+  decided?: 'confirmed' | 'custom';
+}
+
+/** A single day read allowance-first. `spentCents` is in the display currency. */
+export interface SpendDayView {
+  date: IsoDate;
+  spentCents: Cents;
+  slices: SpendDaySlice[];
+}
+
+/**
  * A discrepancy between the balances a card reported and the payments captured between them.
  *
  * Only one bank prints a balance, so only that card self-checks; the absence of a gap elsewhere
