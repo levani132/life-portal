@@ -8,6 +8,7 @@ import {
   formatMonth,
   nextDayOfMonth,
   toDay,
+  wallClockDay,
   weekdayOf,
 } from './dates';
 
@@ -69,5 +70,36 @@ describe('dates', () => {
   it('formats a month from either a month key or a full day', () => {
     expect(formatMonth('2026-08')).toBe('August 2026');
     expect(formatMonth('2026-08-18')).toBe('August 2026');
+  });
+});
+
+describe('wallClockDay', () => {
+  it('reads the literal wall clock, never the machine timezone', () => {
+    // 05:00 in Tbilisi is 01:00 UTC. Read through Date.getHours() on a UTC host, the 4am rule
+    // fires against the wrong clock and files the payment a day early — the bug this exists for.
+    expect(wallClockDay('2026-08-31T05:00:00+04:00')).toBe('2026-08-31');
+    expect(wallClockDay('2026-08-31T01:00:00+04:00')).toBe('2026-08-30');
+  });
+
+  it('accepts a wall clock with no offset, as a browser datetime-local sends', () => {
+    expect(wallClockDay('2026-08-30T18:00')).toBe('2026-08-30');
+    expect(wallClockDay('2026-08-30T03:59')).toBe('2026-08-29');
+  });
+
+  it('treats a bare date as that day — there is no clock to apply the rule to', () => {
+    expect(wallClockDay('2026-08-23')).toBe('2026-08-23');
+  });
+
+  it('respects the configured day-start hour', () => {
+    expect(wallClockDay('2026-08-31T05:00:00+04:00', 6)).toBe('2026-08-30');
+    expect(wallClockDay('2026-08-31T05:00:00+04:00', 0)).toBe('2026-08-31');
+  });
+
+  it('refuses locale prose rather than guessing', () => {
+    // What an iOS Shortcut sends when the date variable has no format set.
+    expect(wallClockDay('30 Aug 2026 at 22:38')).toBeNull();
+    expect(wallClockDay('30/08/2026, 22:38')).toBeNull();
+    expect(wallClockDay('')).toBeNull();
+    expect(wallClockDay(undefined)).toBeNull();
   });
 });

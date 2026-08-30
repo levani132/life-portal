@@ -20,13 +20,13 @@ import {
   eachDay,
   fxContext,
   isNewLineProposal,
-  localDay,
   parseBankMessage,
   spendWaterfall,
   startOfFinancialMonth,
   suggestBudgets,
   sumCents,
   toDay,
+  wallClockDay,
 } from '@life-portal/shared-domain';
 import type {
   BudgetDismissal,
@@ -92,9 +92,18 @@ export class SpendingService {
    * here, because a phone automation cannot read the owner's profile. It can only report the
    * moment; `dayStartHour` lives on the server, so this is the only place the two can meet.
    */
-  private async dayFor(userId: string, at: string): Promise<string> {
+  private async dayFor(userId: string, ...candidates: (string | undefined)[]): Promise<string> {
     const profile = await this.nutrition.profile(userId);
-    return localDay(new Date(at), profile.dayStartHour ?? 4);
+    const dayStartHour = profile.dayStartHour ?? 4;
+    // The day comes from a timestamp's own wall clock, never from `new Date().getHours()` —
+    // that answers in the *server's* timezone, and on a UTC host it filed every early-morning
+    // payment a day early. Candidates are tried in order of how much they know about the
+    // owner's clock; the last one (server receipt time) always parses.
+    for (const candidate of candidates) {
+      const day = wallClockDay(candidate, dayStartHour);
+      if (day) return day;
+    }
+    return wallClockDay(new Date().toISOString(), dayStartHour) as string;
   }
 
   // ---------------------------------------------------------------- ingest
@@ -117,7 +126,11 @@ export class SpendingService {
     paymentId?: string;
     day?: string;
   }> {
-    const at = dto.at ?? receivedAt;
+    // Whatever an unconfigured iOS date variable sent — locale prose included — must never
+    // reject the request: a Shortcut cannot handle an error, so a 400 here loses the message
+    // for good. An unusable `at` simply falls back to the arrival time, which for a live
+    // automation is seconds away from the truth anyway.
+    const at = dto.at && !Number.isNaN(Date.parse(dto.at)) ? dto.at : receivedAt;
 
     const duplicate = await this.findRecentDuplicate(userId, dto.raw, receivedAt);
     if (duplicate) {
@@ -131,7 +144,12 @@ export class SpendingService {
     }
 
     const parsed = parseBankMessage(dto.raw, dto.bank as SpendBank | undefined);
-    const day = await this.dayFor(userId, parsed?.statedAt ?? at);
+    // Candidates in order of how much they know about the owner's clock. A bank's printed
+    // *date* cannot say that a 01:00 payment belongs to yesterday, so any timestamp carrying a
+    // clock — TBC's own, or the phone's — outranks BOG's date-only stamp.
+    const statedWithClock =
+      parsed?.statedAt && parsed.statedAt.length > 10 ? parsed.statedAt : undefined;
+    const day = await this.dayFor(userId, statedWithClock, dto.at, parsed?.statedAt, at, receivedAt);
 
     const created = await this.payments.create({
       userId,

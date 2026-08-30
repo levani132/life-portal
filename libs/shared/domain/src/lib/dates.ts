@@ -89,8 +89,7 @@ export function diffMonths(a: string, b: string): number {
   const from = toUtcDate(a);
   const to = toUtcDate(b);
   let months =
-    (to.getUTCFullYear() - from.getUTCFullYear()) * 12 +
-    (to.getUTCMonth() - from.getUTCMonth());
+    (to.getUTCFullYear() - from.getUTCFullYear()) * 12 + (to.getUTCMonth() - from.getUTCMonth());
   if (to.getUTCDate() < from.getUTCDate()) {
     months -= 1;
   }
@@ -178,4 +177,30 @@ export function formatMonth(month: string, locale = 'en-GB'): string {
     year: 'numeric',
     timeZone: 'UTC',
   });
+}
+
+/**
+ * The calendar day a timestamp's *own wall clock* belongs to, given the owner's day-start hour.
+ *
+ * Deliberately reads the literal fields out of the string instead of going through `Date`:
+ * `new Date(...).getHours()` answers in whatever timezone the *server* happens to run in, and a
+ * payment made at 05:00 in Tbilisi is 01:00 UTC — on a UTC host the 4am rule would fire against
+ * the wrong clock and file every early-morning payment a day early. The string a phone or a
+ * browser sends already carries the owner's wall clock (`2026-08-31T05:00:00+04:00`,
+ * `2026-08-30T18:00`, or just `2026-08-23`), so the honest reading is the literal one.
+ *
+ * Returns `null` for anything that does not begin with a recognisable date — an iOS Shortcut
+ * with an unconfigured date variable sends the device locale's prose ("30 Aug 2026 at 22:38"),
+ * and the caller falls back to its own arrival time rather than guessing.
+ */
+export function wallClockDay(value: string | undefined, dayStartHour = 4): DayString | null {
+  if (!value) return null;
+  const match = /^(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}))?/.exec(value.trim());
+  if (!match) return null;
+  const [, day, hourText] = match;
+  // A bare date has no clock to apply the rule to, so it simply is that day.
+  if (hourText == null) return toDay(day);
+  const hour = Number(hourText);
+  if (!Number.isFinite(hour) || hour > 23) return null;
+  return hour < dayStartHour ? addDays(day, -1) : toDay(day);
 }

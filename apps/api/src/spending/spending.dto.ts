@@ -27,8 +27,13 @@ export class IngestDto {
 
   @IsString() @MaxLength(2000) raw!: string;
 
-  /** ISO with offset, as the phone's clock reported it. The server derives the day from this. */
-  @IsOptional() @IsISO8601() at?: string;
+  /**
+   * When the phone says this happened. Ideally ISO with an offset, but deliberately **not**
+   * validated as such: an iOS date variable left on its default format sends locale prose, and
+   * rejecting the request over it would lose the message a Shortcut can never resend. Anything
+   * unreadable falls back to the arrival time.
+   */
+  @IsOptional() @IsString() @MaxLength(80) at?: string;
 }
 
 export class CreatePaymentDto {

@@ -2,6 +2,19 @@
 
 User-visible changes. Newest first.
 
+## 2026-08-30 — The shortcut works however your phone formats dates
+
+**Fixed:** the very first real message from a correctly set-up shortcut was rejected, because iOS
+sends its date variable as human-readable text unless told otherwise, and the server insisted on a
+machine format — losing the message over a cosmetic field. Any date format is accepted now; one
+the server cannot read just files the payment under the moment it arrived, seconds off at most.
+The setup instructions also show how to set the variable to ISO 8601 for exact timing.
+
+**Also fixed before it ever bit:** the day a payment belongs to was computed in the *server's*
+timezone, which is UTC in production — an early-morning payment (before 8am Tbilisi) would have
+been filed a day early. The day now comes from the timestamp's own wall clock, wherever the
+server runs.
+
 ## 2026-08-30 — A lari lunch no longer wears a dollar sign
 
 **Fixed:** a budget line entered in one currency was shown with the display currency's symbol on

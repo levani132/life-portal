@@ -790,3 +790,27 @@ and capture-health sit in compact side panels. `/spending` as a page is gone; `/
 
 Read this as a deliberate, owner-decided amendment to the "one Next route" half of principle I,
 not drift: the API namespace separation that principle exists for is untouched.
+
+## A payment's day comes from the timestamp's own wall clock — and ingest never rejects over it
+
+**2026-08-30.** Two production bugs found the day the owner set up their real Shortcut, both
+invisible on a developer machine in Tbilisi.
+
+**1. The 400 that lost messages.** `at` was validated `@IsISO8601()`, and an iOS date variable
+left on its default format sends the device locale's prose — "30 Aug 2026 at 22:38". The request
+was rejected, which violates this module's founding rule: a Shortcut cannot handle an error, so a
+non-2xx loses the message for good — and here it was lost over a *metadata* field while the raw
+message it carried was perfectly parseable. `at` is now an unvalidated string; anything unreadable
+falls back to the arrival time, which for a live automation is seconds from the truth.
+
+**2. The server-timezone day.** `localDay(new Date(at))` reads `getHours()` in the *server's*
+zone. On this Mac (Asia/Tbilisi) every test passed; on Render (UTC), 05:00+04:00 is 01:00 server
+time, so the 4am rule fired against the wrong clock and filed every early-morning payment a day
+early. `wallClockDay()` now reads the literal fields out of the string — the wall clock a phone,
+a browser or a bank message sends is already the owner's — and the server's zone plays no part.
+Verified with `TZ=UTC`.
+
+Candidate order matters and is deliberate: a timestamp *with a clock* (TBC's own, or the phone's)
+outranks BOG's date-only stamp, because a printed date cannot say that a 01:00 payment belongs to
+yesterday. `localDay(Date)` remains for the browser, where the `Date` really is in the owner's
+zone.

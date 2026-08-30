@@ -359,7 +359,13 @@ function SetupInstructions({ token }: { token?: string }) {
               </li>
               <li>
                 <code className="text-ink">at</code> — Text — the{' '}
-                <strong className="text-ink">Current Date</strong> variable
+                <strong className="text-ink">Current Date</strong> variable. For the payment to land
+                on the right day, tap the blue variable and set{' '}
+                <strong className="text-ink">Date Format</strong> to{' '}
+                <strong className="text-ink">ISO 8601</strong> with{' '}
+                <strong className="text-ink">ISO 8601 Time</strong> turned on — left on its default,
+                iOS sends a human-readable date the server cannot read, and the payment is filed
+                under the moment it arrived instead. Nothing is lost either way.
               </li>
             </ul>
           </li>
