@@ -3,7 +3,8 @@
  *
  * The logo is a portal ring that doubles as a progress gauge (see `public/icon.svg`), so the
  * loading state is that same drawing with the gauge actually moving — it sweeps to 100%, holds for
- * a beat, then unwinds back to 0% and repeats. Nothing here reports real progress: the boot is one
+ * a beat, then empties in the same clockwise direction and repeats, so it laps the ring rather than
+ * rewinding. Nothing here reports real progress: the boot is one
  * `/auth/me` round trip with no measurable stages, and a percentage readout would be a number the
  * app cannot stand behind.
  *

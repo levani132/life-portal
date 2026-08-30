@@ -153,23 +153,30 @@
 
 /*
  * The boot loader (`components/portal-loader.tsx`): the logo's gauge ring filling to 100%, holding,
- * then unwinding to 0%. `stroke-dasharray` is animated rather than `stroke-dashoffset`, because an
- * offset sweep would unwind from the wrong end — the arc has to shrink back to where it started,
- * not slide around the circle. 942.5 is the circumference of the r=150 ring.
+ * then emptying to 0% — with both edges always moving clockwise, so the gauge appears to run in
+ * circles rather than fill and rewind. The fill grows the dash with the offset pinned (the head
+ * advances from twelve o'clock); the empty shrinks the dash while driving the offset to the full
+ * negative circumference, which parks the head at twelve o'clock and sends the tail chasing after
+ * it. The two properties interpolate over the same span with the same easing, so they stay in
+ * lockstep. 942.5 is the circumference of the r=150 ring.
  */
 @keyframes portal-sweep {
   0%,
   6% {
     stroke-dasharray: 0 942.5;
+    stroke-dashoffset: 0;
     animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
   48%,
   58% {
     stroke-dasharray: 942.5 942.5;
+    stroke-dashoffset: 0;
     animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
   100% {
+    /* Both end states are an empty ring, so the offset snapping back to 0 on loop is invisible. */
     stroke-dasharray: 0 942.5;
+    stroke-dashoffset: -942.5;
   }
 }
 
