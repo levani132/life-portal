@@ -79,6 +79,10 @@ number on a line reads them as a balance.
 `dagibrunda:` is cashback that accrues to a loyalty pot (verified: it never moves `Nashti`), and
 `Ertgul kulabashi gaqvs:` is a loyalty balance. Only the payment amount is money.
 
+`Nashti`'s currency is kept apart from the payment's (`reportedBalanceCurrency`): a $10 charge on
+a lari card prints a USD amount over a GEL balance, and the completeness check needs both to
+chain the readings in one currency.
+
 ## Completeness
 
 `detectMissedMessages` chains each card's `Nashti` readings and reports a gap where the balances and
@@ -88,6 +92,15 @@ the captured payments disagree. Derived, so a payment added by hand later closes
 across two banks, so as *the* balance it would be wrong; as one card's own running total it is
 exact, which is the only job it does. Only TBC prints one, so a card with no gaps is not evidence of
 completeness.
+
+**The chain runs in the account's currency, not each payment's.** A foreign-currency payment is
+converted at the NBG rate in force on its own day before it is deducted — deducting the raw dollar
+figure from a lari balance invented a permanent gap per dollar payment. Because the bank converts
+at *its* card rate rather than the published one, a segment that needed conversion is checked to
+within 5% of the amount converted (the spread is a percent or two; a lost message misses by its
+whole size) instead of to the tetri. A foreign payment whose day has no rate makes its segment
+unverifiable, and an unverifiable segment reports nothing — unknowable is not missing, exactly as
+with BOG's silence.
 
 ## The waterfall
 

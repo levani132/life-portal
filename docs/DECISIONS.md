@@ -814,3 +814,27 @@ Candidate order matters and is deliberate: a timestamp *with a clock* (TBC's own
 outranks BOG's date-only stamp, because a printed date cannot say that a 01:00 payment belongs to
 yesterday. `localDay(Date)` remains for the browser, where the `Date` really is in the owner's
 zone.
+
+## The completeness chain converts foreign payments, and forgives the bank's spread
+
+**2026-09-01.** A $10 charge on the lari card made `detectMissedMessages` report a permanent
+"missed payment": the message prints the amount in USD but `Nashti` in GEL, and the chain deducted
+the raw 10.00 from a lari balance — reporting the difference between ten dollars and their lari
+value as missing money, forever.
+
+Three decisions, each following an existing rule rather than adding a new one:
+
+1. **The chain runs in the account's currency.** The parser now keeps `Nashti`'s currency
+   (`reportedBalanceCurrency`) instead of discarding it, and a payment in any other currency is
+   converted at the rate in force on *its own day* — the fx module's one rule — before it is
+   deducted. Rows ingested before the field existed are all lari accounts, so its absence reads
+   as GEL.
+2. **A converted segment is checked to within 5% of the amount converted, not to the tetri.**
+   The bank converts at its card rate; the archive holds the published NBG rate. The spread is a
+   percent or two, so demanding exactness would swap one phantom gap for a smaller one. A lost
+   message misses by its own whole size and still shows; the tetri-exact check remains wherever
+   nothing was converted, which is almost every segment.
+3. **No rate means no verdict.** A foreign payment on a day the archive does not reach makes its
+   segment unverifiable, and an unverifiable segment reports nothing — the same "silence is not
+   evidence" stance the check already takes for BOG. Its closing reading still anchors the next
+   segment, so one unratable day never blinds the whole chain.

@@ -1,5 +1,6 @@
 import type { SpendPayment } from '@life-portal/shared-types';
 import { detectMissedMessages } from './completeness';
+import { rateTable } from './fx';
 
 /** Everything a `SpendPayment` needs that this check never looks at. */
 function payment(overrides: Partial<SpendPayment> & Pick<SpendPayment, 'id'>): SpendPayment {
@@ -223,5 +224,141 @@ describe('detectMissedMessages', () => {
         missingCents: -695,
       },
     ]);
+  });
+});
+
+describe('detectMissedMessages across currencies', () => {
+  // 2.70 lari to the dollar, expanded to the flat FROM_TO table the check reads — the same
+  // shape `rateTable` hands every other conversion in the app.
+  const rates = rateTable('GEL', { USD: 2.7 });
+  const ratesByDay = { '2026-08-18': rates, '2026-08-19': rates };
+
+  const anchor = payment({
+    id: 'fx0',
+    cardLast4: '4419',
+    amountCents: 18_648,
+    at: '2026-08-18T10:12:00+04:00',
+    reportedBalanceCents: 128_582,
+    reportedBalanceCurrency: 'GEL',
+  });
+
+  /** A $10 charge on the lari card, as TBC prints it: USD amount, GEL `Nashti`. */
+  function dollarPayment(overrides: Partial<SpendPayment>): SpendPayment {
+    return payment({
+      id: 'fx-usd',
+      cardLast4: '4419',
+      amountCents: 1_000,
+      currency: 'USD',
+      at: '2026-08-18T12:00:00+04:00',
+      reportedBalanceCurrency: 'GEL',
+      ...overrides,
+    });
+  }
+
+  it('values a dollar payment at its own day’s rate, never at face value', () => {
+    // The bank moved the account by ₾27.00, not by "10.00": 1285.82 − 27.00 = 1258.82.
+    const chain = [anchor, dollarPayment({ reportedBalanceCents: 125_882 })];
+
+    expect(detectMissedMessages(chain, ratesByDay)).toEqual([]);
+  });
+
+  it('converts a dollar payment that carried no reading of its own', () => {
+    // The $10 sits between two GEL readings: 1285.82 − 27.00 − 6.95 = 1251.87.
+    const chain = [
+      anchor,
+      dollarPayment({ reportedBalanceCents: undefined }),
+      payment({
+        id: 'fx1',
+        cardLast4: '4419',
+        amountCents: 695,
+        at: '2026-08-18T13:40:00+04:00',
+        reportedBalanceCents: 125_187,
+        reportedBalanceCurrency: 'GEL',
+      }),
+    ];
+
+    expect(detectMissedMessages(chain, ratesByDay)).toEqual([]);
+  });
+
+  it('absorbs the bank converting at its own rate rather than the published one', () => {
+    // The card charged ₾27.50 (a 2.75 rate) while NBG published 2.70 — fifty tetri of spread,
+    // not a missing message: 1285.82 − 27.50 = 1258.32.
+    const chain = [anchor, dollarPayment({ reportedBalanceCents: 125_832 })];
+
+    expect(detectMissedMessages(chain, ratesByDay)).toEqual([]);
+  });
+
+  it('still reports the message the spread cannot explain', () => {
+    // The $10 arrived, but a ₾14.45 message was lost alongside it:
+    // 1285.82 − 27.00 − 14.45 = 1244.37 reported, against 1258.82 expected.
+    const chain = [anchor, dollarPayment({ reportedBalanceCents: 124_437 })];
+
+    expect(detectMissedMessages(chain, ratesByDay)).toEqual([
+      {
+        cardLast4: '4419',
+        from: '2026-08-18',
+        to: '2026-08-18',
+        missingCents: 1_445,
+      },
+    ]);
+  });
+
+  it('reports nothing when a foreign payment has no rate for its day', () => {
+    // Unknowable is not missing: with no rate the segment cannot be checked either way.
+    const chain = [anchor, dollarPayment({ reportedBalanceCents: 125_882 })];
+
+    expect(detectMissedMessages(chain)).toEqual([]);
+  });
+
+  it('chains a reading after an unverifiable segment as a fresh fixed point', () => {
+    // No rate for the dollar day, but the two GEL payments after its reading still self-check —
+    // and here they do not meet: 1258.82 − 6.95 = 1251.87, yet 1237.42 was reported.
+    const chain = [
+      anchor,
+      dollarPayment({ reportedBalanceCents: 125_882 }),
+      payment({
+        id: 'fx2',
+        cardLast4: '4419',
+        amountCents: 695,
+        at: '2026-08-18T13:40:00+04:00',
+        reportedBalanceCents: 123_742,
+        reportedBalanceCurrency: 'GEL',
+      }),
+    ];
+
+    expect(detectMissedMessages(chain)).toEqual([
+      {
+        cardLast4: '4419',
+        from: '2026-08-18',
+        to: '2026-08-18',
+        missingCents: 1_445,
+      },
+    ]);
+  });
+
+  it('chains a dollar account in dollars, converting the lari payment instead', () => {
+    const chain = [
+      payment({
+        id: 'usd1',
+        cardLast4: '9001',
+        currency: 'USD',
+        amountCents: 5_000,
+        at: '2026-08-18T10:00:00+04:00',
+        reportedBalanceCents: 100_000,
+        reportedBalanceCurrency: 'USD',
+      }),
+      payment({
+        id: 'usd2',
+        cardLast4: '9001',
+        currency: 'GEL',
+        amountCents: 2_700,
+        at: '2026-08-18T15:00:00+04:00',
+        // ₾27.00 at 2.70 is $10.00: 1000.00 − 10.00 = 990.00.
+        reportedBalanceCents: 99_000,
+        reportedBalanceCurrency: 'USD',
+      }),
+    ];
+
+    expect(detectMissedMessages(chain, ratesByDay)).toEqual([]);
   });
 });

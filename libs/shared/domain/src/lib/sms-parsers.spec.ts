@@ -103,9 +103,22 @@ describe('parseTbcMessage', () => {
       merchant: 'Gulfclub',
       cardLast4: '6810',
       reportedBalanceCents: 128582,
+      reportedBalanceCurrency: 'GEL',
       cashbackCents: 93,
       statedAt: '2026-08-23T23:38:00',
     });
+  });
+
+  it('keeps the balance currency apart from a foreign payment’s', () => {
+    // A $10 charge on a lari card: the amount is USD, `Nashti` stays GEL — and the completeness
+    // check needs both to chain the readings in one currency.
+    const parsed = parseTbcMessage(
+      '10.00USD\n(*6810)\nAMZN Mktp\nNashti: 1258.82GEL\n24/08/26 12:00',
+    );
+    expect(parsed?.currency).toBe('USD');
+    expect(parsed?.amountCents).toBe(1000);
+    expect(parsed?.reportedBalanceCents).toBe(125882);
+    expect(parsed?.reportedBalanceCurrency).toBe('GEL');
   });
 
   it('keeps cashback distinct from the amount and never nets it off', () => {

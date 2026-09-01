@@ -35,6 +35,12 @@ export interface ParsedMessage {
   statedAt?: IsoDate;
   /** TBC's `Nashti`. One account of several, so it is a completeness check — never a balance. */
   reportedBalanceCents?: Cents;
+  /**
+   * The currency `Nashti` is printed in — the account's, kept apart from the payment's: a $10
+   * charge on a lari card prints a USD amount over a GEL balance, and the completeness check
+   * needs both to chain the readings in one currency.
+   */
+  reportedBalanceCurrency?: Currency;
   /** TBC's `dagibrunda`. Accrues to the loyalty pot, not the account: recorded, then ignored. */
   cashbackCents?: Cents;
 }
@@ -137,8 +143,8 @@ export function parseBogMessage(raw: string): ParsedMessage | null {
 /** `186.48GEL` on the first line, with no keyword at all — the shape itself is the anchor. */
 const TBC_AMOUNT = /^([\d,.]+)\s*([A-Za-z]{3})$/;
 const TBC_CARD = /^\(\*(\d{4})\)$/;
-/** `Nashti:` is the account balance after the payment. */
-const TBC_BALANCE = /^Nashti\s*:\s*([\d,.]+)\s*[A-Za-z]{3}$/i;
+/** `Nashti:` is the account balance after the payment, in the *account's* currency. */
+const TBC_BALANCE = /^Nashti\s*:\s*([\d,.]+)\s*([A-Za-z]{3})$/i;
 /** `dagibrunda:` is cashback into the loyalty pot — verified never to move `Nashti`. */
 const TBC_CASHBACK = /^dagibrunda\s*:\s*([\d,.]+)\s*[A-Za-z]{3}$/i;
 /** `Ertgul kulabashi gaqvs:` is the loyalty balance. Matched only so it is never a merchant. */
@@ -188,10 +194,15 @@ export function parseTbcMessage(raw: string): ParsedMessage | null {
 
   const balanceLine = rows.find((line) => TBC_BALANCE.test(line));
   if (balanceLine) {
-    const cents = parseAmountCents(
-      (TBC_BALANCE.exec(balanceLine) as RegExpExecArray)[1],
-    );
-    if (cents !== null) parsed.reportedBalanceCents = cents;
+    const [, figure, code] = TBC_BALANCE.exec(balanceLine) as RegExpExecArray;
+    const cents = parseAmountCents(figure);
+    if (cents !== null) {
+      parsed.reportedBalanceCents = cents;
+      // The account's currency, which the payment's need not match — a foreign charge prints
+      // its own currency on line one while `Nashti` stays in the account's.
+      const balanceCurrency = asCurrency(code);
+      if (balanceCurrency !== null) parsed.reportedBalanceCurrency = balanceCurrency;
+    }
   }
 
   const cashbackLine = rows.find((line) => TBC_CASHBACK.test(line));

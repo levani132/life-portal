@@ -21,6 +21,8 @@ import {
   fxContext,
   isNewLineProposal,
   parseBankMessage,
+  ratePointFor,
+  rateTable,
   spendWaterfall,
   startOfFinancialMonth,
   suggestBudgets,
@@ -168,6 +170,7 @@ export class SpendingService {
       rawReceivedAt: receivedAt,
       status: parsed && parsed.amountCents != null ? 'recorded' : 'unparsed',
       reportedBalanceCents: parsed?.reportedBalanceCents,
+      reportedBalanceCurrency: parsed?.reportedBalanceCurrency,
       cashbackCents: parsed?.cashbackCents,
     });
 
@@ -461,7 +464,7 @@ export class SpendingService {
     const result = await this.run(userId, today);
     const ladder = result.ladderFor(today);
     const payments = await this.list(userId, addDays(today, -30), today);
-    const gaps = detectMissedMessages(await this.list(userId));
+    const gaps = await this.gapsFor(await this.list(userId));
     const unparsed = await this.list(userId, undefined, undefined, 'unparsed');
 
     const spent = ladder.tiers.reduce((sum, t) => sum + t.consumedCents, 0) + ladder.extraCents;
@@ -511,7 +514,7 @@ export class SpendingService {
       spentTodayCents: spentToday,
       extraThisMonthCents: ladder.extraCents,
       unparsedCount: unparsed.length,
-      gapCount: detectMissedMessages(await this.list(userId)).length,
+      gapCount: (await this.gapsFor(await this.list(userId))).length,
     };
   }
 
@@ -770,7 +773,25 @@ export class SpendingService {
    * Derived rather than stored, so a payment added by hand later closes its own gap.
    */
   async gaps(userId: string): Promise<CompletenessGap[]> {
-    return detectMissedMessages(await this.list(userId));
+    return this.gapsFor(await this.list(userId));
+  }
+
+  /**
+   * The completeness check, with the rates it needs to chain a foreign-currency payment.
+   *
+   * A dollar charge on a lari card prints a USD amount over a GEL `Nashti`, so the chain has to
+   * value it in the account's currency — at the rate of the payment's own day, from the same
+   * archive every other figure converts through. One archive read serves every day.
+   */
+  private async gapsFor(payments: SpendPaymentDto[]): Promise<CompletenessGap[]> {
+    const archive = await this.fx.archive();
+    const ratesByDay: Record<string, Record<string, number>> = {};
+    for (const payment of payments) {
+      if (ratesByDay[payment.day]) continue;
+      const point = ratePointFor(archive, payment.day);
+      ratesByDay[payment.day] = point && archive ? rateTable(archive.base, point.rates) : {};
+    }
+    return detectMissedMessages(payments, ratesByDay);
   }
 
   // ---------------------------------------------------------------- helpers

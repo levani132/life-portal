@@ -99,6 +99,12 @@ export interface SpendPayment extends Timestamped {
    * account of several across two banks, so it is never the owner's balance.
    */
   reportedBalanceCents?: Cents;
+  /**
+   * The currency that balance is printed in — the *account's*, which a foreign-currency payment
+   * does not share: a $10 charge on a lari card prints a USD amount over a GEL `Nashti`. Absent
+   * on rows ingested before it was captured; the completeness check assumes GEL then.
+   */
+  reportedBalanceCurrency?: Currency;
   /** Cashback, which accrues to a loyalty pot rather than the account. Recorded, then ignored. */
   cashbackCents?: Cents;
   /** Paid back, or refunded. Counts as neither spending nor consumption. */

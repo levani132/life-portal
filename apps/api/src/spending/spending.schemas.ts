@@ -109,6 +109,12 @@ export class SpendPayment {
    */
   @Prop(centsField) reportedBalanceCents?: number;
 
+  /**
+   * The currency that balance is printed in — the *account's*, which a foreign-currency payment
+   * does not share. Absent on rows ingested before it was captured; the check assumes GEL then.
+   */
+  @Prop({ enum: SUPPORTED_CURRENCIES }) reportedBalanceCurrency?: string;
+
   /** Cashback, which accrues to a loyalty pot rather than the account. Recorded, then ignored. */
   @Prop(centsField) cashbackCents?: number;
 
