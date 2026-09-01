@@ -13,7 +13,9 @@ own card rate; a real missed message still shows at its full size.
 
 ## 2026-09-01 — Pull down to refresh
 
-The page now refreshes the way the feed apps do: pull down from the top, the ring fills as you
+The page now refreshes the way the feed apps do: pull down at the top — or just keep dragging,
+or flick hard enough, when a scroll reaches it: the top bounces, and a bounce past the threshold
+refreshes without a second gesture. The ring fills as you
 pull, a small tick (on phones that have one) says when to let go, and releasing refetches
 everything on the page — no reload, no lost scroll position elsewhere. The header also casts a
 soft shadow once content scrolls under it, and no longer follows the page when the top is
