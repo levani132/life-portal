@@ -32,6 +32,16 @@ export function useDefaultCurrency(): Currency {
   return (data?.displayCurrency as Currency) ?? 'GEL';
 }
 
+/**
+ * Refetches every query in the cache — the pull-to-refresh gesture's one job.
+ *
+ * Broader than `revalidateLinked` on purpose: the gesture is the owner saying "show me what is
+ * true now" about the whole page, spending and settings included, not about a write's ripple.
+ */
+export function refreshAll(): Promise<unknown> {
+  return globalMutate(() => true);
+}
+
 /** Refetches every query whose key starts with `prefix`. */
 export function revalidate(prefix: string): Promise<unknown> {
   return globalMutate(

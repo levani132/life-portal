@@ -34,6 +34,13 @@
 
   html {
     color-scheme: dark;
+    /*
+     * No rubber band at the page edges. Overscrolling the top dragged the whole document —
+     * sticky header included — down with the finger, which read as the header "not sticking";
+     * `none` (on the root, where Safari consults it) also stops the momentum bounce that a
+     * touch handler can never cancel. The app's own pull-to-refresh supplies the pull feel.
+     */
+    overscroll-behavior-y: none;
   }
 
   body {
@@ -50,6 +57,12 @@
      * See docs/DECISIONS.md.
      */
     touch-action: pan-x pan-y;
+    /*
+     * The app has its own pull-to-refresh (`components/pull-to-refresh.tsx`); this keeps Chrome's
+     * built-in one from firing underneath it, and mirrors the root rule above for the browsers
+     * that read it off the body instead.
+     */
+    overscroll-behavior-y: none;
     font-family:
       ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   }

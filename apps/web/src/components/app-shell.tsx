@@ -7,6 +7,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { useApi } from '../lib/hooks';
 import { PortalLoader } from './portal-loader';
+import { PullToRefresh } from './pull-to-refresh';
 import type { Board } from '@life-portal/shared-types';
 
 const CORE_LINKS = [
@@ -30,6 +31,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  // The header is sticky; the shadow appearing once content passes under it is what makes that
+  // read as "pinned" rather than "hasn't moved yet".
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 4);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login');
@@ -61,7 +72,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-40 border-b border-border bg-surface/90 pt-[env(safe-area-inset-top)] backdrop-blur">
+      <header
+        className={clsx(
+          'sticky top-0 z-40 border-b border-border bg-surface/90 pt-[env(safe-area-inset-top)] backdrop-blur transition-shadow',
+          scrolled && 'shadow-lg shadow-black/30',
+        )}
+      >
         <div className="mx-auto max-w-7xl px-4 py-2.5 lg:flex lg:items-center lg:gap-x-6 lg:py-3">
           <div className="flex items-center justify-between gap-3">
             <Link
@@ -138,9 +154,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
-        {children}
-      </main>
+      <PullToRefresh>
+        <main className="mx-auto max-w-7xl px-4 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+          {children}
+        </main>
+      </PullToRefresh>
     </div>
   );
 }

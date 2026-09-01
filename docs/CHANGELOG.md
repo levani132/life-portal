@@ -2,6 +2,23 @@
 
 User-visible changes. Newest first.
 
+## 2026-09-01 — A dollar payment is no longer a "missed message"
+
+**Fixed:** paying in a foreign currency on the lari card put a permanent gap in the capture-health
+panel. The bank prints the charge in dollars but the balance in lari, and the completeness check
+deducted the raw dollar figure from the lari balance — so every such payment looked like money
+that left the account without a message. Foreign payments are now converted at the National Bank
+of Georgia rate for the day they were made, with a small allowance for the bank converting at its
+own card rate; a real missed message still shows at its full size.
+
+## 2026-09-01 — Pull down to refresh
+
+The page now refreshes the way the feed apps do: pull down from the top, the ring fills as you
+pull, a small tick (on phones that have one) says when to let go, and releasing refetches
+everything on the page — no reload, no lost scroll position elsewhere. The header also casts a
+soft shadow once content scrolls under it, and no longer follows the page when the top is
+overscrolled — the browser's rubber band is off, and the pull gesture is what lives there now.
+
 ## 2026-08-30 — The shortcut works however your phone formats dates
 
 **Fixed:** the very first real message from a correctly set-up shortcut was rejected, because iOS
