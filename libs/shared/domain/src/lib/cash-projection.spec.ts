@@ -1,5 +1,5 @@
 import type { Expense, IncomeSource, RealisedSale } from '@life-portal/shared-types';
-import { projectCash, snapshotAt } from './cash-projection';
+import { incomeOccurrences, nextIncomeDay, projectCash, snapshotAt } from './cash-projection';
 
 const salary: IncomeSource = {
   id: 'inc1',
@@ -488,5 +488,62 @@ describe('actuals never displace money SMS capture cannot see', () => {
       actualOutByDay: { '2026-08-24': 1_822 },
     });
     expect(projection.days.find((d) => d.date === '2026-08-24')?.outCents).toBe(1_822);
+  });
+});
+
+describe('arrival overrides — the salary paid early', () => {
+  // September's payday (scheduled the 7th) landed on the 4th, before a holiday.
+  const paidEarly: IncomeSource = {
+    ...salary,
+    arrivalOverrides: [{ scheduledDay: '2026-09-07', actualDay: '2026-09-04' }],
+  };
+
+  it('moves the occurrence, never duplicating it', () => {
+    const days = incomeOccurrences(paidEarly, '2026-08-01', '2026-10-31');
+    expect(days).toEqual(['2026-08-07', '2026-09-04', '2026-10-07']);
+  });
+
+  it('finds an occurrence moved into the window from just outside it', () => {
+    // The window ends the 5th; the schedule says the 7th, but the money arrived on the 4th.
+    expect(incomeOccurrences(paidEarly, '2026-09-01', '2026-09-05')).toEqual(['2026-09-04']);
+    // And the scheduled day itself no longer carries anything.
+    expect(incomeOccurrences(paidEarly, '2026-09-06', '2026-09-30')).toEqual([]);
+  });
+
+  it('projects the salary onto the day it really arrives', () => {
+    const projection = projectCash({ ...baseInput, incomes: [paidEarly] });
+    expect(projection.days.find((d) => d.date === '2026-09-04')?.inCents).toBe(400_000);
+    expect(projection.days.find((d) => d.date === '2026-09-07')?.inCents).toBe(0);
+  });
+
+  it('closes the free-money window on the real arrival, not the scheduled day', () => {
+    // Asking on 8 Aug: the next salary is now 4 Sep, so the 1 Sep rent stays committed but
+    // nothing between the 4th and the old 7th does.
+    const projection = projectCash({ ...baseInput, incomes: [paidEarly] });
+    const snapshot = snapshotAt(projection, '2026-08-08', '2026-08-03');
+    expect(snapshot.nextIncomeDate).toBe('2026-09-04');
+    expect(snapshot.committedBeforeNextIncomeCents).toBe(90_000);
+  });
+
+  it('does not report an early salary already received as the next one', () => {
+    // Today is the 5th: the 7th's occurrence landed on the 4th, so the next payday is October's.
+    expect(nextIncomeDay(paidEarly, '2026-09-05')).toBe('2026-10-07');
+    // On the 3rd it is still ahead, on its real day.
+    expect(nextIncomeDay(paidEarly, '2026-09-03')).toBe('2026-09-04');
+  });
+
+  it('keeps a payday moved later visible until it arrives', () => {
+    const paidLate: IncomeSource = {
+      ...salary,
+      arrivalOverrides: [{ scheduledDay: '2026-09-07', actualDay: '2026-09-09' }],
+    };
+    // The 8th is after the scheduled day but before the money: still the next payday.
+    expect(nextIncomeDay(paidLate, '2026-09-08')).toBe('2026-09-09');
+    expect(incomeOccurrences(paidLate, '2026-09-01', '2026-09-30')).toEqual(['2026-09-09']);
+  });
+
+  it('changes nothing when there are no overrides', () => {
+    expect(nextIncomeDay(salary, '2026-09-05')).toBe('2026-09-07');
+    expect(incomeOccurrences(salary, '2026-09-01', '2026-09-30')).toEqual(['2026-09-07']);
   });
 });

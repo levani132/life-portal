@@ -40,6 +40,21 @@ export class RecurrenceSub {
 export const RecurrenceSchema = SchemaFactory.createForClass(RecurrenceSub);
 
 /**
+ * One occurrence that landed on a different day than the schedule says — the salary paid early
+ * before a holiday. Moves the occurrence; never adds a second one (that would double-count it).
+ */
+@Schema({ _id: false })
+export class IncomeArrivalOverrideSub {
+  @Prop(requiredDayField)
+  scheduledDay!: string;
+
+  @Prop(requiredDayField)
+  actualDay!: string;
+}
+
+export const IncomeArrivalOverrideSchema = SchemaFactory.createForClass(IncomeArrivalOverrideSub);
+
+/**
  * A point-in-time reconciliation of actual cash on hand. Rows are kept rather than
  * overwritten so the history of "what I thought I had" survives, and the latest `asOf` is
  * the one projections start from.
@@ -81,6 +96,10 @@ export class IncomeSource {
 
   @Prop({ type: RecurrenceSchema, required: true })
   recurrence!: RecurrenceSub;
+
+  /** Occurrences that moved off their scheduled day. `default: undefined` keeps rows clean. */
+  @Prop({ type: [IncomeArrivalOverrideSchema], default: undefined })
+  arrivalOverrides?: IncomeArrivalOverrideSub[];
 
   @Prop({ default: true })
   active!: boolean;

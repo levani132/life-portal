@@ -38,6 +38,20 @@ export interface Recurrence {
   endDate?: IsoDate;
 }
 
+/**
+ * One occurrence of an income that landed (or will land) on a different day than scheduled.
+ *
+ * The salary is often paid early — before a weekend or a holiday. An override *moves* that one
+ * occurrence rather than adding a second income event, so the money is never counted twice and
+ * the free-money window closes on the day the salary really arrives.
+ */
+export interface IncomeArrivalOverride {
+  /** The day the schedule says this occurrence falls on. Identifies which occurrence moved. */
+  scheduledDay: IsoDate;
+  /** The day the money actually arrived, or is known to be arriving. */
+  actualDay: IsoDate;
+}
+
 export interface IncomeSource extends Timestamped {
   id: Id;
   userId: Id;
@@ -46,6 +60,8 @@ export interface IncomeSource extends Timestamped {
   amountCents: Cents;
   currency: Currency;
   recurrence: Recurrence;
+  /** Occurrences that moved off their scheduled day. Rare; usually empty. */
+  arrivalOverrides?: IncomeArrivalOverride[];
   active: boolean;
   note?: string;
 }

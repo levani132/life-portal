@@ -11,8 +11,24 @@ and how much is genuinely mine to spend?*
 | Collection | Purpose |
 | --- | --- |
 | `cash_balances` | Manual reconciliations. One row per `asOf` day; re-saving the same day corrects it. |
-| `income_sources` | Recurring inflows. The salary: monthly, day 7. |
+| `income_sources` | Recurring inflows. The salary: monthly, day 7. Plus `arrivalOverrides`, below. |
 | `expenses` | Recurring and one-off outflows. |
+
+### Arrival overrides — the salary paid early
+
+The salary often lands before a weekend or holiday. `income_sources.arrivalOverrides` is a list of
+`{ scheduledDay, actualDay }` pairs, each **moving** one scheduled occurrence to the day the money
+really arrived (or is known to be arriving). Moving rather than adding is the invariant: captured
+bank credits never feed the projection (see below), so the budgeted occurrence is the only copy of
+that payday, and duplicating it would double the month's income.
+
+`incomeOccurrences()` in the domain lib expands the schedule and applies the overrides — the
+expansion window is padded by the largest shift so an occurrence moved into the window from just
+outside it is still found. `nextIncomeDay()` answers "when does money next arrive" the same way,
+which is what stops a salary already received early from being reported as the *next* one. Both
+the projection and `summary()` go through these, so the free-money window closes on the real
+arrival date automatically. The UI is *landed on another day?* on each income row; saving PATCHes
+the whole `arrivalOverrides` array, and `[]` clears every override.
 
 Realised sales are **not** a collection — see below.
 

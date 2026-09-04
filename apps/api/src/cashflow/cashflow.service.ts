@@ -16,7 +16,7 @@ import {
   defaultHorizon,
   fxContext,
   monthlyEquivalentCents,
-  nextOccurrence,
+  nextIncomeDay,
   projectCash,
   realisedSales,
   runwayDays,
@@ -334,7 +334,8 @@ export class CashflowService {
 
     const activeIncome = incomes.filter((i) => i.active);
     const nextDates = activeIncome
-      .map((income) => ({ income, date: nextOccurrence(income.recurrence, addDays(today, 1)) }))
+      // Arrival overrides applied: a salary already received early is not the *next* one.
+      .map((income) => ({ income, date: nextIncomeDay(income, addDays(today, 1)) }))
       .filter((entry): entry is { income: IncomeSourceDto; date: string } => Boolean(entry.date))
       .sort((a, b) => (a.date < b.date ? -1 : 1));
     const next = nextDates[0];

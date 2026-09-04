@@ -1,5 +1,7 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -66,6 +68,15 @@ export class SetBalanceDto {
   note?: string;
 }
 
+/** One occurrence that landed on a different day than scheduled. Replaces it, never adds. */
+export class IncomeArrivalOverrideDto {
+  @Matches(DAY, DAY_MESSAGE)
+  scheduledDay!: string;
+
+  @Matches(DAY, DAY_MESSAGE)
+  actualDay!: string;
+}
+
 export class UpsertIncomeDto {
   @IsString()
   @MaxLength(120)
@@ -82,6 +93,14 @@ export class UpsertIncomeDto {
   @ValidateNested()
   @Type(() => RecurrenceDto)
   recurrence!: RecurrenceDto;
+
+  /** The whole list each time: sending `[]` clears every override. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(36)
+  @ValidateNested({ each: true })
+  @Type(() => IncomeArrivalOverrideDto)
+  arrivalOverrides?: IncomeArrivalOverrideDto[];
 
   @IsOptional()
   @IsBoolean()

@@ -38,6 +38,7 @@ import {
   addDays,
   addMonths,
   describeRecurrence,
+  diffDays,
   formatCents,
   formatCentsCompact,
   formatDay,
@@ -45,6 +46,7 @@ import {
   isNewLineProposal,
   localDay,
   monthlyEquivalentCents,
+  occurrencesBetween,
   relativeDays,
   salesOnDay,
   snapshotAt,
@@ -347,7 +349,12 @@ function Cashflow() {
             ) : (
               <ul className="space-y-2">
                 {data.incomes.map((income) => (
-                  <IncomeRow key={income.id} income={income} currency={summary.currency} />
+                  <IncomeRow
+                    key={income.id}
+                    income={income}
+                    currency={summary.currency}
+                    today={data.today}
+                  />
                 ))}
               </ul>
             )}
@@ -2097,13 +2104,40 @@ function ExpenseList({
   );
 }
 
-function IncomeRow({ income, currency }: { income: IncomeSource; currency: string }) {
+function IncomeRow({
+  income,
+  currency,
+  today,
+}: {
+  income: IncomeSource;
+  currency: string;
+  today: string;
+}) {
   const { run, pending } = useAction();
+  const [moving, setMoving] = useState(false);
+  // The move worth surfacing on the row itself: an arrival still ahead, or moved off a scheduled
+  // day still ahead. Past ones are history and live only in the modal.
+  const liveOverride = [...(income.arrivalOverrides ?? [])]
+    .filter((o) => o.actualDay >= today || o.scheduledDay >= today)
+    .sort((a, b) => (a.scheduledDay < b.scheduledDay ? -1 : 1))[0];
   return (
     <li className="flex items-start justify-between gap-3 rounded-lg border border-border px-3 py-2">
       <div className="min-w-0">
         <p className="truncate text-sm">{income.label}</p>
         <p className="text-xs text-ink-faint">{describeRecurrence(income.recurrence)}</p>
+        {liveOverride && (
+          <p className="text-[11px] text-sky-400">
+            {formatDay(liveOverride.scheduledDay)} payday moved to{' '}
+            {formatDay(liveOverride.actualDay)}
+          </p>
+        )}
+        <button
+          type="button"
+          className="mt-0.5 text-[11px] text-ink-faint underline hover:text-ink"
+          onClick={() => setMoving(true)}
+        >
+          landed on another day?
+        </button>
       </div>
       <div className="shrink-0 text-right">
         {/* The income's own currency — the salary is genuinely paid in dollars. */}
@@ -2120,7 +2154,122 @@ function IncomeRow({ income, currency }: { income: IncomeSource; currency: strin
           remove
         </button>
       </div>
+      {moving && <ArrivalModal income={income} today={today} onClose={() => setMoving(false)} />}
     </li>
+  );
+}
+
+/**
+ * "The salary landed early" — moves one scheduled occurrence to the day the money really
+ * arrived. A move, never an extra income event: the budgeted occurrence and the captured bank
+ * message must stay one payday, or it would be counted twice.
+ */
+function ArrivalModal({
+  income,
+  today,
+  onClose,
+}: {
+  income: IncomeSource;
+  today: string;
+  onClose: () => void;
+}) {
+  // The occurrences a move plausibly concerns: last month's (paid late) through two months out.
+  const candidates = occurrencesBetween(income.recurrence, addMonths(today, -1), addMonths(today, 2));
+  const closest = candidates.reduce(
+    (best, day) =>
+      best == null || Math.abs(diffDays(today, day)) < Math.abs(diffDays(today, best)) ? day : best,
+    undefined as string | undefined,
+  );
+  const [scheduledDay, setScheduledDay] = useState(closest ?? '');
+  const [actualDay, setActualDay] = useState(today);
+  const { run, pending, error } = useAction();
+  const overrides = income.arrivalOverrides ?? [];
+
+  const save = (next: { scheduledDay: string; actualDay: string }[]) =>
+    run(() => api.patch(`/cashflow/incomes/${income.id}`, { arrivalOverrides: next }));
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Salary landed on another day"
+      submitLabel="Move it"
+      pending={pending}
+      error={error}
+      onSubmit={async () => {
+        if (!scheduledDay || !actualDay) return;
+        const ok = await save([
+          ...overrides
+            .filter((o) => o.scheduledDay !== scheduledDay)
+            .map((o) => ({ scheduledDay: o.scheduledDay, actualDay: o.actualDay })),
+          { scheduledDay, actualDay },
+        ]);
+        if (ok) onClose();
+      }}
+    >
+      <p className="text-xs text-ink-muted">
+        This moves that one payday — the balance, the free-money window and “next salary” all
+        recalculate around the real date. It never adds a second payment.
+      </p>
+      {candidates.length === 0 ? (
+        <p className="text-xs text-amber-400">
+          This income has no occurrences around today to move.
+        </p>
+      ) : (
+        <Field label="Which payday">
+          <Select value={scheduledDay} onChange={(e) => setScheduledDay(e.target.value)}>
+            {candidates.map((day) => (
+              <option key={day} value={day}>
+                {formatDay(day)}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
+      <Field label="It actually landed on" hint="Or will land — a known early payment counts too.">
+        <Input
+          type="date"
+          required
+          value={actualDay}
+          onChange={(e) => setActualDay(e.target.value)}
+        />
+      </Field>
+
+      {overrides.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-ink-muted">Already moved</p>
+          <ul className="mt-1 divide-y divide-border rounded-lg border border-border">
+            {overrides.map((o) => (
+              <li
+                key={o.scheduledDay}
+                className="flex items-center justify-between gap-3 px-3 py-1.5"
+              >
+                <span className="text-xs text-ink-muted">
+                  {formatDay(o.scheduledDay)} → {formatDay(o.actualDay)}
+                </span>
+                <button
+                  type="button"
+                  className="text-[11px] text-ink-faint hover:text-rose-400"
+                  disabled={pending}
+                  onClick={() =>
+                    void save(
+                      overrides
+                        .filter((other) => other.scheduledDay !== o.scheduledDay)
+                        .map((other) => ({
+                          scheduledDay: other.scheduledDay,
+                          actualDay: other.actualDay,
+                        })),
+                    )
+                  }
+                >
+                  undo
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Modal>
   );
 }
 

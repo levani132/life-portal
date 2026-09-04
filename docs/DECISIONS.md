@@ -838,3 +838,25 @@ Three decisions, each following an existing rule rather than adding a new one:
    segment unverifiable, and an unverifiable segment reports nothing — the same "silence is not
    evidence" stance the check already takes for BOG. Its closing reading still anchors the next
    segment, so one unratable day never blinds the whole chain.
+
+## An early salary moves the payday — it never adds one, and it is never inferred
+
+**2026-09-04.** The salary regularly lands days before its scheduled date, and the projection kept
+paying it on the calendar day: "on hand now" lagged the real account for half a week and the
+free-money window closed on the wrong date. Three options were considered.
+
+1. **Infer it from the captured bank credit.** Rejected: captured credits deliberately never feed
+   the projection (counting them beside the budgeted income source doubles every payday), and
+   guessing which credit *is* the salary would import that double-count risk through the back
+   door.
+2. **Add a one-off income for the real day.** Rejected: the scheduled occurrence still exists, so
+   the same salary lands twice unless the owner also remembers to end-date the schedule around it.
+3. **Move the occurrence** — chosen. `income_sources.arrivalOverrides` holds
+   `{ scheduledDay, actualDay }` pairs; the scheduled day identifies which occurrence moved, so
+   the schedule itself is untouched and next month is back to normal with no cleanup. Because it
+   is a move, the money can never be counted twice, "next salary" skips an occurrence already
+   received (`nextIncomeDay()`), and marking a payment *late* works with the same mechanism.
+
+The occurrence expansion pads its window by the largest shift among the overrides, so a payday
+moved into the window from just outside it is found and one moved out of it is dropped —
+`incomeOccurrences()` has the tests.

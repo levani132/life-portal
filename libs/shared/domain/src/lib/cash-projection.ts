@@ -6,11 +6,12 @@ import type {
   CashSnapshot,
   Currency,
   Expense,
+  IncomeArrivalOverride,
   IncomeSource,
   RealisedSale,
 } from '@life-portal/shared-types';
-import { addDays, eachDay, isAfter, maxDay, minDay, toDay, type DayString } from './dates';
-import { monthlyEquivalentCents, occurrencesBetween } from './recurrence';
+import { addDays, diffDays, eachDay, isAfter, maxDay, minDay, toDay, type DayString } from './dates';
+import { monthlyEquivalentCents, nextOccurrence, occurrencesBetween } from './recurrence';
 import { sumCents } from './money';
 import { canConvert, toDisplayCents } from './fx';
 
@@ -105,6 +106,74 @@ function unconvertedCurrencies(
   return [...found].sort();
 }
 
+/** How far, at most, any override moves an occurrence — the padding the expansion window needs. */
+function maxOverrideShiftDays(overrides: IncomeArrivalOverride[]): number {
+  let max = 0;
+  for (const override of overrides) {
+    max = Math.max(max, Math.abs(diffDays(toDay(override.scheduledDay), toDay(override.actualDay))));
+  }
+  return max;
+}
+
+/**
+ * Every day this income actually lands inside `[from, to]`, arrival overrides applied.
+ *
+ * An override *moves* its occurrence — the schedule is expanded first, then each scheduled day
+ * with an override is replaced by the day the money really arrived. The expansion window is
+ * padded by the largest shift so an occurrence moved into the window from just outside it is
+ * found, and one moved out of the window is dropped.
+ */
+export function incomeOccurrences(
+  income: Pick<IncomeSource, 'recurrence' | 'arrivalOverrides'>,
+  from: string,
+  to: string,
+): DayString[] {
+  const overrides = income.arrivalOverrides ?? [];
+  if (overrides.length === 0) return occurrencesBetween(income.recurrence, from, to);
+
+  const moved = new Map(overrides.map((o) => [toDay(o.scheduledDay), toDay(o.actualDay)]));
+  const pad = maxOverrideShiftDays(overrides);
+  const lo = toDay(from);
+  const hi = toDay(to);
+  return occurrencesBetween(income.recurrence, addDays(lo, -pad), addDays(hi, pad))
+    .map((day) => moved.get(day) ?? day)
+    .filter((day) => day >= lo && day <= hi)
+    .sort();
+}
+
+/** Backstop for `nextIncomeDay`'s scan; overrides shift by days, never by fifty occurrences. */
+const MAX_NEXT_SCAN = 60;
+
+/**
+ * The next day this income actually arrives on or after `from`, arrival overrides applied.
+ *
+ * A salary scheduled for the 7th but already received on the 4th must not be reported as "next
+ * salary on the 7th" — that occurrence has happened, so the answer is next month's. Scheduled
+ * occurrences are scanned from `pad` days back (a moved-earlier one can still be ahead of
+ * `from`) and the earliest actual day on or after `from` wins.
+ */
+export function nextIncomeDay(
+  income: Pick<IncomeSource, 'recurrence' | 'arrivalOverrides'>,
+  from: string,
+): DayString | undefined {
+  const overrides = income.arrivalOverrides ?? [];
+  const lo = toDay(from);
+  if (overrides.length === 0) return nextOccurrence(income.recurrence, lo);
+
+  const moved = new Map(overrides.map((o) => [toDay(o.scheduledDay), toDay(o.actualDay)]));
+  const pad = maxOverrideShiftDays(overrides);
+  let cursor = nextOccurrence(income.recurrence, addDays(lo, -pad));
+  let best: DayString | undefined;
+  for (let i = 0; cursor && i < MAX_NEXT_SCAN; i += 1) {
+    // Once the scheduled day is beyond best + pad, no later occurrence can map earlier than best.
+    if (best && cursor > addDays(best, pad)) break;
+    const actual = moved.get(cursor) ?? cursor;
+    if (actual >= lo && (!best || actual < best)) best = actual;
+    cursor = nextOccurrence(income.recurrence, addDays(cursor, 1));
+  }
+  return best;
+}
+
 function expenseOccurrences(expense: Expense, from: string, to: string): DayString[] {
   if (!expense.active) return [];
   if (expense.kind === 'one_off') {
@@ -126,7 +195,7 @@ export function buildCashEvents(
 
   for (const income of input.incomes) {
     if (!income.active) continue;
-    for (const date of occurrencesBetween(income.recurrence, from, to)) {
+    for (const date of incomeOccurrences(income, from, to)) {
       events.push({
         date,
         label: income.label,
