@@ -96,6 +96,18 @@ export class StocksService {
     lot.soldQuantity = alreadySold + quantity;
     lot.soldPricePerShareCents = dto.pricePerShareCents;
     lot.soldAt = dto.soldAt ?? today;
+    // The destination is part of the sale decision: a loan id earmarks that share of the
+    // proceeds (the cashflow inflow shrinks by it — see `realisedSales()`), '' routes everything
+    // to the balance, and an omitted field keeps whatever the lot already said.
+    if (dto.allocateToLoanId !== undefined) {
+      if (dto.allocateToLoanId === '') {
+        lot.allocateToLoanId = undefined;
+        lot.allocationRatio = 1;
+      } else {
+        lot.allocateToLoanId = dto.allocateToLoanId;
+        lot.allocationRatio = dto.allocationRatio ?? 1;
+      }
+    }
     await lot.save();
     return lot.toJSON() as unknown as StockLotDto;
   }

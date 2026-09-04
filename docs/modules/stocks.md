@@ -80,6 +80,24 @@ overstate the cash.
 `earmarkedByLoan()` splits proceeds per lot by `allocateToLoanId` × `allocationRatio`. Lots with
 no allocation contribute to no loan.
 
+### Selling, and where the money goes
+
+Each open lot has a **sell** action (partial or whole). The sale decides the destination in the
+same request: `POST /lots/:id/sell` also accepts `allocateToLoanId` — a loan id earmarks the
+proceeds (`allocationRatio` says how much of them; the UI takes an amount and converts), `''`
+routes everything to the balance and clears any earmark set at purchase, and omitting the field
+keeps whatever the lot already said.
+
+The earmarked share is *excluded* from the realised-sale cash inflow (`realisedSales()` —
+principle IV: that money is the loans widget's) and, once the lot is sold, it leaves
+`earmarkedByLoan()` too because only open quantity counts there. The earmark is a signal that
+the cash is spoken for; the actual repayment is still recorded on the Debts screen when the
+money is sent, which is what reduces the balance owed.
+
+A lot sold twice keeps one `soldPricePerShareCents` and one destination (the open question below),
+so selling in several tranches at different prices or to different destinations needs the lot
+split by hand first.
+
 ## Endpoints
 
 ```
@@ -91,7 +109,7 @@ POST /api/stocks/history/:symbol          { points: [{ date, closeCents }] }
 GET  /api/stocks/lots
 POST /api/stocks/lots
 PATCH /api/stocks/lots/:id
-POST /api/stocks/lots/:id/sell            partial sales supported via { quantity }
+POST /api/stocks/lots/:id/sell            partial sales via { quantity }; destination too — see below
 DELETE /api/stocks/lots/:id
 GET  /api/stocks/targets
 PUT  /api/stocks/targets                  upsert by symbol

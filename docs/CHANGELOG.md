@@ -2,6 +2,44 @@
 
 User-visible changes. Newest first.
 
+## 2026-09-04 — Sell shares, and say where the money goes
+
+Each purchase on the Stocks page now has a *sell* action: how many shares (part of a lot is
+fine), at what price, on what day — and, in the same dialog, where the money goes. All to your
+balance, all earmarked for a loan, or split: pick the loan and say how much of the proceeds it
+gets, and the rest lands as spendable cash on the sale day. The earmarked share is set aside for
+the debt rather than counted as free money; record the actual repayment on the Debts screen when
+you send it, as before.
+
+## 2026-09-04 — Tell the app the salary landed early
+
+Salaries rarely land on the scheduled day — a weekend or a holiday moves them forward. Each income
+row now has *landed on another day?*: pick the payday that moved and the day the money actually
+arrived, and everything recalculates around the real date — the projected balance rises on that
+day, "next salary" skips an occurrence already received, and the free-money window closes on the
+real arrival instead of the calendar one. It moves the payday, never duplicates it, and an *undo*
+in the same dialog puts it back.
+
+## 2026-09-04 — A hand-entered payment can now name its card
+
+A transfer entered by hand used to make the missing-message check cry wolf: the card's next
+balance reading moved by money the chain knew nothing about. The *card last four* field now shows
+when editing any payment, not only when adding one — put the card on the transfer and the gap
+closes; clear the field and the payment leaves the chain again. (Adding the card at entry time
+always worked; now it can be fixed after the fact.)
+
+## 2026-09-04 — One tap to make a split add up
+
+When confirming a payment across several allowances, editing one amount left you doing arithmetic
+for the others. Each row now offers *put the remaining X here* (or *take the extra X off this
+row*, when the split overshoots) so the second field levels itself.
+
+## 2026-09-04 — The edit form no longer hides behind the payment list
+
+**Fixed:** pressing *edit* inside "Every payment" opened the edit form underneath the list it was
+opened from. It now opens on top, and Escape closes only the top-most dialog instead of the whole
+stack.
+
 ## 2026-09-01 — A dollar payment is no longer a "missed message"
 
 **Fixed:** paying in a foreign currency on the lari card put a permanent gap in the capture-health

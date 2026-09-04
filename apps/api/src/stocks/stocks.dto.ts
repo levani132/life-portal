@@ -96,6 +96,22 @@ export class SellLotDto {
   @IsOptional()
   @Matches(DAY)
   soldAt?: string;
+
+  /**
+   * Where the money goes, decided at the moment of sale: a loan id earmarks the proceeds
+   * (`allocationRatio` says how much of them), an empty string sends everything to the balance,
+   * and omitting the field leaves whatever the lot already said untouched.
+   */
+  @IsOptional()
+  @Matches(/^([a-f\d]{24})?$/i, { message: 'Must be a loan id, or empty for the balance' })
+  allocateToLoanId?: string;
+
+  /** Share of the proceeds earmarked to the loan. 1 = all of it; 0.4 = 40%, rest to balance. */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  allocationRatio?: number;
 }
 
 export class UpsertTargetDto {

@@ -6,6 +6,7 @@ import type {
   EsppPlan,
   EsppProjection,
   Loan,
+  StockLot,
   StockPosition,
   StockTarget,
   StocksSummary,
@@ -149,6 +150,7 @@ function Stocks() {
               key={position.symbol}
               position={position}
               loans={loans}
+              today={data.today}
               onSetPrice={() => setQuoting(position.symbol)}
             />
           ))
@@ -197,14 +199,17 @@ function Tile({
 function PositionPanel({
   position,
   loans,
+  today,
   onSetPrice,
 }: {
   position: StockPosition;
   loans: Loan[];
+  today: string;
   onSetPrice: () => void;
 }) {
   const [showTarget, setShowTarget] = useState(false);
   const [showMaths, setShowMaths] = useState(false);
+  const [selling, setSelling] = useState<StockLot | null>(null);
   const { run, pending } = useAction();
   const currency = position.currency;
 
@@ -337,6 +342,15 @@ function PositionPanel({
                 </div>
                 <div className="flex items-center gap-3">
                   <Money cents={Math.round(remaining * lot.pricePerShareCents)} currency={currency} />
+                  {remaining > 0 && (
+                    <button
+                      type="button"
+                      className="text-[11px] text-sky-400 hover:text-sky-300"
+                      onClick={() => setSelling(lot)}
+                    >
+                      sell
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="text-[11px] text-ink-faint hover:text-rose-400"
@@ -361,7 +375,177 @@ function PositionPanel({
           onClose={() => setShowTarget(false)}
         />
       )}
+      {selling && (
+        <SellLotModal
+          lot={selling}
+          currency={currency}
+          currentPriceCents={position.currentPricePerShareCents}
+          loans={loans}
+          today={today}
+          onClose={() => setSelling(null)}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * Records a sale — part of a lot or all of it — and decides where the money goes in the same
+ * breath: all to the balance, all earmarked to a loan, or split. The earmarked share is excluded
+ * from the cash-flow inflow (the loans widget's money, counted there); the rest lands as
+ * spendable cash on the sale day.
+ */
+function SellLotModal({
+  lot,
+  currency,
+  currentPriceCents,
+  loans,
+  today,
+  onClose,
+}: {
+  lot: StockLot;
+  currency: string;
+  currentPriceCents?: number;
+  loans: Loan[];
+  today: string;
+  onClose: () => void;
+}) {
+  const remaining = lot.quantity - (lot.soldQuantity ?? 0);
+  const [form, setForm] = useState({
+    quantity: String(remaining),
+    priceCents: currentPriceCents as number | undefined,
+    soldAt: today,
+    /** '' means the balance; otherwise a loan id. */
+    destination: lot.allocateToLoanId ?? '',
+    /** Blank means "all of it" when a loan is picked. */
+    toLoanCents: undefined as number | undefined,
+  });
+  const { run, pending, error } = useAction();
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const quantity = Number(form.quantity);
+  const grossCents =
+    Number.isFinite(quantity) && quantity > 0 && form.priceCents != null
+      ? Math.round(quantity * form.priceCents)
+      : undefined;
+  const loanShareCents =
+    grossCents != null ? Math.min(grossCents, form.toLoanCents ?? grossCents) : undefined;
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`Sell ${lot.symbol}`}
+      submitLabel="Record the sale"
+      pending={pending}
+      error={error ?? notice}
+      onSubmit={async () => {
+        setNotice(null);
+        if (!Number.isFinite(quantity) || quantity <= 0 || quantity > remaining) {
+          setNotice(`Between more than nothing and ${remaining} shares.`);
+          return;
+        }
+        if (form.priceCents == null || form.priceCents <= 0) {
+          setNotice('The sale price has to be more than nothing.');
+          return;
+        }
+        const ratio =
+          form.destination && grossCents
+            ? Math.min(1, Math.max(0, (loanShareCents ?? grossCents) / grossCents))
+            : undefined;
+        const ok = await run(() =>
+          api.post(`/stocks/lots/${lot.id}/sell`, {
+            quantity,
+            pricePerShareCents: form.priceCents,
+            soldAt: form.soldAt,
+            // '' explicitly routes everything to the balance, clearing an old earmark.
+            allocateToLoanId: form.destination,
+            allocationRatio: ratio,
+          }),
+        );
+        if (ok) onClose();
+      }}
+    >
+      <p className="text-xs text-ink-muted">
+        This lot has {remaining} share{remaining === 1 ? '' : 's'} left, bought at{' '}
+        {formatCents(lot.pricePerShareCents, currency)}. The sale shows up as cash on the day it
+        happened.
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="How many shares" hint="Fractions are fine.">
+          <Input
+            type="number"
+            step="0.0001"
+            min="0"
+            max={String(remaining)}
+            required
+            value={form.quantity}
+            onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+          />
+        </Field>
+        <Field label="Sold on">
+          <Input
+            type="date"
+            required
+            value={form.soldAt}
+            onChange={(e) => setForm({ ...form, soldAt: e.target.value })}
+          />
+        </Field>
+      </div>
+      <Field label="Price per share" hint="What the broker actually filled at.">
+        <MoneyInput
+          required
+          valueCents={form.priceCents}
+          onChangeCents={(cents) => setForm({ ...form, priceCents: cents })}
+          currency={currency}
+        />
+      </Field>
+      <Field label="Where the money goes">
+        <Select
+          value={form.destination}
+          onChange={(e) => setForm({ ...form, destination: e.target.value, toLoanCents: undefined })}
+        >
+          <option value="">My balance</option>
+          {loans.map((loan) => (
+            <option key={loan.id} value={loan.id}>
+              Towards {loan.lender}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      {form.destination && (
+        <Field
+          label="How much of it goes to the loan"
+          hint="Leave blank for all of it. Anything less lands on your balance."
+        >
+          <MoneyInput
+            valueCents={form.toLoanCents}
+            onChangeCents={(cents) => setForm({ ...form, toLoanCents: cents })}
+            currency={currency}
+          />
+        </Field>
+      )}
+      {grossCents != null && (
+        <p className="tabular text-xs text-ink-faint">
+          Sells for {formatCents(grossCents, currency)}
+          {form.destination && loanShareCents != null ? (
+            <>
+              {' '}
+              — {formatCents(loanShareCents, currency)} earmarked for the loan,{' '}
+              {formatCents(grossCents - loanShareCents, currency)} to your balance.
+            </>
+          ) : (
+            <> — all of it to your balance.</>
+          )}
+        </p>
+      )}
+      {form.destination && (
+        <p className="text-xs text-ink-faint">
+          Earmarking sets the money aside for the debt — record the actual repayment on the Debts
+          screen when you send it.
+        </p>
+      )}
+    </Modal>
   );
 }
 
