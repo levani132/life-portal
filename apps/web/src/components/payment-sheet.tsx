@@ -569,6 +569,24 @@ function ConfirmForm({
             </Field>
           </div>
 
+          {/* One tap to make the rows sum to the payment again after editing another row:
+              this row absorbs whatever is unaccounted for, or gives back the excess. */}
+          {leftoverCents !== 0 && (
+            <button
+              type="button"
+              className="mt-2 block text-[11px] text-sky-400 underline hover:text-sky-300"
+              onClick={() =>
+                update(row.key, {
+                  amountCents: Math.max(0, (row.amountCents ?? 0) + leftoverCents),
+                })
+              }
+            >
+              {leftoverCents > 0
+                ? `Put the remaining ${formatCents(leftoverCents, payment.currency)} here`
+                : `Take the extra ${formatCents(-leftoverCents, payment.currency)} off this row`}
+            </button>
+          )}
+
           {row.span ? (
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <Field label="This was for" hint="Bought tonight, eaten tomorrow.">

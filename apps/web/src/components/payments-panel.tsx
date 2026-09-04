@@ -148,9 +148,6 @@ export function PaymentsPanel({
       )}
 
       {adding && <PaymentModal onClose={() => setAdding(false)} onChanged={onChanged} />}
-      {editing && (
-        <PaymentModal existing={editing} onClose={() => setEditing(null)} onChanged={onChanged} />
-      )}
       {seeingAll && (
         <AllPaymentsModal
           overviewPayments={payments}
@@ -160,6 +157,11 @@ export function PaymentsPanel({
           onEdit={(payment) => setEditing(payment)}
           onChanged={onChanged}
         />
+      )}
+      {/* After the full list in the tree: both are fixed at the same z-index, so the later
+          sibling paints on top — the edit form opened from that list must cover it. */}
+      {editing && (
+        <PaymentModal existing={editing} onClose={() => setEditing(null)} onChanged={onChanged} />
       )}
     </Panel>
   );
@@ -596,7 +598,7 @@ export function PaymentModal({
     amountCents: existing && !completing ? existing.amountCents : undefined,
     currency: existing?.currency as Currency | undefined,
     merchant: existing?.merchant ?? '',
-    cardLast4: '',
+    cardLast4: existing?.cardLast4 ?? '',
     direction: existing?.direction ?? 'out',
     at: localInputValue(existing ? new Date(existing.at) : new Date()),
     notReallySpentCents: existing?.notReallySpentCents,
@@ -625,7 +627,11 @@ export function PaymentModal({
         };
         const ok = await run(async () => {
           await (existing
-            ? api.patch(`/spending/payments/${existing.id}`, body)
+            ? // On PATCH an empty card field is sent as '' — "no card" — so clearing it works.
+              api.patch(`/spending/payments/${existing.id}`, {
+                ...body,
+                cardLast4: form.cardLast4,
+              })
             : api.post('/spending/payments', {
                 ...body,
                 cardLast4: form.cardLast4 || undefined,
@@ -680,19 +686,22 @@ export function PaymentModal({
         </Field>
       </div>
 
-      {!existing && (
-        <Field label="Card last four" hint="Lets the missing-message check follow this card.">
-          <Input
-            inputMode="numeric"
-            maxLength={4}
-            placeholder="4821"
-            value={form.cardLast4}
-            onChange={(event) =>
-              setForm({ ...form, cardLast4: event.target.value.replace(/\D/g, '') })
-            }
-          />
-        </Field>
-      )}
+      {/* Shown for existing rows too: a manual entry that named no card is invisible to the
+          missing-message check, and this is where the owner fixes that after the fact. */}
+      <Field
+        label="Card last four"
+        hint="Lets the missing-message check follow this card, and counts the payment against its balance."
+      >
+        <Input
+          inputMode="numeric"
+          maxLength={4}
+          placeholder="4821"
+          value={form.cardLast4}
+          onChange={(event) =>
+            setForm({ ...form, cardLast4: event.target.value.replace(/\D/g, '') })
+          }
+        />
+      </Field>
 
       <Field label="Paid back" hint="A share someone returned, or a refund. Leave blank if none.">
         <MoneyInput

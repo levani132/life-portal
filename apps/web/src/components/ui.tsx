@@ -238,6 +238,12 @@ export function ProgressBar({ ratio, tone = 'good' }: { ratio: number; tone?: Wi
   );
 }
 
+/**
+ * The open modals, bottom to top. Modals do stack — edit-a-payment opens over the full payment
+ * list — and Escape must close only the top one, not every open modal at once.
+ */
+const modalStack: (() => void)[] = [];
+
 export function Modal({
   open,
   onClose,
@@ -261,11 +267,17 @@ export function Modal({
 }) {
   useEffect(() => {
     if (!open) return;
+    const close = onClose;
+    modalStack.push(close);
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape' && modalStack[modalStack.length - 1] === close) close();
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      const index = modalStack.lastIndexOf(close);
+      if (index >= 0) modalStack.splice(index, 1);
+      window.removeEventListener('keydown', onKey);
+    };
   }, [open, onClose]);
 
   if (!open) return null;

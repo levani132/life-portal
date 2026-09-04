@@ -64,6 +64,15 @@ export class UpdatePaymentDto {
 
   @IsOptional() @IsString() @MaxLength(200) merchant?: string;
 
+  /**
+   * Editable after the fact, because the completeness chain follows a card by these digits: a
+   * manual entry that named no card is invisible to the check until the owner adds them. An
+   * empty string clears the field.
+   */
+  @IsOptional()
+  @Matches(/^(\d{4})?$/, { message: 'Card last four must be four digits' })
+  cardLast4?: string;
+
   @IsOptional() @IsISO8601() at?: string;
 
   @IsOptional() @Matches(DAY, { message: DAY_MESSAGE }) day?: string;

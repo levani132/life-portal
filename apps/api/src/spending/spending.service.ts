@@ -262,9 +262,17 @@ export class SpendingService {
     if (dto.day) patch['day'] = toDay(dto.day);
     if (dto.amountCents != null && existing.status === 'unparsed') patch['status'] = 'recorded';
 
+    // An empty string means "no card", which is an $unset, not a value — the schema's four-digit
+    // match would reject '' and a null would still occupy the field the completeness check reads.
+    const update: Record<string, unknown> = { $set: patch };
+    if (dto.cardLast4 === '') {
+      delete patch['cardLast4'];
+      update['$unset'] = { cardLast4: '' };
+    }
+
     const updated = await this.payments.findOneAndUpdate(
       this.scoped(userId, { _id: id }),
-      { $set: patch },
+      update,
       { new: true },
     );
     if (!updated) throw new NotFoundException(`Payment ${id} not found`);

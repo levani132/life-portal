@@ -93,6 +93,12 @@ across two banks, so as *the* balance it would be wrong; as one card's own runni
 exact, which is the only job it does. Only TBC prints one, so a card with no gaps is not evidence of
 completeness.
 
+**A manual payment joins the chain by naming its card.** A transfer entered by hand moves the real
+balance, so the next reading would otherwise report a false gap of exactly its size. Any payment
+carrying `cardLast4` — manual or ingested — is deducted from that card's chain, and `cardLast4` is
+editable after the fact (`PATCH`; an empty string clears it), so a gap caused by a forgotten card
+field is closed by editing the payment, not re-entering it.
+
 **The chain runs in the account's currency, not each payment's.** A foreign-currency payment is
 converted at the NBG rate in force on its own day before it is deducted — deducting the raw dollar
 figure from a lari balance invented a permanent gap per dollar payment. Because the bank converts
