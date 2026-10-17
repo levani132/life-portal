@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { User, UserSchema } from '../auth/schemas/user.schema';
 import { Today } from '../common/today';
 import {
   CreateCheatMealDto,
@@ -102,6 +103,27 @@ export class NutritionController {
   @Post('foods/import')
   importFood(@CurrentUser('userId') userId: string, @Body() dto: ImportFoodDto) {
     return this.nutrition.importFood(userId, dto.code);
+  }
+
+  // ---------------------------------------------------------------- public foods (sharing)
+
+  @Get('foods/public')
+  listPublicFoods(
+    @CurrentUser('userId') userId: string,
+    @Query('q') q?: string,
+    @Query('limit') limit?: string,
+    @Query('skip') skip?: string,
+  ) {
+    return this.nutrition.listPublicFoods(userId, {
+      q,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      skip: skip ? parseInt(skip, 10) : undefined,
+    });
+  }
+
+  @Post('foods/import-public/:id')
+  importPublicFood(@CurrentUser('userId') userId: string, @Param('id') id: string) {
+    return this.nutrition.importPublicFood(userId, id);
   }
 
   @Post('foods')
@@ -300,6 +322,7 @@ export class NutritionController {
       { name: NutritionProfile.name, schema: NutritionProfileSchema },
       { name: WeighIn.name, schema: WeighInSchema },
       { name: CheatMeal.name, schema: CheatMealSchema },
+      { name: User.name, schema: UserSchema },
     ]),
   ],
   controllers: [NutritionController],

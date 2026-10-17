@@ -20,6 +20,7 @@ import {
   ACTIVITY_LEVELS,
   FOOD_ENTRY_MODES,
   FOOD_UNITS,
+  FOOD_VISIBILITY,
   MEAL_SLOTS,
   NUTRITION_GOALS,
   SEXES,
@@ -52,6 +53,7 @@ export class CreateFoodDto {
   @IsOptional() @IsString() @MaxLength(32) barcode?: string;
   @IsOptional() @IsBoolean() archived?: boolean;
   @IsOptional() @IsString() @MaxLength(500) notes?: string;
+  @IsOptional() @IsIn(FOOD_VISIBILITY) visibility?: string;
 }
 
 /** PATCH variant: every field optional. */
@@ -150,6 +152,12 @@ export class UpdateProfileDto {
   @IsOptional() @IsInt() @Min(0) @Max(500) proteinOverrideG?: number;
   @IsOptional() @IsInt() @Min(0) @Max(500) fatOverrideG?: number;
   @IsOptional() @IsInt() @Min(0) @Max(1000) carbOverrideG?: number;
+  @IsOptional() @IsIn(FOOD_VISIBILITY) defaultFoodVisibility?: string;
+  @IsOptional() @IsBoolean() shareMeals?: boolean;
+  @IsOptional() @IsBoolean() shareWeight?: boolean;
+  @IsOptional() @IsBoolean() shareTargets?: boolean;
+  /** When changing defaultFoodVisibility, also update all foods that had the old default. */
+  @IsOptional() @IsBoolean() updateExistingFoodsVisibility?: boolean;
 }
 
 export class UpsertWeighInDto {
@@ -175,4 +183,8 @@ export class UpdateCheatMealDto {
 
 export class ReorderCheatDto {
   @IsArray() @IsMongoId({ each: true }) order!: string[];
+}
+
+export class ImportPublicFoodDto {
+  @IsMongoId() foodId!: string;
 }

@@ -31,6 +31,7 @@ import { FoodForm } from '../../components/food-form';
 import { FoodPicker } from '../../components/food-picker';
 import { LogFoodModal } from '../../components/log-food-modal';
 import { NutritionSettings } from '../../components/nutrition-settings';
+import { PublicFoodsPanel } from '../../components/public-foods-panel';
 import {
   Chip,
   EmptyState,
@@ -908,7 +909,11 @@ function FoodsTab({
                     {mgToG(food.perServing.proteinMg)}g C {mgToG(food.perServing.carbMg)}g F{' '}
                     {mgToG(food.perServing.fatMg)}g
                     {food.useCount > 0 && ` · eaten ${food.useCount}×`}
-                    {food.source === 'openfoodfacts' && ' · imported'}
+                    {food.source === 'openfoodfacts' && ' · imported from OFF'}
+                    {food.source === 'imported' && ' · imported from user'}
+                    {food.visibility === 'public' && (
+                      <span className="ml-1 text-sky-400">· public</span>
+                    )}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
@@ -937,6 +942,11 @@ function FoodsTab({
       </Panel>
 
       <SavedMealsPanel overview={overview} onChanged={onChanged} />
+
+      <PublicFoodsPanel
+        hasPublicFoods={overview.hasPublicFoodsToImport}
+        onImported={onChanged}
+      />
 
       <FoodForm
         open={adding}

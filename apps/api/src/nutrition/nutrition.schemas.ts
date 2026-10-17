@@ -4,6 +4,7 @@ import {
   FOOD_ENTRY_MODES,
   FOOD_SOURCES,
   FOOD_UNITS,
+  FOOD_VISIBILITY,
   MEAL_SLOTS,
   NUTRITION_GOALS,
   SEXES,
@@ -72,6 +73,8 @@ export class Food {
    */
   @Prop({ default: false, index: true }) archived!: boolean;
   @Prop({ maxlength: 500 }) notes?: string;
+  /** Whether this food is visible to other users. Defaults to user's defaultFoodVisibility. */
+  @Prop({ required: true, enum: FOOD_VISIBILITY, default: 'private' }) visibility!: string;
 }
 
 export const FoodSchema = SchemaFactory.createForClass(Food);
@@ -182,6 +185,14 @@ export class NutritionProfile {
   @Prop({ min: 0, max: 500 }) proteinOverrideG?: number;
   @Prop({ min: 0, max: 500 }) fatOverrideG?: number;
   @Prop({ min: 0, max: 1000 }) carbOverrideG?: number;
+  /** Default visibility for newly created foods. */
+  @Prop({ required: true, enum: FOOD_VISIBILITY, default: 'private' }) defaultFoodVisibility!: string;
+  /** Whether to share daily meals with other users. */
+  @Prop({ required: true, default: false }) shareMeals!: boolean;
+  /** Whether to share weight/body metrics with other users. */
+  @Prop({ required: true, default: false }) shareWeight!: boolean;
+  /** Whether to share nutrition targets with other users. */
+  @Prop({ required: true, default: false }) shareTargets!: boolean;
 }
 
 export const NutritionProfileSchema = SchemaFactory.createForClass(NutritionProfile);

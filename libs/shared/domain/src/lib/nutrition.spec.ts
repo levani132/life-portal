@@ -54,6 +54,7 @@ const oats: Food = {
   favourite: false,
   source: 'manual',
   archived: false,
+  visibility: 'private',
   energyKcalPer100: 380,
   proteinMgPer100: 13_000,
   fatMgPer100: 7_000,
@@ -106,6 +107,10 @@ const profile: NutritionProfile = {
   goal: 'fat_loss',
   cheatDays: [],
   dayStartHour: 4,
+  defaultFoodVisibility: 'private',
+  shareMeals: false,
+  shareWeight: false,
+  shareTargets: false,
   createdAt: '2026-08-01T00:00:00.000Z',
   updatedAt: '2026-08-01T00:00:00.000Z',
 };

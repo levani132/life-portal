@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import type { ActivityLevel, NutritionGoal, NutritionProfile, Sex } from '@life-portal/shared-types';
-import { ACTIVITY_LEVELS, NUTRITION_GOALS, SEXES } from '@life-portal/shared-types';
+import type { ActivityLevel, FoodVisibility, NutritionGoal, NutritionProfile, Sex } from '@life-portal/shared-types';
+import { ACTIVITY_LEVELS, FOOD_VISIBILITY, NUTRITION_GOALS, SEXES } from '@life-portal/shared-types';
 import { ACTIVITY_LABELS, GOAL_PLAN } from '@life-portal/shared-domain';
 import { api } from '../lib/api';
 import { useAction } from '../lib/hooks';
@@ -47,6 +47,14 @@ export function NutritionSettings({
     fatOverrideG: profile.fatOverrideG ? String(profile.fatOverrideG) : '',
     carbOverrideG: profile.carbOverrideG ? String(profile.carbOverrideG) : '',
   });
+  const [defaultFoodVisibility, setDefaultFoodVisibility] = useState<FoodVisibility>(
+    profile.defaultFoodVisibility,
+  );
+  const [shareMeals, setShareMeals] = useState(profile.shareMeals);
+  const [shareWeight, setShareWeight] = useState(profile.shareWeight);
+  const [shareTargets, setShareTargets] = useState(profile.shareTargets);
+  const [showVisibilityPrompt, setShowVisibilityPrompt] = useState(false);
+  const [pendingVisibility, setPendingVisibility] = useState<FoodVisibility | null>(null);
 
   /*
    * There is deliberately **no effect re-seeding this form from `profile`**.
@@ -71,7 +79,7 @@ export function NutritionSettings({
     return Number.isFinite(parsed) ? parsed : null;
   };
 
-  const save = () =>
+  const save = (updateExistingFoods = false) =>
     void run(async () => {
       await api.put('/nutrition/profile', {
         sex: sex || null,
@@ -86,10 +94,34 @@ export function NutritionSettings({
         proteinOverrideG: int(overrides.proteinOverrideG),
         fatOverrideG: int(overrides.fatOverrideG),
         carbOverrideG: int(overrides.carbOverrideG),
+        defaultFoodVisibility,
+        shareMeals,
+        shareWeight,
+        shareTargets,
+        updateExistingFoodsVisibility: updateExistingFoods,
       });
     }).then((ok) => {
-      if (ok) onSaved?.();
+      if (ok) {
+        setShowVisibilityPrompt(false);
+        setPendingVisibility(null);
+        onSaved?.();
+      }
     });
+
+  const handleVisibilityChange = (newVisibility: FoodVisibility) => {
+    if (newVisibility !== profile.defaultFoodVisibility) {
+      setPendingVisibility(newVisibility);
+      setShowVisibilityPrompt(true);
+    }
+    setDefaultFoodVisibility(newVisibility);
+  };
+
+  const confirmVisibilityChange = (updateExisting: boolean) => {
+    setShowVisibilityPrompt(false);
+    if (updateExisting) {
+      save(true);
+    }
+  };
 
   const toggleCheatDay = (value: number) =>
     setCheatDays((current) =>
@@ -101,7 +133,7 @@ export function NutritionSettings({
       title="Your numbers"
       description="What the targets are worked out from. Everything here is editable, and every figure it produces says where it came from."
       actions={
-        <button type="button" className="btn-primary" onClick={save} disabled={pending}>
+        <button type="button" className="btn-primary" onClick={() => save()} disabled={pending}>
           {pending ? 'Saving…' : 'Save'}
         </button>
       }
@@ -257,12 +289,94 @@ export function NutritionSettings({
           </div>
         </details>
 
+        <details className="rounded-lg border border-border px-3 py-2">
+          <summary className="cursor-pointer text-xs uppercase tracking-wide text-ink-faint">
+            Sharing & Privacy
+          </summary>
+          <p className="mt-2 text-xs text-ink-faint">
+            Control what other users can see. Public foods can be imported by others.
+          </p>
+          <div className="mt-3 space-y-3">
+            <Field label="New foods are" hint="default visibility for foods you create">
+              <Select
+                value={defaultFoodVisibility}
+                onChange={(event) => handleVisibilityChange(event.target.value as FoodVisibility)}
+              >
+                {FOOD_VISIBILITY.map((option) => (
+                  <option key={option} value={option}>
+                    {option === 'private' ? 'Private — only you can see' : 'Public — others can import'}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm text-ink-muted">
+                <input
+                  type="checkbox"
+                  checked={shareMeals}
+                  onChange={(event) => setShareMeals(event.target.checked)}
+                  className="h-4 w-4 rounded border-border bg-surface"
+                />
+                Share my daily meals with others
+              </label>
+              <label className="flex items-center gap-2 text-sm text-ink-muted">
+                <input
+                  type="checkbox"
+                  checked={shareWeight}
+                  onChange={(event) => setShareWeight(event.target.checked)}
+                  className="h-4 w-4 rounded border-border bg-surface"
+                />
+                Share my weight and body metrics
+              </label>
+              <label className="flex items-center gap-2 text-sm text-ink-muted">
+                <input
+                  type="checkbox"
+                  checked={shareTargets}
+                  onChange={(event) => setShareTargets(event.target.checked)}
+                  className="h-4 w-4 rounded border-border bg-surface"
+                />
+                Share my nutrition targets
+              </label>
+            </div>
+          </div>
+        </details>
+
         {error && (
           <p className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
             {error}
           </p>
         )}
       </div>
+
+      {showVisibilityPrompt && pendingVisibility && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-border bg-surface p-5">
+            <h3 className="text-lg font-semibold">Update existing foods?</h3>
+            <p className="mt-2 text-sm text-ink-muted">
+              You changed the default visibility to{' '}
+              <strong>{pendingVisibility}</strong>. Do you also want to update all
+              your existing foods that were{' '}
+              <strong>{profile.defaultFoodVisibility}</strong> to the new setting?
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => confirmVisibilityChange(false)}
+              >
+                No, just new foods
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => confirmVisibilityChange(true)}
+              >
+                Yes, update all
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Panel>
   );
 }

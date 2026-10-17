@@ -74,6 +74,8 @@ All under `/api/nutrition`, all JWT-guarded and user-scoped.
 | `GET` | `/foods/lookup?q=` | Open Food Facts search. Declared before `/foods/:id` so the literal path wins. |
 | `GET` | `/foods/lookup/barcode/:code` | Barcode lookup. |
 | `POST` | `/foods/import` | `{ code }` → an owned food row. |
+| `GET` | `/foods/public?q=&limit=&skip=` | List public foods from other users available to import. |
+| `POST` | `/foods/import-public/:id` | Import a public food from another user into own database. |
 | `GET`/`POST` | `/entries` | List by `?day=` or `?from=&to=` / log a meal. |
 | `PATCH`/`DELETE` | `/entries/:id` | Correct / remove. |
 | `POST` | `/entries/repeat` | Repeat a day or a slot onto another day. |
@@ -176,6 +178,22 @@ that serves the day being viewed.
 **Food picker order.** Favourites, then `lastUsedDay` descending, then `createdAt` descending.
 `lastUsedDay` and `useCount` come from one aggregation over `meal_entries` — never stored, because
 a counter drifts the moment an entry is deleted or back-dated.
+
+## Privacy and Sharing
+
+Users can share their food database with others:
+
+- **`defaultFoodVisibility`** on the profile controls whether new foods are `public` or `private`
+  by default.
+- Each food has its own **`visibility`** field that can override the default.
+- When changing `defaultFoodVisibility`, the API accepts `updateExistingFoodsVisibility: true` to
+  bulk-update all foods that had the old default visibility.
+- **`shareMeals`**, **`shareWeight`**, **`shareTargets`** control whether other users can see
+  daily meals, weight/body metrics, and nutrition targets respectively (future use).
+
+Public foods can be imported by other users via `POST /foods/import-public/:id`. The imported
+food becomes the user's own copy with `source: 'imported'` and `sourceRef` pointing to the
+original food's ID.
 
 ## Cross-links
 

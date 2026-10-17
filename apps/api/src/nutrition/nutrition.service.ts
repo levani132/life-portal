@@ -14,6 +14,8 @@ import type {
   NutritionProfile as NutritionProfileDto,
   NutritionSummary,
   NutritionTargets,
+  PublicFood,
+  PublicFoodsResponse,
   RecentMeal,
   SavedMeal as SavedMealDto,
   SavedMealComponentView,
@@ -50,6 +52,7 @@ import {
   SavedMeal,
   WeighIn,
 } from './nutrition.schemas';
+import { User } from '../auth/schemas/user.schema';
 import type {
   CreateCheatMealDto,
   CreateEntryDto,
@@ -74,6 +77,10 @@ const DEFAULT_PROFILE = {
   goal: 'maintain',
   cheatDays: [] as number[],
   dayStartHour: 4,
+  defaultFoodVisibility: 'private',
+  shareMeals: false,
+  shareWeight: false,
+  shareTargets: false,
 };
 
 /**
@@ -98,6 +105,7 @@ export class NutritionService {
     @InjectModel(NutritionProfile.name) private readonly profiles: Model<NutritionProfile>,
     @InjectModel(WeighIn.name) private readonly weighIns: Model<WeighIn>,
     @InjectModel(CheatMeal.name) private readonly cheatMeals: Model<CheatMeal>,
+    @InjectModel(User.name) private readonly users: Model<User>,
     private readonly lookup: OpenFoodFactsProvider,
   ) {}
 
@@ -169,6 +177,13 @@ export class NutritionService {
     const facts = factsFromInput(dto, entryMode, servingSize);
     this.warnOnImplausibleFacts(dto.name, facts);
 
+    // Use user's default visibility if not specified
+    let visibility = dto.visibility;
+    if (!visibility) {
+      const profile = await this.profile(userId);
+      visibility = profile.defaultFoodVisibility;
+    }
+
     const created = await this.foods.create({
       userId,
       name: dto.name,
@@ -182,6 +197,7 @@ export class NutritionService {
       source: 'manual',
       archived: dto.archived ?? false,
       notes: dto.notes,
+      visibility,
       ...facts,
     } as never);
     return created.toJSON() as unknown as FoodDto;
@@ -201,6 +217,7 @@ export class NutritionService {
       ...(dto.barcode != null ? { barcode: dto.barcode } : {}),
       ...(dto.archived != null ? { archived: dto.archived } : {}),
       ...(dto.notes != null ? { notes: dto.notes } : {}),
+      ...(dto.visibility != null ? { visibility: dto.visibility } : {}),
       servingSize,
       entryMode,
     };
@@ -303,6 +320,9 @@ export class NutritionService {
       );
     }
 
+    // Use user's default visibility
+    const profile = await this.profile(userId);
+
     const created = await this.foods.create({
       userId,
       name: result.name,
@@ -315,6 +335,7 @@ export class NutritionService {
       source: 'openfoodfacts',
       sourceRef: result.code,
       archived: false,
+      visibility: profile.defaultFoodVisibility,
       energyKcalPer100: result.energyKcalPer100,
       proteinMgPer100: result.proteinMgPer100 ?? 0,
       fatMgPer100: result.fatMgPer100 ?? 0,
@@ -323,6 +344,104 @@ export class NutritionService {
       sugarMgPer100: result.sugarMgPer100,
       satFatMgPer100: result.satFatMgPer100,
       sodiumMgPer100: result.sodiumMgPer100,
+    } as never);
+    return created.toJSON() as unknown as FoodDto;
+  }
+
+  // ---------------------------------------------------------------- public foods (sharing)
+
+  /** Lists public foods from other users that can be imported. */
+  async listPublicFoods(
+    userId: string,
+    options: { q?: string; limit?: number; skip?: number } = {},
+  ): Promise<PublicFoodsResponse> {
+    const filter: Record<string, unknown> = {
+      userId: { $ne: userId },
+      visibility: 'public',
+      archived: false,
+    };
+    if (options.q?.trim()) {
+      const pattern = new RegExp(options.q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter['$or'] = [{ name: pattern }, { brand: pattern }];
+    }
+
+    const [rows, total, userIds] = await Promise.all([
+      this.foods
+        .find(filter)
+        .sort({ name: 1 })
+        .skip(options.skip ?? 0)
+        .limit(options.limit ?? 50),
+      this.foods.countDocuments(filter),
+      this.foods.distinct('userId', filter),
+    ]);
+
+    // Fetch user names for attribution
+    const users = await this.users.find({ _id: { $in: userIds } });
+    const userMap = new Map(users.map((u) => [String(u._id), u.name]));
+
+    const foods: PublicFood[] = rows.map((row) => {
+      const food = row.toJSON() as unknown as FoodDto;
+      const { userId: foodUserId, ...rest } = food;
+      return {
+        ...rest,
+        sharedByUserId: foodUserId,
+        sharedByName: userMap.get(foodUserId) ?? 'Unknown',
+      };
+    });
+
+    return { foods, total };
+  }
+
+  /** Checks if there are any public foods from other users available to import. */
+  async hasPublicFoodsToImport(userId: string): Promise<boolean> {
+    const count = await this.foods.countDocuments({
+      userId: { $ne: userId },
+      visibility: 'public',
+      archived: false,
+    });
+    return count > 0;
+  }
+
+  /** Imports a public food from another user into the current user's database. */
+  async importPublicFood(userId: string, foodId: string): Promise<FoodDto> {
+    if (!isValidObjectId(foodId)) throw new NotFoundException(`Food ${foodId} not found`);
+    
+    const source = await this.foods.findOne({
+      _id: foodId,
+      visibility: 'public',
+      archived: false,
+    });
+    if (!source) throw new NotFoundException(`Public food ${foodId} not found`);
+    if (source.userId === userId) {
+      throw new BadRequestException('You cannot import your own food.');
+    }
+
+    // Use user's default visibility for the imported copy
+    const profile = await this.profile(userId);
+
+    const created = await this.foods.create({
+      userId,
+      name: source.name,
+      brand: source.brand,
+      unit: source.unit,
+      servingSize: source.servingSize,
+      servingLabel: source.servingLabel,
+      entryMode: source.entryMode,
+      favourite: false,
+      barcode: source.barcode,
+      source: 'imported',
+      sourceRef: String(source._id),
+      archived: false,
+      visibility: profile.defaultFoodVisibility,
+      energyKcalPer100: source.energyKcalPer100,
+      proteinMgPer100: source.proteinMgPer100,
+      fatMgPer100: source.fatMgPer100,
+      carbMgPer100: source.carbMgPer100,
+      fibreMgPer100: source.fibreMgPer100,
+      sugarMgPer100: source.sugarMgPer100,
+      satFatMgPer100: source.satFatMgPer100,
+      sodiumMgPer100: source.sodiumMgPer100,
+      notes: source.notes,
     } as never);
     return created.toJSON() as unknown as FoodDto;
   }
@@ -349,11 +468,22 @@ export class NutritionService {
    *    wants to *remove* an override (a measured basal rate, a manual protein target) has to send
    *    `null`, and that has to become `$unset` — `$set: null` would leave a null sitting where the
    *    type says the field is absent, which is the mistake `centsField` exists to prevent.
+   *
+   * When `updateExistingFoodsVisibility` is true and `defaultFoodVisibility` changes, all foods
+   * that had the old default visibility are updated to the new one.
    */
   async updateProfile(userId: string, dto: UpdateProfileDto): Promise<NutritionProfileDto> {
+    const { updateExistingFoodsVisibility, ...profileFields } = dto;
+    
+    // Get current profile to check if defaultFoodVisibility is changing
+    const currentProfile = await this.profile(userId);
+    const oldVisibility = currentProfile.defaultFoodVisibility;
+    const newVisibility = profileFields.defaultFoodVisibility;
+    const visibilityChanging = newVisibility && newVisibility !== oldVisibility;
+
     const set: Record<string, unknown> = {};
     const unset: Record<string, ''> = {};
-    for (const [field, value] of Object.entries(dto)) {
+    for (const [field, value] of Object.entries(profileFields)) {
       if (value === null) unset[field] = '';
       else if (value !== undefined) set[field] = value;
     }
@@ -370,6 +500,15 @@ export class NutritionService {
       },
       { new: true, upsert: true, runValidators: true },
     );
+
+    // Bulk update foods visibility if requested
+    if (visibilityChanging && updateExistingFoodsVisibility) {
+      await this.foods.updateMany(
+        { userId, visibility: oldVisibility },
+        { $set: { visibility: newVisibility } },
+      );
+    }
+
     return updated.toJSON() as unknown as NutritionProfileDto;
   }
 
@@ -859,11 +998,12 @@ export class NutritionService {
   /** Everything `/nutrition` renders, in one round trip. */
   async overview(userId: string, today: string, day?: string): Promise<NutritionOverview> {
     const viewed = day ? toDay(day) : today;
-    const [profile, weighIns, foods, savedMeals] = await Promise.all([
+    const [profile, weighIns, foods, savedMeals, hasPublicFoods] = await Promise.all([
       this.profile(userId),
       this.listWeighIns(userId),
       this.listFoods(userId),
       this.listSavedMeals(userId),
+      this.hasPublicFoodsToImport(userId),
     ]);
     const targets = nutritionTargets({ profile, weighIns, today });
 
@@ -889,6 +1029,7 @@ export class NutritionService {
       recentMeals: recent,
       suggestions: mealSuggestions({ entries: history, foods, day: viewed }),
       foodLookup: this.lookup.status,
+      hasPublicFoodsToImport: hasPublicFoods,
     };
   }
 

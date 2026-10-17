@@ -27,8 +27,11 @@ export type FoodUnit = (typeof FOOD_UNITS)[number];
 export const FOOD_ENTRY_MODES = ['per_serving', 'per_100'] as const;
 export type FoodEntryMode = (typeof FOOD_ENTRY_MODES)[number];
 
-export const FOOD_SOURCES = ['manual', 'openfoodfacts'] as const;
+export const FOOD_SOURCES = ['manual', 'openfoodfacts', 'imported'] as const;
 export type FoodSource = (typeof FOOD_SOURCES)[number];
+
+export const FOOD_VISIBILITY = ['private', 'public'] as const;
+export type FoodVisibility = (typeof FOOD_VISIBILITY)[number];
 
 export const ACTIVITY_LEVELS = ['sedentary', 'light', 'moderate', 'very', 'athlete'] as const;
 export type ActivityLevel = (typeof ACTIVITY_LEVELS)[number];
@@ -88,6 +91,8 @@ export interface Food extends NutritionFacts, Timestamped {
   /** A food that has been logged is archived rather than deleted, so history keeps its name. */
   archived: boolean;
   notes?: string;
+  /** Whether this food is visible to other users. */
+  visibility: FoodVisibility;
 }
 
 /** What one serving works out to. Derived, so the UI never does the arithmetic twice. */
@@ -239,6 +244,14 @@ export interface NutritionProfile extends Timestamped {
   proteinOverrideG?: number;
   fatOverrideG?: number;
   carbOverrideG?: number;
+  /** Default visibility for newly created foods. */
+  defaultFoodVisibility: FoodVisibility;
+  /** Whether to share daily meals with other users. */
+  shareMeals: boolean;
+  /** Whether to share weight/body metrics with other users. */
+  shareWeight: boolean;
+  /** Whether to share nutrition targets with other users. */
+  shareTargets: boolean;
 }
 
 export interface WeighIn extends Timestamped {
@@ -419,4 +432,21 @@ export interface NutritionOverview {
   /** Per-slot one-tap offers, in slot order then rank. Empty until something has been eaten. */
   suggestions: MealSuggestion[];
   foodLookup: FoodLookupStatus;
+  /** Whether there are public foods from other users available to import. */
+  hasPublicFoodsToImport: boolean;
+}
+
+// ------------------------------------------------------------------ public foods (sharing)
+
+/** A food shared by another user, available for import. */
+export interface PublicFood extends Omit<Food, 'userId'> {
+  /** Display name of the user who shared this food. */
+  sharedByName: string;
+  sharedByUserId: Id;
+}
+
+export interface PublicFoodsResponse {
+  foods: PublicFood[];
+  /** Total count of public foods available (for pagination info). */
+  total: number;
 }

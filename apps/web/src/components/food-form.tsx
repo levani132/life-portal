@@ -7,6 +7,7 @@ import type {
   FoodLookupResponse,
   FoodLookupResult,
   FoodUnit,
+  FoodVisibility,
 } from '@life-portal/shared-types';
 import { factsFromInput, factsToInput, macroEnergyMismatch, mgToG } from '@life-portal/shared-domain';
 import { api } from '../lib/api';
@@ -75,6 +76,7 @@ export function FoodForm({
   const [servingLabel, setServingLabel] = useState('');
   const [entryMode, setEntryMode] = useState<FoodEntryMode>('per_serving');
   const [favourite, setFavourite] = useState(false);
+  const [visibility, setVisibility] = useState<FoodVisibility>('private');
   const [numbers, setNumbers] = useState<NumberFields>(EMPTY);
 
   useEffect(() => {
@@ -90,6 +92,7 @@ export function FoodForm({
       setServingLabel(food.servingLabel ?? '');
       setEntryMode(food.entryMode);
       setFavourite(food.favourite);
+      setVisibility(food.visibility);
       setNumbers({
         energyKcal: String(typed.energyKcal),
         proteinG: String(mgToG(typed.proteinMg, 1)),
@@ -108,6 +111,7 @@ export function FoodForm({
       setServingLabel('');
       setEntryMode('per_serving');
       setFavourite(false);
+      setVisibility('private');
       setNumbers(EMPTY);
     }
   }, [open, food, clearError]);
@@ -135,6 +139,7 @@ export function FoodForm({
     satFatMg: optional(numbers.satFatG),
     sodiumMg: numbers.sodiumMg.trim() === '' ? undefined : Math.round(num(numbers.sodiumMg)),
     favourite,
+    visibility,
   };
 
   /**
@@ -336,6 +341,16 @@ export function FoodForm({
               className="h-4 w-4 rounded border-border bg-surface"
             />
             Keep this one near the top of the list
+          </label>
+
+          <label className="flex items-center gap-2 text-sm text-ink-muted">
+            <input
+              type="checkbox"
+              checked={visibility === 'public'}
+              onChange={(event) => setVisibility(event.target.checked ? 'public' : 'private')}
+              className="h-4 w-4 rounded border-border bg-surface"
+            />
+            Share this food with other users
           </label>
 
           {mismatch && (
