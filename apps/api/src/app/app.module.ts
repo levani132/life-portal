@@ -12,6 +12,7 @@ import { DashboardModule } from '../dashboard/dashboard.module';
 import { FxModule } from '../fx/fx.module';
 import { ItemsModule } from '../items/items.module';
 import { LoansModule } from '../loans/loans.module';
+import { McpModule } from '../mcp/mcp.module';
 import { NutritionModule } from '../nutrition/nutrition.module';
 import { PersonalModule } from '../personal/personal.module';
 import { SettingsModule } from '../settings/settings.module';
@@ -41,6 +42,7 @@ import { StocksModule } from '../stocks/stocks.module';
     NutritionModule,
     SpendingModule,
     DashboardModule,
+    McpModule,
   ],
   providers: [
     // Guarding globally means a new controller ships authenticated unless it opts out with
