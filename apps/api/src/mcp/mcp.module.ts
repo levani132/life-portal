@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Headers, Module, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Module, Post, Query, Req } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import type { Request } from 'express';
 import { CurrentUser, Public } from '../auth/current-user.decorator';
 import { loadConfig } from '../config/configuration';
 import { NutritionModule } from '../nutrition/nutrition.module';
@@ -33,8 +34,11 @@ export class McpController {
   /** OpenAPI schema for ChatGPT Actions. */
   @Public()
   @Get('openapi.json')
-  openApiSchema() {
-    return this.mcp.openApiSchema();
+  openApiSchema(@Req() req: Request) {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    const baseUrl = `${protocol}://${host}/api/mcp`;
+    return this.mcp.openApiSchema(baseUrl);
   }
 
   /**

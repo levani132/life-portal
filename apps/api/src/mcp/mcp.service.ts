@@ -246,7 +246,7 @@ export class McpService {
   }
 
   /** OpenAPI 3.0 schema for ChatGPT Actions. */
-  openApiSchema() {
+  openApiSchema(baseUrl: string) {
     return {
       openapi: '3.0.0',
       info: {
@@ -254,7 +254,7 @@ export class McpService {
         version: '1.0.0',
         description: 'AI assistant API for nutrition tracking in Life Portal',
       },
-      servers: [{ url: '/api/mcp' }],
+      servers: [{ url: baseUrl }],
       paths: {
         '/call': {
           post: {
