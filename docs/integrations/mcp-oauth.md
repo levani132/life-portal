@@ -37,11 +37,25 @@ The SDK validates exact registered redirect URIs. Use the exact callback shown b
 there is no wildcard callback allowlist. This server uses DCR, rather than CIMD, and does not
 advertise RFC 9207 issuer identification, so ChatGPT may use its callback-specific redirect.
 
-## Connect on iPhone
+## First-time beta testers and iPhone
 
-Open the Life Portal plugin connection in ChatGPT, choose Connect, sign in on the Life Portal
-page, and approve nutrition access. Start a fresh chat after updating the plugin and ask for
-today's meals and macros, specifying your local day. No manual token entry is needed.
+The settings page must not assume the user can open the owner's private plugin. Each tester
+creates a personal hosted connection in ChatGPT Plugins → + → Add custom MCP server:
+
+- Name: Life Portal; description: Track my meals, macros and nutrition goals.
+- Public server URL: `https://life-portal.onrender.com/api/mcp` (or the deployed API URL).
+- Authentication: OAuth; dynamic client registration; scope: `nutrition`.
+- Review the notice and create the plugin, install/connect, and sign in with the tester's own
+  Life Portal credentials. No shared client secret or manual token is needed.
+- Start a new chat, select the connection with @ and request meals/macros. Authentication may
+  appear during setup or first use. Account/workspace policies control custom-connection access.
+
+If setup controls are missing in the phone app, use ChatGPT on the web in Safari, then return
+to the same ChatGPT account in the app. If they are also absent on the web, the tester needs
+help with account/workspace eligibility; a manual token does not unlock that feature.
+
+The existing owner's installed wrapper remains usable, but its private URL is not a public
+installation link. No public directory publication is required for this per-tester setup.
 
 To disconnect, open Life Portal → Settings → AI Assistant → Disconnect all signed-in
 assistants. This leaves manual tokens active. Individual grants can also be revoked through

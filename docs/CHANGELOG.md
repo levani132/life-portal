@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-10-18 · First-time ChatGPT beta setup
+
+AI Assistant Setup now walks invited testers through creating their own ChatGPT connection,
+with a copyable server URL, OAuth choices, personal account sign-in and iPhone setup help.
+It no longer assumes the owner's private plugin is already available to a new user.
+
 ## 2026-10-18 — Sign in to connect an assistant from your phone
 
 Life Portal now supports an OAuth sign-in and approval screen for nutrition assistants.
