@@ -71,8 +71,42 @@ function McpSetup() {
           )}
         </Panel>
 
-        <Panel title="2. Configure Your AI Assistant" description="Add this MCP server to your AI app.">
+        <Panel title="2. Connect to ChatGPT" description="Use the MCP protocol endpoint.">
           <div className="space-y-4">
+            <div>
+              <h4 className="mb-2 text-sm font-medium text-ink">MCP Connection URL</h4>
+              <p className="mb-2 text-xs text-ink-muted">
+                Use this URL to connect ChatGPT or other MCP clients:
+              </p>
+              <div className="flex items-center gap-2">
+                <pre className="flex-1 overflow-x-auto rounded-lg border border-line bg-surface-sunken p-3 text-xs">
+{`${apiUrl}/mcp`}
+                </pre>
+                <button
+                  type="button"
+                  className="btn-ghost shrink-0"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${apiUrl}/mcp`);
+                  }}
+                >
+                  Copy
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-ink-faint">
+                This is a standards-compliant MCP Streamable HTTP endpoint.
+              </p>
+            </div>
+
+            <div>
+              <h4 className="mb-2 text-sm font-medium text-ink">Authentication</h4>
+              <p className="mb-2 text-xs text-ink-muted">
+                When connecting, use your MCP token as a Bearer token in the Authorization header:
+              </p>
+              <pre className="overflow-x-auto rounded-lg border border-line bg-surface-sunken p-3 text-xs">
+{`Authorization: Bearer YOUR_TOKEN`}
+              </pre>
+            </div>
+
             <div>
               <h4 className="mb-2 text-sm font-medium text-ink">For Claude Desktop</h4>
               <p className="mb-2 text-xs text-ink-muted">
@@ -82,10 +116,10 @@ function McpSetup() {
 {`{
   "mcpServers": {
     "life-portal": {
-      "command": "curl",
-      "args": ["-X", "POST", "${apiUrl}/mcp/call",
-        "-H", "Content-Type: application/json",
-        "-d", "{\\"token\\": \\"YOUR_TOKEN\\", \\"tool\\": \\"$TOOL\\", \\"arguments\\": $ARGS}"]
+      "url": "${apiUrl}/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_TOKEN"
+      }
     }
   }
 }`}
@@ -93,33 +127,14 @@ function McpSetup() {
             </div>
 
             <div>
-              <h4 className="mb-2 text-sm font-medium text-ink">For ChatGPT / Custom GPTs</h4>
+              <h4 className="mb-2 text-sm font-medium text-ink">Legacy REST API</h4>
               <p className="mb-2 text-xs text-ink-muted">
-                In your GPT&apos;s Actions configuration:
+                For clients that don&apos;t support MCP protocol, use the REST endpoints:
               </p>
-              <div className="space-y-2 rounded-lg border border-line bg-surface-sunken p-3 text-xs">
-                <p><span className="text-ink-faint">Authentication:</span> API Key</p>
-                <p><span className="text-ink-faint">Auth Type:</span> Bearer</p>
-                <p><span className="text-ink-faint">API Key:</span> YOUR_TOKEN</p>
-              </div>
-              <p className="mt-2 mb-2 text-xs text-ink-muted">OpenAPI schema URL:</p>
-              <pre className="overflow-x-auto rounded-lg border border-line bg-surface-sunken p-3 text-xs">
-{`${apiUrl}/mcp/openapi.json`}
-              </pre>
-              <p className="mt-2 text-xs text-ink-faint">
-                Or manually configure: POST to <code className="text-sky-400">{apiUrl}/mcp/call</code> with body:
-                <code className="ml-1">{'{"tool": "tool_name", "arguments": {...}}'}</code>
-              </p>
-            </div>
-
-            <div>
-              <h4 className="mb-2 text-sm font-medium text-ink">For Amazon Q / Other MCP Clients</h4>
-              <p className="mb-2 text-xs text-ink-muted">
-                Discover available tools at:
-              </p>
-              <pre className="overflow-x-auto rounded-lg border border-line bg-surface-sunken p-3 text-xs">
-{`GET ${apiUrl}/mcp/tools`}
-              </pre>
+              <ul className="space-y-1 text-xs text-ink-faint">
+                <li>• <code>GET {apiUrl}/mcp/tools</code> — List available tools</li>
+                <li>• <code>POST {apiUrl}/mcp/call</code> — Execute a tool</li>
+              </ul>
             </div>
           </div>
         </Panel>

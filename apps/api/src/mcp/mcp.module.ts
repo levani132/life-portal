@@ -1,11 +1,24 @@
-import { Body, Controller, Get, Headers, Module, Post, Query, Req } from '@nestjs/common';
+import {
+  All,
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Module,
+  Post,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { CurrentUser, Public } from '../auth/current-user.decorator';
 import { loadConfig } from '../config/configuration';
 import { NutritionModule } from '../nutrition/nutrition.module';
+import { NutritionService } from '../nutrition/nutrition.service';
 import { McpService } from './mcp.service';
 import { McpToolCallDto } from './mcp.dto';
+import { handleMcpRequest } from './mcp-protocol';
 
 /**
  * MCP (Model Context Protocol) server for AI assistants.
@@ -16,7 +29,10 @@ import { McpToolCallDto } from './mcp.dto';
  */
 @Controller('mcp')
 export class McpController {
-  constructor(private readonly mcp: McpService) {}
+  constructor(
+    private readonly mcp: McpService,
+    private readonly nutrition: NutritionService,
+  ) {}
 
   /** Generate a long-lived MCP token for AI assistants. Requires normal JWT auth. */
   @Post('token')
@@ -70,6 +86,22 @@ export class McpController {
   async sse(@Query('token') token: string) {
     const userId = await this.mcp.verifyToken(token);
     return { userId, status: 'connected' };
+  }
+
+  /**
+   * MCP Protocol endpoint (Streamable HTTP).
+   * Handles POST (JSON-RPC), GET (SSE), DELETE (session termination).
+   * This is the standards-compliant MCP endpoint for ChatGPT and other MCP clients.
+   */
+  @Public()
+  @All()
+  async mcpProtocol(@Req() req: Request, @Res() res: Response) {
+    await handleMcpRequest(
+      req as never,
+      res as never,
+      this.nutrition,
+      (token) => this.mcp.verifyToken(token),
+    );
   }
 }
 
