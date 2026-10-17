@@ -34,9 +34,7 @@ function McpSetup() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const apiUrl = typeof window !== 'undefined' 
-    ? `${window.location.origin}/api/mcp`
-    : 'http://localhost:3333/api/mcp';
+  const apiUrl = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3333/api';
 
   return (
     <>
@@ -85,7 +83,7 @@ function McpSetup() {
   "mcpServers": {
     "life-portal": {
       "command": "curl",
-      "args": ["-X", "POST", "${apiUrl}/call",
+      "args": ["-X", "POST", "${apiUrl}/mcp/call",
         "-H", "Content-Type: application/json",
         "-d", "{\\"token\\": \\"YOUR_TOKEN\\", \\"tool\\": \\"$TOOL\\", \\"arguments\\": $ARGS}"]
     }
@@ -106,10 +104,10 @@ function McpSetup() {
               </div>
               <p className="mt-2 mb-2 text-xs text-ink-muted">OpenAPI schema URL:</p>
               <pre className="overflow-x-auto rounded-lg border border-line bg-surface-sunken p-3 text-xs">
-{`${apiUrl.replace('/mcp', '')}/mcp/openapi.json`}
+{`${apiUrl}/mcp/openapi.json`}
               </pre>
               <p className="mt-2 text-xs text-ink-faint">
-                Or manually configure: POST to <code className="text-sky-400">{apiUrl}/call</code> with body:
+                Or manually configure: POST to <code className="text-sky-400">{apiUrl}/mcp/call</code> with body:
                 <code className="ml-1">{'{"tool": "tool_name", "arguments": {...}}'}</code>
               </p>
             </div>
@@ -120,7 +118,7 @@ function McpSetup() {
                 Discover available tools at:
               </p>
               <pre className="overflow-x-auto rounded-lg border border-line bg-surface-sunken p-3 text-xs">
-{`GET ${apiUrl}/tools`}
+{`GET ${apiUrl}/mcp/tools`}
               </pre>
             </div>
           </div>
