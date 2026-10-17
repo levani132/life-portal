@@ -285,7 +285,7 @@ export class McpService {
             responses: {
               '200': {
                 description: 'Tool definitions',
-                content: { 'application/json': { schema: { type: 'object' } } },
+                content: { 'application/json': { schema: { $ref: '#/components/schemas/ToolList' } } },
               },
             },
           },
@@ -309,13 +309,35 @@ export class McpService {
               arguments: {
                 type: 'object',
                 description: 'Tool arguments - see GET /tools for each tool schema',
+                additionalProperties: true,
               },
             },
           },
           ToolResult: {
             type: 'object',
             properties: {
-              result: { type: 'object', description: 'Tool execution result' },
+              result: {
+                type: 'object',
+                description: 'Tool execution result',
+                additionalProperties: true,
+              },
+            },
+          },
+          ToolList: {
+            type: 'object',
+            properties: {
+              tools: {
+                type: 'array',
+                description: 'Available tools',
+                items: {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string' },
+                    description: { type: 'string' },
+                    inputSchema: { type: 'object', additionalProperties: true },
+                  },
+                },
+              },
             },
           },
         },
