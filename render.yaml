@@ -65,5 +65,9 @@ services:
         sync: false
 
       # ---- optional ----
+      # Set to this service's public HTTPS origin to enable assistant OAuth sign-in.
+      # Example: https://life-portal.onrender.com (no /api suffix).
+      - key: MCP_OAUTH_ISSUER
+        sync: false
       - key: FINNHUB_API_KEY
         sync: false

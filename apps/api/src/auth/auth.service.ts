@@ -47,6 +47,11 @@ export class AuthService {
   }
 
   async login(dto: LoginDto): Promise<AuthSession> {
+    return this.issueSession(await this.authenticateCredentials(dto));
+  }
+
+  /** Verify an OAuth sign-in without rotating the dashboard session. */
+  async authenticateCredentials(dto: LoginDto): Promise<UserDocument> {
     const user = await this.userModel
       .findOne({ email: dto.email.toLowerCase().trim() })
       .select('+passwordHash');
@@ -61,7 +66,7 @@ export class AuthService {
 
     user.lastLoginAt = new Date();
     await user.save();
-    return this.issueSession(user);
+    return user;
   }
 
   async refresh(refreshToken: string): Promise<AuthTokens> {

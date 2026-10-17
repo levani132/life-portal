@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { AppShell, PageHeader } from '../../../components/app-shell';
 import { ErrorNote, Panel, Spinner } from '../../../components/ui';
 import { api } from '../../../lib/api';
-import { useAction } from '../../../lib/hooks';
+import { useAction, useApi } from '../../../lib/hooks';
 
 export default function McpPage() {
   return (
@@ -18,6 +18,8 @@ function McpSetup() {
   const [token, setToken] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [disconnected, setDisconnected] = useState(false);
+  const { data: oauth } = useApi<{ enabled: boolean }>('/mcp/oauth/status');
   const { run, pending, error } = useAction();
 
   const generateToken = () =>
@@ -46,7 +48,27 @@ function McpSetup() {
       {error && <ErrorNote message={error} />}
 
       <div className="grid gap-6">
-        <Panel title="1. Generate an MCP Token" description="This token lets AI assistants access your nutrition data.">
+        {oauth?.enabled && (
+          <Panel title="Connect from your phone" description="Sign in to Life Portal when connecting your assistant.">
+            <div className="space-y-3 text-sm text-ink-muted">
+              <p>Choose Connect in your assistant, sign in with your Life Portal email and password, then allow nutrition access. You do not need to copy a token.</p>
+              <p>To stop access from connected assistants, disconnect them here. You can reconnect at any time.</p>
+              <button
+                type="button"
+                className="btn-ghost"
+                disabled={pending}
+                onClick={() => run(async () => {
+                  await api.post('/mcp/oauth/revoke', {});
+                  setDisconnected(true);
+                }, { revalidate: false })}
+              >
+                {pending ? 'Disconnecting…' : 'Disconnect all signed-in assistants'}
+              </button>
+              {disconnected && <p role="status">Signed-in assistants disconnected. Manually generated tokens are still active.</p>}
+            </div>
+          </Panel>
+        )}
+        <Panel title="Manual token connection" description="This token lets AI assistants access your nutrition data.">
           {token ? (
             <div className="space-y-3">
               <div className="rounded-lg border border-line bg-surface-sunken p-3">
@@ -57,7 +79,7 @@ function McpSetup() {
                   {copied ? 'Copied!' : 'Copy Token'}
                 </button>
                 <span className="text-xs text-ink-faint">
-                  Expires: {new Date(expiresAt!).toLocaleDateString()}
+                  Expires: {expiresAt ? new Date(expiresAt).toLocaleDateString() : ''}
                 </span>
               </div>
               <p className="text-xs text-amber-400">

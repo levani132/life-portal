@@ -12,6 +12,8 @@ export interface AppConfig {
    * process to bind it — there only the API runs, so there is nothing to collide with.
    */
   port: number;
+  /** Canonical API origin enabling the MCP OAuth server. */
+  mcpOAuthIssuer?: string;
   mongoUri: string;
   jwtSecret: string;
   /**
@@ -66,6 +68,17 @@ function required(name: string, value: string | undefined): string {
   return value.trim();
 }
 
+function oauthIssuer(): string | undefined {
+  const value = process.env['MCP_OAUTH_ISSUER']?.trim();
+  if (!value) return undefined;
+  const url = new URL(value);
+  if (url.username || url.password || url.search || url.hash || url.pathname !== '/' ||
+      (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname)))) {
+    throw new Error('MCP_OAUTH_ISSUER must be an HTTPS origin (HTTP loopback is allowed for development).');
+  }
+  return url.origin;
+}
+
 export function loadConfig(): AppConfig {
   const jwtSecret = required('JWT_SECRET', process.env['JWT_SECRET']);
   if (jwtSecret.length < 32) {
@@ -74,6 +87,7 @@ export function loadConfig(): AppConfig {
 
   return {
     port: positiveInt('API_PORT', process.env['API_PORT'] ?? process.env['PORT'], 3333),
+    mcpOAuthIssuer: oauthIssuer(),
     mongoUri: required('MONGODB_URI', process.env['MONGODB_URI']),
     jwtSecret,
     accessTokenTtlSeconds: positiveInt('ACCESS_TOKEN_TTL_SECONDS', process.env['ACCESS_TOKEN_TTL_SECONDS'], 900),

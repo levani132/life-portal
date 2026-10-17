@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-10-18 — Sign in to connect an assistant from your phone
+
+Life Portal now supports an OAuth sign-in and approval screen for nutrition assistants.
+After enabling it on the server and updating the plugin connection, connect from ChatGPT on
+an iPhone with your Life Portal email and password instead of copying a token. Connected
+assistants can be disconnected from Settings → AI Assistant. Existing manual tokens still work.
+MCP sessions now verify credentials and account ownership on every request.
+
 ## 2026-09-04 — Sell shares, and say where the money goes
 
 Each purchase on the Stocks page now has a *sell* action: how many shares (part of a lot is

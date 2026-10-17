@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { McpOAuthService } from './mcp/oauth.service';
 import { AppModule } from './app/app.module';
 import { loadConfig } from './config/configuration';
 
@@ -11,6 +12,12 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
   app.setGlobalPrefix('api');
+  const oauth = app.get(McpOAuthService);
+  if (oauth.enabled) {
+    // Render terminates TLS one proxy hop away. Never trust arbitrary forwarded hosts.
+    app.getHttpAdapter().getInstance().set('trust proxy', 1);
+    app.use(oauth.router());
+  }
 
   app.useGlobalPipes(
     new ValidationPipe({

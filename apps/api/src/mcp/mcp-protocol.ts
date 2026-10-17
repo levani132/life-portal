@@ -51,6 +51,7 @@ function createMcpServer(userId: string, nutrition: NutritionService): McpServer
   server.registerTool(
     'get_nutrition_day',
     {
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['nutrition'] }] },
       description: 'Get full nutrition data for a specific day including meals, macros, and targets.',
       inputSchema: {
         day: z.string().optional().describe('Date in YYYY-MM-DD format. Defaults to today.'),
@@ -81,6 +82,7 @@ function createMcpServer(userId: string, nutrition: NutritionService): McpServer
   server.registerTool(
     'log_meal',
     {
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['nutrition'] }] },
       description: 'Log a meal entry. Requires food ID, day, slot, and amount.',
       inputSchema: {
         foodId: z.string().describe('MongoDB ID of the food'),
@@ -108,6 +110,7 @@ function createMcpServer(userId: string, nutrition: NutritionService): McpServer
   server.registerTool(
     'update_meal',
     {
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['nutrition'] }] },
       description: 'Update an existing meal entry.',
       inputSchema: {
         entryId: z.string().describe('MongoDB ID of the meal entry'),
@@ -134,6 +137,7 @@ function createMcpServer(userId: string, nutrition: NutritionService): McpServer
   server.registerTool(
     'delete_meal',
     {
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['nutrition'] }] },
       description: 'Delete a meal entry.',
       inputSchema: {
         entryId: z.string().describe('MongoDB ID of the meal entry'),
@@ -149,6 +153,7 @@ function createMcpServer(userId: string, nutrition: NutritionService): McpServer
   server.registerTool(
     'list_foods',
     {
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['nutrition'] }] },
       description: 'List foods from the database. Can filter by search query.',
       inputSchema: {
         q: z.string().optional().describe('Search query'),
@@ -166,6 +171,7 @@ function createMcpServer(userId: string, nutrition: NutritionService): McpServer
   server.registerTool(
     'create_food',
     {
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['nutrition'] }] },
       description: 'Add a new food to the database.',
       inputSchema: {
         name: z.string().describe('Food name'),
@@ -205,6 +211,7 @@ function createMcpServer(userId: string, nutrition: NutritionService): McpServer
   server.registerTool(
     'update_food',
     {
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['nutrition'] }] },
       description: 'Update an existing food.',
       inputSchema: {
         foodId: z.string().describe('MongoDB ID of the food'),
@@ -241,6 +248,7 @@ function createMcpServer(userId: string, nutrition: NutritionService): McpServer
   server.registerTool(
     'delete_food',
     {
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['nutrition'] }] },
       description: 'Delete a food. Logged foods are archived instead.',
       inputSchema: {
         foodId: z.string().describe('MongoDB ID of the food'),
@@ -256,6 +264,7 @@ function createMcpServer(userId: string, nutrition: NutritionService): McpServer
   server.registerTool(
     'get_profile',
     {
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['nutrition'] }] },
       description: 'Get nutrition profile and calculated targets.',
       inputSchema: {},
     },
@@ -273,6 +282,7 @@ function createMcpServer(userId: string, nutrition: NutritionService): McpServer
   server.registerTool(
     'update_profile',
     {
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['nutrition'] }] },
       description: 'Update nutrition profile settings.',
       inputSchema: {
         sex: z.enum(['male', 'female']).optional(),
@@ -298,6 +308,7 @@ function createMcpServer(userId: string, nutrition: NutritionService): McpServer
   server.registerTool(
     'log_weight',
     {
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['nutrition'] }] },
       description: 'Log a weigh-in.',
       inputSchema: {
         day: z.string().optional().describe('YYYY-MM-DD, defaults to today'),
@@ -322,6 +333,7 @@ function createMcpServer(userId: string, nutrition: NutritionService): McpServer
   server.registerTool(
     'get_weigh_ins',
     {
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['nutrition'] }] },
       description: 'Get all weigh-in records.',
       inputSchema: {},
     },
@@ -354,6 +366,7 @@ export async function handleMcpRequest(
   res: ServerResponse,
   nutrition: NutritionService,
   verifyToken: (token: string) => Promise<string>,
+  metadataUrl?: string,
 ): Promise<void> {
   const method = req.method?.toUpperCase();
   const sessionId = req.headers['mcp-session-id'] as string | undefined;
@@ -362,21 +375,26 @@ export async function handleMcpRequest(
   const authHeader = req.headers['authorization'];
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
 
+  // A session ID is routing information, never an authentication credential.
+  let userId: string;
+  try {
+    if (!token) throw new Error('Missing credential');
+    userId = await verifyToken(token);
+  } catch {
+    res.writeHead(401, {
+      'Content-Type': 'application/json',
+      ...(metadataUrl ? { 'WWW-Authenticate': `Bearer resource_metadata="${metadataUrl}", scope="nutrition"` } : {}),
+    });
+    res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32001, message: 'Authorization required' }, id: null }));
+    return;
+  }
+
   try {
     if (method === 'POST') {
       const body = req.body;
 
       // Check if this is an initialization request
       if (!sessionId && isInitializeRequest(body)) {
-        // Require auth for new sessions
-        if (!token) {
-          res.writeHead(401, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32001, message: 'Authorization required' }, id: null }));
-          return;
-        }
-
-        const userId = await verifyToken(token);
-
         if (sessions.size >= MAX_SESSIONS) {
           res.writeHead(503, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32000, message: 'Too many sessions' }, id: null }));
@@ -405,7 +423,7 @@ export async function handleMcpRequest(
       // Existing session
       if (sessionId) {
         const session = sessions.get(sessionId);
-        if (!session) {
+        if (!session || session.userId !== userId) {
           res.writeHead(404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32001, message: 'Session not found' }, id: null }));
           return;
@@ -429,7 +447,7 @@ export async function handleMcpRequest(
       }
 
       const session = sessions.get(sessionId);
-      if (!session) {
+      if (!session || session.userId !== userId) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32001, message: 'Session not found' }, id: null }));
         return;

@@ -860,3 +860,18 @@ free-money window closed on the wrong date. Three options were considered.
 The occurrence expansion pads its window by the largest shift among the overrides, so a payday
 moved into the window from just outside it is found and one moved out of it is dropped —
 `incomeOccurrences()` has the tests.
+
+## 2026-10-18 · MCP OAuth supports phone sign-in without changing dashboard sessions
+
+A fixed token cannot supply the plugin portal's missing token-entry flow. The API now offers
+OAuth authorization code + S256 PKCE using the existing MCP SDK and explicit nutrition consent.
+DCR avoids a manually provisioned shared client secret and supports host-specific callbacks.
+The canonical issuer is configured, not inferred from untrusted request headers. Mongo stores
+registrations and hashed expiring grants so Render restarts do not disconnect every assistant.
+Client registration metadata is encrypted because confidential clients include a shared secret.
+
+The consent page checks the existing account password without calling `login()`, which would
+rotate the dashboard refresh token. OAuth tokens are independent, opaque, resource-bound and
+accepted only by MCP. Existing manually generated tokens retain their behavior. Every transport
+request now verifies a credential and session ownership: a session ID must never become a
+substitute bearer token. Users can revoke OAuth connections from the AI Assistant settings.
