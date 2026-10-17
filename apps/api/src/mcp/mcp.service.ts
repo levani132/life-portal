@@ -245,6 +245,70 @@ export class McpService {
     };
   }
 
+  /** OpenAPI 3.0 schema for ChatGPT Actions. */
+  openApiSchema() {
+    return {
+      openapi: '3.0.0',
+      info: {
+        title: 'Life Portal Nutrition API',
+        version: '1.0.0',
+        description: 'AI assistant API for nutrition tracking in Life Portal',
+      },
+      servers: [{ url: '/api/mcp' }],
+      paths: {
+        '/call': {
+          post: {
+            operationId: 'callTool',
+            summary: 'Execute a nutrition tool',
+            requestBody: {
+              required: true,
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    required: ['tool'],
+                    properties: {
+                      tool: {
+                        type: 'string',
+                        enum: [
+                          'get_nutrition_day', 'log_meal', 'update_meal', 'delete_meal',
+                          'list_foods', 'create_food', 'update_food', 'delete_food',
+                          'get_profile', 'update_profile', 'log_weight', 'get_weigh_ins',
+                        ],
+                        description: 'Tool to execute',
+                      },
+                      arguments: {
+                        type: 'object',
+                        description: 'Tool arguments (see /tools for schema)',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            responses: {
+              '200': { description: 'Tool result' },
+              '401': { description: 'Invalid or missing token' },
+            },
+            security: [{ bearerAuth: [] }],
+          },
+        },
+        '/tools': {
+          get: {
+            operationId: 'listTools',
+            summary: 'List available tools and their schemas',
+            responses: { '200': { description: 'Tool definitions' } },
+          },
+        },
+      },
+      components: {
+        securitySchemes: {
+          bearerAuth: { type: 'http', scheme: 'bearer' },
+        },
+      },
+    };
+  }
+
   /** Execute a tool and return the result. */
   async callTool(
     userId: string,

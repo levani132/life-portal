@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Module, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Module, Post, Query } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { CurrentUser, Public } from '../auth/current-user.decorator';
 import { loadConfig } from '../config/configuration';
@@ -30,12 +30,34 @@ export class McpController {
     return this.mcp.listTools();
   }
 
-  /** Execute a tool. Auth via MCP token in the request body. */
+  /** OpenAPI schema for ChatGPT Actions. */
+  @Public()
+  @Get('openapi.json')
+  openApiSchema() {
+    return this.mcp.openApiSchema();
+  }
+
+  /**
+   * Execute a tool.
+   * Auth via either:
+   * - Authorization: Bearer <token> header (ChatGPT, standard OAuth)
+   * - token field in request body (MCP protocol)
+   */
   @Public()
   @Post('call')
-  async callTool(@Body() dto: McpToolCallDto) {
-    const userId = await this.mcp.verifyToken(dto.token);
-    return this.mcp.callTool(userId, dto.tool, dto.arguments);
+  async callTool(
+    @Headers('authorization') authHeader: string | undefined,
+    @Body() dto: McpToolCallDto,
+  ) {
+    const token = this.extractToken(authHeader) ?? dto.token;
+    const userId = await this.mcp.verifyToken(token);
+    return this.mcp.callTool(userId, dto.tool, dto.arguments ?? {});
+  }
+
+  /** Extract Bearer token from Authorization header. */
+  private extractToken(authHeader: string | undefined): string | undefined {
+    if (!authHeader?.startsWith('Bearer ')) return undefined;
+    return authHeader.slice(7);
   }
 
   /** SSE endpoint for MCP protocol. */

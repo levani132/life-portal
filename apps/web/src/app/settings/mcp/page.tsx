@@ -97,18 +97,21 @@ function McpSetup() {
             <div>
               <h4 className="mb-2 text-sm font-medium text-ink">For ChatGPT / Custom GPTs</h4>
               <p className="mb-2 text-xs text-ink-muted">
-                Use these endpoints in your GPT&apos;s Actions:
+                In your GPT&apos;s Actions configuration:
               </p>
+              <div className="space-y-2 rounded-lg border border-line bg-surface-sunken p-3 text-xs">
+                <p><span className="text-ink-faint">Authentication:</span> API Key</p>
+                <p><span className="text-ink-faint">Auth Type:</span> Bearer</p>
+                <p><span className="text-ink-faint">API Key:</span> YOUR_TOKEN</p>
+              </div>
+              <p className="mt-2 mb-2 text-xs text-ink-muted">OpenAPI schema URL:</p>
               <pre className="overflow-x-auto rounded-lg border border-line bg-surface-sunken p-3 text-xs">
-{`Base URL: ${apiUrl}
-
-POST /call
-Body: {
-  "token": "YOUR_TOKEN",
-  "tool": "tool_name",
-  "arguments": { ... }
-}`}
+{`${apiUrl.replace('/mcp', '')}/mcp/openapi.json`}
               </pre>
+              <p className="mt-2 text-xs text-ink-faint">
+                Or manually configure: POST to <code className="text-sky-400">{apiUrl}/call</code> with body:
+                <code className="ml-1">{'{"tool": "tool_name", "arguments": {...}}'}</code>
+              </p>
             </div>
 
             <div>
