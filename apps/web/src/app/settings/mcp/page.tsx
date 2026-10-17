@@ -51,7 +51,12 @@ function McpSetup() {
         {oauth?.enabled && (
           <Panel title="Connect from your phone" description="Sign in to Life Portal when connecting your assistant.">
             <div className="space-y-3 text-sm text-ink-muted">
-              <p>Choose Connect in your assistant, sign in with your Life Portal email and password, then allow nutrition access. You do not need to copy a token.</p>
+              <ol className="list-decimal space-y-2 pl-5">
+                <li>Open your Life Portal Nutrition Assistant plugin in ChatGPT and choose Connect.</li>
+                <li>Sign in with your Life Portal email and password, then allow nutrition access. You do not need to copy a token.</li>
+                <li>Start a new Work chat, select the plugin with @, and ask: &ldquo;Show today&apos;s meals and macros.&rdquo;</li>
+              </ol>
+              <p>If ChatGPT says &ldquo;Desktop only&rdquo;, the plugin needs its hosted connection updated. Copying a token will not enable it on your phone.</p>
               <p>To stop access from connected assistants, disconnect them here. You can reconnect at any time.</p>
               <button
                 type="button"
@@ -93,7 +98,7 @@ function McpSetup() {
           )}
         </Panel>
 
-        <Panel title="2. Connect to ChatGPT" description="Use the MCP protocol endpoint.">
+        <Panel title="Connection details" description="For setting up a connection or a manual-token client.">
           <div className="space-y-4">
             <div>
               <h4 className="mb-2 text-sm font-medium text-ink">MCP Connection URL</h4>
@@ -122,7 +127,7 @@ function McpSetup() {
             <div>
               <h4 className="mb-2 text-sm font-medium text-ink">Authentication</h4>
               <p className="mb-2 text-xs text-ink-muted">
-                When connecting, use your MCP token as a Bearer token in the Authorization header:
+                For clients that accept a manual token, send it as a Bearer token. ChatGPT phone connections use sign-in instead:
               </p>
               <pre className="overflow-x-auto rounded-lg border border-line bg-surface-sunken p-3 text-xs">
 {`Authorization: Bearer YOUR_TOKEN`}
@@ -161,7 +166,7 @@ function McpSetup() {
           </div>
         </Panel>
 
-        <Panel title="3. Available Tools" description="What your AI assistant can do with your nutrition data.">
+        <Panel title="Available Tools" description="What your AI assistant can do with your nutrition data.">
           <div className="grid gap-3 sm:grid-cols-2">
             <ToolCard
               name="get_nutrition_day"
