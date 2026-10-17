@@ -115,11 +115,13 @@ describe('MCP OAuth HTTP flow', () => {
     const tokens = await response.json();
     expect((await provider.verifyAccessToken(tokens.access_token)).extra?.['userId']).toBe('owner-1');
     expect((await token(fields)).status).toBe(400);
-    const refresh = { grant_type: 'refresh_token', client_id: client.client_id, refresh_token: tokens.refresh_token, resource: provider.resource };
+    const refresh = { grant_type: 'refresh_token', client_id: client.client_id, refresh_token: tokens.refresh_token };
+    expect((await token({ ...refresh, resource: 'https://evil.example/mcp' })).status).toBe(400);
     expect((await token({ ...refresh, client_id: other.client_id })).status).toBe(400);
     expect((await token({ ...refresh, scope: 'finance' })).status).toBe(400);
     const rotated = await (await token(refresh)).json();
     expect(rotated.refresh_token).not.toBe(tokens.refresh_token);
+    expect((await provider.verifyAccessToken(rotated.access_token)).resource?.href).toBe(provider.resource);
     expect((await token(refresh)).status).toBe(400);
     expect((await fetch(`${origin}/revoke`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: client.client_id, token: rotated.refresh_token }) })).status).toBe(200);
     await expect(provider.verifyAccessToken(rotated.access_token)).rejects.toThrow();

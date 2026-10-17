@@ -122,7 +122,8 @@ The AI translates these into tool calls using the schema from `GET /mcp/tools`.
   rotating or replacing the dashboard refresh token. The page names the callback origin rather
   than trusting a self-reported client display name.
 - Codes expire after 60 seconds, access tokens after one hour, refresh tokens after 30 days.
-  Refresh tokens rotate and may only narrow scopes. Revocation invalidates the entire grant,
+  Refresh tokens rotate and may only narrow scopes. Refresh requests may omit `resource` to
+  inherit the original audience; an explicit different audience is rejected. Revocation invalidates the entire grant,
   including outstanding access tokens; the settings action revokes all the user's OAuth grants.
 - Tokens are opaque and scoped to `nutrition` and the exact `/api/mcp` resource. They never
   authorize normal JWT dashboard/finance routes. The MCP server resolves the account from the

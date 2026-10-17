@@ -170,9 +170,11 @@ export class McpOAuthService implements OAuthServerProvider {
   }
 
   async exchangeRefreshToken(client: OAuthClientInformationFull, refreshToken: string, scopes?: string[], resource?: URL): Promise<OAuthTokens> {
-    this.validateResource(resource);
+    // Refresh may omit resource and inherit the original grant (RFC 8707). It may never
+    // switch audiences, even if the client supplies a new resource explicitly.
+    if (resource) this.validateResource(resource);
     const row = await this.lookup(refreshToken, 'refresh', client.client_id);
-    if (!row || (scopes && scopes.some((scope) => !row.scopes.includes(scope)))) throw new InvalidGrantError('Invalid refresh token or scopes.');
+    if (!row || row.resource !== this.resource || (scopes && scopes.some((scope) => !row.scopes.includes(scope)))) throw new InvalidGrantError('Invalid refresh token or scopes.');
     const consumed = await this.credentials.findOneAndDelete({ key: row.key, kind: 'refresh', expiresAt: { $gt: new Date() } }).lean();
     if (!consumed) throw new InvalidGrantError('Refresh token already used. Reconnect Life Portal.');
     return this.issueTokens({ ...consumed, scopes: scopes ?? consumed.scopes });
