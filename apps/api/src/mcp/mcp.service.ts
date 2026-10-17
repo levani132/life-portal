@@ -245,10 +245,10 @@ export class McpService {
     };
   }
 
-  /** OpenAPI 3.0 schema for ChatGPT Actions. */
+  /** OpenAPI 3.1 schema for ChatGPT Actions. */
   openApiSchema(baseUrl: string) {
     return {
-      openapi: '3.0.0',
+      openapi: '3.1.0',
       info: {
         title: 'Life Portal Nutrition API',
         version: '1.0.0',
@@ -264,30 +264,15 @@ export class McpService {
               required: true,
               content: {
                 'application/json': {
-                  schema: {
-                    type: 'object',
-                    required: ['tool'],
-                    properties: {
-                      tool: {
-                        type: 'string',
-                        enum: [
-                          'get_nutrition_day', 'log_meal', 'update_meal', 'delete_meal',
-                          'list_foods', 'create_food', 'update_food', 'delete_food',
-                          'get_profile', 'update_profile', 'log_weight', 'get_weigh_ins',
-                        ],
-                        description: 'Tool to execute',
-                      },
-                      arguments: {
-                        type: 'object',
-                        description: 'Tool arguments (see /tools for schema)',
-                      },
-                    },
-                  },
+                  schema: { $ref: '#/components/schemas/ToolCall' },
                 },
               },
             },
             responses: {
-              '200': { description: 'Tool result' },
+              '200': {
+                description: 'Tool result',
+                content: { 'application/json': { schema: { $ref: '#/components/schemas/ToolResult' } } },
+              },
               '401': { description: 'Invalid or missing token' },
             },
             security: [{ bearerAuth: [] }],
@@ -297,11 +282,43 @@ export class McpService {
           get: {
             operationId: 'listTools',
             summary: 'List available tools and their schemas',
-            responses: { '200': { description: 'Tool definitions' } },
+            responses: {
+              '200': {
+                description: 'Tool definitions',
+                content: { 'application/json': { schema: { type: 'object' } } },
+              },
+            },
           },
         },
       },
       components: {
+        schemas: {
+          ToolCall: {
+            type: 'object',
+            required: ['tool'],
+            properties: {
+              tool: {
+                type: 'string',
+                enum: [
+                  'get_nutrition_day', 'log_meal', 'update_meal', 'delete_meal',
+                  'list_foods', 'create_food', 'update_food', 'delete_food',
+                  'get_profile', 'update_profile', 'log_weight', 'get_weigh_ins',
+                ],
+                description: 'Tool to execute',
+              },
+              arguments: {
+                type: 'object',
+                description: 'Tool arguments - see GET /tools for each tool schema',
+              },
+            },
+          },
+          ToolResult: {
+            type: 'object',
+            properties: {
+              result: { type: 'object', description: 'Tool execution result' },
+            },
+          },
+        },
         securitySchemes: {
           bearerAuth: { type: 'http', scheme: 'bearer' },
         },
