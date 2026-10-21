@@ -8,8 +8,13 @@ import type {
   FoodWithUsage,
   MealSlot,
   WidgetCard,
+  PortalState,
 } from '@life-portal/shared-types';
-import { arrangeWidgets, formatCents, formatDay } from '@life-portal/shared-domain';
+import {
+  arrangeWidgets,
+  formatCents,
+  formatDay,
+} from '@life-portal/shared-domain';
 import { AppShell } from '../components/app-shell';
 import { LogFoodModal } from '../components/log-food-modal';
 import { SortableGrid, type SortableState } from '../components/sortable-grid';
@@ -66,11 +71,14 @@ export default function DashboardPage() {
 
 function Dashboard() {
   const { data, error, isLoading } = useApi<DashboardResponse>('/dashboard');
+  const portal = useApi<PortalState>('/portal');
   // The one quick action a card may carry (constitution principle I, amended 1.1.0). The foods
   // and the profile's day-start hour come from the food widget's own endpoint, so the dashboard
   // payload stays a summary.
   const [logging, setLogging] = useState<MealSlot | null>(null);
-  const { data: food } = useApi<{ foods: FoodWithUsage[] }>(logging ? '/nutrition' : null);
+  const { data: food } = useApi<{ foods: FoodWithUsage[] }>(
+    logging ? '/nutrition' : null,
+  );
 
   const [editing, setEditing] = useState(false);
   /**
@@ -82,7 +90,10 @@ function Dashboard() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const cards = useMemo(
-    () => (pendingOrder ? arrangeWidgets(data?.cards ?? [], pendingOrder) : (data?.cards ?? [])),
+    () =>
+      pendingOrder
+        ? arrangeWidgets(data?.cards ?? [], pendingOrder)
+        : (data?.cards ?? []),
     [data?.cards, pendingOrder],
   );
 
@@ -95,7 +106,9 @@ function Dashboard() {
       await revalidate('/dashboard');
       setPendingOrder(null);
     } catch {
-      setSaveError('Could not save the new arrangement. It will be back where it was on reload.');
+      setSaveError(
+        'Could not save the new arrangement. It will be back where it was on reload.',
+      );
     }
   }, []);
 
@@ -128,25 +141,45 @@ function Dashboard() {
     <>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Where you stand</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Your Home</h1>
           <p className="mt-1 text-sm text-ink-muted">{formatDay(data.today)}</p>
         </div>
-        <div className="text-right">
-          <p className="text-xs uppercase tracking-wide text-ink-faint">Net position</p>
-          <p
-            className={clsx(
-              'tabular text-2xl font-semibold',
-              data.netPositionCents >= 0 ? 'text-emerald-400' : 'text-rose-400',
-            )}
-          >
-            {formatCents(data.netPositionCents, data.displayCurrency)}
-          </p>
-          <p className="text-xs text-ink-faint">
-            cash + items + shares − debts
-            <EstimateMark basis="Items at their realistic price; shares at market value where a quote exists, at cost otherwise." />
-          </p>
-        </div>
+        {data.netPositionCents != null && (
+          <div className="text-right">
+            <p className="text-xs uppercase tracking-wide text-ink-faint">
+              Net position
+            </p>
+            <p
+              className={clsx(
+                'tabular text-2xl font-semibold',
+                data.netPositionCents >= 0
+                  ? 'text-emerald-400'
+                  : 'text-rose-400',
+              )}
+            >
+              {formatCents(data.netPositionCents, data.displayCurrency)}
+            </p>
+            <p className="text-xs text-ink-faint">
+              cash + items + shares − debts
+              <EstimateMark basis="Items at their realistic price; shares at market value where a quote exists, at cost otherwise." />
+            </p>
+          </div>
+        )}
       </div>
+
+      {portal.data && !portal.data.setupCompleted && (
+        <div className="card mb-6 flex flex-wrap items-center justify-between gap-4 border-sky-500/30 p-5">
+          <div>
+            <h2 className="font-medium">Make this portal yours</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              Choose your modules, arrange Home and review your privacy.
+            </p>
+          </div>
+          <Link href="/setup" className="btn btn-primary">
+            {portal.data.setupStep > 0 ? 'Continue setup' : 'Set up my portal'}
+          </Link>
+        </div>
+      )}
 
       {data.attention.length > 0 && (
         <ul className="mb-6 space-y-2">
@@ -177,7 +210,12 @@ function Dashboard() {
       )}
 
       {cards.length === 0 ? (
-        <EmptyState message="No widgets yet. Run `npm run seed` to set up your boards and loan." />
+        <div className="card p-6">
+          <EmptyState message="A little space for what matters to you. Choose a module to get started." />
+          <Link href="/settings/modules" className="btn btn-primary mt-4">
+            Add a module
+          </Link>
+        </div>
       ) : (
         <>
           {/*
@@ -191,11 +229,13 @@ function Dashboard() {
               type="button"
               className={clsx(
                 'text-xs transition',
-                editing ? 'font-medium text-sky-300 hover:text-sky-200' : 'text-ink-faint hover:text-ink',
+                editing
+                  ? 'font-medium text-sky-300 hover:text-sky-200'
+                  : 'text-ink-faint hover:text-ink',
               )}
               onClick={() => setEditing(!editing)}
             >
-              {editing ? 'Done' : 'Rearrange'}
+              {editing ? 'Done' : 'Arrange Home'}
             </button>
           </div>
 
@@ -226,7 +266,7 @@ function Dashboard() {
           {editing && <div className="h-16" aria-hidden />}
 
           {editing && (
-            <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            <div className="pointer-events-none fixed inset-x-0 bottom-16 z-40 flex justify-center p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
               <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-sky-500/40 bg-surface-raised/95 px-4 py-2 text-xs shadow-2xl shadow-black/50 backdrop-blur">
                 <span className="text-sky-200">Hold a card and drag it</span>
                 <span className="text-ink-faint" aria-hidden>
@@ -283,10 +323,17 @@ function SummaryCard({
     <>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className={clsx('h-2 w-2 rounded-full', ACCENT_DOT[card.accent] ?? 'bg-ink-faint')} />
+          <span
+            className={clsx(
+              'h-2 w-2 rounded-full',
+              ACCENT_DOT[card.accent] ?? 'bg-ink-faint',
+            )}
+          />
           <div>
             <h2 className="text-sm font-semibold">{card.title}</h2>
-            {card.subtitle && <p className="text-xs text-ink-faint">{card.subtitle}</p>}
+            {card.subtitle && (
+              <p className="text-xs text-ink-faint">{card.subtitle}</p>
+            )}
           </div>
         </div>
         {editing ? (
@@ -307,18 +354,27 @@ function SummaryCard({
             +
           </button>
         ) : (
-          <span className="text-ink-faint opacity-0 transition group-hover:opacity-100">→</span>
+          <span className="text-ink-faint opacity-0 transition group-hover:opacity-100">
+            →
+          </span>
         )}
       </div>
 
       <dl className="grid grid-cols-3 gap-2">
         {card.stats.map((stat) => (
           <div key={stat.label}>
-            <dd className={clsx('tabular text-base font-semibold', TONE_TEXT[stat.tone ?? 'neutral'])}>
+            <dd
+              className={clsx(
+                'tabular text-base font-semibold',
+                TONE_TEXT[stat.tone ?? 'neutral'],
+              )}
+            >
               {stat.value}
               {stat.estimated && <EstimateMark />}
             </dd>
-            <dt className="mt-0.5 text-[11px] leading-tight text-ink-faint">{stat.label}</dt>
+            <dt className="mt-0.5 text-[11px] leading-tight text-ink-faint">
+              {stat.label}
+            </dt>
           </div>
         ))}
       </dl>
@@ -345,12 +401,18 @@ function SummaryCard({
       }}
       className={clsx(
         'card group flex h-full flex-col gap-4 p-5',
-        !editing && `transition ${ACCENT_RING[card.accent] ?? 'hover:border-ink-faint'}`,
+        !editing &&
+          `transition ${ACCENT_RING[card.accent] ?? 'hover:border-ink-faint'}`,
         editing && !dragging && 'widget-jiggle cursor-grab',
-        dragging && 'scale-[1.02] cursor-grabbing border-sky-500/60 shadow-2xl shadow-black/50',
+        dragging &&
+          'scale-[1.02] cursor-grabbing border-sky-500/60 shadow-2xl shadow-black/50',
       )}
       // Staggered so the cards wobble independently rather than as one block.
-      style={editing && !dragging ? { animationDelay: `${(index % 4) * 90}ms` } : undefined}
+      style={
+        editing && !dragging
+          ? { animationDelay: `${(index % 4) * 90}ms` }
+          : undefined
+      }
     >
       {body}
     </Link>

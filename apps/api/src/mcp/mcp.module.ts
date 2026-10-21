@@ -1,3 +1,4 @@
+import { AccessService, RequireModule } from '../access/access.module';
 import {
   All,
   Body,
@@ -13,7 +14,12 @@ import {
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
 import { McpOAuthService } from './oauth.service';
-import { McpOAuthClient, McpOAuthClientSchema, McpOAuthCredential, McpOAuthCredentialSchema } from './oauth.schema';
+import {
+  McpOAuthClient,
+  McpOAuthClientSchema,
+  McpOAuthCredential,
+  McpOAuthCredentialSchema,
+} from './oauth.schema';
 import { JwtModule } from '@nestjs/jwt';
 import type { Request, Response } from 'express';
 import { CurrentUser, Public, TokenAuth } from '../auth/current-user.decorator';
@@ -35,13 +41,18 @@ import { handleMcpRequest } from './mcp-protocol';
 export class McpController {
   constructor(
     private readonly mcp: McpService,
+    private readonly access: AccessService,
     private readonly nutrition: NutritionService,
     private readonly oauth: McpOAuthService,
   ) {}
 
   /** Generate a long-lived MCP token for AI assistants. Requires normal JWT auth. */
+  @RequireModule('nutrition')
   @Post('token')
-  generateToken(@CurrentUser('userId') userId: string): { token: string; expiresAt: string } {
+  generateToken(@CurrentUser('userId') userId: string): {
+    token: string;
+    expiresAt: string;
+  } {
     return this.mcp.generateToken(userId);
   }
 
@@ -100,6 +111,7 @@ export class McpController {
   @Get('sse')
   async sse(@Query('token') token: string) {
     const userId = await this.mcp.verifyToken(token);
+    await this.access.require(userId, 'nutrition');
     return { userId, status: 'connected' };
   }
 
@@ -115,7 +127,11 @@ export class McpController {
       req as never,
       res as never,
       this.nutrition,
-      (token) => this.verifyCredential(token),
+      async (token) => {
+        const userId = await this.verifyCredential(token);
+        await this.access.require(userId, 'nutrition');
+        return userId;
+      },
       this.oauth.enabled ? this.oauth.metadataUrl : undefined,
     );
   }

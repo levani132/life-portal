@@ -1,3 +1,6 @@
+import type { Currency, ModuleId } from '@life-portal/shared-types';
+import { AccessService } from '../access/access.module';
+import { selectedAvailableModules } from '@life-portal/shared-domain';
 import { Injectable } from '@nestjs/common';
 import type {
   DashboardResponse,
@@ -30,6 +33,7 @@ const SALARY_SOON_DAYS = 5;
 @Injectable()
 export class DashboardService {
   constructor(
+    private readonly access: AccessService,
     private readonly loans: LoansService,
     private readonly cashflow: CashflowService,
     private readonly items: ItemsService,
@@ -55,61 +59,147 @@ export class DashboardService {
    */
   async build(userId: string, today: string): Promise<DashboardResponse> {
     const settings = await this.settings.get(userId);
-    // One rate lookup for the whole dashboard, so every card on it agrees.
-    const { currency, fx } = await this.fx.displayFor(userId, today);
-
-    const [loans, cashflow, items, stocks, boardSummaries, personal, nutrition, spending] =
-      await Promise.all([
-        this.loans.summary(userId, today),
-        this.cashflow.summary(userId, today),
-        this.items.summary(userId, currency, fx),
-        this.stocks.summary(userId, today, { taxRate: settings.capitalGainsTaxRate, currency, fx }),
-        this.boards.summaries(userId, today),
-        this.personal.summary(userId, today, currency, fx),
-        this.nutrition.summary(userId, today),
-        this.spending.summary(userId, today),
-      ]);
-
-    const cards: WidgetCard[] = [
-      this.loansCard(loans, currency),
-      this.cashflowCard(cashflow, today, currency),
-      this.itemsCard(items, currency),
-      this.stocksCard(stocks, currency),
-      ...boardSummaries.map((board, index) => this.boardCard(board, index)),
-      this.personalCard(personal, currency),
-      this.nutritionCard(nutrition),
-      this.spendingCard(spending),
-    ];
-
-    // Net position: what is mine, minus what is owed. Stocks are counted at market value
-    // where a quote exists, at cost otherwise, so an unpriced holding is not counted as zero.
-    // Every term is already in `currency` because each summary converted its own rows — this
-    // used to add dollars to lari, which is what made the headline figure meaningless.
+    const identity = await this.access.forUser(userId);
+    const selected = selectedAvailableModules(
+      settings.selectedModules,
+      identity.access,
+    );
+    const has = (id: ModuleId) => selected.includes(id);
+    const finance = ['money', 'stocks', 'loans', 'items', 'personal'].some(
+      (id) => selected.includes(id as ModuleId),
+    );
+    const { currency, fx } = finance
+      ? await this.fx.displayFor(userId, today)
+      : {
+          currency: settings.displayCurrency as Currency,
+          fx: {
+            displayCurrency: settings.displayCurrency as Currency,
+            rates: {},
+          },
+        };
+    const [
+      loans,
+      cashflow,
+      items,
+      stocks,
+      allBoards,
+      personal,
+      nutrition,
+      spending,
+    ] = await Promise.all([
+      has('loans') ? this.loans.summary(userId, today) : undefined,
+      has('money') ? this.cashflow.summary(userId, today) : undefined,
+      has('items') ? this.items.summary(userId, currency, fx) : undefined,
+      has('stocks')
+        ? this.stocks.summary(userId, today, {
+            taxRate: settings.capitalGainsTaxRate,
+            currency,
+            fx,
+          })
+        : undefined,
+      has('projects') || has('epam')
+        ? this.boards.summaries(userId, today)
+        : [],
+      has('personal')
+        ? this.personal.summary(userId, today, currency, fx)
+        : undefined,
+      has('nutrition') ? this.nutrition.summary(userId, today) : undefined,
+      has('money') ? this.spending.summary(userId, today) : undefined,
+    ]);
+    const boardSummaries = allBoards.filter((board) =>
+      board.key === 'epam' ? has('epam') : has('projects'),
+    );
+    const cards: WidgetCard[] = [];
+    if (loans) cards.push(this.loansCard(loans, currency));
+    if (cashflow && spending) {
+      const card = this.cashflowCard(cashflow, today, currency);
+      const daily = this.spendingCard(spending);
+      cards.push({
+        ...card,
+        title: 'Money',
+        subtitle: 'Balance, budget and spending',
+        stats: [card.stats[0], card.stats[1], daily.stats[0]],
+        alert: card.alert ?? daily.alert,
+      });
+    }
+    if (items) cards.push(this.itemsCard(items, currency));
+    if (stocks) cards.push(this.stocksCard(stocks, currency));
+    if (personal) cards.push(this.personalCard(personal, currency));
+    if (nutrition) cards.push(this.nutritionCard(nutrition));
+    if (has('projects')) {
+      const projects = boardSummaries.filter((board) => board.key !== 'epam');
+      cards.push({
+        key: 'projects',
+        id: 'projects',
+        title: 'Projects',
+        href: '/projects',
+        icon: 'folder',
+        accent: 'violet',
+        tone: 'neutral',
+        order: 10,
+        stats: [
+          { label: 'Projects', value: String(projects.length) },
+          {
+            label: 'Open tasks',
+            value: String(projects.reduce((n, p) => n + p.openTaskCount, 0)),
+          },
+          {
+            label: 'Overdue',
+            value: String(projects.reduce((n, p) => n + p.overdueTaskCount, 0)),
+          },
+        ],
+      });
+    }
+    boardSummaries
+      .filter((board) => board.key === 'epam')
+      .forEach((board) => cards.push(this.boardCard(board, 0)));
     const netPositionCents =
-      cashflow.currentBalanceCents +
-      items.expectedProceedsCents +
-      (stocks.totalMarketValueCents ?? stocks.totalCostCents) -
-      loans.totalRemainingCents;
-
+      cashflow && items && stocks && loans
+        ? cashflow.currentBalanceCents +
+          items.expectedProceedsCents +
+          (stocks.totalMarketValueCents ?? stocks.totalCostCents) -
+          loans.totalRemainingCents
+        : undefined;
     return {
       generatedAt: new Date().toISOString(),
       today,
       cards: arrangeWidgets(cards, settings.widgetOrder),
       netPositionCents,
       displayCurrency: currency,
-      summaries: { loans, cashflow, items, stocks, boards: boardSummaries, personal, nutrition },
-      attention: this.attention({ loans, cashflow, stocks, boardSummaries, personal, today }),
+      summaries: {
+        loans,
+        cashflow,
+        items,
+        stocks,
+        boards: boardSummaries,
+        personal,
+        nutrition,
+      },
+      attention: this.attention({
+        loans,
+        cashflow,
+        stocks,
+        boardSummaries,
+        personal,
+        today,
+      }),
     };
   }
 
   // ---------------------------------------------------------------- cards
 
-  private loansCard(loans: DashboardResponse['summaries']['loans'], currency: string): WidgetCard {
+  private loansCard(
+    loans: NonNullable<DashboardResponse['summaries']['loans']>,
+    currency: string,
+  ): WidgetCard {
     const focus = loans.focus;
     const stats: WidgetStat[] = [
       {
         label: focus ? `Owed to ${focus.lender}` : 'Total owed',
-        value: formatCentsCompact(focus?.remainingCents ?? loans.totalRemainingCents, currency),
+        value: formatCentsCompact(
+          focus?.remainingCents ?? loans.totalRemainingCents,
+          currency,
+        ),
         raw: focus?.remainingCents ?? loans.totalRemainingCents,
         tone: loans.totalRemainingCents > 0 ? 'warn' : 'good',
       },
@@ -121,7 +211,9 @@ export class DashboardService {
       },
       {
         label: 'Clear by',
-        value: focus?.worstCasePayoffDate ? formatDay(focus.worstCasePayoffDate) : 'not scheduled',
+        value: focus?.worstCasePayoffDate
+          ? formatDay(focus.worstCasePayoffDate)
+          : 'not scheduled',
         tone: focus?.worstCasePayoffDate ? 'neutral' : 'warn',
         estimated: true,
       },
@@ -131,7 +223,10 @@ export class DashboardService {
       key: 'loans',
       id: 'loans',
       title: 'Debts',
-      subtitle: loans.activeCount > 1 ? `${loans.activeCount} active loans` : focus?.lender,
+      subtitle:
+        loans.activeCount > 1
+          ? `${loans.activeCount} active loans`
+          : focus?.lender,
       href: '/loans',
       icon: 'hand-coins',
       accent: 'rose',
@@ -139,7 +234,9 @@ export class DashboardService {
       stats,
       progress: focus?.progressRatio,
       alert:
-        focus && !focus.worstCasePayoffDate ? 'No guaranteed repayment plan — add one' : undefined,
+        focus && !focus.worstCasePayoffDate
+          ? 'No guaranteed repayment plan — add one'
+          : undefined,
       order: 1,
     };
   }
@@ -150,9 +247,15 @@ export class DashboardService {
     currency: string,
   ): WidgetCard {
     const nextIncomeDate = cashflow.nextIncomeDate;
-    const daysToIncome = nextIncomeDate ? diffDays(today, nextIncomeDate) : undefined;
+    const daysToIncome = nextIncomeDate
+      ? diffDays(today, nextIncomeDate)
+      : undefined;
     const tone: WidgetTone =
-      cashflow.freeTodayCents < 0 ? 'bad' : cashflow.freeTodayCents < 20_000 ? 'warn' : 'good';
+      cashflow.freeTodayCents < 0
+        ? 'bad'
+        : cashflow.freeTodayCents < 20_000
+          ? 'warn'
+          : 'good';
 
     return {
       key: 'cashflow',
@@ -178,9 +281,14 @@ export class DashboardService {
         },
         {
           label: 'Salary',
-          value: nextIncomeDate ? relativeDays(today, nextIncomeDate) : 'not set',
+          value: nextIncomeDate
+            ? relativeDays(today, nextIncomeDate)
+            : 'not set',
           raw: daysToIncome,
-          tone: daysToIncome != null && daysToIncome <= SALARY_SOON_DAYS ? 'good' : 'neutral',
+          tone:
+            daysToIncome != null && daysToIncome <= SALARY_SOON_DAYS
+              ? 'good'
+              : 'neutral',
         },
       ],
       alert:
@@ -197,10 +305,14 @@ export class DashboardService {
    * One quick action only (principle I): adding a payment by hand, which is the thing that
    * happens often and would otherwise start with a navigation.
    */
-  private spendingCard(spending: Awaited<ReturnType<SpendingService['summary']>>): WidgetCard {
+  private spendingCard(
+    spending: Awaited<ReturnType<SpendingService['summary']>>,
+  ): WidgetCard {
     const { remainingTodayCents, dailyBudgetCents, currency } = spending;
-    const ratioLeft = dailyBudgetCents > 0 ? remainingTodayCents / dailyBudgetCents : 1;
-    const tone: WidgetTone = remainingTodayCents <= 0 ? 'bad' : ratioLeft < 0.25 ? 'warn' : 'good';
+    const ratioLeft =
+      dailyBudgetCents > 0 ? remainingTodayCents / dailyBudgetCents : 1;
+    const tone: WidgetTone =
+      remainingTodayCents <= 0 ? 'bad' : ratioLeft < 0.25 ? 'warn' : 'good';
 
     // A message the app could not read, or one it can prove never arrived, is money not counted.
     const needsAttention = spending.unparsedCount + spending.gapCount;
@@ -247,12 +359,17 @@ export class DashboardService {
     };
   }
 
-  private itemsCard(items: DashboardResponse['summaries']['items'], currency: string): WidgetCard {
+  private itemsCard(
+    items: NonNullable<DashboardResponse['summaries']['items']>,
+    currency: string,
+  ): WidgetCard {
     return {
       key: 'items',
       id: 'items',
       title: 'Items to sell',
-      subtitle: items.openCount ? `${items.openCount} still to go` : 'nothing listed',
+      subtitle: items.openCount
+        ? `${items.openCount} still to go`
+        : 'nothing listed',
       href: '/items',
       icon: 'tag',
       accent: 'amber',
@@ -272,7 +389,9 @@ export class DashboardService {
           tone: 'good',
         },
       ],
-      alert: items.nearlySoldCount ? `${items.nearlySoldCount} with a buyer waiting` : undefined,
+      alert: items.nearlySoldCount
+        ? `${items.nearlySoldCount} with a buyer waiting`
+        : undefined,
       order: 3,
     };
   }
@@ -282,13 +401,16 @@ export class DashboardService {
     currency: string,
   ): WidgetCard {
     const pnl = stocks.totalUnrealisedPnlPct;
-    const tone: WidgetTone = pnl == null ? 'neutral' : pnl >= 0 ? 'good' : 'bad';
+    const tone: WidgetTone =
+      pnl == null ? 'neutral' : pnl >= 0 ? 'good' : 'bad';
 
     return {
       key: 'stocks',
       id: 'stocks',
       title: 'Stocks',
-      subtitle: stocks.positionCount ? `${stocks.positionCount} positions` : 'no holdings',
+      subtitle: stocks.positionCount
+        ? `${stocks.positionCount} positions`
+        : 'no holdings',
       href: '/stocks',
       icon: 'trending-up',
       accent: 'sky',
@@ -326,11 +448,15 @@ export class DashboardService {
   }
 
   private boardCard(
-    board: DashboardResponse['summaries']['boards'][number],
+    board: NonNullable<DashboardResponse['summaries']['boards']>[number],
     index: number,
   ): WidgetCard {
     const stats: WidgetStat[] = [
-      { label: 'Open', value: String(board.openTaskCount), raw: board.openTaskCount },
+      {
+        label: 'Open',
+        value: String(board.openTaskCount),
+        raw: board.openTaskCount,
+      },
       {
         label: 'Urgent',
         value: String(board.urgentTaskCount),
@@ -364,9 +490,12 @@ export class DashboardService {
     }
 
     const alerts: string[] = [];
-    if (board.needsAttentionCount) alerts.push(`${board.needsAttentionCount} need attention`);
-    if (board.overdueOneOnOneCount) alerts.push(`${board.overdueOneOnOneCount} 1:1s overdue`);
-    if (board.overdueTaskCount) alerts.push(`${board.overdueTaskCount} overdue`);
+    if (board.needsAttentionCount)
+      alerts.push(`${board.needsAttentionCount} need attention`);
+    if (board.overdueOneOnOneCount)
+      alerts.push(`${board.overdueOneOnOneCount} 1:1s overdue`);
+    if (board.overdueTaskCount)
+      alerts.push(`${board.overdueTaskCount} overdue`);
 
     return {
       key: 'board',
@@ -406,16 +535,24 @@ export class DashboardService {
           label: 'Next up',
           value: personal.next ? `${personal.next.daysUntil}d` : '—',
           raw: personal.next?.daysUntil,
-          tone: personal.next && personal.next.daysUntil <= 7 ? 'good' : 'neutral',
+          tone:
+            personal.next && personal.next.daysUntil <= 7 ? 'good' : 'neutral',
         },
-        { label: 'Ideas', value: String(personal.ideaCount), raw: personal.ideaCount },
+        {
+          label: 'Ideas',
+          value: String(personal.ideaCount),
+          raw: personal.ideaCount,
+        },
         {
           label: 'Committed',
           value: formatCentsCompact(personal.upcomingCommittedCents, currency),
           raw: personal.upcomingCommittedCents,
         },
       ],
-      alert: personal.plannedCount === 0 ? 'Nothing booked — plan something' : undefined,
+      alert:
+        personal.plannedCount === 0
+          ? 'Nothing booked — plan something'
+          : undefined,
       order: 20,
     };
   }
@@ -430,7 +567,9 @@ export class DashboardService {
    * Readable before the profile exists: with no targets there is still a calorie count and an
    * invitation to fill the profile in, rather than three dashes or a misleading zero.
    */
-  private nutritionCard(nutrition: DashboardResponse['summaries']['nutrition']): WidgetCard {
+  private nutritionCard(
+    nutrition: NonNullable<DashboardResponse['summaries']['nutrition']>,
+  ): WidgetCard {
     const { targetKcal, leftKcal, proteinLeftG } = nutrition;
     const overBy = leftKcal != null && leftKcal < 0 ? -leftKcal : 0;
     const tone: WidgetTone = !nutrition.targetsAvailable
@@ -454,37 +593,61 @@ export class DashboardService {
       title: 'Food',
       subtitle:
         cheatNote ??
-        (nutrition.entryCount > 0 ? `${nutrition.entryCount} logged today` : 'nothing logged yet'),
+        (nutrition.entryCount > 0
+          ? `${nutrition.entryCount} logged today`
+          : 'nothing logged yet'),
       href: '/nutrition',
       icon: 'utensils',
       accent: 'lime',
       tone,
-      stats: [
-        {
-          label: 'Eaten',
-          value: `${nutrition.eatenKcal} kcal`,
-          raw: nutrition.eatenKcal,
-        },
-        {
-          label: overBy > 0 ? 'Over by' : 'Left today',
-          value: leftKcal == null ? '—' : `${Math.abs(leftKcal)} kcal`,
-          raw: leftKcal,
-          tone,
-          estimated: nutrition.targetsAvailable,
-        },
-        {
-          label: 'Protein left',
-          value: proteinLeftG == null ? '—' : `${Math.max(0, proteinLeftG)} g`,
-          raw: proteinLeftG,
-          tone: proteinLeftG != null && proteinLeftG <= 0 ? 'good' : 'neutral',
-          estimated: nutrition.targetsAvailable,
-        },
-      ],
+      stats: nutrition.targetsAvailable
+        ? [
+            {
+              label: 'Eaten',
+              value: `${nutrition.eatenKcal} kcal`,
+              raw: nutrition.eatenKcal,
+            },
+            {
+              label: overBy > 0 ? 'Over by' : 'Left today',
+              value: leftKcal == null ? '—' : `${Math.abs(leftKcal)} kcal`,
+              raw: leftKcal,
+              tone,
+              estimated: nutrition.targetsAvailable,
+            },
+            {
+              label: 'Protein left',
+              value:
+                proteinLeftG == null ? '—' : `${Math.max(0, proteinLeftG)} g`,
+              raw: proteinLeftG,
+              tone:
+                proteinLeftG != null && proteinLeftG <= 0 ? 'good' : 'neutral',
+              estimated: nutrition.targetsAvailable,
+            },
+          ]
+        : [
+            {
+              label: 'Eaten',
+              value: `${nutrition.eatenKcal} kcal`,
+              raw: nutrition.eatenKcal,
+            },
+            {
+              label: 'Protein',
+              value: `${nutrition.proteinEatenG} g`,
+              raw: nutrition.proteinEatenG,
+            },
+            {
+              label: 'Logged foods',
+              value: String(nutrition.entryCount),
+              raw: nutrition.entryCount,
+            },
+          ],
       progress:
-        targetKcal && targetKcal > 0 ? Math.min(1, nutrition.eatenKcal / targetKcal) : undefined,
+        targetKcal && targetKcal > 0
+          ? Math.min(1, nutrition.eatenKcal / targetKcal)
+          : undefined,
       alert: nutrition.targetsAvailable
         ? undefined
-        : 'No targets yet — add your height, age and weight',
+        : 'Log meals now; set nutrition goals whenever you’re ready',
       quickAction: { kind: 'log-food', label: 'Log food' },
       order: 25,
     };
@@ -494,33 +657,34 @@ export class DashboardService {
     loans: DashboardResponse['summaries']['loans'];
     cashflow: DashboardResponse['summaries']['cashflow'];
     stocks: DashboardResponse['summaries']['stocks'];
-    boardSummaries: DashboardResponse['summaries']['boards'];
+    boardSummaries: NonNullable<DashboardResponse['summaries']['boards']>;
     personal: DashboardResponse['summaries']['personal'];
     today: string;
   }): DashboardResponse['attention'] {
     const out: DashboardResponse['attention'] = [];
 
-    if (input.cashflow.nextIncomeDate) {
-      const days = diffDays(input.today, input.cashflow.nextIncomeDate);
+    if (input.cashflow?.nextIncomeDate) {
+      const days = diffDays(input.today, input.cashflow?.nextIncomeDate);
       if (days >= 0 && days <= SALARY_SOON_DAYS) {
         out.push({
           tone: 'good',
-          message: `Salary lands ${relativeDays(input.today, input.cashflow.nextIncomeDate)} — review the plan before it does.`,
+          message: `Salary lands ${relativeDays(input.today, input.cashflow?.nextIncomeDate)} — review the plan before it does.`,
           href: '/cashflow',
         });
       }
     }
 
-    if (input.cashflow.freeTodayCents < 0) {
+    if (input.cashflow && input.cashflow.freeTodayCents < 0) {
       out.push({
         tone: 'bad',
-        message: 'Committed spending exceeds your balance before the next salary.',
+        message:
+          'Committed spending exceeds your balance before the next salary.',
         href: '/cashflow',
       });
     }
 
     if (
-      input.loans.focus &&
+      input.loans?.focus &&
       !input.loans.focus.worstCasePayoffDate &&
       input.loans.totalRemainingCents > 0
     ) {
@@ -531,10 +695,15 @@ export class DashboardService {
       });
     }
 
-    if (input.stocks.positionCount > 0 && input.stocks.quotesStale) {
+    if (
+      input.stocks &&
+      input.stocks.positionCount > 0 &&
+      input.stocks.quotesStale
+    ) {
       out.push({
         tone: 'warn',
-        message: 'Share prices are stale. Refresh them so the target figures mean something.',
+        message:
+          'Share prices are stale. Refresh them so the target figures mean something.',
         href: '/stocks',
       });
     }
@@ -556,7 +725,7 @@ export class DashboardService {
       }
     }
 
-    if (input.personal.next && input.personal.next.daysUntil <= 7) {
+    if (input.personal?.next && input.personal.next.daysUntil <= 7) {
       out.push({
         tone: 'good',
         message: `${input.personal.next.title} is ${relativeDays(input.today, input.personal.next.date)}.`,

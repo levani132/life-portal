@@ -235,3 +235,27 @@ gracefully).
   enough history to run it.
 - Recipes with per-component units (a spoon, a slice) are out of scope; `servingLabel` is display
   text only.
+
+## 2026-10-22: private sharing baseline
+
+Food and nutrition-profile records now have `privacyVersion: 1`. New records get the marker.
+`ensurePrivateSharing(userId)` resets unversioned foods to private and unversioned profile
+sharing switches/defaults to private, then marks them in the same per-row atomic updates.
+It is safe to retry and does not erase a choice made after migration. Portal/profile reads and
+food edits initialize it. Public browse/import queries require the marker, so unvisited legacy
+accounts cannot continue leaking their old public foods. Migration changes no meal facts,
+quantities, nutrition goals or weight records. Module audiences are separately stored in settings;
+future social views must intersect them with the existing fine-grained food switches.
+
+## Shared nutrition summaries and blocks
+
+`sharedStats(userId, today)` is the only Food projection used in social widgets. It includes
+meal totals, daily targets and/or latest recorded weight only when their individual switches
+are enabled; it never returns full profiles, meal notes, food IDs or body measurements outside
+the enabled categories. Social additionally checks module audiences and both accounts' flags.
+Public food browse, availability counts and import check either-direction blocks through the
+graph service. Previously imported independent copies are not revoked by later blocking.
+
+## Explicit food publications and imports (007)
+
+`NutritionPublicationService` owns the boundary for [food posts](posts.md). It projects only reviewed nutrition facts from owned entries, active foods or saved meals, retaining historical entry facts. Live `shareMeals`/weight/target preferences are not changed by explicit publishing. Imported foods always start private, retain attribution and use a partial unique `(userId, postImportKey)` index for retry/concurrency safety. Saved meals have an analogous optional key. Imports never add meal entries and never overwrite a previous copy. `Food.attribution` is an optional label/URL; `Food.postImportKey` and `SavedMeal.postImportKey` are optional server-owned markers; existing rows need no migration.

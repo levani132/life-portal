@@ -1,5 +1,16 @@
+import type {
+  Audience,
+  ModuleId,
+  PortalPreferences,
+} from '@life-portal/shared-types';
 import { Body, Controller, Get, Injectable, Module, Put } from '@nestjs/common';
-import { InjectModel, MongooseModule, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import {
+  InjectModel,
+  MongooseModule,
+  Prop,
+  Schema,
+  SchemaFactory,
+} from '@nestjs/mongoose';
 import { IsIn, IsInt, IsNumber, IsOptional, Max, Min } from 'class-validator';
 import { Model } from 'mongoose';
 import type { UserSettings as UserSettingsDto } from '@life-portal/shared-types';
@@ -66,6 +77,14 @@ export class UserSettings {
    */
   @Prop({ type: [String], default: [] })
   widgetOrder!: string[];
+
+  @Prop({ type: [String], default: undefined }) selectedModules?: ModuleId[];
+  @Prop({ type: Object }) moduleVisibility?: Partial<
+    Record<ModuleId, Audience>
+  >;
+  @Prop({ default: 0 }) setupStep?: number;
+  @Prop({ default: false }) setupCompleted?: boolean;
+  @Prop({ default: false }) setupDismissed?: boolean;
 }
 
 export const UserSettingsSchema = SchemaFactory.createForClass(UserSettings);
@@ -116,7 +135,9 @@ export const DEFAULT_SETTINGS = {
 
 @Injectable()
 export class SettingsService {
-  constructor(@InjectModel(UserSettings.name) private readonly model: Model<UserSettings>) {}
+  constructor(
+    @InjectModel(UserSettings.name) private readonly model: Model<UserSettings>,
+  ) {}
 
   /**
    * Settings are created on first read rather than at registration, so a user seeded
@@ -131,9 +152,13 @@ export class SettingsService {
     return found.toJSON() as unknown as UserSettingsDto;
   }
 
-  async update(userId: string, dto: UpdateSettingsDto): Promise<UserSettingsDto> {
+  async update(
+    userId: string,
+    dto: UpdateSettingsDto,
+  ): Promise<UserSettingsDto> {
     const patch: Record<string, unknown> = { ...dto };
-    if (dto.fxRates) patch['fxRatesUpdatedAt'] = new Date().toISOString().slice(0, 10);
+    if (dto.fxRates)
+      patch['fxRatesUpdatedAt'] = new Date().toISOString().slice(0, 10);
     return this.write(userId, patch);
   }
 
@@ -142,7 +167,10 @@ export class SettingsService {
    * field on `UpdateSettingsDto`, so the rearrange gesture has exactly one writer and cannot
    * arrive bundled with a currency change.
    */
-  setWidgetOrder(userId: string, widgetOrder: string[]): Promise<UserSettingsDto> {
+  setWidgetOrder(
+    userId: string,
+    widgetOrder: string[],
+  ): Promise<UserSettingsDto> {
     return this.write(userId, { widgetOrder });
   }
 
@@ -152,11 +180,28 @@ export class SettingsService {
    * Its own method for the same reason `setWidgetOrder` has one: reordering the ladder has exactly
    * one writer and cannot arrive bundled with a currency change.
    */
-  setSpendOrder(userId: string, spendOrder: string[]): Promise<UserSettingsDto> {
+  setSpendOrder(
+    userId: string,
+    spendOrder: string[],
+  ): Promise<UserSettingsDto> {
     return this.write(userId, { spendOrder });
   }
 
-  private async write(userId: string, patch: Record<string, unknown>): Promise<UserSettingsDto> {
+  async initializeModules(userId: string, selectedModules: ModuleId[]): Promise<void> {
+    await this.model.updateOne({ userId, selectedModules: { $exists: false } }, { $set: { selectedModules } });
+  }
+
+  setPortalPreferences(
+    userId: string,
+    preferences: PortalPreferences,
+  ): Promise<UserSettingsDto> {
+    return this.write(userId, preferences as Record<string, unknown>);
+  }
+
+  private async write(
+    userId: string,
+    patch: Record<string, unknown>,
+  ): Promise<UserSettingsDto> {
     // Upserting with the defaults means a first-ever write does not need a prior read — but a
     // path may not appear in `$set` and `$setOnInsert` at once: Mongo answers the whole update
     // with `ConflictingUpdateOperators` (a 500), so only untouched fields get a default.
@@ -182,13 +227,20 @@ export class SettingsController {
   }
 
   @Put()
-  update(@CurrentUser('userId') userId: string, @Body() dto: UpdateSettingsDto) {
+  update(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: UpdateSettingsDto,
+  ) {
     return this.settings.update(userId, dto);
   }
 }
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: UserSettings.name, schema: UserSettingsSchema }])],
+  imports: [
+    MongooseModule.forFeature([
+      { name: UserSettings.name, schema: UserSettingsSchema },
+    ]),
+  ],
   controllers: [SettingsController],
   providers: [SettingsService],
   exports: [SettingsService],

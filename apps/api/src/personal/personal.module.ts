@@ -1,3 +1,4 @@
+import { RequireModule } from '../access/access.module';
 import {
   Body,
   Controller,
@@ -237,6 +238,7 @@ export class PersonalService {
 
 // ------------------------------------------------------------------ controller
 
+@RequireModule('personal')
 @Controller('personal')
 export class PersonalController {
   constructor(

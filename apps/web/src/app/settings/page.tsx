@@ -5,6 +5,7 @@ import type {
   Currency,
   FxRatePoint,
   UserSettings,
+  PortalState,
 } from '@life-portal/shared-types';
 import { SUPPORTED_CURRENCIES } from '@life-portal/shared-types';
 import { formatDay } from '@life-portal/shared-domain';
@@ -43,14 +44,54 @@ export default function SettingsPage() {
 }
 
 function Settings() {
+  const portal = useApi<PortalState>('/portal');
+  const hasFinance =
+    !!portal.data &&
+    ['money', 'stocks', 'loans', 'items', 'personal'].some(
+      (id) => portal.data?.access[id as keyof PortalState['access']],
+    );
   const settings = useApi<UserSettings>('/settings');
-  const fx = useApi<FxStatus>('/fx');
+  const fx = useApi<FxStatus>(hasFinance ? '/fx' : null);
   const { run, pending, error } = useAction();
 
-  if (settings.isLoading) return <Spinner />;
+  if (settings.isLoading || !portal.data) return <Spinner />;
   if (settings.error)
     return <ErrorNote message={(settings.error as Error).message} />;
   if (!settings.data) return null;
+
+  if (!hasFinance)
+    return (
+      <div className="mx-auto max-w-2xl">
+        <PageHeader
+          title="Settings"
+          subtitle="Make Life Portal work for you."
+        />
+        <div className="card divide-y divide-border">
+          {[
+            { href: '/settings/modules', label: 'Manage modules' },
+            { href: '/settings/privacy', label: 'Privacy and sharing' },
+            ...(portal.data.access.nutrition
+              ? [
+                  {
+                    href: '/nutrition?tab=you',
+                    label: 'Food preferences and nutrition goals',
+                  },
+                  { href: '/settings/mcp', label: 'AI assistant connections' },
+                ]
+              : []),
+            { href: '/setup', label: 'Revisit setup' },
+          ].map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="block p-5 hover:bg-surface-raised"
+            >
+              {link.label} →
+            </Link>
+          ))}
+        </div>
+      </div>
+    );
 
   const current = settings.data;
 
@@ -188,7 +229,8 @@ function Settings() {
             Setup AI Connection
           </Link>
           <p className="mt-3 text-xs text-ink-faint">
-            Use MCP (Model Context Protocol) to let AI assistants log meals, check your macros, and manage your food database.
+            Use MCP (Model Context Protocol) to let AI assistants log meals,
+            check your macros, and manage your food database.
           </p>
         </Panel>
       </div>

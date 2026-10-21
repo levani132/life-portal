@@ -20,6 +20,7 @@ export const WIDGET_KEYS = [
   'board',
   'personal',
   'nutrition',
+  'projects',
 ] as const;
 export type WidgetKey = (typeof WIDGET_KEYS)[number];
 
@@ -79,9 +80,9 @@ export interface DashboardResponse {
   /** Already sorted for display: the user's `widgetOrder` first, then unarranged cards. */
   cards: WidgetCard[];
   /** Headline net-worth-ish figure: cash + items + stocks − debts. */
-  netPositionCents: Cents;
+  netPositionCents?: Cents;
   displayCurrency: string;
-  summaries: {
+  summaries: Partial<{
     loans: LoansSummary;
     cashflow: CashflowSummary;
     items: ItemsSummary;
@@ -89,7 +90,7 @@ export interface DashboardResponse {
     boards: BoardSummary[];
     personal: PersonalSummary;
     nutrition: NutritionSummary;
-  };
+  }>;
   /** Cross-widget nudges, e.g. "salary lands in 4 days" or "quotes are 6 days stale". */
   attention: { tone: WidgetTone; message: string; href?: string }[];
 }

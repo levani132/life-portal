@@ -9,7 +9,11 @@ import {
   NUTRITION_GOALS,
   SEXES,
 } from '@life-portal/shared-types';
-import { baseSchemaOptions, dayField, requiredDayField } from '../common/mongoose';
+import {
+  baseSchemaOptions,
+  dayField,
+  requiredDayField,
+} from '../common/mongoose';
 
 /**
  * Widget 9 — food.
@@ -29,7 +33,11 @@ const integerValidator = {
 };
 
 /** Optional nutrient. No default, on purpose. */
-const nutrientField = { type: Number, min: 0, validate: integerValidator } as const;
+const nutrientField = {
+  type: Number,
+  min: 0,
+  validate: integerValidator,
+} as const;
 
 /** Required nutrient: the four every food must state. */
 const requiredNutrientField = {
@@ -49,7 +57,8 @@ export class Food {
   @Prop({ trim: true, maxlength: 120 }) brand?: string;
   @Prop({ required: true, enum: FOOD_UNITS, default: 'g' }) unit!: string;
   /** Base units in one serving. */
-  @Prop({ required: true, min: 1, max: 5000, validate: integerValidator }) servingSize!: number;
+  @Prop({ required: true, min: 1, max: 5000, validate: integerValidator })
+  servingSize!: number;
   @Prop({ maxlength: 60 }) servingLabel?: string;
   /** Pure fat is 900 kcal per 100 g, so anything above that is a typo, not a food. */
   @Prop({ ...requiredNutrientField, max: 900 }) energyKcalPer100!: number;
@@ -61,12 +70,16 @@ export class Food {
   @Prop(nutrientField) satFatMgPer100?: number;
   @Prop(nutrientField) sodiumMgPer100?: number;
   /** How the owner typed the numbers in, so the edit form reopens the same way. */
-  @Prop({ required: true, enum: FOOD_ENTRY_MODES, default: 'per_serving' }) entryMode!: string;
+  @Prop({ required: true, enum: FOOD_ENTRY_MODES, default: 'per_serving' })
+  entryMode!: string;
   @Prop({ default: false }) favourite!: boolean;
   @Prop({ maxlength: 32 }) barcode?: string;
-  @Prop({ required: true, enum: FOOD_SOURCES, default: 'manual' }) source!: string;
+  @Prop({ required: true, enum: FOOD_SOURCES, default: 'manual' })
+  source!: string;
   /** Open Food Facts product code, for the attribution link. */
   @Prop() sourceRef?: string;
+  @Prop({ type: Object }) attribution?: { label: string; url?: string };
+  @Prop() postImportKey?: string;
   /**
    * A food that has already been logged is archived rather than deleted: the log keeps its
    * snapshot either way, but the picker has to stay clean and the history readable.
@@ -74,11 +87,20 @@ export class Food {
   @Prop({ default: false, index: true }) archived!: boolean;
   @Prop({ maxlength: 500 }) notes?: string;
   /** Whether this food is visible to other users. Defaults to user's defaultFoodVisibility. */
-  @Prop({ required: true, enum: FOOD_VISIBILITY, default: 'private' }) visibility!: string;
+  @Prop({ required: true, enum: FOOD_VISIBILITY, default: 'private' })
+  visibility!: string;
+  @Prop({ default: 1 }) privacyVersion!: number;
 }
 
 export const FoodSchema = SchemaFactory.createForClass(Food);
 FoodSchema.index({ userId: 1, name: 1 });
+FoodSchema.index(
+  { userId: 1, postImportKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { postImportKey: { $type: 'string' } },
+  },
+);
 FoodSchema.index({ userId: 1, favourite: -1 });
 FoodSchema.index({ userId: 1, barcode: 1 }, { sparse: true });
 
@@ -87,7 +109,7 @@ FoodSchema.index({ userId: 1, barcode: 1 }, { sparse: true });
 /**
  * The facts a meal was logged with, frozen.
  *
- * This is the one place in the codebase where a value is copied rather than referenced, and it
+ * This is an event snapshot rather than a live reference (as are explicit food publications), and it
  * is deliberate: an event row records what was true when it happened, exactly as a stock lot
  * records its purchase price. Without it, correcting a food's calories would silently rewrite
  * every day it had ever appeared in. See `docs/DECISIONS.md`.
@@ -118,7 +140,8 @@ export class MealEntry {
   @Prop({ required: true, enum: MEAL_SLOTS }) slot!: string;
   @Prop({ required: true, index: true }) foodId!: string;
   /** Base units eaten. */
-  @Prop({ required: true, min: 1, max: 20_000, validate: integerValidator }) amount!: number;
+  @Prop({ required: true, min: 1, max: 20_000, validate: integerValidator })
+  amount!: number;
   @Prop({ required: true, enum: FOOD_UNITS }) unit!: string;
   @Prop({ type: EntryFactsSchema, required: true }) facts!: EntryFactsSub;
   /** Set when the entry came from a saved meal, so the group can be undone together. */
@@ -138,10 +161,13 @@ MealEntrySchema.index({ userId: 1, foodId: 1 });
 @Schema({ _id: false })
 export class SavedMealComponentSub {
   @Prop({ required: true }) foodId!: string;
-  @Prop({ required: true, min: 1, max: 20_000, validate: integerValidator }) amount!: number;
+  @Prop({ required: true, min: 1, max: 20_000, validate: integerValidator })
+  amount!: number;
 }
 
-export const SavedMealComponentSchema = SchemaFactory.createForClass(SavedMealComponentSub);
+export const SavedMealComponentSchema = SchemaFactory.createForClass(
+  SavedMealComponentSub,
+);
 
 /**
  * A named group of foods — "my oatmeal bowl". Components **reference** foods and never copy
@@ -151,6 +177,7 @@ export const SavedMealComponentSchema = SchemaFactory.createForClass(SavedMealCo
 @Schema({ ...baseSchemaOptions, collection: 'saved_meals' })
 export class SavedMeal {
   @Prop({ required: true, index: true }) userId!: string;
+  @Prop() postImportKey?: string;
   @Prop({ required: true, trim: true, maxlength: 120 }) name!: string;
   @Prop({ enum: MEAL_SLOTS }) defaultSlot?: string;
   @Prop({ type: [SavedMealComponentSchema], default: [] })
@@ -159,6 +186,13 @@ export class SavedMeal {
 }
 
 export const SavedMealSchema = SchemaFactory.createForClass(SavedMeal);
+SavedMealSchema.index(
+  { userId: 1, postImportKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { postImportKey: { $type: 'string' } },
+  },
+);
 SavedMealSchema.index({ userId: 1, name: 1 });
 
 // ------------------------------------------------------------------ profile
@@ -173,8 +207,10 @@ export class NutritionProfile {
   @Prop({ enum: SEXES }) sex?: string;
   @Prop({ min: 100, max: 250 }) heightCm?: number;
   @Prop(dayField) birthDate?: string;
-  @Prop({ required: true, enum: ACTIVITY_LEVELS, default: 'light' }) activityLevel!: string;
-  @Prop({ required: true, enum: NUTRITION_GOALS, default: 'maintain' }) goal!: string;
+  @Prop({ required: true, enum: ACTIVITY_LEVELS, default: 'light' })
+  activityLevel!: string;
+  @Prop({ required: true, enum: NUTRITION_GOALS, default: 'maintain' })
+  goal!: string;
   /** The owner's own measured figure. Beats every equation, and is not an estimate. */
   @Prop({ min: 800, max: 5000 }) basalRateKcal?: number;
   /** Weekdays, `0` = Sunday, matching `weekdayOf()`. */
@@ -186,16 +222,21 @@ export class NutritionProfile {
   @Prop({ min: 0, max: 500 }) fatOverrideG?: number;
   @Prop({ min: 0, max: 1000 }) carbOverrideG?: number;
   /** Default visibility for newly created foods. */
-  @Prop({ required: true, enum: FOOD_VISIBILITY, default: 'private' }) defaultFoodVisibility!: string;
-  /** Whether to share daily meals with other users. */
+  @Prop({ required: true, enum: FOOD_VISIBILITY, default: 'private' })
+  defaultFoodVisibility!: string;
+  /** Separate explicit opt-in for sharing foods and portions. */
+  @Prop({ required: true, default: false }) shareDiary!: boolean;
+  /** Whether to share daily meal totals with other users. */
   @Prop({ required: true, default: false }) shareMeals!: boolean;
   /** Whether to share weight/body metrics with other users. */
   @Prop({ required: true, default: false }) shareWeight!: boolean;
   /** Whether to share nutrition targets with other users. */
   @Prop({ required: true, default: false }) shareTargets!: boolean;
+  @Prop({ default: 1 }) privacyVersion!: number;
 }
 
-export const NutritionProfileSchema = SchemaFactory.createForClass(NutritionProfile);
+export const NutritionProfileSchema =
+  SchemaFactory.createForClass(NutritionProfile);
 
 // ------------------------------------------------------------------ weigh-ins
 
@@ -203,7 +244,12 @@ export const NutritionProfileSchema = SchemaFactory.createForClass(NutritionProf
 export class WeighIn {
   @Prop({ required: true, index: true }) userId!: string;
   @Prop(requiredDayField) day!: string;
-  @Prop({ required: true, min: 20_000, max: 400_000, validate: integerValidator })
+  @Prop({
+    required: true,
+    min: 20_000,
+    max: 400_000,
+    validate: integerValidator,
+  })
   weightGrams!: number;
   /** Decimal, e.g. `0.18`. The one input that switches the basal-rate equation. */
   @Prop({ min: 0.03, max: 0.6 }) bodyFatPct?: number;
@@ -221,7 +267,8 @@ WeighInSchema.index({ userId: 1, day: 1 }, { unique: true });
 export class CheatMeal {
   @Prop({ required: true, index: true }) userId!: string;
   @Prop({ required: true }) foodId!: string;
-  @Prop({ required: true, min: 1, max: 20_000, validate: integerValidator }) amount!: number;
+  @Prop({ required: true, min: 1, max: 20_000, validate: integerValidator })
+  amount!: number;
   @Prop({ default: 0 }) order!: number;
   @Prop({ default: false }) eaten!: boolean;
   @Prop(dayField) eatenDay?: string;

@@ -1,3 +1,4 @@
+import { RequireModule } from '../access/access.module';
 import {
   Body,
   Controller,
@@ -73,6 +74,7 @@ export class QuoteRefreshJob {
   }
 }
 
+@RequireModule('stocks')
 @Controller('stocks')
 export class StocksController {
   constructor(

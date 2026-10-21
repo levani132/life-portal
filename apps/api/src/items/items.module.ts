@@ -1,3 +1,4 @@
+import { RequireModule } from '../access/access.module';
 import {
   Body,
   Controller,
@@ -240,6 +241,7 @@ export class ItemsService extends OwnedCrudService<SellableItem> {
 
 // ------------------------------------------------------------------ controller
 
+@RequireModule('items')
 @Controller('items')
 export class ItemsController {
   constructor(

@@ -1,3 +1,4 @@
+import { AccessService } from '../access/access.module';
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { toDay } from '@life-portal/shared-domain';
@@ -29,6 +30,7 @@ const MCP_TOKEN_TTL = 365 * 24 * 60 * 60;
 @Injectable()
 export class McpService {
   constructor(
+    private readonly access: AccessService,
     private readonly jwt: JwtService,
     private readonly nutrition: NutritionService,
     @Inject(CONFIG) private readonly config: AppConfig,
@@ -356,6 +358,7 @@ export class McpService {
   ): Promise<{ result: unknown }> {
     const today = toDay(new Date().toISOString());
 
+    await this.access.require(userId, 'nutrition');
     switch (tool) {
       case 'get_nutrition_day': {
         const day = (args.day as string) || today;

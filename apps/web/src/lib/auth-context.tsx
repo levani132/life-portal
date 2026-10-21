@@ -1,5 +1,7 @@
 'use client';
 
+import { mutate } from 'swr';
+
 import { useRouter } from 'next/navigation';
 import {
   createContext,
@@ -59,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (email: string, password: string) => {
       const session = await api.login(email, password);
       tokens.set(session);
+      await mutate(() => true, undefined, { revalidate: false });
       setUser(session.user);
       router.push('/');
     },
@@ -69,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (body: { email: string; password: string; name: string; inviteCode?: string }) => {
       const session = await api.register(body);
       tokens.set(session);
+      await mutate(() => true, undefined, { revalidate: false });
       setUser(session.user);
       router.push('/');
     },
@@ -83,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     tokens.clear();
     setUser(null);
+    await mutate(() => true, undefined, { revalidate: false });
     router.push('/login');
   }, [router]);
 

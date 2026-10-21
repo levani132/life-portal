@@ -1,3 +1,4 @@
+import { RequireModule } from '../access/access.module';
 import {
   Body,
   Controller,
@@ -45,6 +46,7 @@ import { SpendingService } from './spending.service';
  * Its own controller so the header-authenticated route cannot accidentally acquire a JWT-guarded
  * neighbour, or the reverse.
  */
+@RequireModule('money')
 @Controller('spending')
 export class SpendingIngestController {
   constructor(
@@ -72,6 +74,7 @@ export class SpendingIngestController {
   }
 }
 
+@RequireModule('money')
 @Controller('spending')
 export class SpendingController {
   constructor(

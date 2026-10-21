@@ -1,7 +1,12 @@
+import { PostsModule } from '../posts/posts.module';
+import { SocialModule } from '../social/social.module';
+import { SocialGraphModule } from '../social-graph/social-graph.module';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
+import { AccessModule, ModuleAccessGuard } from '../access/access.module';
+import { PortalModule } from '../portal/portal.module';
 import { AuthModule } from '../auth/auth.module';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BoardsModule } from '../boards/boards.module';
@@ -31,6 +36,11 @@ import { StocksModule } from '../stocks/stocks.module';
     }),
     ScheduleModule.forRoot(),
     AuthModule,
+    AccessModule,
+    SocialGraphModule,
+    SocialModule,
+    PostsModule,
+    PortalModule,
     SettingsModule,
     FxModule,
     CashflowModule,
@@ -48,6 +58,7 @@ import { StocksModule } from '../stocks/stocks.module';
     // Guarding globally means a new controller ships authenticated unless it opts out with
     // `@Public()`, rather than the other way round.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: ModuleAccessGuard },
   ],
 })
 export class AppModule {}

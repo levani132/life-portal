@@ -393,3 +393,33 @@ four rows of wrapped links.
 default and scoped to the owner, integer-cent money throughout, calendar dates as strings to
 sidestep timezones, and 182 unit tests over the projection, scenario, ESPP, target-price and
 nutrition logic.
+
+## 2026-10-22
+
+- Added resumable setup for modules, privacy, Home order and a first Food action.
+- Added Home/Menu navigation and reusable module/privacy settings.
+- New accounts get Food by default; developer controls release access by cohort or individual.
+- Money now has one Home card; Projects have one overview and a creation screen.
+- Home loads only selected modules and omits unrelated financial headlines and alerts.
+- Existing sharing defaults migrate to private once; existing tracking data stays intact.
+
+### Social foundation
+
+- Added internal/developer social feature access with cohort/user controls.
+- Added profiles, opt-in search, mutual friend requests, unfriend, mute and block/unblock.
+- Friends show up to two audience-approved widgets in Home order; profiles show shared About.
+- Added friend/stranger previews and links to Food's separate privacy controls.
+- Blocked users no longer appear in public food browsing or imports in either direction.
+- Private data stays private by default; new social profiles are hidden from search until opted in.
+
+### 2026-10-22 — Wall and food posts
+
+- Added fourth-tab Wall and profile Posts/About tabs behind the foodPosts feature flag. Production remains Food-only by default.
+- Share one logged food, a whole meal/day, a catalogue food, a combination/saved meal or an immutable food-database collection. Preview and choose Only me/Friends/Everyone before publishing; Only me is the default.
+- Edit post text/audience or delete it; current friendship, blocking and feature switches govern access. Muting removes updates from Wall.
+- Import selected foods privately with duplicate previews, preserved provenance and optional whole-meal saving. Repeated/concurrent imports are safe and never log meals.
+- Added report-and-hide and developer removal controls. Previously imported copies remain independent after a source post changes or is removed.
+
+### 2026-10-22 — Prevent accidental refresh while scrolling
+
+Pull-to-refresh now requires a fresh downward drag starting at the page top and release beyond the threshold. Scrolling or momentum reaching the top, short pulls, canceled gestures and multiple touches no longer trigger refresh.

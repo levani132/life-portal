@@ -12,6 +12,8 @@ export interface AppConfig {
    * process to bind it — there only the API runs, so there is nothing to collide with.
    */
   port: number;
+  /** The only account with developer privileges. Never assigned by registration. */
+  developerUserId?: string;
   /** Canonical API origin enabling the MCP OAuth server. */
   mcpOAuthIssuer?: string;
   mongoUri: string;
@@ -88,6 +90,7 @@ export function loadConfig(): AppConfig {
   return {
     port: positiveInt('API_PORT', process.env['API_PORT'] ?? process.env['PORT'], 3333),
     mcpOAuthIssuer: oauthIssuer(),
+    developerUserId: process.env['DEVELOPER_USER_ID']?.trim() || undefined,
     mongoUri: required('MONGODB_URI', process.env['MONGODB_URI']),
     jwtSecret,
     accessTokenTtlSeconds: positiveInt('ACCESS_TOKEN_TTL_SECONDS', process.env['ACCESS_TOKEN_TTL_SECONDS'], 900),

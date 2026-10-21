@@ -1,3 +1,4 @@
+import type { FoodAttribution } from './posts';
 import type { Estimate, Id, IsoDate, Timestamped } from './common';
 
 /**
@@ -16,7 +17,13 @@ import type { Estimate, Id, IsoDate, Timestamped } from './common';
  *    one multiply and a serving size is only ever a convenience.
  */
 
-export const MEAL_SLOTS = ['breakfast', 'lunch', 'dinner', 'snack', 'uncategorized'] as const;
+export const MEAL_SLOTS = [
+  'breakfast',
+  'lunch',
+  'dinner',
+  'snack',
+  'uncategorized',
+] as const;
 export type MealSlot = (typeof MEAL_SLOTS)[number];
 
 /** Grams for solids, millilitres for liquids. Never converted between (see docs/DECISIONS.md). */
@@ -33,7 +40,13 @@ export type FoodSource = (typeof FOOD_SOURCES)[number];
 export const FOOD_VISIBILITY = ['private', 'public'] as const;
 export type FoodVisibility = (typeof FOOD_VISIBILITY)[number];
 
-export const ACTIVITY_LEVELS = ['sedentary', 'light', 'moderate', 'very', 'athlete'] as const;
+export const ACTIVITY_LEVELS = [
+  'sedentary',
+  'light',
+  'moderate',
+  'very',
+  'athlete',
+] as const;
 export type ActivityLevel = (typeof ACTIVITY_LEVELS)[number];
 
 export const NUTRITION_GOALS = [
@@ -88,6 +101,8 @@ export interface Food extends NutritionFacts, Timestamped {
   source: FoodSource;
   /** Open Food Facts product code, for the attribution link. */
   sourceRef?: string;
+  attribution?: FoodAttribution;
+  postImportKey?: string;
   /** A food that has been logged is archived rather than deleted, so history keeps its name. */
   archived: boolean;
   notes?: string;
@@ -248,6 +263,8 @@ export interface NutritionProfile extends Timestamped {
   defaultFoodVisibility: FoodVisibility;
   /** Whether to share daily meals with other users. */
   shareMeals: boolean;
+  /** Separate opt-in for sharing actual foods and portions on the shared profile. */
+  shareDiary: boolean;
   /** Whether to share weight/body metrics with other users. */
   shareWeight: boolean;
   /** Whether to share nutrition targets with other users. */
@@ -296,7 +313,12 @@ export interface NutritionTargets {
   /** Set when a goal's deficit was clipped by the safety floor. */
   floorApplied?: { floorKcal: number; requestedKcal: number; reason: string };
   /** Set when a macro had to be cut to keep carbohydrate non-negative. */
-  macroAdjustment?: { what: 'fat' | 'protein'; fromG: number; toG: number; reason: string };
+  macroAdjustment?: {
+    what: 'fat' | 'protein';
+    fromG: number;
+    toG: number;
+    reason: string;
+  };
   projectedWeeklyChangeKg?: number;
   rateVerdict?: 'sane' | 'fast' | 'slow';
   /** Goal-specific caveat, e.g. why maximum growth stops at +20%. */

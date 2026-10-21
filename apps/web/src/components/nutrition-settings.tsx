@@ -1,8 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import type { ActivityLevel, FoodVisibility, NutritionGoal, NutritionProfile, Sex } from '@life-portal/shared-types';
-import { ACTIVITY_LEVELS, FOOD_VISIBILITY, NUTRITION_GOALS, SEXES } from '@life-portal/shared-types';
+import type {
+  ActivityLevel,
+  FoodVisibility,
+  NutritionGoal,
+  NutritionProfile,
+  Sex,
+} from '@life-portal/shared-types';
+import {
+  ACTIVITY_LEVELS,
+  FOOD_VISIBILITY,
+  NUTRITION_GOALS,
+  SEXES,
+} from '@life-portal/shared-types';
 import { ACTIVITY_LABELS, GOAL_PLAN } from '@life-portal/shared-domain';
 import { api } from '../lib/api';
 import { useAction } from '../lib/hooks';
@@ -32,29 +43,40 @@ export function NutritionSettings({
   const { run, pending, error } = useAction();
 
   const [sex, setSex] = useState<Sex | ''>(profile.sex ?? '');
-  const [heightCm, setHeightCm] = useState(profile.heightCm ? String(profile.heightCm) : '');
+  const [heightCm, setHeightCm] = useState(
+    profile.heightCm ? String(profile.heightCm) : '',
+  );
   const [birthDate, setBirthDate] = useState(profile.birthDate ?? '');
-  const [activityLevel, setActivityLevel] = useState<ActivityLevel>(profile.activityLevel);
+  const [activityLevel, setActivityLevel] = useState<ActivityLevel>(
+    profile.activityLevel,
+  );
   const [goal, setGoal] = useState<NutritionGoal>(profile.goal);
   const [basalRateKcal, setBasalRateKcal] = useState(
     profile.basalRateKcal ? String(profile.basalRateKcal) : '',
   );
   const [cheatDays, setCheatDays] = useState<number[]>(profile.cheatDays);
-  const [dayStartHour, setDayStartHour] = useState(String(profile.dayStartHour));
+  const [dayStartHour, setDayStartHour] = useState(
+    String(profile.dayStartHour),
+  );
   const [overrides, setOverrides] = useState({
-    energyOverrideKcal: profile.energyOverrideKcal ? String(profile.energyOverrideKcal) : '',
-    proteinOverrideG: profile.proteinOverrideG ? String(profile.proteinOverrideG) : '',
+    energyOverrideKcal: profile.energyOverrideKcal
+      ? String(profile.energyOverrideKcal)
+      : '',
+    proteinOverrideG: profile.proteinOverrideG
+      ? String(profile.proteinOverrideG)
+      : '',
     fatOverrideG: profile.fatOverrideG ? String(profile.fatOverrideG) : '',
     carbOverrideG: profile.carbOverrideG ? String(profile.carbOverrideG) : '',
   });
-  const [defaultFoodVisibility, setDefaultFoodVisibility] = useState<FoodVisibility>(
-    profile.defaultFoodVisibility,
-  );
+  const [defaultFoodVisibility, setDefaultFoodVisibility] =
+    useState<FoodVisibility>(profile.defaultFoodVisibility);
   const [shareMeals, setShareMeals] = useState(profile.shareMeals);
+  const [shareDiary, setShareDiary] = useState(profile.shareDiary ?? false);
   const [shareWeight, setShareWeight] = useState(profile.shareWeight);
   const [shareTargets, setShareTargets] = useState(profile.shareTargets);
   const [showVisibilityPrompt, setShowVisibilityPrompt] = useState(false);
-  const [pendingVisibility, setPendingVisibility] = useState<FoodVisibility | null>(null);
+  const [pendingVisibility, setPendingVisibility] =
+    useState<FoodVisibility | null>(null);
 
   /*
    * There is deliberately **no effect re-seeding this form from `profile`**.
@@ -96,6 +118,7 @@ export function NutritionSettings({
         carbOverrideG: int(overrides.carbOverrideG),
         defaultFoodVisibility,
         shareMeals,
+        shareDiary,
         shareWeight,
         shareTargets,
         updateExistingFoodsVisibility: updateExistingFoods,
@@ -125,7 +148,9 @@ export function NutritionSettings({
 
   const toggleCheatDay = (value: number) =>
     setCheatDays((current) =>
-      current.includes(value) ? current.filter((day) => day !== value) : [...current, value].sort(),
+      current.includes(value)
+        ? current.filter((day) => day !== value)
+        : [...current, value].sort(),
     );
 
   return (
@@ -133,7 +158,12 @@ export function NutritionSettings({
       title="Your numbers"
       description="What the targets are worked out from. Everything here is editable, and every figure it produces says where it came from."
       actions={
-        <button type="button" className="btn-primary" onClick={() => save()} disabled={pending}>
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => save()}
+          disabled={pending}
+        >
           {pending ? 'Saving…' : 'Save'}
         </button>
       }
@@ -141,7 +171,10 @@ export function NutritionSettings({
       <div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label="Sex" hint="the equations differ">
-            <Select value={sex} onChange={(event) => setSex(event.target.value as Sex | '')}>
+            <Select
+              value={sex}
+              onChange={(event) => setSex(event.target.value as Sex | '')}
+            >
               <option value="">not set</option>
               {SEXES.map((option) => (
                 <option key={option} value={option}>
@@ -168,10 +201,15 @@ export function NutritionSettings({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="How active are you?" hint={ACTIVITY_LABELS[activityLevel]}>
+          <Field
+            label="How active are you?"
+            hint={ACTIVITY_LABELS[activityLevel]}
+          >
             <Select
               value={activityLevel}
-              onChange={(event) => setActivityLevel(event.target.value as ActivityLevel)}
+              onChange={(event) =>
+                setActivityLevel(event.target.value as ActivityLevel)
+              }
             >
               {ACTIVITY_LEVELS.map((option) => (
                 <option key={option} value={option}>
@@ -184,7 +222,10 @@ export function NutritionSettings({
             label="What are you after?"
             hint={`${GOAL_PLAN[goal].energyFactor === 1 ? 'maintenance' : `${Math.round((GOAL_PLAN[goal].energyFactor - 1) * 100)}% of maintenance`}`}
           >
-            <Select value={goal} onChange={(event) => setGoal(event.target.value as NutritionGoal)}>
+            <Select
+              value={goal}
+              onChange={(event) => setGoal(event.target.value as NutritionGoal)}
+            >
               {NUTRITION_GOALS.map((option) => (
                 <option key={option} value={option}>
                   {GOAL_PLAN[option].label}
@@ -210,7 +251,10 @@ export function NutritionSettings({
             label="A new day starts at"
             hint="a meal before this hour counts towards the day before"
           >
-            <Select value={dayStartHour} onChange={(event) => setDayStartHour(event.target.value)}>
+            <Select
+              value={dayStartHour}
+              onChange={(event) => setDayStartHour(event.target.value)}
+            >
               {[0, 1, 2, 3, 4, 5, 6].map((hour) => (
                 <option key={hour} value={hour}>
                   {String(hour).padStart(2, '0')}:00
@@ -246,8 +290,9 @@ export function NutritionSettings({
             Override the targets by hand
           </summary>
           <p className="mt-2 text-xs text-ink-faint">
-            For when a coach — or you — disagrees with the model. An override is shown as recorded
-            rather than estimated, and the modelled figure stays visible beside it.
+            For when a coach — or you — disagrees with the model. An override is
+            shown as recorded rather than estimated, and the modelled figure
+            stays visible beside it.
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-4">
             <Field label="Calories">
@@ -255,7 +300,10 @@ export function NutritionSettings({
                 inputMode="numeric"
                 value={overrides.energyOverrideKcal}
                 onChange={(event) =>
-                  setOverrides({ ...overrides, energyOverrideKcal: event.target.value })
+                  setOverrides({
+                    ...overrides,
+                    energyOverrideKcal: event.target.value,
+                  })
                 }
               />
             </Field>
@@ -264,7 +312,10 @@ export function NutritionSettings({
                 inputMode="numeric"
                 value={overrides.proteinOverrideG}
                 onChange={(event) =>
-                  setOverrides({ ...overrides, proteinOverrideG: event.target.value })
+                  setOverrides({
+                    ...overrides,
+                    proteinOverrideG: event.target.value,
+                  })
                 }
               />
             </Field>
@@ -273,7 +324,10 @@ export function NutritionSettings({
                 inputMode="numeric"
                 value={overrides.carbOverrideG}
                 onChange={(event) =>
-                  setOverrides({ ...overrides, carbOverrideG: event.target.value })
+                  setOverrides({
+                    ...overrides,
+                    carbOverrideG: event.target.value,
+                  })
                 }
               />
             </Field>
@@ -282,7 +336,10 @@ export function NutritionSettings({
                 inputMode="numeric"
                 value={overrides.fatOverrideG}
                 onChange={(event) =>
-                  setOverrides({ ...overrides, fatOverrideG: event.target.value })
+                  setOverrides({
+                    ...overrides,
+                    fatOverrideG: event.target.value,
+                  })
                 }
               />
             </Field>
@@ -294,17 +351,25 @@ export function NutritionSettings({
             Sharing & Privacy
           </summary>
           <p className="mt-2 text-xs text-ink-faint">
-            Control what other users can see. Public foods can be imported by others.
+            Control what other users can see. Public foods can be imported by
+            others.
           </p>
           <div className="mt-3 space-y-3">
-            <Field label="New foods are" hint="default visibility for foods you create">
+            <Field
+              label="New foods are"
+              hint="default visibility for foods you create"
+            >
               <Select
                 value={defaultFoodVisibility}
-                onChange={(event) => handleVisibilityChange(event.target.value as FoodVisibility)}
+                onChange={(event) =>
+                  handleVisibilityChange(event.target.value as FoodVisibility)
+                }
               >
                 {FOOD_VISIBILITY.map((option) => (
                   <option key={option} value={option}>
-                    {option === 'private' ? 'Private — only you can see' : 'Public — others can import'}
+                    {option === 'private'
+                      ? 'Private — only you can see'
+                      : 'Public — others can import'}
                   </option>
                 ))}
               </Select>
@@ -317,8 +382,21 @@ export function NutritionSettings({
                   onChange={(event) => setShareMeals(event.target.checked)}
                   className="h-4 w-4 rounded border-border bg-surface"
                 />
-                Share my daily meals with others
+                Share my daily meal totals
               </label>
+              <label className="flex items-center gap-2 text-sm text-ink-muted">
+                <input
+                  type="checkbox"
+                  checked={shareDiary}
+                  onChange={(event) => setShareDiary(event.target.checked)}
+                  className="h-4 w-4 rounded border-border bg-surface"
+                />
+                Share foods and portions in my daily diary
+              </label>
+              <p className="text-xs text-ink-faint">
+                Your Food audience in Privacy and sharing decides who can see
+                this. Private notes stay private.
+              </p>
               <label className="flex items-center gap-2 text-sm text-ink-muted">
                 <input
                   type="checkbox"
@@ -354,9 +432,10 @@ export function NutritionSettings({
             <h3 className="text-lg font-semibold">Update existing foods?</h3>
             <p className="mt-2 text-sm text-ink-muted">
               You changed the default visibility to{' '}
-              <strong>{pendingVisibility}</strong>. Do you also want to update all
-              your existing foods that were{' '}
-              <strong>{profile.defaultFoodVisibility}</strong> to the new setting?
+              <strong>{pendingVisibility}</strong>. Do you also want to update
+              all your existing foods that were{' '}
+              <strong>{profile.defaultFoodVisibility}</strong> to the new
+              setting?
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button

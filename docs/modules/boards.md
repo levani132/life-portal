@@ -106,3 +106,10 @@ Ideas the brief invited but that are not built yet:
 - **Interview pipeline.** Candidates are logged as one-off contributions; there is no
   candidate-through-stages view.
 - Recurring tasks. Boards have none — only the cashflow module has recurrence.
+
+## Portal access and project overview
+
+Projects now have one Home overview card and `/projects` listing/creation screen.
+EPAM remains the same board model, but the `epam` key is reserved for the configured developer.
+Listing filters it for other accounts; resolve/create/rename and direct child mutations enforce
+its availability. Ownership filters remain on every query.

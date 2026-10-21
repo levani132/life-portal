@@ -41,6 +41,7 @@ export class AuthService {
       name: dto.name.trim(),
       passwordHash: await bcrypt.hash(dto.password, BCRYPT_ROUNDS),
       roles: ['owner'],
+      cohort: 'production',
     });
 
     return this.issueSession(created);

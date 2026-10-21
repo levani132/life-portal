@@ -48,19 +48,21 @@ must not run two refreshes concurrently — `apps/web/src/lib/api.ts` shares one
 
 **Code:** `apps/api/src/settings/settings.module.ts`
 
+Portal access, onboarding and module selection are described in [portal.md](portal.md).
+
 One row per user, created on first read via upsert rather than at registration — so a user
 seeded straight into Mongo still gets sane defaults.
 
 | Field | Default | Used by |
 | --- | --- | --- |
-| `displayCurrency` | `USD` | dashboard roll-ups |
+| `displayCurrency` | `GEL` | dashboard roll-ups |
 | `salaryDayOfMonth` | 7 | defaults in forms |
 | `capitalGainsTaxRate` | 0 | stock liquidation maths (Georgia: 0% on most personal share sales) |
 | `fxRates` | `{}` | `convertCents()`, keyed `USD_GEL` style |
 | `widgetOrder` | `[]` | the dashboard's card order — see below |
 
-`widgetOrder` is written only by `PUT /api/dashboard/order`, never by `PUT /api/settings`: the DTO
-there deliberately does not accept it, so the rearrange gesture has exactly one writer and cannot
+`widgetOrder` is written only by `PUT /api/dashboard/order`, also by setup through `PUT /api/portal`, never by `PUT /api/settings`: the DTO
+there deliberately does not accept it, so currency changes cannot accidentally overwrite arrangement and cannot
 arrive bundled with a currency change. `SettingsService.setWidgetOrder()` is that writer.
 
 ---
@@ -69,7 +71,7 @@ arrive bundled with a currency change. `SettingsService.setWidgetOrder()` is tha
 
 **Code:** `apps/api/src/dashboard/` · `apps/web/src/app/page.tsx`
 
-`GET /api/dashboard` returns every card and every summary in one request.
+`GET /api/dashboard` returns only selected, available cards and summaries in one request. See [portal.md](portal.md) for gating, setup and consolidated Money/Projects cards.
 
 ## The registry pattern
 
@@ -82,8 +84,7 @@ Cards carry at most three `WidgetStat`s with pre-formatted `value` strings, an o
 `progress` ratio, an optional `alert` line, a `tone` and an `order`. `estimated: true` on a stat
 renders the `est` marker (principle VI).
 
-Board cards are generated one per board from `boards.summaries()`, at `order` 10+, so the number
-of cards follows the data.
+Projects share one overview card. The developer-only EPAM board retains a separate card.
 
 ## The card order is the user's
 

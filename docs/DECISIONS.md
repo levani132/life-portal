@@ -888,3 +888,55 @@ do not allow null origins. Reproduce and verify with a real browser form as well
 The consent CSP also allows the validated request's callback origin alongside self. Chrome
 applies `form-action` to the POST's redirect, so self alone prevents returning to the assistant.
 The server still validates exact registered redirect URIs; no wildcard destinations are allowed.
+
+## 2026-10-22 · Separate feature availability, Home selection and sharing
+
+The portal is preparing for invited users and later social sharing. Registration now explicitly
+assigns production access (Food by default); missing legacy cohorts retain internal access.
+The legacy owner role is common to all users and cannot grant administration. Developer identity
+is an explicit server account ID, and EPAM is reserved for it. A small feature_policies collection
+allows cohort release switches without deployment, with individual overrides on users.
+
+Hidden selections retain data. Dashboard summary loading is conditional, and net position is
+omitted when any contributing module is absent. Money and Projects each have one product card
+while retaining existing bounded services. Setup owns the same preferences as module/privacy
+settings and can be skipped, resumed and revisited. Home/Menu navigation leaves social tabs for
+their actual implementation. All module audiences start private; existing food visibility is
+reset once using atomic per-row version markers, and public queries exclude unversioned foods.
+
+Verification uses an isolated ephemeral Mongo database and separate API/web ports. No seed,
+configuration changes or migration is run against the connected production database.
+
+Constitution 1.2.0 records the move from a single-user dashboard to private-by-default accounts,
+permits related modules to share a product card while keeping collection ownership intact, and
+names the bounded exceptions for explicit food catalogue sharing and developer feature-account
+administration. Owner-scoped tracking APIs remain the rule.
+
+The API also includes an empty local `.fork-ts-checkerrc.json`, so Webpack's checker does
+not inherit or try to read unrelated ancestor/home configuration files. This made the normal
+API build reproducible across the workspace's two macOS account paths without changing any
+home-directory permissions or skipping typechecking.
+
+## 2026-10-22 · Social profiles use dedicated projections and atomic connection pairs
+
+Constitution 1.3.0 permits explicit audience-checked social projections while maintaining the
+private tracking API boundary. Profiles live separately from auth users so social APIs cannot
+accidentally return email/credentials. Discovery is opt-in; known links work independently.
+
+One canonical pair owns friendship, directional blocks and mutes. Conditional state writes
+prevent opposite requests auto-accepting and prevent accept-after-block races. A global graph
+service also lets Food honor blocks without importing the entire SocialModule back into
+Nutrition and creating a module cycle. Shared widgets use separate allowlisted stats instead
+of stripping fields from the much larger owner dashboard. Food's category switches constrain
+its shared stats independently of the module audience.
+
+Social is a feature flag, not a selectable tracking module. It defaults to internal/developer
+only. Search/Friends ship with their behavior; Wall remains deferred until real posts exist.
+
+### 2026-10-22 — Explicit food publication snapshots (constitution 1.4)
+
+A post is an intentional publication event, independent of a live widget's audience. Server-created snapshots freeze the facts an author reviewed; a preview fingerprint catches source changes before publishing. This adds a narrow principle III/IV exception for immutable publications and recipient-owned imports while keeping derived totals and social widget projections transient. UUID/tombstone publishing and uniquely indexed copy imports make retries safe, without Mongo transactions or new dependencies. Imports preserve provenance, start private and cannot be recalled after another account copies them; audience changes and deletion revoke subsequent reads/imports. Public posts still require authenticated enabled accounts. Mute affects Wall; bilateral blocks and unfriend immediately affect every read. Reports hide a post from the reporter and provide a developer removal queue without granting access to private post payloads.
+
+### 2026-10-22 — Pull-to-refresh requires a separate gesture at the top
+
+Momentum and scroll-to-pull chaining caused accidental refreshes during normal navigation. Remove momentum-driven bounce/refresh and require the gesture to start at the page top. Keep the existing pull distance and release threshold; cancel upward/sideways gestures, interrupted touches and gestures claimed by another control. Regression tests cover normal scroll arrival, starting below the top, deliberate release, short pulls and cancellation.

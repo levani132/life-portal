@@ -1,3 +1,4 @@
+import { RequireModule } from '../access/access.module';
 import {
   Body,
   Controller,
@@ -35,6 +36,7 @@ import {
 } from './cashflow.schemas';
 import { CashflowService } from './cashflow.service';
 
+@RequireModule('money')
 @Controller('cashflow')
 export class CashflowController {
   constructor(

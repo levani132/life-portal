@@ -10,3 +10,6 @@ export * from './lib/boards';
 export * from './lib/personal';
 export * from './lib/nutrition';
 export * from './lib/dashboard';
+export * from './lib/portal';
+export * from './lib/social';
+export * from './lib/posts';

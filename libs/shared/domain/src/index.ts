@@ -16,3 +16,6 @@ export * from './lib/completeness';
 export * from './lib/sms-parsers';
 export * from './lib/spend-waterfall';
 export * from './lib/spend-suggestions';
+export * from './lib/portal';
+export * from './lib/social';
+export * from './lib/posts';

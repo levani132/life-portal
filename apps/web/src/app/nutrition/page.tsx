@@ -4,6 +4,8 @@ import clsx from 'clsx';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import type {
+  PortalState,
+  PostSelection,
   Estimate,
   Food,
   MealEntry,
@@ -29,6 +31,7 @@ import { AppShell, PageHeader } from '../../components/app-shell';
 import { CheatQueue } from '../../components/cheat-queue';
 import { FoodForm } from '../../components/food-form';
 import { FoodPicker } from '../../components/food-picker';
+import { PostComposer } from '../../components/post-composer';
 import { LogFoodModal } from '../../components/log-food-modal';
 import { NutritionSettings } from '../../components/nutrition-settings';
 import { PublicFoodsPanel } from '../../components/public-foods-panel';
@@ -83,7 +86,26 @@ function Nutrition() {
   const [today, setToday] = useState<string | null>(null);
   const [day, setDay] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('today');
-  const [logging, setLogging] = useState<{ slot: MealSlot; entry?: MealEntry } | null>(null);
+  const portal = useApi<PortalState>('/portal');
+  const canPost =
+    portal.data?.access.foodPosts &&
+    portal.data.access.social &&
+    portal.data.access.nutrition;
+  const [sharing, setSharing] = useState<PostSelection | 'choose' | null>(null);
+  const [recentEntry, setRecentEntry] = useState<MealEntry | null>(null);
+  const [logging, setLogging] = useState<{
+    slot: MealSlot;
+    entry?: MealEntry;
+  } | null>(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('tab') === 'you') setTab('you');
+    if (params.get('tab') === 'foods') setTab('foods');
+    if (params.get('log') === '1') {
+      setLogging({ slot: mealContextNow().slot });
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
 
   useEffect(() => {
     const context = mealContextNow(dayStartHour);
@@ -96,7 +118,8 @@ function Nutrition() {
 
   // The profile decides when a day starts, which decides which day this is. One correction.
   useEffect(() => {
-    if (data && data.profile.dayStartHour !== dayStartHour) setDayStartHour(data.profile.dayStartHour);
+    if (data && data.profile.dayStartHour !== dayStartHour)
+      setDayStartHour(data.profile.dayStartHour);
   }, [data, dayStartHour]);
 
   if (isLoading || !today || !day) return <Spinner label="Adding up today…" />;
@@ -118,6 +141,14 @@ function Nutrition() {
         }
         actions={
           <>
+            {canPost && (
+              <button
+                className="btn-ghost"
+                onClick={() => setSharing('choose')}
+              >
+                Share food
+              </button>
+            )}
             <Link
               href="/settings/mcp"
               className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-ink-muted transition hover:border-sky-500/40 hover:text-sky-400"
@@ -146,17 +177,25 @@ function Nutrition() {
                   onClick={() => setTab(option)}
                   className={clsx(
                     'rounded-md px-2.5 py-1',
-                    tab === option ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:text-ink',
+                    tab === option
+                      ? 'bg-surface-raised text-ink'
+                      : 'text-ink-muted hover:text-ink',
                   )}
                 >
-                  {option === 'today' ? 'Today' : option === 'foods' ? 'Foods' : 'You'}
+                  {option === 'today'
+                    ? 'Today'
+                    : option === 'foods'
+                      ? 'Foods'
+                      : 'You'}
                 </button>
               ))}
             </div>
             <button
               type="button"
               className="btn-primary"
-              onClick={() => setLogging({ slot: mealContextNow(dayStartHour).slot })}
+              onClick={() =>
+                setLogging({ slot: mealContextNow(dayStartHour).slot })
+              }
             >
               + Log food
             </button>
@@ -164,6 +203,23 @@ function Nutrition() {
         }
       />
 
+      {canPost && recentEntry && (
+        <div className="card mb-5 flex flex-wrap items-center gap-3 p-4">
+          <p className="flex-1 text-sm">Food logged. Share it with a post?</p>
+          <button
+            className="btn-ghost"
+            onClick={() => {
+              setSharing({ kind: 'entry', entryId: recentEntry.id });
+              setRecentEntry(null);
+            }}
+          >
+            Share this food
+          </button>
+          <button className="btn-ghost" onClick={() => setRecentEntry(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
       {tab === 'today' && (
         <div className="space-y-5">
           <DayNavigator
@@ -173,9 +229,20 @@ function Nutrition() {
             entryCount={dayTotals.entryCount}
           />
 
+          {canPost && dayTotals.entryCount > 0 && (
+            <button
+              className="btn-ghost"
+              onClick={() => setSharing({ kind: 'day', day })}
+            >
+              Share this day
+            </button>
+          )}
+
           <MacroTiles totals={dayTotals.totals} targets={targets} />
 
-          {!targets.available && <MissingInputs targets={targets} onFix={() => setTab('you')} />}
+          {!targets.available && (
+            <MissingInputs targets={targets} onFix={() => setTab('you')} />
+          )}
 
           <div className="grid gap-5 lg:grid-cols-3">
             <div className="space-y-5 lg:col-span-2">
@@ -184,16 +251,20 @@ function Nutrition() {
                   key={slot.slot}
                   slot={slot}
                   day={day}
-                  suggestions={data.suggestions.filter((row) => row.slot === slot.slot)}
+                  suggestions={data.suggestions.filter(
+                    (row) => row.slot === slot.slot,
+                  )}
                   onAdd={() => setLogging({ slot: slot.slot })}
                   onEdit={(entry) => setLogging({ slot: entry.slot, entry })}
                   onChanged={refresh}
+                  onShare={canPost ? setSharing : undefined}
                 />
               ))}
               {!viewingToday && (
                 <p className="text-xs text-ink-faint">
-                  You are looking at {formatDay(day)}, {relativeDays(today, day)}. Anything logged
-                  here lands on that day.
+                  You are looking at {formatDay(day)},{' '}
+                  {relativeDays(today, day)}. Anything logged here lands on that
+                  day.
                 </p>
               )}
             </div>
@@ -207,15 +278,29 @@ function Nutrition() {
         </div>
       )}
 
-      {tab === 'foods' && <FoodsTab overview={data} onChanged={refresh} />}
+      {tab === 'foods' && (
+        <FoodsTab
+          overview={data}
+          onChanged={refresh}
+          onShare={canPost ? setSharing : undefined}
+        />
+      )}
 
       {tab === 'you' && (
         <div className="grid gap-5 lg:grid-cols-2">
           <div className="space-y-5">
             {/* Keyed on the server's own version, so a real change re-seeds the form and an
                 ordinary refetch does not (see the note in NutritionSettings). */}
-            <NutritionSettings key={profile.updatedAt} profile={profile} onSaved={refresh} />
-            <WeighInPanel weighIns={data.weighIns} today={today} onSaved={refresh} />
+            <NutritionSettings
+              key={profile.updatedAt}
+              profile={profile}
+              onSaved={refresh}
+            />
+            <WeighInPanel
+              weighIns={data.weighIns}
+              today={today}
+              onSaved={refresh}
+            />
           </div>
           <div className="space-y-5">
             <TargetsPanel targets={targets} />
@@ -224,6 +309,13 @@ function Nutrition() {
         </div>
       )}
 
+      {sharing && (
+        <PostComposer
+          initialDay={day}
+          initialSource={sharing === 'choose' ? undefined : sharing}
+          onClose={() => setSharing(null)}
+        />
+      )}
       {logging && (
         <LogFoodModal
           open
@@ -232,7 +324,10 @@ function Nutrition() {
           day={day}
           slot={logging.slot}
           entry={logging.entry}
-          onLogged={refresh}
+          onLogged={(entry) => {
+            refresh();
+            if (entry) setRecentEntry(entry);
+          }}
         />
       )}
     </>
@@ -281,7 +376,11 @@ function DayNavigator({
         </button>
       </div>
       {day !== today && (
-        <button type="button" className="btn-ghost" onClick={() => onChange(today)}>
+        <button
+          type="button"
+          className="btn-ghost"
+          onClick={() => onChange(today)}
+        >
           Back to today
         </button>
       )}
@@ -348,7 +447,12 @@ function MacroTiles({
                 <span className="text-xs">{tile.unit}</span>
               </span>
             </p>
-            <p className={clsx('mt-0.5 text-xs', over ? 'text-rose-400' : 'text-ink-faint')}>
+            <p
+              className={clsx(
+                'mt-0.5 text-xs',
+                over ? 'text-rose-400' : 'text-ink-faint',
+              )}
+            >
               {left == null
                 ? 'no target yet'
                 : over
@@ -359,7 +463,13 @@ function MacroTiles({
               <div className="mt-2">
                 <ProgressBar
                   ratio={tile.eaten / tile.target}
-                  tone={over ? 'bad' : tile.eaten / tile.target > 0.9 ? 'warn' : 'good'}
+                  tone={
+                    over
+                      ? 'bad'
+                      : tile.eaten / tile.target > 0.9
+                        ? 'warn'
+                        : 'good'
+                  }
                 />
               </div>
             )}
@@ -370,13 +480,21 @@ function MacroTiles({
   );
 }
 
-function MissingInputs({ targets, onFix }: { targets: NutritionTargets; onFix: () => void }) {
-  const missing = targets.missingInputs.map((input) => MISSING_INPUT_LABELS[input] ?? input);
+function MissingInputs({
+  targets,
+  onFix,
+}: {
+  targets: NutritionTargets;
+  onFix: () => void;
+}) {
+  const missing = targets.missingInputs.map(
+    (input) => MISSING_INPUT_LABELS[input] ?? input,
+  );
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
       <p>
-        No targets yet — they need {missing.join(', ')}. Logging still works; it just cannot tell
-        you what is left.
+        No targets yet — they need {missing.join(', ')}. Logging still works; it
+        just cannot tell you what is left.
       </p>
       <button type="button" className="btn-ghost shrink-0" onClick={onFix}>
         Fill it in
@@ -392,6 +510,7 @@ function SlotSection({
   onAdd,
   onEdit,
   onChanged,
+  onShare,
 }: {
   slot: SlotTotals;
   day: string;
@@ -400,6 +519,7 @@ function SlotSection({
   onAdd: () => void;
   onEdit: (entry: MealEntry) => void;
   onChanged: () => void;
+  onShare?: (source: PostSelection) => void;
 }) {
   const { run, pending } = useAction();
   const [saving, setSaving] = useState(false);
@@ -412,7 +532,11 @@ function SlotSection({
 
   const saveAsMeal = () =>
     void run(async () =>
-      api.post('/nutrition/meals/from-day', { name: name.trim(), day, slot: slot.slot }),
+      api.post('/nutrition/meals/from-day', {
+        name: name.trim(),
+        day,
+        slot: slot.slot,
+      }),
     ).then((ok) => {
       if (ok) {
         setSaving(false);
@@ -431,6 +555,14 @@ function SlotSection({
       }
       actions={
         <>
+          {onShare && slot.entries.length > 0 && (
+            <button
+              className="btn-ghost"
+              onClick={() => onShare({ kind: 'meal', day, slot: slot.slot })}
+            >
+              Share meal
+            </button>
+          )}
           {slot.entries.length > 0 && (
             <button
               type="button"
@@ -457,12 +589,17 @@ function SlotSection({
       ) : (
         <ul className="divide-y divide-border">
           {slot.entries.map((entry) => (
-            <li key={entry.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+            <li
+              key={entry.id}
+              className="flex items-center justify-between gap-3 py-2 text-sm"
+            >
               <div className="min-w-0">
                 <p className="truncate">
                   {entry.facts.name}
                   {entry.facts.brand && (
-                    <span className="ml-1 text-xs text-ink-faint">{entry.facts.brand}</span>
+                    <span className="ml-1 text-xs text-ink-faint">
+                      {entry.facts.brand}
+                    </span>
                   )}
                 </p>
                 <p className="text-xs text-ink-faint">
@@ -470,12 +607,25 @@ function SlotSection({
                   {entry.servings > 0 &&
                     ` · ${entry.servings} serving${entry.servings === 1 ? '' : 's'}`}
                   {' · P '}
-                  {mgToG(entry.totals.proteinMg)}g C {mgToG(entry.totals.carbMg)}g F{' '}
-                  {mgToG(entry.totals.fatMg)}g
+                  {mgToG(entry.totals.proteinMg)}g C{' '}
+                  {mgToG(entry.totals.carbMg)}g F {mgToG(entry.totals.fatMg)}g
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-3">
-                <span className="tabular text-ink-muted">{entry.totals.energyKcal} kcal</span>
+                <span className="tabular text-ink-muted">
+                  {entry.totals.energyKcal} kcal
+                </span>
+                {onShare && (
+                  <button
+                    className="text-xs text-sky-300"
+                    onClick={() =>
+                      onShare({ kind: 'entry', entryId: entry.id })
+                    }
+                    aria-label={`Share ${entry.facts.name}`}
+                  >
+                    share
+                  </button>
+                )}
                 <button
                   type="button"
                   className="text-xs text-ink-faint hover:text-ink"
@@ -514,11 +664,16 @@ function SlotSection({
         pending={pending}
       >
         <Field label="Call it" hint="e.g. my oatmeal bowl">
-          <Input value={name} onChange={(event) => setName(event.target.value)} required />
+          <Input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            required
+          />
         </Field>
         <p className="text-xs text-ink-faint">
-          Saves the {slot.entries.length} item{slot.entries.length === 1 ? '' : 's'} and their
-          amounts. Logging it later uses whatever those foods say then.
+          Saves the {slot.entries.length} item
+          {slot.entries.length === 1 ? '' : 's'} and their amounts. Logging it
+          later uses whatever those foods say then.
         </p>
       </Modal>
     </Panel>
@@ -576,9 +731,12 @@ function SlotSuggestions({
                 : `${slotLabel}, ${formatDay(suggestion.lastDay)}`
             }
           >
-            <span className="block truncate font-medium text-ink">{suggestion.name}</span>
+            <span className="block truncate font-medium text-ink">
+              {suggestion.name}
+            </span>
             <span className="tabular block text-ink-faint">
-              {suggestion.amount} {suggestion.unit} · {suggestion.totals.energyKcal} kcal
+              {suggestion.amount} {suggestion.unit} ·{' '}
+              {suggestion.totals.energyKcal} kcal
               {suggestion.dayCount > 1 && ` · ${suggestion.dayCount} days`}
             </span>
           </button>
@@ -612,7 +770,10 @@ function CheatSection({
     void run(async () =>
       api.post('/nutrition/cheat', {
         foodId,
-        amount: Math.max(1, Math.round(Number(amount) || selected?.servingSize || 100)),
+        amount: Math.max(
+          1,
+          Math.round(Number(amount) || selected?.servingSize || 100),
+        ),
       }),
     ).then((ok) => {
       if (ok) {
@@ -641,16 +802,24 @@ function CheatSection({
           : 'No cheat day set. One is worth setting — a diet with no release valve does not last.'
       }
       actions={
-        <button type="button" className="btn-ghost" onClick={() => setAdding(true)}>
+        <button
+          type="button"
+          className="btn-ghost"
+          onClick={() => setAdding(true)}
+        >
           + Queue
         </button>
       }
     >
       {cheat.queue.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-          <Chip tone="neutral">queued: {cheat.queueTotals.energyKcal.toLocaleString()} kcal</Chip>
+          <Chip tone="neutral">
+            queued: {cheat.queueTotals.energyKcal.toLocaleString()} kcal
+          </Chip>
           {cheat.bankedKcal > 0 && (
-            <Chip tone="good">{cheat.bankedKcal.toLocaleString()} kcal banked</Chip>
+            <Chip tone="good">
+              {cheat.bankedKcal.toLocaleString()} kcal banked
+            </Chip>
           )}
         </div>
       )}
@@ -665,8 +834,8 @@ function CheatSection({
 
       {!cheat.isToday && cheat.queue.some((row) => !row.eaten) && (
         <p className="mt-3 text-xs text-ink-faint">
-          &ldquo;Log it&rdquo; appears on the day itself. Until then this is a list, in the order
-          you want it.
+          &ldquo;Log it&rdquo; appears on the day itself. Until then this is a
+          list, in the order you want it.
         </p>
       )}
 
@@ -728,7 +897,12 @@ function RepeatPanel({
 
   const repeat = (sourceDay: string, slot: MealSlot) =>
     void run(async () =>
-      api.post('/nutrition/entries/repeat', { sourceDay, sourceSlot: slot, day, slot }),
+      api.post('/nutrition/entries/repeat', {
+        sourceDay,
+        sourceSlot: slot,
+        day,
+        slot,
+      }),
     ).then((ok) => {
       if (ok) onChanged();
     });
@@ -744,11 +918,17 @@ function RepeatPanel({
     });
 
   return (
-    <Panel title="Log it again" description="The same thing, on this day, in one tap.">
+    <Panel
+      title="Log it again"
+      description="The same thing, on this day, in one tap."
+    >
       {overview.savedMeals.length > 0 && (
         <ul className="mb-3 space-y-1.5">
           {overview.savedMeals.map((meal) => (
-            <li key={meal.id} className="flex items-center justify-between gap-2 text-sm">
+            <li
+              key={meal.id}
+              className="flex items-center justify-between gap-2 text-sm"
+            >
               <span className="min-w-0 truncate">
                 {meal.name}
                 <span className="ml-1 text-xs text-ink-faint">
@@ -760,7 +940,11 @@ function RepeatPanel({
                 className="btn-ghost shrink-0"
                 onClick={() => logMeal(meal)}
                 disabled={pending || !meal.loggable}
-                title={meal.loggable ? undefined : 'One of its foods is gone — fix it under Foods'}
+                title={
+                  meal.loggable
+                    ? undefined
+                    : 'One of its foods is gone — fix it under Foods'
+                }
               >
                 Log
               </button>
@@ -778,7 +962,9 @@ function RepeatPanel({
             >
               <span className="min-w-0 truncate text-ink-muted">
                 {SLOT_LABELS[meal.slot]}, {formatDay(meal.day)}
-                <span className="ml-1 text-xs text-ink-faint">{meal.totals.energyKcal} kcal</span>
+                <span className="ml-1 text-xs text-ink-faint">
+                  {meal.totals.energyKcal} kcal
+                </span>
               </span>
               <button
                 type="button"
@@ -801,9 +987,11 @@ function RepeatPanel({
 function FoodsTab({
   overview,
   onChanged,
+  onShare,
 }: {
   overview: NutritionOverview;
   onChanged: () => void;
+  onShare?: (source: PostSelection) => void;
 }) {
   const [query, setQuery] = useState('');
   const [showArchived, setShowArchived] = useState(false);
@@ -828,9 +1016,11 @@ function FoodsTab({
     });
 
   const remove = (food: Food) =>
-    void run(async () => api.delete(`/nutrition/foods/${food.id}`)).then((ok) => {
-      if (ok) onChanged();
-    });
+    void run(async () => api.delete(`/nutrition/foods/${food.id}`)).then(
+      (ok) => {
+        if (ok) onChanged();
+      },
+    );
 
   return (
     <div className="space-y-5">
@@ -838,9 +1028,23 @@ function FoodsTab({
         title="Your foods"
         description={`${overview.foods.length} in your database, ordered by what you actually eat`}
         actions={
-          <button type="button" className="btn-primary" onClick={() => setAdding(true)}>
-            Add a food
-          </button>
+          <>
+            {onShare && overview.foods.some((f) => !f.archived) && (
+              <button
+                className="btn-ghost"
+                onClick={() => onShare({ kind: 'database' })}
+              >
+                Share database
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => setAdding(true)}
+            >
+              Add a food
+            </button>
+          </>
         }
       >
         <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -875,7 +1079,11 @@ function FoodsTab({
                 : 'Nothing matching that.'
             }
             action={
-              <button type="button" className="btn-primary" onClick={() => setAdding(true)}>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => setAdding(true)}
+              >
                 Add a food
               </button>
             }
@@ -883,8 +1091,20 @@ function FoodsTab({
         ) : (
           <ul className="divide-y divide-border">
             {shown.map((food) => (
-              <li key={food.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+              <li
+                key={food.id}
+                className="flex items-center justify-between gap-3 py-2 text-sm"
+              >
                 <div className="min-w-0">
+                  {onShare && !food.archived && (
+                    <button
+                      className="mb-1 text-xs text-sky-300"
+                      onClick={() => onShare({ kind: 'food', foodId: food.id })}
+                      aria-label={`Share ${food.name}`}
+                    >
+                      share
+                    </button>
+                  )}
                   <p className="truncate">
                     <button
                       type="button"
@@ -893,20 +1113,32 @@ function FoodsTab({
                         'mr-1.5',
                         food.favourite ? 'text-amber-400' : 'text-ink-faint',
                       )}
-                      aria-label={food.favourite ? 'Remove from favourites' : 'Add to favourites'}
+                      aria-label={
+                        food.favourite
+                          ? 'Remove from favourites'
+                          : 'Add to favourites'
+                      }
                       disabled={pending}
                     >
                       ★
                     </button>
                     {food.name}
-                    {food.brand && <span className="ml-1 text-xs text-ink-faint">{food.brand}</span>}
+                    {food.brand && (
+                      <span className="ml-1 text-xs text-ink-faint">
+                        {food.brand}
+                      </span>
+                    )}
                     {food.archived && (
-                      <span className="ml-2 text-xs text-ink-faint">(archived)</span>
+                      <span className="ml-2 text-xs text-ink-faint">
+                        (archived)
+                      </span>
                     )}
                   </p>
                   <p className="text-xs text-ink-faint">
-                    {food.servingSize} {food.unit} serving · {food.perServing.energyKcal} kcal · P{' '}
-                    {mgToG(food.perServing.proteinMg)}g C {mgToG(food.perServing.carbMg)}g F{' '}
+                    {food.servingSize} {food.unit} serving ·{' '}
+                    {food.perServing.energyKcal} kcal · P{' '}
+                    {mgToG(food.perServing.proteinMg)}g C{' '}
+                    {mgToG(food.perServing.carbMg)}g F{' '}
                     {mgToG(food.perServing.fatMg)}g
                     {food.useCount > 0 && ` · eaten ${food.useCount}×`}
                     {food.source === 'openfoodfacts' && ' · imported from OFF'}
@@ -998,7 +1230,8 @@ function SavedMealsPanel({
                 <p className="min-w-0 truncate">
                   {meal.name}
                   <span className="ml-2 text-xs text-ink-faint">
-                    {meal.totals.energyKcal} kcal · P {mgToG(meal.totals.proteinMg)}g
+                    {meal.totals.energyKcal} kcal · P{' '}
+                    {mgToG(meal.totals.proteinMg)}g
                   </span>
                 </p>
                 <button
@@ -1022,7 +1255,8 @@ function SavedMealsPanel({
               </p>
               {!meal.loggable && (
                 <p className="mt-1 text-xs text-amber-400">
-                  One of its foods is gone, so this cannot be logged until it is fixed.
+                  One of its foods is gone, so this cannot be logged until it is
+                  fixed.
                 </p>
               )}
             </li>
@@ -1037,7 +1271,9 @@ function SavedMealsPanel({
 
 function TargetsPanel({ targets }: { targets: NutritionTargets }) {
   if (!targets.available) {
-    const missing = targets.missingInputs.map((input) => MISSING_INPUT_LABELS[input] ?? input);
+    const missing = targets.missingInputs.map(
+      (input) => MISSING_INPUT_LABELS[input] ?? input,
+    );
     return (
       <Panel title="Your targets">
         <p className="text-sm text-ink-muted">
@@ -1067,7 +1303,10 @@ function TargetsPanel({ targets }: { targets: NutritionTargets }) {
       <dl className="divide-y divide-border">
         {rows.map((row) =>
           row.figure == null ? null : (
-            <div key={row.label} className="flex items-baseline justify-between gap-3 py-2">
+            <div
+              key={row.label}
+              className="flex items-baseline justify-between gap-3 py-2"
+            >
               <dt className="text-sm text-ink-muted">
                 {row.label}
                 {isRecorded(row.figure) ? (
@@ -1075,12 +1314,16 @@ function TargetsPanel({ targets }: { targets: NutritionTargets }) {
                     yours
                   </span>
                 ) : (
-                  <EstimateMark basis={(row.figure as Estimate<number>).basis} />
+                  <EstimateMark
+                    basis={(row.figure as Estimate<number>).basis}
+                  />
                 )}
               </dt>
               <dd className="tabular text-sm font-semibold">
                 {row.figure.value.toLocaleString()}
-                <span className="ml-1 text-xs font-normal text-ink-faint">{row.unit}</span>
+                <span className="ml-1 text-xs font-normal text-ink-faint">
+                  {row.unit}
+                </span>
               </dd>
             </div>
           ),
@@ -1090,16 +1333,18 @@ function TargetsPanel({ targets }: { targets: NutritionTargets }) {
       <div className="mt-3 space-y-2 text-xs">
         {targets.bodyFatRecordedPct != null ? (
           <p className="text-ink-faint">
-            Using your recorded body fat of {Math.round(targets.bodyFatRecordedPct * 1000) / 10}%,
-            so protein and fat are set against lean mass.
+            Using your recorded body fat of{' '}
+            {Math.round(targets.bodyFatRecordedPct * 1000) / 10}%, so protein
+            and fat are set against lean mass.
           </p>
         ) : (
           targets.bodyFatPct && (
             <p className="text-ink-faint">
-              Body fat looks like roughly {Math.round(targets.bodyFatPct.value * 100)}%
-              <EstimateMark basis={targets.bodyFatPct.basis} /> — shown for reference only. It is
-              not used in the calorie maths; record a measured figure with a weigh-in and it will
-              be.
+              Body fat looks like roughly{' '}
+              {Math.round(targets.bodyFatPct.value * 100)}%
+              <EstimateMark basis={targets.bodyFatPct.basis} /> — shown for
+              reference only. It is not used in the calorie maths; record a
+              measured figure with a weigh-in and it will be.
             </p>
           )
         )}
@@ -1121,8 +1366,10 @@ function TargetsPanel({ targets }: { targets: NutritionTargets }) {
             </span>{' '}
             a week
             <EstimateMark basis="Energy difference from maintenance × 7 ÷ 7700 kcal per kg. A rule of thumb: real loss slows as you get lighter, because maintenance falls with you." />
-            {targets.rateVerdict === 'fast' && ' — faster than is usually worth it.'}
-            {targets.rateVerdict === 'slow' && ' — slow enough to be hard to see week to week.'}
+            {targets.rateVerdict === 'fast' &&
+              ' — faster than is usually worth it.'}
+            {targets.rateVerdict === 'slow' &&
+              ' — slow enough to be hard to see week to week.'}
           </p>
         )}
 
@@ -1138,7 +1385,9 @@ function TargetsPanel({ targets }: { targets: NutritionTargets }) {
           </p>
         )}
 
-        {targets.goalNote && <p className="text-ink-faint">{targets.goalNote}</p>}
+        {targets.goalNote && (
+          <p className="text-ink-faint">{targets.goalNote}</p>
+        )}
       </div>
     </Panel>
   );

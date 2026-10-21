@@ -1,4 +1,11 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { SharedFoodDiary, SharedStat } from '@life-portal/shared-types';
+import { SocialGraphService } from '../social-graph/social-graph.module';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, Model } from 'mongoose';
 import type {
@@ -79,6 +86,7 @@ const DEFAULT_PROFILE = {
   dayStartHour: 4,
   defaultFoodVisibility: 'private',
   shareMeals: false,
+  shareDiary: false,
   shareWeight: false,
   shareTargets: false,
 };
@@ -99,10 +107,12 @@ export class NutritionService {
   private readonly logger = new Logger(NutritionService.name);
 
   constructor(
+    private readonly graph: SocialGraphService,
     @InjectModel(Food.name) private readonly foods: Model<Food>,
     @InjectModel(MealEntry.name) private readonly entries: Model<MealEntry>,
     @InjectModel(SavedMeal.name) private readonly savedMeals: Model<SavedMeal>,
-    @InjectModel(NutritionProfile.name) private readonly profiles: Model<NutritionProfile>,
+    @InjectModel(NutritionProfile.name)
+    private readonly profiles: Model<NutritionProfile>,
     @InjectModel(WeighIn.name) private readonly weighIns: Model<WeighIn>,
     @InjectModel(CheatMeal.name) private readonly cheatMeals: Model<CheatMeal>,
     @InjectModel(User.name) private readonly users: Model<User>,
@@ -118,14 +128,21 @@ export class NutritionService {
    */
   async listFoods(
     userId: string,
-    options: { q?: string; favourite?: boolean; includeArchived?: boolean } = {},
+    options: {
+      q?: string;
+      favourite?: boolean;
+      includeArchived?: boolean;
+    } = {},
   ): Promise<FoodWithUsage[]> {
     const filter: Record<string, unknown> = { userId };
     if (!options.includeArchived) filter['archived'] = false;
     if (options.favourite) filter['favourite'] = true;
     if (options.q?.trim()) {
       // Escaped, because a stray `(` in a search box should not be a 500.
-      const pattern = new RegExp(options.q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const pattern = new RegExp(
+        options.q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+        'i',
+      );
       filter['$or'] = [{ name: pattern }, { brand: pattern }];
     }
 
@@ -164,16 +181,27 @@ export class NutritionService {
       useCount: number;
     }>([
       { $match: { userId } },
-      { $group: { _id: '$foodId', lastUsedDay: { $max: '$day' }, useCount: { $sum: 1 } } },
+      {
+        $group: {
+          _id: '$foodId',
+          lastUsedDay: { $max: '$day' },
+          useCount: { $sum: 1 },
+        },
+      },
     ]);
     return new Map(
-      rows.map((row) => [String(row._id), { lastUsedDay: row.lastUsedDay, useCount: row.useCount }]),
+      rows.map((row) => [
+        String(row._id),
+        { lastUsedDay: row.lastUsedDay, useCount: row.useCount },
+      ]),
     );
   }
 
   async createFood(userId: string, dto: CreateFoodDto): Promise<FoodDto> {
     const servingSize = dto.servingSize;
-    const entryMode = (dto.entryMode ?? 'per_serving') as 'per_serving' | 'per_100';
+    const entryMode = (dto.entryMode ?? 'per_serving') as
+      | 'per_serving'
+      | 'per_100';
     const facts = factsFromInput(dto, entryMode, servingSize);
     this.warnOnImplausibleFacts(dto.name, facts);
 
@@ -203,10 +231,17 @@ export class NutritionService {
     return created.toJSON() as unknown as FoodDto;
   }
 
-  async updateFood(userId: string, id: string, dto: UpdateFoodDto): Promise<FoodDto> {
+  async updateFood(
+    userId: string,
+    id: string,
+    dto: UpdateFoodDto,
+  ): Promise<FoodDto> {
+    await this.ensurePrivateSharing(userId);
     const existing = await this.findFood(userId, id);
     const servingSize = dto.servingSize ?? existing.servingSize;
-    const entryMode = (dto.entryMode ?? existing.entryMode) as 'per_serving' | 'per_100';
+    const entryMode = (dto.entryMode ?? existing.entryMode) as
+      | 'per_serving'
+      | 'per_100';
 
     const patch: Record<string, unknown> = {
       ...(dto.name != null ? { name: dto.name } : {}),
@@ -224,7 +259,12 @@ export class NutritionService {
 
     // The four numbers travel together: re-normalising from a partial set would mix a new
     // per-serving protein figure with an old per-100 carbohydrate one.
-    if (dto.energyKcal != null || dto.proteinMg != null || dto.fatMg != null || dto.carbMg != null) {
+    if (
+      dto.energyKcal != null ||
+      dto.proteinMg != null ||
+      dto.fatMg != null ||
+      dto.carbMg != null
+    ) {
       const facts = factsFromInput(
         {
           energyKcal: dto.energyKcal ?? 0,
@@ -271,12 +311,18 @@ export class NutritionService {
       await this.foods.findOneAndDelete({ userId, _id: id });
       return { id, deleted: true };
     }
-    await this.foods.findOneAndUpdate({ userId, _id: id }, { $set: { archived: true } });
+    await this.foods.findOneAndUpdate(
+      { userId, _id: id },
+      { $set: { archived: true } },
+    );
     return { id, archived: true };
   }
 
   /** A warning in the log, never a rejection: real labels disagree with their own macros. */
-  private warnOnImplausibleFacts(name: string, facts: Parameters<typeof macroEnergyMismatch>[0]) {
+  private warnOnImplausibleFacts(
+    name: string,
+    facts: Parameters<typeof macroEnergyMismatch>[0],
+  ) {
     const mismatch = macroEnergyMismatch(facts);
     if (mismatch) {
       this.logger.warn(
@@ -286,7 +332,8 @@ export class NutritionService {
   }
 
   private async findFood(userId: string, id: string) {
-    if (!isValidObjectId(id)) throw new NotFoundException(`Food ${id} not found`);
+    if (!isValidObjectId(id))
+      throw new NotFoundException(`Food ${id} not found`);
     const found = await this.foods.findOne({ userId, _id: id });
     if (!found) throw new NotFoundException(`Food ${id} not found`);
     return found.toJSON() as unknown as FoodDto;
@@ -310,7 +357,8 @@ export class NutritionService {
     const found = await this.lookup.byBarcode(code);
     if (!found.result) {
       throw new BadRequestException(
-        found.reason ?? `Open Food Facts has no usable product for ${code}. Add it by hand instead.`,
+        found.reason ??
+          `Open Food Facts has no usable product for ${code}. Add it by hand instead.`,
       );
     }
     const result = found.result;
@@ -348,6 +396,27 @@ export class NutritionService {
     return created.toJSON() as unknown as FoodDto;
   }
 
+  /** Explicit one-time private baseline, with a per-row marker safe across concurrent requests. */
+  async ensurePrivateSharing(userId: string): Promise<void> {
+    await this.foods.updateMany(
+      { userId, privacyVersion: { $ne: 1 } },
+      { $set: { visibility: 'private', privacyVersion: 1 } },
+    );
+    await this.profiles.updateMany(
+      { userId, privacyVersion: { $ne: 1 } },
+      {
+        $set: {
+          defaultFoodVisibility: 'private',
+          shareMeals: false,
+          shareDiary: false,
+          shareWeight: false,
+          shareTargets: false,
+          privacyVersion: 1,
+        },
+      },
+    );
+  }
+
   // ---------------------------------------------------------------- public foods (sharing)
 
   /** Lists public foods from other users that can be imported. */
@@ -356,12 +425,16 @@ export class NutritionService {
     options: { q?: string; limit?: number; skip?: number } = {},
   ): Promise<PublicFoodsResponse> {
     const filter: Record<string, unknown> = {
-      userId: { $ne: userId },
+      userId: { $ne: userId, $nin: await this.graph.blockedUserIds(userId) },
       visibility: 'public',
+      privacyVersion: 1,
       archived: false,
     };
     if (options.q?.trim()) {
-      const pattern = new RegExp(options.q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const pattern = new RegExp(
+        options.q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+        'i',
+      );
       filter['$or'] = [{ name: pattern }, { brand: pattern }];
     }
 
@@ -395,8 +468,9 @@ export class NutritionService {
   /** Checks if there are any public foods from other users available to import. */
   async hasPublicFoodsToImport(userId: string): Promise<boolean> {
     const count = await this.foods.countDocuments({
-      userId: { $ne: userId },
+      userId: { $ne: userId, $nin: await this.graph.blockedUserIds(userId) },
       visibility: 'public',
+      privacyVersion: 1,
       archived: false,
     });
     return count > 0;
@@ -404,14 +478,17 @@ export class NutritionService {
 
   /** Imports a public food from another user into the current user's database. */
   async importPublicFood(userId: string, foodId: string): Promise<FoodDto> {
-    if (!isValidObjectId(foodId)) throw new NotFoundException(`Food ${foodId} not found`);
-    
+    if (!isValidObjectId(foodId))
+      throw new NotFoundException(`Food ${foodId} not found`);
+
     const source = await this.foods.findOne({
       _id: foodId,
       visibility: 'public',
+      privacyVersion: 1,
       archived: false,
     });
-    if (!source) throw new NotFoundException(`Public food ${foodId} not found`);
+    if (!source || (await this.graph.isBlocked(userId, source.userId)))
+      throw new NotFoundException(`Public food ${foodId} not found`);
     if (source.userId === userId) {
       throw new BadRequestException('You cannot import your own food.');
     }
@@ -431,6 +508,18 @@ export class NutritionService {
       barcode: source.barcode,
       source: 'imported',
       sourceRef: String(source._id),
+      ...(source.attribution
+        ? { attribution: source.attribution }
+        : source.source === 'openfoodfacts' &&
+            source.sourceRef &&
+            /^\d{5,20}$/.test(source.sourceRef)
+          ? {
+              attribution: {
+                label: 'Open Food Facts · ODbL',
+                url: `https://world.openfoodfacts.org/product/${source.sourceRef}`,
+              },
+            }
+          : {}),
       archived: false,
       visibility: profile.defaultFoodVisibility,
       energyKcalPer100: source.energyKcalPer100,
@@ -450,6 +539,7 @@ export class NutritionService {
 
   /** Created on first read with defaults, exactly as `SettingsService.get` does. */
   async profile(userId: string): Promise<NutritionProfileDto> {
+    await this.ensurePrivateSharing(userId);
     const found = await this.profiles.findOneAndUpdate(
       { userId },
       { $setOnInsert: { userId, ...DEFAULT_PROFILE } },
@@ -472,9 +562,12 @@ export class NutritionService {
    * When `updateExistingFoodsVisibility` is true and `defaultFoodVisibility` changes, all foods
    * that had the old default visibility are updated to the new one.
    */
-  async updateProfile(userId: string, dto: UpdateProfileDto): Promise<NutritionProfileDto> {
+  async updateProfile(
+    userId: string,
+    dto: UpdateProfileDto,
+  ): Promise<NutritionProfileDto> {
     const { updateExistingFoodsVisibility, ...profileFields } = dto;
-    
+
     // Get current profile to check if defaultFoodVisibility is changing
     const currentProfile = await this.profile(userId);
     const oldVisibility = currentProfile.defaultFoodVisibility;
@@ -488,7 +581,9 @@ export class NutritionService {
       else if (value !== undefined) set[field] = value;
     }
     const seed = Object.fromEntries(
-      Object.entries(DEFAULT_PROFILE).filter(([field]) => !(field in set) && !(field in unset)),
+      Object.entries(DEFAULT_PROFILE).filter(
+        ([field]) => !(field in set) && !(field in unset),
+      ),
     );
 
     const updated = await this.profiles.findOneAndUpdate(
@@ -518,7 +613,11 @@ export class NutritionService {
   }
 
   /** One weigh-in per day: stepping on the scale twice corrects it rather than stacking rows. */
-  async upsertWeighIn(userId: string, today: string, dto: UpsertWeighInDto): Promise<WeighInDto> {
+  async upsertWeighIn(
+    userId: string,
+    today: string,
+    dto: UpsertWeighInDto,
+  ): Promise<WeighInDto> {
     const day = dto.day ? toDay(dto.day) : today;
     const patch: Record<string, unknown> = { weightGrams: dto.weightGrams };
     // `$unset` rather than skipping, so clearing a body-fat reading actually clears it and the
@@ -536,15 +635,22 @@ export class NutritionService {
     return saved.toJSON() as unknown as WeighInDto;
   }
 
-  async removeWeighIn(userId: string, id: string): Promise<{ id: string; deleted: true }> {
-    if (!isValidObjectId(id)) throw new NotFoundException(`Weigh-in ${id} not found`);
+  async removeWeighIn(
+    userId: string,
+    id: string,
+  ): Promise<{ id: string; deleted: true }> {
+    if (!isValidObjectId(id))
+      throw new NotFoundException(`Weigh-in ${id} not found`);
     const deleted = await this.weighIns.findOneAndDelete({ userId, _id: id });
     if (!deleted) throw new NotFoundException(`Weigh-in ${id} not found`);
     return { id, deleted: true };
   }
 
   async targets(userId: string, today: string): Promise<NutritionTargets> {
-    const [profile, weighIns] = await Promise.all([this.profile(userId), this.listWeighIns(userId)]);
+    const [profile, weighIns] = await Promise.all([
+      this.profile(userId),
+      this.listWeighIns(userId),
+    ]);
     return nutritionTargets({ profile, weighIns, today });
   }
 
@@ -562,7 +668,9 @@ export class NutritionService {
         ...(range.to ? { $lte: toDay(range.to) } : {}),
       };
     }
-    const rows = await this.entries.find(filter).sort({ day: -1, createdAt: 1 });
+    const rows = await this.entries
+      .find(filter)
+      .sort({ day: -1, createdAt: 1 });
     return rows.map((row) => this.serializeEntry(row));
   }
 
@@ -578,7 +686,10 @@ export class NutritionService {
    * The one write that matters. The `facts` snapshot is built here from the food, never accepted
    * from the client: what a meal contained is not something a request gets to assert.
    */
-  async createEntry(userId: string, dto: CreateEntryDto): Promise<MealEntryDto> {
+  async createEntry(
+    userId: string,
+    dto: CreateEntryDto,
+  ): Promise<MealEntryDto> {
     const food = await this.findFood(userId, dto.foodId);
     const amount = this.resolveAmount(dto, food.servingSize);
     const created = await this.entries.create({
@@ -601,8 +712,13 @@ export class NutritionService {
    * silently re-price the meal with numbers that were edited afterwards. `foodId` is not editable
    * either — a different food is a different meal.
    */
-  async updateEntry(userId: string, id: string, dto: UpdateEntryDto): Promise<MealEntryDto> {
-    if (!isValidObjectId(id)) throw new NotFoundException(`Entry ${id} not found`);
+  async updateEntry(
+    userId: string,
+    id: string,
+    dto: UpdateEntryDto,
+  ): Promise<MealEntryDto> {
+    if (!isValidObjectId(id))
+      throw new NotFoundException(`Entry ${id} not found`);
     const existing = await this.entries.findOne({ userId, _id: id });
     if (!existing) throw new NotFoundException(`Entry ${id} not found`);
 
@@ -623,8 +739,12 @@ export class NutritionService {
     return this.serializeEntry(updated);
   }
 
-  async removeEntry(userId: string, id: string): Promise<{ id: string; deleted: true }> {
-    if (!isValidObjectId(id)) throw new NotFoundException(`Entry ${id} not found`);
+  async removeEntry(
+    userId: string,
+    id: string,
+  ): Promise<{ id: string; deleted: true }> {
+    if (!isValidObjectId(id))
+      throw new NotFoundException(`Entry ${id} not found`);
     const deleted = await this.entries.findOneAndDelete({ userId, _id: id });
     if (!deleted) throw new NotFoundException(`Entry ${id} not found`);
     return { id, deleted: true };
@@ -636,11 +756,16 @@ export class NutritionService {
     servingSize: number,
   ): number {
     if (dto.amount != null && dto.servings != null) {
-      throw new BadRequestException('Give either an amount or a number of servings, not both.');
+      throw new BadRequestException(
+        'Give either an amount or a number of servings, not both.',
+      );
     }
     if (dto.amount != null) return dto.amount;
-    if (dto.servings != null) return servingsToAmount(dto.servings, servingSize);
-    throw new BadRequestException('An amount or a number of servings is required.');
+    if (dto.servings != null)
+      return servingsToAmount(dto.servings, servingSize);
+    throw new BadRequestException(
+      'An amount or a number of servings is required.',
+    );
   }
 
   /**
@@ -648,10 +773,17 @@ export class NutritionService {
    * new meal, so it gets today's numbers — falling back to the old snapshot when the food itself
    * has since been deleted.
    */
-  async repeatMeal(userId: string, dto: RepeatMealDto): Promise<MealEntryDto[]> {
-    const filter: Record<string, unknown> = { userId, day: toDay(dto.sourceDay) };
+  async repeatMeal(
+    userId: string,
+    dto: RepeatMealDto,
+  ): Promise<MealEntryDto[]> {
+    const filter: Record<string, unknown> = {
+      userId,
+      day: toDay(dto.sourceDay),
+    };
     if (dto.sourceSlot) filter['slot'] = dto.sourceSlot;
-    if (dto.entryIds?.length) filter['_id'] = { $in: dto.entryIds.filter(isValidObjectId) };
+    if (dto.entryIds?.length)
+      filter['_id'] = { $in: dto.entryIds.filter(isValidObjectId) };
 
     const sources = await this.entries.find(filter).sort({ createdAt: 1 });
     if (sources.length === 0) {
@@ -662,7 +794,9 @@ export class NutritionService {
       userId,
       _id: { $in: sources.map((row) => row.foodId).filter(isValidObjectId) },
     });
-    const byId = new Map(foods.map((row) => [String(row._id), row.toJSON() as unknown as FoodDto]));
+    const byId = new Map(
+      foods.map((row) => [String(row._id), row.toJSON() as unknown as FoodDto]),
+    );
 
     const created = await this.entries.insertMany(
       sources.map((source) => {
@@ -697,32 +831,46 @@ export class NutritionService {
         'components' | 'totals' | 'loggable'
       > & { components: { foodId: string; amount: number }[] };
 
-      const components: SavedMealComponentView[] = plain.components.map((component) => {
-        const food = byId.get(component.foodId);
-        if (!food || food.archived) {
-          return { ...component, missing: true, ...(food ? { name: food.name } : {}) };
-        }
-        return {
-          ...component,
-          name: food.name,
-          brand: food.brand,
-          unit: food.unit,
-          totals: entryTotals(component.amount, food),
-          missing: false,
-        };
-      });
+      const components: SavedMealComponentView[] = plain.components.map(
+        (component) => {
+          const food = byId.get(component.foodId);
+          if (!food || food.archived) {
+            return {
+              ...component,
+              missing: true,
+              ...(food ? { name: food.name } : {}),
+            };
+          }
+          return {
+            ...component,
+            name: food.name,
+            brand: food.brand,
+            unit: food.unit,
+            totals: entryTotals(component.amount, food),
+            missing: false,
+          };
+        },
+      );
 
       return {
         ...plain,
         components,
-        totals: sumTotals(components.filter((c) => c.totals).map((c) => c.totals as never)),
+        totals: sumTotals(
+          components.filter((c) => c.totals).map((c) => c.totals as never),
+        ),
         loggable: components.length > 0 && components.every((c) => !c.missing),
       };
     });
   }
 
-  async createSavedMeal(userId: string, dto: CreateSavedMealDto): Promise<SavedMealDto> {
-    await this.assertFoodsExist(userId, dto.components.map((c) => c.foodId));
+  async createSavedMeal(
+    userId: string,
+    dto: CreateSavedMealDto,
+  ): Promise<SavedMealDto> {
+    await this.assertFoodsExist(
+      userId,
+      dto.components.map((c) => c.foodId),
+    );
     const created = await this.savedMeals.create({
       userId,
       name: dto.name,
@@ -734,16 +882,28 @@ export class NutritionService {
   }
 
   /** Saves what was logged in one slot as a reusable meal, which is how real ones get built. */
-  async saveSlotAsMeal(userId: string, dto: SaveSlotAsMealDto): Promise<SavedMealDto> {
-    const entries = await this.entries.find({ userId, day: toDay(dto.day), slot: dto.slot });
+  async saveSlotAsMeal(
+    userId: string,
+    dto: SaveSlotAsMealDto,
+  ): Promise<SavedMealDto> {
+    const entries = await this.entries.find({
+      userId,
+      day: toDay(dto.day),
+      slot: dto.slot,
+    });
     if (entries.length === 0) {
-      throw new BadRequestException('There is nothing logged in that slot to save.');
+      throw new BadRequestException(
+        'There is nothing logged in that slot to save.',
+      );
     }
     const created = await this.savedMeals.create({
       userId,
       name: dto.name,
       defaultSlot: dto.slot,
-      components: entries.map((entry) => ({ foodId: entry.foodId, amount: entry.amount })),
+      components: entries.map((entry) => ({
+        foodId: entry.foodId,
+        amount: entry.amount,
+      })),
       archived: false,
     } as never);
     return this.oneSavedMeal(userId, String(created._id));
@@ -754,9 +914,13 @@ export class NutritionService {
     id: string,
     dto: UpdateSavedMealDto,
   ): Promise<SavedMealDto> {
-    if (!isValidObjectId(id)) throw new NotFoundException(`Saved meal ${id} not found`);
+    if (!isValidObjectId(id))
+      throw new NotFoundException(`Saved meal ${id} not found`);
     if (dto.components?.length) {
-      await this.assertFoodsExist(userId, dto.components.map((c) => c.foodId));
+      await this.assertFoodsExist(
+        userId,
+        dto.components.map((c) => c.foodId),
+      );
     }
     const updated = await this.savedMeals.findOneAndUpdate(
       { userId, _id: id },
@@ -767,15 +931,23 @@ export class NutritionService {
     return this.oneSavedMeal(userId, id);
   }
 
-  async removeSavedMeal(userId: string, id: string): Promise<{ id: string; deleted: true }> {
-    if (!isValidObjectId(id)) throw new NotFoundException(`Saved meal ${id} not found`);
+  async removeSavedMeal(
+    userId: string,
+    id: string,
+  ): Promise<{ id: string; deleted: true }> {
+    if (!isValidObjectId(id))
+      throw new NotFoundException(`Saved meal ${id} not found`);
     const deleted = await this.savedMeals.findOneAndDelete({ userId, _id: id });
     if (!deleted) throw new NotFoundException(`Saved meal ${id} not found`);
     return { id, deleted: true };
   }
 
   /** One entry per component, each with its own snapshot, all tagged with the meal they came from. */
-  async logSavedMeal(userId: string, id: string, dto: LogSavedMealDto): Promise<MealEntryDto[]> {
+  async logSavedMeal(
+    userId: string,
+    id: string,
+    dto: LogSavedMealDto,
+  ): Promise<MealEntryDto[]> {
     const meal = await this.oneSavedMeal(userId, id);
     if (!meal.loggable) {
       throw new BadRequestException(
@@ -784,9 +956,13 @@ export class NutritionService {
     }
     const foods = await this.foods.find({
       userId,
-      _id: { $in: meal.components.map((c) => c.foodId).filter(isValidObjectId) },
+      _id: {
+        $in: meal.components.map((c) => c.foodId).filter(isValidObjectId),
+      },
     });
-    const byId = new Map(foods.map((row) => [String(row._id), row.toJSON() as unknown as FoodDto]));
+    const byId = new Map(
+      foods.map((row) => [String(row._id), row.toJSON() as unknown as FoodDto]),
+    );
 
     const created = await this.entries.insertMany(
       meal.components.map((component) => {
@@ -806,16 +982,25 @@ export class NutritionService {
     return created.map((row) => this.serializeEntry(row));
   }
 
-  private async oneSavedMeal(userId: string, id: string): Promise<SavedMealDto> {
+  private async oneSavedMeal(
+    userId: string,
+    id: string,
+  ): Promise<SavedMealDto> {
     const all = await this.listSavedMeals(userId);
     const found = all.find((meal) => meal.id === id);
     if (!found) throw new NotFoundException(`Saved meal ${id} not found`);
     return found;
   }
 
-  private async assertFoodsExist(userId: string, foodIds: string[]): Promise<void> {
+  private async assertFoodsExist(
+    userId: string,
+    foodIds: string[],
+  ): Promise<void> {
     const ids = foodIds.filter(isValidObjectId);
-    const count = await this.foods.countDocuments({ userId, _id: { $in: ids } });
+    const count = await this.foods.countDocuments({
+      userId,
+      _id: { $in: ids },
+    });
     if (count !== new Set(ids).size) {
       throw new BadRequestException('One of those foods no longer exists.');
     }
@@ -863,7 +1048,10 @@ export class NutritionService {
     const food = await this.findFood(userId, dto.foodId);
     const amount = this.resolveAmount(dto, food.servingSize);
     // New rows go to the back of the queue; the owner reorders deliberately.
-    const last = await this.cheatMeals.find({ userId }).sort({ order: -1 }).limit(1);
+    const last = await this.cheatMeals
+      .find({ userId })
+      .sort({ order: -1 })
+      .limit(1);
     await this.cheatMeals.create({
       userId,
       foodId: food.id,
@@ -881,7 +1069,8 @@ export class NutritionService {
     today: string,
     dto: UpdateCheatMealDto,
   ): Promise<CheatDayInfo['queue']> {
-    if (!isValidObjectId(id)) throw new NotFoundException(`Cheat meal ${id} not found`);
+    if (!isValidObjectId(id))
+      throw new NotFoundException(`Cheat meal ${id} not found`);
     const existing = await this.cheatMeals.findOne({ userId, _id: id });
     if (!existing) throw new NotFoundException(`Cheat meal ${id} not found`);
 
@@ -897,12 +1086,20 @@ export class NutritionService {
       patch['amount'] = this.resolveAmount(dto, food.servingSize);
     }
 
-    await this.cheatMeals.findOneAndUpdate({ userId, _id: id }, { $set: patch }, { runValidators: true });
+    await this.cheatMeals.findOneAndUpdate(
+      { userId, _id: id },
+      { $set: patch },
+      { runValidators: true },
+    );
     return (await this.cheatInfo(userId, today)).queue;
   }
 
-  async removeCheatMeal(userId: string, id: string): Promise<{ id: string; deleted: true }> {
-    if (!isValidObjectId(id)) throw new NotFoundException(`Cheat meal ${id} not found`);
+  async removeCheatMeal(
+    userId: string,
+    id: string,
+  ): Promise<{ id: string; deleted: true }> {
+    if (!isValidObjectId(id))
+      throw new NotFoundException(`Cheat meal ${id} not found`);
     const deleted = await this.cheatMeals.findOneAndDelete({ userId, _id: id });
     if (!deleted) throw new NotFoundException(`Cheat meal ${id} not found`);
     return { id, deleted: true };
@@ -918,7 +1115,10 @@ export class NutritionService {
       order
         .filter(isValidObjectId)
         .map((id, index) =>
-          this.cheatMeals.updateOne({ userId, _id: id }, { $set: { order: index } }),
+          this.cheatMeals.updateOne(
+            { userId, _id: id },
+            { $set: { order: index } },
+          ),
         ),
     );
     return (await this.cheatInfo(userId, today)).queue;
@@ -930,7 +1130,8 @@ export class NutritionService {
     id: string,
     dto: LogSavedMealDto,
   ): Promise<{ entry: MealEntryDto; cheat: CheatDayInfo }> {
-    if (!isValidObjectId(id)) throw new NotFoundException(`Cheat meal ${id} not found`);
+    if (!isValidObjectId(id))
+      throw new NotFoundException(`Cheat meal ${id} not found`);
     const row = await this.cheatMeals.findOne({ userId, _id: id });
     if (!row) throw new NotFoundException(`Cheat meal ${id} not found`);
 
@@ -952,7 +1153,10 @@ export class NutritionService {
       { userId, _id: id },
       { $set: { eaten: true, eatenDay: day } },
     );
-    return { entry: this.serializeEntry(created), cheat: await this.cheatInfo(userId, day) };
+    return {
+      entry: this.serializeEntry(created),
+      cheat: await this.cheatInfo(userId, day),
+    };
   }
 
   // ---------------------------------------------------------------- derived views
@@ -970,8 +1174,14 @@ export class NutritionService {
   }
 
   /** The last few logged meals, newest first, for one-tap repeating. */
-  private async recentMeals(userId: string, today: string): Promise<RecentMeal[]> {
-    const entries = await this.listEntries(userId, { from: addDays(today, -14), to: today });
+  private async recentMeals(
+    userId: string,
+    today: string,
+  ): Promise<RecentMeal[]> {
+    const entries = await this.listEntries(userId, {
+      from: addDays(today, -14),
+      to: today,
+    });
     const groups = new Map<string, RecentMeal>();
     for (const entry of entries) {
       const key = `${entry.day}:${entry.slot}`;
@@ -996,20 +1206,28 @@ export class NutritionService {
   }
 
   /** Everything `/nutrition` renders, in one round trip. */
-  async overview(userId: string, today: string, day?: string): Promise<NutritionOverview> {
+  async overview(
+    userId: string,
+    today: string,
+    day?: string,
+  ): Promise<NutritionOverview> {
     const viewed = day ? toDay(day) : today;
-    const [profile, weighIns, foods, savedMeals, hasPublicFoods] = await Promise.all([
-      this.profile(userId),
-      this.listWeighIns(userId),
-      this.listFoods(userId),
-      this.listSavedMeals(userId),
-      this.hasPublicFoodsToImport(userId),
-    ]);
+    const [profile, weighIns, foods, savedMeals, hasPublicFoods] =
+      await Promise.all([
+        this.profile(userId),
+        this.listWeighIns(userId),
+        this.listFoods(userId),
+        this.listSavedMeals(userId),
+        this.hasPublicFoodsToImport(userId),
+      ]);
     const targets = nutritionTargets({ profile, weighIns, today });
 
     // One window covers both the day being viewed and the history its suggestions rank over.
     const [history, weekEntries, recent, cheat] = await Promise.all([
-      this.listEntries(userId, { from: addDays(viewed, -SUGGESTION_LOOKBACK_DAYS), to: viewed }),
+      this.listEntries(userId, {
+        from: addDays(viewed, -SUGGESTION_LOOKBACK_DAYS),
+        to: viewed,
+      }),
       this.listEntries(userId, { from: weekStart(today), to: weekEnd(today) }),
       this.recentMeals(userId, today),
       this.cheatInfo(userId, today),
@@ -1033,6 +1251,70 @@ export class NutritionService {
     };
   }
 
+  /** Only explicitly shared food categories leave this module. No profile or entry rows. */
+  async sharedStats(
+    userId: string,
+    today: string,
+    sharedProfile?: NutritionProfileDto,
+  ): Promise<SharedStat[]> {
+    const profile = sharedProfile ?? (await this.profile(userId));
+    const stats: SharedStat[] = [];
+    let summary: NutritionSummary | undefined;
+    if (profile.shareMeals || profile.shareTargets)
+      summary = await this.summary(userId, today);
+    if (profile.shareMeals && summary)
+      stats.push({ label: 'Eaten today', value: `${summary.eatenKcal} kcal` });
+    if (profile.shareTargets && summary?.targetKcal !== undefined)
+      stats.push({
+        label: 'Daily target',
+        value: `${summary.targetKcal} kcal`,
+        estimated: profile.energyOverrideKcal == null,
+      });
+    if (profile.shareWeight) {
+      const latest = (await this.listWeighIns(userId))
+        .filter((w) => w.day <= today)
+        .at(-1);
+      if (latest)
+        stats.push({
+          label: 'Weight',
+          value: `${latest.weightGrams / 1000} kg`,
+        });
+    }
+    if (profile.shareMeals && summary && stats.length < 3)
+      stats.push({ label: 'Protein', value: `${summary.proteinEatenG} g` });
+    if (profile.shareMeals && summary && stats.length < 3)
+      stats.push({ label: 'Logged foods', value: String(summary.entryCount) });
+    return stats;
+  }
+
+  /** Caller must check module audience and graph access before requesting this projection. */
+  async sharedDiary(
+    userId: string,
+    day: string,
+    today: string,
+  ): Promise<SharedFoodDiary | null> {
+    if ((await this.profile(userId)).shareDiary !== true) return null;
+    const entries = await this.listEntries(userId, { day });
+    const totals = dayTotals(day, entries);
+    return {
+      day,
+      today,
+      totals: totals.totals,
+      slots: totals.slots
+        .filter((slot) => slot.entries.length)
+        .map((slot) => ({
+          slot: slot.slot,
+          foods: slot.entries.map((entry) => ({
+            name: entry.facts.name,
+            ...(entry.facts.brand ? { brand: entry.facts.brand } : {}),
+            amount: entry.amount,
+            unit: entry.unit,
+            totals: entryTotals(entry.amount, entry.facts),
+          })),
+        })),
+    };
+  }
+
   /** The dashboard card's three numbers, plus the cheat-day countdown. */
   async summary(userId: string, today: string): Promise<NutritionSummary> {
     const [profile, weighIns, entries] = await Promise.all([
@@ -1050,7 +1332,9 @@ export class NutritionService {
       entryCount: totals.entryCount,
       targets,
       goal: profile.goal,
-      cheat: next ? { nextDay: next.day, daysUntil: next.daysUntil } : undefined,
+      cheat: next
+        ? { nextDay: next.day, daysUntil: next.daysUntil }
+        : undefined,
     });
   }
 }

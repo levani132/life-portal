@@ -1,3 +1,4 @@
+import { RequireModule } from '../access/access.module';
 import {
   Body,
   Controller,
@@ -36,6 +37,7 @@ export class ReprioritiseDto {
   order!: string[];
 }
 
+@RequireModule('loans')
 @Controller('loans')
 export class LoansController {
   constructor(private readonly loans: LoansService) {}

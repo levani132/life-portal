@@ -108,6 +108,7 @@ const profile: NutritionProfile = {
   cheatDays: [],
   dayStartHour: 4,
   defaultFoodVisibility: 'private',
+  shareDiary: false,
   shareMeals: false,
   shareWeight: false,
   shareTargets: false,

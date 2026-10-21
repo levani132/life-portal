@@ -1,3 +1,4 @@
+import { AccessService } from '../access/access.module';
 import {
   CanActivate,
   ExecutionContext,
@@ -30,7 +31,7 @@ const WINDOW_MS = 60 * 60 * 1000;
 export class IngestTokenGuard implements CanActivate {
   private readonly hits = new Map<string, { count: number; resetAt: number }>();
 
-  constructor(private readonly tokens: IngestTokenService) {}
+  constructor(private readonly tokens: IngestTokenService, private readonly access: AccessService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request & { ingest?: unknown }>();
@@ -44,6 +45,7 @@ export class IngestTokenGuard implements CanActivate {
     const verified = await this.tokens.verify(presented, today);
     if (!verified) throw new UnauthorizedException('Invalid, expired or revoked ingest token');
 
+    await this.access.require(verified.userId, 'money');
     this.consume(verified.tokenId);
 
     // Handed to the controller so it never has to re-verify or trust anything in the body.

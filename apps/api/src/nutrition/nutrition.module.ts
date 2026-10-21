@@ -1,3 +1,5 @@
+import { NutritionPublicationService } from './nutrition-publication.service';
+import { RequireModule } from '../access/access.module';
 import {
   Body,
   Controller,
@@ -48,6 +50,7 @@ import {
 import { NutritionService } from './nutrition.service';
 import { OpenFoodFactsProvider } from './openfoodfacts.provider';
 
+@RequireModule('nutrition')
 @Controller('nutrition')
 export class NutritionController {
   constructor(private readonly nutrition: NutritionService) {}
@@ -326,7 +329,7 @@ export class NutritionController {
     ]),
   ],
   controllers: [NutritionController],
-  providers: [NutritionService, OpenFoodFactsProvider],
-  exports: [NutritionService],
+  providers: [NutritionService, OpenFoodFactsProvider, NutritionPublicationService],
+  exports: [NutritionService, NutritionPublicationService],
 })
 export class NutritionModule {}

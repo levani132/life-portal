@@ -1,3 +1,4 @@
+import { AccessService } from '../access/access.module';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, Model } from 'mongoose';
@@ -36,6 +37,7 @@ const CONTRIBUTION_WINDOW_MONTHS = 6;
 @Injectable()
 export class BoardsService {
   constructor(
+    private readonly access: AccessService,
     @InjectModel(Board.name) private readonly boards: Model<Board>,
     @InjectModel(BoardTask.name) private readonly tasks: Model<BoardTask>,
     @InjectModel(BoardNote.name) private readonly notes: Model<BoardNote>,
@@ -44,10 +46,17 @@ export class BoardsService {
     @InjectModel(Win.name) private readonly wins: Model<Win>,
   ) {}
 
+  private async authorizeChild<T extends { userId: string; boardId: string }>(userId: string, id: string, model: Model<T>) {
+    const row = await model.findOne({ _id: this.oid(id, 'Record'), userId });
+    if (!row) throw new NotFoundException('Record not found');
+    await this.resolve(userId, row.boardId);
+  }
+
   // ---------------------------------------------------------------- boards
 
   async list(userId: string): Promise<BoardDto[]> {
-    const rows = await this.boards.find({ userId, archived: false }).sort({ order: 1, name: 1 });
+    const { access } = await this.access.forUser(userId);
+    const rows = await this.boards.find({ userId, archived: false, ...(!access.epam ? { key: { $ne: 'epam' } } : {}) }).sort({ order: 1, name: 1 });
     return rows.map((r) => r.toJSON() as unknown as BoardDto);
   }
 
@@ -58,16 +67,19 @@ export class BoardsService {
       ...(isValidObjectId(idOrKey) ? { _id: idOrKey } : { key: idOrKey.toLowerCase() }),
     });
     if (!found) throw new NotFoundException(`Board ${idOrKey} not found`);
+    await this.access.require(userId, found.key === 'epam' ? 'epam' : 'projects');
     return found.toJSON() as unknown as BoardDto;
   }
 
   async createBoard(userId: string, dto: CreateBoardDto): Promise<BoardDto> {
+    await this.access.require(userId, dto.key === 'epam' ? 'epam' : 'projects');
     const created = await this.boards.create({ ...dto, userId });
     return created.toJSON() as unknown as BoardDto;
   }
 
   async updateBoard(userId: string, idOrKey: string, dto: UpdateBoardDto): Promise<BoardDto> {
     const board = await this.resolve(userId, idOrKey);
+    if (dto.key === 'epam') await this.access.require(userId, 'epam');
     const updated = await this.boards.findOneAndUpdate({ _id: board.id, userId }, { $set: dto }, { new: true });
     // `resolve` just found it, so this only fires on a concurrent delete.
     if (!updated) throw new NotFoundException(`Board ${idOrKey} not found`);
@@ -103,6 +115,7 @@ export class BoardsService {
   }
 
   async updateTask(userId: string, id: string, dto: UpdateTaskDto, today: string): Promise<BoardTaskDto> {
+    await this.authorizeChild(userId, id, this.tasks);
     const patch: Record<string, unknown> = { ...dto };
     // Completion is stamped by the server so a task's history cannot drift from its status.
     if (dto.status === 'done') patch['completedAt'] = today;
@@ -118,6 +131,7 @@ export class BoardsService {
   }
 
   async removeTask(userId: string, id: string) {
+    await this.authorizeChild(userId, id, this.tasks);
     const deleted = await this.tasks.findOneAndDelete({ _id: this.oid(id, 'Task'), userId });
     if (!deleted) throw new NotFoundException(`Task ${id} not found`);
     return { id, deleted: true as const };
@@ -147,12 +161,14 @@ export class BoardsService {
   }
 
   async updateNote(userId: string, id: string, dto: UpdateNoteDto): Promise<BoardNoteDto> {
+    await this.authorizeChild(userId, id, this.notes);
     const updated = await this.notes.findOneAndUpdate({ _id: this.oid(id, 'Note'), userId }, { $set: dto }, { new: true });
     if (!updated) throw new NotFoundException(`Note ${id} not found`);
     return updated.toJSON() as unknown as BoardNoteDto;
   }
 
   async removeNote(userId: string, id: string) {
+    await this.authorizeChild(userId, id, this.notes);
     const deleted = await this.notes.findOneAndDelete({ _id: this.oid(id, 'Note'), userId });
     if (!deleted) throw new NotFoundException(`Note ${id} not found`);
     return { id, deleted: true as const };
@@ -171,12 +187,14 @@ export class BoardsService {
   }
 
   async updatePerson(userId: string, id: string, dto: UpdatePersonDto): Promise<PersonDto> {
+    await this.authorizeChild(userId, id, this.people);
     const updated = await this.people.findOneAndUpdate({ _id: this.oid(id, 'Person'), userId }, { $set: dto }, { new: true });
     if (!updated) throw new NotFoundException(`Person ${id} not found`);
     return updated.toJSON() as unknown as PersonDto;
   }
 
   async removePerson(userId: string, id: string) {
+    await this.authorizeChild(userId, id, this.people);
     const deleted = await this.people.findOneAndDelete({ _id: this.oid(id, 'Person'), userId });
     if (!deleted) throw new NotFoundException(`Person ${id} not found`);
     return { id, deleted: true as const };
@@ -184,6 +202,7 @@ export class BoardsService {
 
   /** Records a 1:1 and moves the next one out by the person's cadence. */
   async logOneOnOne(userId: string, id: string, today: string, note?: string): Promise<PersonDto> {
+    await this.authorizeChild(userId, id, this.people);
     const person = await this.people.findOne({ _id: this.oid(id, 'Person'), userId });
     if (!person) throw new NotFoundException(`Person ${id} not found`);
 
@@ -226,6 +245,7 @@ export class BoardsService {
   }
 
   async updateContribution(userId: string, id: string, dto: UpdateContributionDto): Promise<ContributionDto> {
+    await this.authorizeChild(userId, id, this.contributions);
     const updated = await this.contributions.findOneAndUpdate(
       { _id: this.oid(id, 'Contribution'), userId },
       { $set: dto },
@@ -236,6 +256,7 @@ export class BoardsService {
   }
 
   async removeContribution(userId: string, id: string) {
+    await this.authorizeChild(userId, id, this.contributions);
     const deleted = await this.contributions.findOneAndDelete({ _id: this.oid(id, 'Contribution'), userId });
     if (!deleted) throw new NotFoundException(`Contribution ${id} not found`);
     return { id, deleted: true as const };
@@ -254,12 +275,14 @@ export class BoardsService {
   }
 
   async updateWin(userId: string, id: string, dto: UpdateWinDto): Promise<WinDto> {
+    await this.authorizeChild(userId, id, this.wins);
     const updated = await this.wins.findOneAndUpdate({ _id: this.oid(id, 'Win'), userId }, { $set: dto }, { new: true });
     if (!updated) throw new NotFoundException(`Win ${id} not found`);
     return updated.toJSON() as unknown as WinDto;
   }
 
   async removeWin(userId: string, id: string) {
+    await this.authorizeChild(userId, id, this.wins);
     const deleted = await this.wins.findOneAndDelete({ _id: this.oid(id, 'Win'), userId });
     if (!deleted) throw new NotFoundException(`Win ${id} not found`);
     return { id, deleted: true as const };

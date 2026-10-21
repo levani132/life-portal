@@ -1,3 +1,4 @@
+import { RequireModule } from '../access/access.module';
 import { Body, Controller, Delete, Get, Module, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
@@ -38,6 +39,7 @@ export class LogOneOnOneDto {
   @IsOptional() @IsString() @MaxLength(2000) note?: string;
 }
 
+@RequireModule('projects')
 @Controller('boards')
 export class BoardsController {
   constructor(private readonly boards: BoardsService) {}

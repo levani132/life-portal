@@ -1,0 +1,4 @@
+- [x] Contracts, policies and snapshot/import primitives
+- [x] Publishing, feed, privacy, reports and moderation API
+- [x] Composer, Wall, profile posts and import UI
+- [x] Tests, integration/browser verification and documentation

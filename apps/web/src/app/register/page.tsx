@@ -45,7 +45,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-sm">
         <h1 className="mb-1 text-lg font-semibold tracking-tight">Create your portal</h1>
         <p className="mb-6 text-sm text-ink-muted">
-          This holds your financial data, so pick a password you do not use anywhere else.
+          Keep your personal information safe with a password you don’t use anywhere else.
         </p>
 
         <form onSubmit={submit} className="card space-y-4 p-5">
@@ -65,7 +65,7 @@ export default function RegisterPage() {
               onChange={set('password')}
             />
           </Field>
-          <Field label="Invite code" hint="Only needed if the server was configured with one.">
+          <Field label="Invite code" hint="Enter it if you were given an invitation.">
             <Input value={form.inviteCode} onChange={set('inviteCode')} />
           </Field>
 

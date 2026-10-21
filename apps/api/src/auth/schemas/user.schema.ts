@@ -1,4 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import type { FeatureAccess } from '@life-portal/shared-types';
 import { HydratedDocument } from 'mongoose';
 import { baseSchemaOptions } from '../../common/mongoose';
 
@@ -9,7 +10,14 @@ import { baseSchemaOptions } from '../../common/mongoose';
     ...(baseSchemaOptions.toJSON as object),
     // Belt and braces: even if a controller returns a raw user, no hash leaves the process.
     transform: (doc, ret: Record<string, unknown>) => {
-      const base = (baseSchemaOptions.toJSON as { transform: (d: unknown, r: Record<string, unknown>) => Record<string, unknown> }).transform;
+      const base = (
+        baseSchemaOptions.toJSON as {
+          transform: (
+            d: unknown,
+            r: Record<string, unknown>,
+          ) => Record<string, unknown>;
+        }
+      ).transform;
       const out = base(doc, ret);
       delete out['passwordHash'];
       delete out['refreshTokenHash'];
@@ -18,7 +26,13 @@ import { baseSchemaOptions } from '../../common/mongoose';
   },
 })
 export class User {
-  @Prop({ required: true, unique: true, lowercase: true, trim: true, index: true })
+  @Prop({
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
+    index: true,
+  })
   email!: string;
 
   @Prop({ required: true, trim: true })
@@ -36,6 +50,13 @@ export class User {
 
   @Prop({ type: [String], default: ['owner'] })
   roles!: string[];
+
+  // Missing on legacy accounts; resolved as internal without changing stored data.
+  @Prop({ type: String, enum: ['production', 'internal'] })
+  cohort?: 'production' | 'internal';
+
+  @Prop({ type: Object, default: {} })
+  featureOverrides?: Partial<FeatureAccess>;
 
   @Prop()
   lastLoginAt?: Date;

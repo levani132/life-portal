@@ -1,6 +1,6 @@
 # Life Portal — agent guide
 
-A private dashboard for one person's financial and personal state: debts, cash flow,
+A private-by-default dashboard for each account's financial and personal state: debts, cash flow,
 sellable assets, share holdings, work obligations, side projects, personal plans and food.
 
 **Read these before changing anything:**
@@ -38,7 +38,9 @@ docs/             Module docs, decisions, changelog
 
 The API is guarded globally: **every** route needs a valid access token unless marked
 `@Public()`. Every query goes through `OwnedCrudService.scoped()` or an explicit `userId`
-filter — there is no unscoped read anywhere, and new code must keep it that way.
+filter. Explicit public-food catalogue reads, audience-checked social projections and developer-only
+feature administration use dedicated authorization and responses; they never open private
+tracking records. Read docs/modules/social.md before changing social access.
 
 ## Commands
 
@@ -160,3 +162,9 @@ MONGODB_URI=mongodb://127.0.0.1:27019/lp-dev JWT_SECRET=$(openssl rand -hex 32) 
 
 Then log in and look at the numbers. If you touched projections, cross-links or schemas, check
 that a figure you expect to be non-zero actually is.
+
+- **Food publishing is explicit, snapshot-based and separate from live widget sharing.** Read
+  `docs/modules/posts.md` and `specs/007-food-posts/` before changing it. All post access needs
+  social + nutrition + foodPosts, current graph/audience checks and no-store responses.
+  NutritionPublicationService alone projects owned nutrition facts and creates attributed
+  private imports. Preserve idempotency keys and deletion tombstones; never log meals on import.

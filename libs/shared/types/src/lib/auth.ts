@@ -1,3 +1,4 @@
+import type { Audience, ModuleId } from './portal';
 import type { Id, IsoDate, Timestamped } from './common';
 
 export interface User extends Timestamped {
@@ -76,4 +77,9 @@ export interface UserSettings extends Timestamped {
    * after the ones it does — see `arrangeWidgets` in `libs/shared/domain`.
    */
   widgetOrder: string[];
+  selectedModules?: ModuleId[];
+  moduleVisibility?: Partial<Record<ModuleId, Audience>>;
+  setupStep?: number;
+  setupCompleted?: boolean;
+  setupDismissed?: boolean;
 }

@@ -145,7 +145,12 @@ export class UpdateProfileDto {
   @IsOptional() @IsIn(ACTIVITY_LEVELS) activityLevel?: string;
   @IsOptional() @IsIn(NUTRITION_GOALS) goal?: string;
   @IsOptional() @IsInt() @Min(800) @Max(5000) basalRateKcal?: number;
-  @IsOptional() @IsArray() @ArrayMaxSize(7) @IsInt({ each: true }) @Min(0, { each: true }) @Max(6, { each: true })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(7)
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  @Max(6, { each: true })
   cheatDays?: number[];
   @IsOptional() @IsInt() @Min(0) @Max(12) dayStartHour?: number;
   @IsOptional() @IsInt() @Min(800) @Max(8000) energyOverrideKcal?: number;
@@ -154,6 +159,7 @@ export class UpdateProfileDto {
   @IsOptional() @IsInt() @Min(0) @Max(1000) carbOverrideG?: number;
   @IsOptional() @IsIn(FOOD_VISIBILITY) defaultFoodVisibility?: string;
   @IsOptional() @IsBoolean() shareMeals?: boolean;
+  @IsOptional() @IsBoolean() shareDiary?: boolean;
   @IsOptional() @IsBoolean() shareWeight?: boolean;
   @IsOptional() @IsBoolean() shareTargets?: boolean;
   /** When changing defaultFoodVisibility, also update all foods that had the old default. */

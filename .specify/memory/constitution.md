@@ -1,8 +1,8 @@
 # Life Portal Constitution
 
-A single private dashboard for Levan's financial and personal state: debts, cash flow,
-sellable assets, stock holdings, work obligations, side projects and personal plans.
-One user, one truth, fast to glance at, fast to update.
+A personal dashboard for each account's financial and personal state: food, debts, cash flow,
+sellable assets, stock holdings, work obligations, projects and personal plans.
+Private by default, fast to glance at, fast to update.
 
 ## Core Principles
 
@@ -12,7 +12,9 @@ Every dashboard concern is one module owning one Mongo collection family, one Ne
 one API namespace and one Next.js route. A widget renders twice: a **summary card** on the
 dashboard (three numbers max, plus **at most one primary quick action**) and a **detail page**
 (full CRUD, projections, history). Adding a widget must never require editing another widget's
-internals — only registering it in the widget registry.
+internals — only registering it in the widget registry. Related modules may share one product
+card (Money combines cashflow and spending; Projects summarises boards) while services retain
+sole ownership of their collections and formulas.
 
 The quick action is a deliberate, bounded exception to "cards are not dashboards": one button,
 for the one thing that happens many times a day and would otherwise start with a navigation
@@ -34,12 +36,18 @@ read** from immutable-ish event rows (payments, expenses, lots, quotes). A loan 
 correct by construction and back-dated edits safe. The only caches allowed are external
 data (stock quotes) with an explicit `fetchedAt`.
 
+Explicitly published food posts are immutable publication events, like historical meal
+snapshots: they record the facts the author reviewed and chose to publish. They are not a
+cache of live tracking data. Recipient imports create independent, private catalogue copies
+with provenance. Derived totals still compute on read; live widget projections remain transient.
+
 ### IV. Cross-Widget Links Are Single-Sourced
 
 When two widgets show the same fact, exactly one row owns it and the other holds a
 reference. The monthly loan repayment is owned by a **cash-flow expense**; the loan's
 repayment plan points at it via `linkedExpenseId`. Editing from either screen mutates the
-one owning row. Never mirror a value into two collections.
+one owning row. Never mirror a live value into two collections. Explicit publication events and attributed
+recipient imports follow the snapshot exception in principle III.
 
 ### V. Projections Are Pure Functions
 
@@ -65,8 +73,10 @@ sold. The user must never mistake a model output for a fact.
   imports the other.
 - **Validation:** every write endpoint takes a `class-validator` DTO. No `any` in
   controllers or schemas.
-- **Auth:** every data route is JWT-guarded and scoped to `userId`. No endpoint may return
-  another user's rows, even though there is currently one user.
+- **Auth:** every private data route is authenticated and scoped to `userId`. Explicit food
+  catalogue sharing, audience-checked social projections and developer-only feature administration
+  use dedicated responses and authorization checks. Other accounts' private tracking records
+  remain inaccessible; public profile fields never include email or credentials.
 - **Secrets:** only via env (`MONGODB_URI`, `JWT_SECRET`, `FINNHUB_API_KEY`). Never
   committed. `.env.example` documents every variable.
 - **External APIs degrade gracefully:** a missing or rate-limited Finnhub key must leave
@@ -99,4 +109,4 @@ Complexity must be justified in writing: a new dependency, a new collection or a
 abstraction layer needs one sentence in the module doc explaining what it buys. Prefer
 deleting code over adding configuration.
 
-**Version**: 1.1.0 | **Ratified**: 2026-08-03 | **Last Amended**: 2026-08-19
+**Version**: 1.4.0 | **Ratified**: 2026-08-03 | **Last Amended**: 2026-10-22
