@@ -61,10 +61,10 @@ describe('MCP OAuth HTTP flow', () => {
   });
   afterEach(async () => { server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); });
 
-  async function register() {
+  async function register(redirectUri = callback) {
     const response = await fetch(`${origin}/register`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ redirect_uris: [callback], token_endpoint_auth_method: 'none' }),
+      body: JSON.stringify({ redirect_uris: [redirectUri], token_endpoint_auth_method: 'none' }),
     });
     expect(response.status).toBe(201);
     return (await response.json()) as { client_id: string };
@@ -141,6 +141,37 @@ describe('MCP OAuth HTTP flow', () => {
     const cancelled = await submit(origin, { cancel: 'yes' });
     expect(new URL(cancelled.headers.get('location')!).searchParams.get('error')).toBe('access_denied');
     expect((await fetch(`${origin}${start.location}`, { headers: { Cookie: start.cookie } })).status).toBe(400);
+  });
+
+  it('serves browser-compatible consent headers for Claude while rejecting absent or null origins', async () => {
+    const claudeCallback = 'https://claude.ai/api/mcp/auth_callback';
+    const client = await register(claudeCallback);
+    const start = await begin(client.client_id, { redirect_uri: claudeCallback });
+    const page = await fetch(`${origin}${start.location}`, { headers: { Cookie: start.cookie } });
+    expect(page.status).toBe(200);
+    // A native HTML form with no-referrer sends Origin: null, unlike our fetch helpers.
+    expect(page.headers.get('referrer-policy')).toBe('strict-origin');
+    expect(page.headers.get('cache-control')).toBe('no-store');
+    expect(page.headers.get('content-security-policy')).toContain("form-action 'self' https://claude.ai;");
+    expect(page.headers.get('content-security-policy')).not.toContain('evil.example');
+    expect(await page.text()).toContain('https://claude.ai');
+    const ticket = new URL(start.location, origin).searchParams.get('ticket')!;
+    const submit = (requestOrigin?: string) => fetch(`${origin}/oauth/consent`, {
+      method: 'POST', redirect: 'manual',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Cookie: start.cookie, ...(requestOrigin === undefined ? {} : { Origin: requestOrigin }) },
+      body: new URLSearchParams({ ticket, email: 'owner@example.com', password: 'correct-test-password' }),
+    });
+    expect((await submit()).status).toBe(403);
+    expect((await submit('null')).status).toBe(403);
+    const approved = await submit(origin);
+    expect(approved.status).toBe(303);
+    expect(approved.headers.get('content-security-policy')).toContain("form-action 'self' https://claude.ai;");
+    const redirect = new URL(approved.headers.get('location')!);
+    expect(`${redirect.origin}${redirect.pathname}`).toBe(claudeCallback);
+    expect(redirect.searchParams.get('state')).toBe('original-state');
+    expect(redirect.searchParams.get('code')).toBeTruthy();
+    const tokens = await token({ grant_type: 'authorization_code', client_id: client.client_id, code: redirect.searchParams.get('code')!, code_verifier: verifier, redirect_uri: claudeCallback, resource: provider.resource });
+    expect(tokens.status).toBe(200);
   });
 
   it('rejects unknown scopes, resource substitution and unregistered redirects', async () => {

@@ -20,6 +20,9 @@ const ACCESS_SECONDS = 3600;
 const REFRESH_SECONDS = 30 * 24 * 3600;
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 const secret = () => randomBytes(32).toString('base64url');
+// Browsers can apply form-action to the post-login redirect as well as the POST itself.
+// Only the callback of this validated, browser-bound request may be added.
+const consentPolicy = (callbackOrigin = '') => `default-src 'none'; style-src 'unsafe-inline'; form-action 'self'${callbackOrigin ? ` ${callbackOrigin}` : ''}; frame-ancestors 'none'; base-uri 'none'`;
 
 @Injectable()
 export class McpOAuthService implements OAuthServerProvider {
@@ -66,9 +69,11 @@ export class McpOAuthService implements OAuthServerProvider {
     const router = Router();
     router.use('/oauth/consent', (_req, res, next) => {
       res.set({
-        'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
+        // no-referrer makes native form POSTs send Origin: null, failing our CSRF check.
+        // strict-origin preserves Origin without exposing the consent ticket in Referer.
+        'Cache-Control': 'no-store', 'Referrer-Policy': 'strict-origin',
         'X-Frame-Options': 'DENY', 'X-Content-Type-Options': 'nosniff',
-        'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+        'Content-Security-Policy': consentPolicy(),
       });
       next();
     });
@@ -76,7 +81,9 @@ export class McpOAuthService implements OAuthServerProvider {
       const ticket = typeof req.query['ticket'] === 'string' ? req.query['ticket'] : '';
       const pending = await this.pendingRequest(ticket, req);
       if (!pending) { res.status(400).send('This connection request has expired. Start again from your assistant.'); return; }
-      res.type('html').send(consentPage(ticket, new URL(pending.redirectUri as string).origin));
+      const callbackOrigin = new URL(pending.redirectUri as string).origin;
+      res.set('Content-Security-Policy', consentPolicy(callbackOrigin));
+      res.type('html').send(consentPage(ticket, callbackOrigin));
     });
     router.post('/oauth/consent',
       rateLimit({ windowMs: 15 * 60_000, limit: 10, standardHeaders: true, legacyHeaders: false }),
@@ -89,6 +96,7 @@ export class McpOAuthService implements OAuthServerProvider {
         const pending = await this.pendingRequest(ticket, req);
         if (!pending) { res.status(400).send('This connection request has expired. Start again from your assistant.'); return; }
         const redirect = new URL(pending.redirectUri as string);
+        res.set('Content-Security-Policy', consentPolicy(redirect.origin));
         if (pending.state !== undefined) redirect.searchParams.set('state', pending.state);
         if (body['cancel'] === 'yes') {
           await this.credentials.deleteOne({ key: pending.key, kind: 'pending' });

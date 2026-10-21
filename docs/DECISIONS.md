@@ -875,3 +875,16 @@ rotate the dashboard refresh token. OAuth tokens are independent, opaque, resour
 accepted only by MCP. Existing manually generated tokens retain their behavior. Every transport
 request now verifies a credential and session ownership: a session ID must never become a
 substitute bearer token. Users can revoke OAuth connections from the AI Assistant settings.
+
+## 2026-10-21 · Consent privacy headers must preserve native form Origin
+
+The OAuth page used `no-referrer`, which makes a browser's native HTML form POST carry
+`Origin: null`. Our strict CSRF guard therefore rejected legitimate sign-ins before checking
+credentials. Previous HTTP smoke tests explicitly supplied Origin and missed browser behavior.
+Use `strict-origin` to preserve native POST origins without leaking the ticket path/query in
+Referer. Keep exact issuer-origin checks, browser-binding cookies and single-use tickets;
+do not allow null origins. Reproduce and verify with a real browser form as well as HTTP tests.
+
+The consent CSP also allows the validated request's callback origin alongside self. Chrome
+applies `form-action` to the POST's redirect, so self alone prevents returning to the assistant.
+The server still validates exact registered redirect URIs; no wildcard destinations are allowed.

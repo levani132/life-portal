@@ -117,7 +117,11 @@ The AI translates these into tool calls using the schema from `GET /mcp/tools`.
 - These two collections preserve registrations and grants across Render restarts. The existing
   MCP SDK owns OAuth parsing, redirect validation, PKCE verification and protocol rate limits.
   `express-rate-limit` is now a direct dependency for the password/consent endpoint's limit.
-- Consent requires an HttpOnly SameSite browser-binding cookie and exact form Origin, expires
+- Consent uses `Referrer-Policy: strict-origin`: native form POSTs retain their Origin while
+  the ticket URL is never sent in Referer. Missing, null and foreign origins remain rejected.
+  Its CSP permits form submission to self and navigation back to only that validated request's
+  callback origin, because browsers may also enforce form-action on the OAuth redirect.
+  Consent requires an HttpOnly SameSite browser-binding cookie and exact form Origin, expires
   after ten minutes and is consumed once. Credentials are checked through AuthService without
   rotating or replacing the dashboard refresh token. The page names the callback origin rather
   than trusting a self-reported client display name.

@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-10-21 — Fix assistant sign-in in the browser
+
+Fixed the “Invalid form origin” error after submitting the assistant sign-in page,
+including connections started from Claude. Browser form submissions now retain the origin
+required by consent validation; cross-origin requests remain blocked.
+
 ## 2026-10-18 · First-time ChatGPT beta setup
 
 AI Assistant Setup now walks invited testers through creating their own ChatGPT connection,
