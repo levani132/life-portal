@@ -70,7 +70,7 @@ function MenuContent() {
             href={href}
             className="flex min-h-16 items-center gap-3 px-5 py-4 hover:bg-surface-raised"
           >
-            <Icon size={20} className="text-sky-300" />
+            <Icon size={20} className="text-accent" />
             <span className="flex-1">{label}</span>
             <ChevronRight size={18} className="text-ink-faint" />
           </Link>

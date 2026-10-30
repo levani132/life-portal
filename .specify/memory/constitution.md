@@ -10,7 +10,7 @@ Private by default, fast to glance at, fast to update.
 
 Every dashboard concern is one module owning one Mongo collection family, one Nest module,
 one API namespace and one Next.js route. A widget renders twice: a **summary card** on the
-dashboard (three numbers max, plus **at most one primary quick action**) and a **detail page**
+dashboard (three numbers max, or Food’s four calorie/macro progress indicators, plus **at most one primary quick action**) and a **detail page**
 (full CRUD, projections, history). Adding a widget must never require editing another widget's
 internals — only registering it in the widget registry. Related modules may share one product
 card (Money combines cashflow and spending; Projects summarises boards) while services retain
@@ -18,7 +18,7 @@ sole ownership of their collections and formulas.
 
 The quick action is a deliberate, bounded exception to "cards are not dashboards": one button,
 for the one thing that happens many times a day and would otherwise start with a navigation
-(logging a meal). A second action, an inline form or an editable field on a card is a violation
+(logging a meal). Widget arrangement/add/remove controls manage Home presentation and are separate from module quick actions. A second module action, an inline form or an editable field on a card is a violation
 — that work belongs on the detail page.
 
 ### II. Money Is Integer Minor Units
@@ -109,4 +109,4 @@ Complexity must be justified in writing: a new dependency, a new collection or a
 abstraction layer needs one sentence in the module doc explaining what it buys. Prefer
 deleting code over adding configuration.
 
-**Version**: 1.4.0 | **Ratified**: 2026-08-03 | **Last Amended**: 2026-10-22
+**Version**: 1.5.0 | **Ratified**: 2026-08-03 | **Last Amended**: 2026-10-31

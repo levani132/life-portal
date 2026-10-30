@@ -3,6 +3,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import {
+  Apple,
+  CalendarDays,
+  CookingPot,
+  Layers,
+  Library,
+  Utensils,
+} from 'lucide-react';
+import {
   REPORT_REASONS,
   type Audience,
   type FoodPost,
@@ -122,27 +130,77 @@ export function PostCard({
     return (
       <p className="card p-5 text-sm text-ink-muted">
         Post removed.{' '}
-        <Link href="/wall" className="text-sky-300">
+        <Link href="/wall" className="text-accent">
           Back to Wall
         </Link>
       </p>
     );
+  const presentation = {
+    entry: {
+      label: 'Logged food',
+      icon: Utensils,
+      tint: 'bg-orange-500/10 text-amber-400',
+    },
+    food: {
+      label: 'Food',
+      icon: Apple,
+      tint: 'bg-emerald-500/10 text-emerald-400',
+    },
+    meal: {
+      label: 'Meal',
+      icon: CookingPot,
+      tint: 'bg-orange-500/10 text-amber-400',
+    },
+    day: {
+      label: 'Food diary',
+      icon: CalendarDays,
+      tint: 'bg-sky-500/10 text-accent',
+    },
+    combination: {
+      label: 'Saved meal',
+      icon: Layers,
+      tint: 'bg-violet-500/10 text-accent',
+    },
+    database: {
+      label: 'Food database',
+      icon: Library,
+      tint: 'bg-emerald-500/10 text-emerald-400',
+    },
+  }[post.kind];
+  const PreviewIcon = presentation.icon;
   return (
-    <article className="card p-5">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
+    <article className="card overflow-hidden rounded-2xl p-4 sm:p-5">
+      <div className="flex items-start gap-3">
+        <Link
+          href={`/people/${post.author.userId}`}
+          aria-label={`View ${post.author.displayName}'s profile`}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-sm font-semibold text-accent"
+        >
+          {post.author.displayName.trim().slice(0, 1).toUpperCase()}
+        </Link>
+        <div className="min-w-0">
           <Link
             href={`/people/${post.author.userId}`}
-            className="font-semibold hover:text-sky-300"
+            className="text-sm font-semibold hover:text-accent-hover"
           >
             {post.author.displayName}
           </Link>
-          <p className="mt-1 text-xs text-ink-faint">
+          <p className="mt-0.5 text-[11px] leading-relaxed text-ink-faint">
+            Shared {presentation.label.toLowerCase()} ·{' '}
+            <time
+              dateTime={post.createdAt}
+              title={new Date(post.createdAt).toLocaleString()}
+            >
+              {new Date(post.createdAt).toLocaleString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </time>
+          </p>
+          <p className="text-[10px] text-ink-faint">
             @{post.author.username} ·{' '}
-            <time dateTime={post.createdAt}>
-              {new Date(post.createdAt).toLocaleDateString()}
-            </time>{' '}
-            ·{' '}
             {post.audience === 'private'
               ? 'Only me'
               : post.audience === 'friends'
@@ -150,85 +208,104 @@ export function PostCard({
                 : 'Everyone in Life Portal'}
           </p>
         </div>
-        {post.kind === 'database' && (
-          <span className="text-xs text-sky-300">
-            Collection v{post.version}
-          </span>
-        )}
       </div>
-      <h2 className="break-words text-lg font-semibold">
-        {detail ? (
-          post.title
-        ) : (
-          <Link href={`/posts/${post.id}`} className="hover:text-sky-300">
-            {post.title}
-          </Link>
-        )}
-      </h2>
       {post.caption && (
-        <p className="mt-3 whitespace-pre-wrap break-words text-sm text-ink-muted">
+        <p className="my-4 whitespace-pre-wrap break-words text-sm leading-relaxed">
           {post.caption}
         </p>
       )}
-      <p className="mt-3 text-xs text-ink-faint">
-        {post.day ? `${post.day} · ` : ''}
-        {post.itemCount} food{post.itemCount === 1 ? '' : 's'}
-        {post.totalKcal === undefined ? '' : ` · ${post.totalKcal} kcal`}
-      </p>
-      <ul
-        className={`mt-4 divide-y divide-border ${detail ? 'max-h-[32rem] overflow-y-auto' : ''}`}
+      <div
+        className="mt-4 rounded-xl border border-border/60 bg-surface p-3 sm:p-4"
+        data-post-kind={post.kind}
       >
-        {post.items.map((food) => (
-          <li key={food.key} className="py-3 text-sm">
-            <div className="flex flex-wrap justify-between gap-2">
-              <span className="font-medium">
-                {food.name}
-                {food.brand && (
-                  <span className="ml-1 text-ink-faint">{food.brand}</span>
-                )}
-              </span>
-              <span className="text-ink-muted">
-                {food.amount === undefined
-                  ? `Per 100 ${food.unit}`
-                  : `${food.amount} ${food.unit}`}
-                {food.slot ? ` · ${food.slot}` : ''}
-              </span>
-            </div>
-            {detail && (
-              <p className="mt-1 text-xs text-ink-muted">
-                Per 100 {food.unit}: {food.energyKcalPer100} kcal · P{' '}
-                {mgToG(food.proteinMgPer100)}g · C {mgToG(food.carbMgPer100)}g ·
-                F {mgToG(food.fatMgPer100)}g
-              </p>
-            )}
-            {food.attribution && (
-              <p className="mt-1 text-xs text-ink-faint">
-                {food.attribution.url ? (
-                  <a
-                    href={food.attribution.url}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="underline"
-                  >
-                    {food.attribution.label}
-                  </a>
-                ) : (
-                  food.attribution.label
-                )}
-              </p>
-            )}
-          </li>
-        ))}
-      </ul>
-      {!detail && post.itemCount > post.items.length && (
-        <Link
-          href={`/posts/${post.id}`}
-          className="mt-3 inline-block text-sm text-sky-300"
+        <div className="flex items-center gap-3">
+          <span
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${presentation.tint}`}
+          >
+            <PreviewIcon size={25} aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-faint">
+              {presentation.label}
+              {post.kind === 'database' ? ` · Collection v${post.version}` : ''}
+            </p>
+            <h2 className="break-words text-sm font-semibold sm:text-base">
+              {detail ? (
+                post.title
+              ) : (
+                <Link
+                  href={`/posts/${post.id}`}
+                  className="hover:text-accent-hover"
+                >
+                  {post.title}
+                </Link>
+              )}
+            </h2>
+            <p className="mt-1 text-xs text-ink-muted">
+              {post.slot
+                ? `${post.slot.charAt(0).toUpperCase() + post.slot.slice(1)} · `
+                : ''}
+              {post.day ? `${post.day} · ` : ''}
+              {post.itemCount} food{post.itemCount === 1 ? '' : 's'}
+              {post.totalKcal === undefined ? '' : ` · ${post.totalKcal} kcal`}
+            </p>
+          </div>
+        </div>
+        <ul
+          className={`mt-3 divide-y divide-border/70 ${detail ? 'max-h-[32rem] overflow-y-auto' : ''}`}
         >
-          View all {post.itemCount} foods →
-        </Link>
-      )}
-      <div className="mt-4 flex flex-wrap gap-2">
+          {post.items.map((food) => (
+            <li key={food.key} className="py-3 text-sm">
+              <div className="flex flex-wrap justify-between gap-2">
+                <span className="font-medium">
+                  {food.name}
+                  {food.brand && (
+                    <span className="ml-1 text-ink-faint">{food.brand}</span>
+                  )}
+                </span>
+                <span className="text-ink-muted">
+                  {food.amount === undefined
+                    ? `Per 100 ${food.unit}`
+                    : `${food.amount} ${food.unit}`}
+                  {food.slot ? ` · ${food.slot}` : ''}
+                </span>
+              </div>
+              {detail && (
+                <p className="mt-1 text-xs text-ink-muted">
+                  Per 100 {food.unit}: {food.energyKcalPer100} kcal · P{' '}
+                  {mgToG(food.proteinMgPer100)}g · C {mgToG(food.carbMgPer100)}g
+                  · F {mgToG(food.fatMgPer100)}g
+                </p>
+              )}
+              {food.attribution && (
+                <p className="mt-1 text-xs text-ink-faint">
+                  {food.attribution.url ? (
+                    <a
+                      href={food.attribution.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="underline"
+                    >
+                      {food.attribution.label}
+                    </a>
+                  ) : (
+                    food.attribution.label
+                  )}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+        {!detail && post.itemCount > post.items.length && (
+          <Link
+            href={`/posts/${post.id}`}
+            className="mt-3 inline-block text-sm text-accent"
+          >
+            View all {post.itemCount} foods →
+          </Link>
+        )}
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3">
         {!detail && (
           <Link href={`/posts/${post.id}`} className="btn-ghost">
             Open post

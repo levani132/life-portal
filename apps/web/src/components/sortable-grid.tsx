@@ -10,6 +10,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  type CSSProperties,
 } from 'react';
 import { moveWidget } from '@life-portal/shared-domain';
 
@@ -83,6 +84,8 @@ interface SortableGridProps<T> {
   /** Fires once the card is dropped, or once per keyboard move — the moment worth saving. */
   onCommit: (ids: string[]) => void;
   className?: string;
+  style?: CSSProperties;
+  getItemStyle?: (item: T, index: number) => CSSProperties;
   children: (item: T, state: SortableState) => ReactNode;
 }
 
@@ -114,7 +117,12 @@ function readTranslate(el: HTMLElement): { x: number; y: number } {
 function layoutBox(el: HTMLElement): Box {
   const rect = el.getBoundingClientRect();
   const { x, y } = readTranslate(el);
-  return { left: rect.left - x, top: rect.top - y, right: rect.right - x, bottom: rect.bottom - y };
+  return {
+    left: rect.left - x,
+    top: rect.top - y,
+    right: rect.right - x,
+    bottom: rect.bottom - y,
+  };
 }
 
 export function SortableGrid<T>({
@@ -126,6 +134,8 @@ export function SortableGrid<T>({
   onOrderChange,
   onCommit,
   className,
+  style,
+  getItemStyle,
   children,
 }: SortableGridProps<T>) {
   const [dragId, setDragId] = useState<string | null>(null);
@@ -269,6 +279,15 @@ export function SortableGrid<T>({
     const current = drag.current;
     if (!current) return;
 
+    const scroller = grid.current?.parentElement;
+    if (scroller && scroller.scrollWidth > scroller.clientWidth) {
+      const bounds = scroller.getBoundingClientRect();
+      const edge = Math.min(60, bounds.width / 5);
+      if (current.clientX < bounds.left + edge)
+        scroller.scrollLeft -= EDGE_SPEED_PX;
+      else if (current.clientX > bounds.right - edge)
+        scroller.scrollLeft += EDGE_SPEED_PX;
+    }
     const height = window.innerHeight;
     let delta = 0;
     if (current.clientY < EDGE_PX) {
@@ -315,34 +334,37 @@ export function SortableGrid<T>({
     press.current = null;
   }, []);
 
-  const endDrag = useCallback(
-    (commit: boolean) => {
-      const current = drag.current;
-      if (!current) return;
-      drag.current = null;
-      setDragId(null);
+  const endDrag = useCallback((commit: boolean) => {
+    const current = drag.current;
+    if (!current) return;
+    drag.current = null;
+    setDragId(null);
 
-      cancelAnimationFrame(frame.current);
-      document.body.style.removeProperty('user-select');
-      try {
-        current.el.releasePointerCapture(current.pointerId);
-      } catch {
-        // Capture may already be gone; releasing it is a courtesy either way.
-      }
+    cancelAnimationFrame(frame.current);
+    document.body.style.removeProperty('user-select');
+    try {
+      current.el.releasePointerCapture(current.pointerId);
+    } catch {
+      // Capture may already be gone; releasing it is a courtesy either way.
+    }
 
-      // Glide into the slot rather than snapping to it.
-      current.el.style.transition = prefersReducedMotion()
-        ? 'none'
-        : `transform ${SETTLE_MS}ms cubic-bezier(0.2, 0, 0, 1)`;
-      current.el.style.transform = '';
+    // Glide into the slot rather than snapping to it.
+    current.el.style.transition = prefersReducedMotion()
+      ? 'none'
+      : `transform ${SETTLE_MS}ms cubic-bezier(0.2, 0, 0, 1)`;
+    current.el.style.transform = '';
 
-      if (commit) callbacks.current.onCommit(idsRef.current);
-    },
-    [],
-  );
+    if (commit) callbacks.current.onCommit(idsRef.current);
+  }, []);
 
   const beginDrag = useCallback(
-    (id: string, el: HTMLDivElement, pointerId: number, clientX: number, clientY: number) => {
+    (
+      id: string,
+      el: HTMLDivElement,
+      pointerId: number,
+      clientX: number,
+      clientY: number,
+    ) => {
       const box = layoutBox(el);
       drag.current = {
         id,
@@ -390,12 +412,21 @@ export function SortableGrid<T>({
       if (!pending || pending.pointerId !== event.pointerId) return;
       pending.x = event.clientX;
       pending.y = event.clientY;
-      const distance = Math.hypot(event.clientX - pending.startX, event.clientY - pending.startY);
+      const distance = Math.hypot(
+        event.clientX - pending.startX,
+        event.clientY - pending.startY,
+      );
 
       if (pending.mouse && editingRef.current) {
         if (distance > MOUSE_SLOP_PX) {
           cancelPress();
-          beginDrag(pending.id, pending.el, pending.pointerId, event.clientX, event.clientY);
+          beginDrag(
+            pending.id,
+            pending.el,
+            pending.pointerId,
+            event.clientX,
+            event.clientY,
+          );
         }
         return;
       }
@@ -440,69 +471,78 @@ export function SortableGrid<T>({
     [cancelPress],
   );
 
-  const onPointerDown = (id: string) => (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    // A press that starts on the card's quick action is that button's, not the grid's.
-    if ((event.target as HTMLElement).closest('button')) return;
-    const el = elements.current.get(id);
-    if (!el) return;
+  const onPointerDown =
+    (id: string) => (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return;
+      // A press that starts on the card's quick action is that button's, not the grid's.
+      if ((event.target as HTMLElement).closest('button, summary')) return;
+      const el = elements.current.get(id);
+      if (!el) return;
 
-    pointerType.current = event.pointerType;
-    suppressClick.current = false;
-    cancelPress();
+      pointerType.current = event.pointerType;
+      suppressClick.current = false;
+      cancelPress();
 
-    const mouse = event.pointerType === 'mouse';
-    const pending = {
-      id,
-      el,
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      x: event.clientX,
-      y: event.clientY,
-      mouse,
-      timer: 0,
+      const mouse = event.pointerType === 'mouse';
+      const pending = {
+        id,
+        el,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        x: event.clientX,
+        y: event.clientY,
+        mouse,
+        timer: 0,
+      };
+      press.current = pending;
+
+      // A mouse already in edit mode drags on movement alone; everything else is a hold.
+      if (mouse && editing) return;
+
+      pending.timer = window.setTimeout(
+        () => {
+          press.current = null;
+          if (!editingRef.current) callbacks.current.onEditingChange(true);
+          beginDrag(
+            pending.id,
+            pending.el,
+            pending.pointerId,
+            pending.x,
+            pending.y,
+          );
+        },
+        editing ? EDIT_PRESS_MS : LONG_PRESS_MS,
+      );
     };
-    press.current = pending;
 
-    // A mouse already in edit mode drags on movement alone; everything else is a hold.
-    if (mouse && editing) return;
+  const onKeyDown =
+    (id: string) => (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      const step =
+        event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+          ? -1
+          : event.key === 'ArrowRight' || event.key === 'ArrowDown'
+            ? 1
+            : 0;
+      if (!step) return;
 
-    pending.timer = window.setTimeout(
-      () => {
-        press.current = null;
-        if (!editingRef.current) callbacks.current.onEditingChange(true);
-        beginDrag(pending.id, pending.el, pending.pointerId, pending.x, pending.y);
-      },
-      editing ? EDIT_PRESS_MS : LONG_PRESS_MS,
-    );
-  };
+      const order = idsRef.current;
+      const from = order.indexOf(id);
+      const to = from + step;
+      if (from < 0 || to < 0 || to >= order.length) return;
 
-  const onKeyDown = (id: string) => (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const step =
-      event.key === 'ArrowLeft' || event.key === 'ArrowUp'
-        ? -1
-        : event.key === 'ArrowRight' || event.key === 'ArrowDown'
-          ? 1
-          : 0;
-    if (!step) return;
-
-    const order = idsRef.current;
-    const from = order.indexOf(id);
-    const to = from + step;
-    if (from < 0 || to < 0 || to >= order.length) return;
-
-    event.preventDefault();
-    captureSlots();
-    const next = moveWidget(order, from, to);
-    onOrderChange(next);
-    onCommit(next);
-  };
+      event.preventDefault();
+      captureSlots();
+      const next = moveWidget(order, from, to);
+      onOrderChange(next);
+      onCommit(next);
+    };
 
   return (
     <div
       ref={grid}
       className={className}
+      style={style}
       role="list"
       onClickCapture={(event) => {
         // The click that follows a long press would otherwise open the card's link.
@@ -518,13 +558,16 @@ export function SortableGrid<T>({
         return (
           <div
             key={id}
+            style={getItemStyle?.(item, index)}
             role="listitem"
             ref={(node) => {
               if (node) elements.current.set(id, node);
               else elements.current.delete(id);
             }}
             tabIndex={editing ? 0 : undefined}
-            aria-label={editing ? `${getLabel(item)}, arrow keys move it` : undefined}
+            aria-label={
+              editing ? `${getLabel(item)}, arrow keys move it` : undefined
+            }
             onPointerDown={onPointerDown(id)}
             onKeyDown={editing ? onKeyDown(id) : undefined}
             onDragStart={(event) => event.preventDefault()}

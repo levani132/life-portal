@@ -63,17 +63,17 @@ export function WeightTrend({ weighIns }: { weighIns: WeighIn[] }) {
       <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={points} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-            <CartesianGrid stroke="rgb(40 45 58)" vertical={false} />
+            <CartesianGrid stroke="rgb(var(--border))" vertical={false} />
             <XAxis
               dataKey="day"
-              tick={{ fill: 'rgb(106 114 130)', fontSize: 11 }}
+              tick={{ fill: 'rgb(var(--ink-faint))', fontSize: 11 }}
               tickFormatter={(value: string) => value.slice(5)}
-              stroke="rgb(40 45 58)"
+              stroke="rgb(var(--border))"
               minTickGap={28}
             />
             <YAxis
-              tick={{ fill: 'rgb(106 114 130)', fontSize: 11 }}
-              stroke="rgb(40 45 58)"
+              tick={{ fill: 'rgb(var(--ink-faint))', fontSize: 11 }}
+              stroke="rgb(var(--border))"
               domain={['dataMin - 1', 'dataMax + 1']}
               // One decimal: whole kilograms made a single weigh-in render as 100, 100, 99, 99, 98.
               tickFormatter={(value: number) => value.toFixed(1)}
@@ -81,8 +81,8 @@ export function WeightTrend({ weighIns }: { weighIns: WeighIn[] }) {
             />
             <Tooltip
               contentStyle={{
-                background: 'rgb(22 25 34)',
-                border: '1px solid rgb(40 45 58)',
+                background: 'rgb(var(--surface-raised))',
+                border: '1px solid rgb(var(--border))',
                 borderRadius: 8,
                 fontSize: 12,
               }}

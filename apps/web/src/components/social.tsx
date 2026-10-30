@@ -64,7 +64,7 @@ export function SharedWidgets({
           </dl>
           {widget.hasDiary &&
             (compact ? (
-              <p className="mt-3 text-xs text-sky-300">
+              <p className="mt-3 text-xs text-accent">
                 Daily food diary shared · open profile to view
               </p>
             ) : ownerId ? (
@@ -215,7 +215,7 @@ export function PersonCard({
     <article className="card p-5">
       <div className="flex items-start gap-3">
         <div
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-sky-500/10 text-sky-300"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-sky-500/10 text-accent"
           aria-hidden
         >
           {person.displayName.slice(0, 1).toUpperCase() || (
@@ -228,7 +228,7 @@ export function PersonCard({
           ) : (
             <Link
               href={`/people/${person.userId}`}
-              className="font-semibold hover:text-sky-300"
+              className="font-semibold hover:text-accent-hover"
             >
               {person.displayName}
             </Link>
@@ -279,7 +279,7 @@ export function ProfileView({ userId }: { userId?: string }) {
   return (
     <div className="mx-auto max-w-3xl">
       <div className="card p-6">
-        <p className="mb-4 text-xs font-medium uppercase tracking-widest text-sky-300">
+        <p className="mb-4 text-xs font-medium uppercase tracking-widest text-accent">
           {userId ? 'Life Portal profile' : 'Your profile'}
         </p>
         <h1 className="break-words text-2xl font-semibold">

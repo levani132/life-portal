@@ -1,6 +1,7 @@
 import './global.css';
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
+import { ThemeSync } from '../components/theme-preference';
 import { AuthProvider } from '../lib/auth-context';
 import { ServiceWorkerRegistration } from '../components/service-worker';
 
@@ -25,7 +26,12 @@ export const metadata: Metadata = {
     // global.css is what keeps the header out from under the clock.
     statusBarStyle: 'black-translucent',
   },
-  formatDetection: { telephone: false, date: false, address: false, email: false },
+  formatDetection: {
+    telephone: false,
+    date: false,
+    address: false,
+    email: false,
+  },
 };
 
 export const viewport: Viewport = {
@@ -44,8 +50,17 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Resolve the saved preference before the first paint. No user data is interpolated. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var p=localStorage.getItem('lp.theme.v1');document.documentElement.dataset.theme=p==='light'||p==='dark'?p:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){}})()`,
+          }}
+        />
+      </head>
       <body>
+        <ThemeSync />
         <AuthProvider>{children}</AuthProvider>
         <ServiceWorkerRegistration />
       </body>

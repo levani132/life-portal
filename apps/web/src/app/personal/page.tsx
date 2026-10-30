@@ -224,7 +224,7 @@ function Personal() {
             <p className="text-xs text-ink-muted">
               Tick &ldquo;add to my budget&rdquo; on a plan with a cost and a
               date, and it appears as one-off spending on the{' '}
-              <Link href="/cashflow" className="text-sky-400 hover:underline">
+              <Link href="/cashflow" className="text-accent hover:underline">
                 Free money
               </Link>{' '}
               page. Change the cost here and the budget follows — it is stored

@@ -377,7 +377,7 @@ function SetupInstructions({ token }: { token?: string }) {
 
         <p className="text-xs text-ink-faint">
           The next bank message that arrives will show up on the{' '}
-          <Link href="/cashflow" className="text-sky-400 hover:underline">
+          <Link href="/cashflow" className="text-accent hover:underline">
             free money page
           </Link>{' '}
           and stamp this token&rsquo;s last-used. A message the parser cannot read is still kept —

@@ -327,7 +327,7 @@ function PaymentRow({
               type="button"
               className={clsx(
                 'text-[11px]',
-                decided ? 'text-ink-faint hover:text-ink' : 'text-sky-400 hover:text-sky-300',
+                decided ? 'text-ink-faint hover:text-ink' : 'text-accent hover:text-accent-hover',
               )}
               onClick={onOpen}
             >

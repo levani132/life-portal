@@ -291,7 +291,7 @@ function LoanBlock({ detail, today }: { detail: LoanDetail; today: string }) {
                               {' · '}
                               <Link
                                 href="/cashflow"
-                                className="text-sky-400 hover:underline"
+                                className="text-accent hover:underline"
                               >
                                 linked to your budget
                               </Link>

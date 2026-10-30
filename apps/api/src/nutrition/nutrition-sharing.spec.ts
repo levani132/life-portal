@@ -24,6 +24,8 @@ function fixture(flags: {
   const summary = jest.spyOn(service, 'summary').mockResolvedValue({
     eatenKcal: 120,
     proteinEatenG: 10,
+    carbEatenG: 0,
+    fatEatenG: 0,
     entryCount: 1,
     targetKcal: 2345,
   } as never);

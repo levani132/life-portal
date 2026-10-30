@@ -78,7 +78,7 @@ export default function RegisterPage() {
 
         <p className="mt-4 text-center text-xs text-ink-faint">
           Already have one?{' '}
-          <Link href="/login" className="text-sky-400 hover:underline">
+          <Link href="/login" className="text-accent hover:underline">
             Sign in
           </Link>
         </p>

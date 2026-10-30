@@ -568,7 +568,7 @@ function ChartPanel({
               className={clsx(
                 'rounded-full border px-2 py-0.5 text-[11px] transition',
                 option.months === months
-                  ? 'border-sky-500/50 bg-sky-500/10 text-sky-200'
+                  ? 'border-sky-500/50 bg-sky-500/10 text-accent'
                   : 'border-border text-ink-muted hover:border-ink-faint hover:text-ink',
               )}
               onClick={() => setMonths(option.months)}
@@ -596,17 +596,17 @@ function ChartPanel({
                     <stop offset="100%" stopColor="rgb(56 189 248)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid stroke="rgb(40 45 58)" vertical={false} />
+                <CartesianGrid stroke="rgb(var(--border))" vertical={false} />
                 <XAxis
                   dataKey="date"
-                  tick={{ fill: 'rgb(106 114 130)', fontSize: 11 }}
+                  tick={{ fill: 'rgb(var(--ink-faint))', fontSize: 11 }}
                   tickFormatter={(value: string) => value.slice(5)}
-                  stroke="rgb(40 45 58)"
+                  stroke="rgb(var(--border))"
                   minTickGap={28}
                 />
                 <YAxis
-                  tick={{ fill: 'rgb(106 114 130)', fontSize: 11 }}
-                  stroke="rgb(40 45 58)"
+                  tick={{ fill: 'rgb(var(--ink-faint))', fontSize: 11 }}
+                  stroke="rgb(var(--border))"
                   tickFormatter={(value: number) => `${Math.round(value / 1000)}k`}
                   width={44}
                 />
@@ -615,19 +615,19 @@ function ChartPanel({
                 {/* Today: where recorded days end and the plan begins. */}
                 <ReferenceLine
                   x={today}
-                  stroke="rgb(106 114 130)"
+                  stroke="rgb(var(--ink-faint))"
                   strokeDasharray="4 4"
                   label={{
                     value: 'today',
                     position: 'insideTopRight',
-                    fill: 'rgb(106 114 130)',
+                    fill: 'rgb(var(--ink-faint))',
                     fontSize: 10,
                   }}
                 />
                 <Tooltip
                   contentStyle={{
-                    background: 'rgb(22 25 34)',
-                    border: '1px solid rgb(40 45 58)',
+                    background: 'rgb(var(--surface-raised))',
+                    border: '1px solid rgb(var(--border))',
                     borderRadius: 8,
                     fontSize: 12,
                   }}
@@ -1720,7 +1720,7 @@ function SuggestionStrip({
   return (
     <div className="mt-1.5 rounded-lg border border-sky-500/30 bg-sky-500/5 px-2.5 py-1.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-sky-200">
+        <p className="text-xs text-accent">
           Suggest {formatCents(suggestion.suggestedCents, displayCurrency)} (was{' '}
           {formatCents(suggestion.currentCents, displayCurrency)})
           <EstimateMark basis={suggestion.basis} />
@@ -1728,7 +1728,7 @@ function SuggestionStrip({
         <div className="flex shrink-0 gap-2">
           <button
             type="button"
-            className="text-[11px] text-sky-300 hover:text-sky-200"
+            className="text-[11px] text-accent hover:text-accent-hover"
             disabled={pending}
             onClick={() => act('accept')}
           >
@@ -1880,7 +1880,7 @@ function OneOffSpending({
               className={clsx(
                 'rounded-full border px-2 py-0.5 text-[11px] transition',
                 key === month
-                  ? 'border-sky-500/50 bg-sky-500/10 text-sky-200'
+                  ? 'border-sky-500/50 bg-sky-500/10 text-accent'
                   : 'border-border text-ink-muted hover:border-ink-faint hover:text-ink',
               )}
               onClick={() => setMonth(key)}
@@ -1997,14 +1997,14 @@ function NewLineProposalRow({
   return (
     <div className="mt-2 rounded-lg border border-sky-500/30 bg-sky-500/5 px-2.5 py-1.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-sky-200">
+        <p className="text-xs text-accent">
           You keep paying for &ldquo;{proposal.label}&rdquo; — budget{' '}
           {formatCents(proposal.suggestedCents, displayCurrency)}/{CADENCE_WORD[proposal.cadence]}?
           <EstimateMark basis={proposal.basis} />
         </p>
         <button
           type="button"
-          className="text-[11px] text-sky-300 hover:text-sky-200"
+          className="text-[11px] text-accent hover:text-accent-hover"
           disabled={pending}
           onClick={() =>
             void run(async () => {
@@ -2126,7 +2126,7 @@ function IncomeRow({
         <p className="truncate text-sm">{income.label}</p>
         <p className="text-xs text-ink-faint">{describeRecurrence(income.recurrence)}</p>
         {liveOverride && (
-          <p className="text-[11px] text-sky-400">
+          <p className="text-[11px] text-accent">
             {formatDay(liveOverride.scheduledDay)} payday moved to{' '}
             {formatDay(liveOverride.actualDay)}
           </p>

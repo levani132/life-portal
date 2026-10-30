@@ -940,3 +940,7 @@ A post is an intentional publication event, independent of a live widget's audie
 ### 2026-10-22 — Pull-to-refresh requires a separate gesture at the top
 
 Momentum and scroll-to-pull chaining caused accidental refreshes during normal navigation. Remove momentum-driven bounce/refresh and require the gesture to start at the page top. Keep the existing pull distance and release threshold; cancel upward/sideways gestures, interrupted touches and gestures claimed by another control. Regression tests cover normal scroll arrival, starting below the top, deliberate release, short pulls and cancellation.
+
+### 2026-10-31 — Appearance is a browser preference
+
+Build light/dark mode on the existing RGB semantic tokens, with System as the default and a versioned local-storage override. Resolve the saved palette in the document head to prevent a wrong-theme first paint, and synchronize OS changes, other tabs, native controls and browser chrome after hydration. This preference needs no account schema or API change. Accent text uses shared tokens; text-only status overrides improve light-mode contrast without changing nutrition progress fills.

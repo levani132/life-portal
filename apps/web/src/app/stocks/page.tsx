@@ -345,7 +345,7 @@ function PositionPanel({
                   {remaining > 0 && (
                     <button
                       type="button"
-                      className="text-[11px] text-sky-400 hover:text-sky-300"
+                      className="text-[11px] text-accent hover:text-accent-hover"
                       onClick={() => setSelling(lot)}
                     >
                       sell

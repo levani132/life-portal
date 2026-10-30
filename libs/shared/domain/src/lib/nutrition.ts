@@ -189,7 +189,10 @@ export function mgToG(mg: number | undefined, digits = 0): number {
  * Rounded per entry rather than at the end of a sum, so a row's number and the total's number
  * are the same arithmetic. Sub-calorie error per entry is irrelevant against label accuracy.
  */
-export function entryTotals(amount: number, facts: NutritionFacts): EntryTotals {
+export function entryTotals(
+  amount: number,
+  facts: NutritionFacts,
+): EntryTotals {
   const scale = amount / 100;
   const totals: EntryTotals = {
     energyKcal: Math.round(facts.energyKcalPer100 * scale),
@@ -204,11 +207,16 @@ export function entryTotals(amount: number, facts: NutritionFacts): EntryTotals 
 }
 
 /** What one serving of a food works out to. */
-export function perServingTotals(food: Pick<Food, 'servingSize'> & NutritionFacts): ServingTotals {
+export function perServingTotals(
+  food: Pick<Food, 'servingSize'> & NutritionFacts,
+): ServingTotals {
   return entryTotals(food.servingSize, food);
 }
 
-export function servingsToAmount(servings: number, servingSize: number): number {
+export function servingsToAmount(
+  servings: number,
+  servingSize: number,
+): number {
   return Math.max(1, Math.round(servings * servingSize));
 }
 
@@ -241,17 +249,22 @@ export function factsFromInput(
   mode: 'per_serving' | 'per_100',
   servingSize: number,
 ): NutritionFacts {
-  const scale = mode === 'per_100' ? 1 : servingSize > 0 ? 100 / servingSize : 0;
+  const scale =
+    mode === 'per_100' ? 1 : servingSize > 0 ? 100 / servingSize : 0;
   const facts: NutritionFacts = {
     energyKcalPer100: Math.round(input.energyKcal * scale),
     proteinMgPer100: Math.round(input.proteinMg * scale),
     fatMgPer100: Math.round(input.fatMg * scale),
     carbMgPer100: Math.round(input.carbMg * scale),
   };
-  if (input.fibreMg != null) facts.fibreMgPer100 = Math.round(input.fibreMg * scale);
-  if (input.sugarMg != null) facts.sugarMgPer100 = Math.round(input.sugarMg * scale);
-  if (input.satFatMg != null) facts.satFatMgPer100 = Math.round(input.satFatMg * scale);
-  if (input.sodiumMg != null) facts.sodiumMgPer100 = Math.round(input.sodiumMg * scale);
+  if (input.fibreMg != null)
+    facts.fibreMgPer100 = Math.round(input.fibreMg * scale);
+  if (input.sugarMg != null)
+    facts.sugarMgPer100 = Math.round(input.sugarMg * scale);
+  if (input.satFatMg != null)
+    facts.satFatMgPer100 = Math.round(input.satFatMg * scale);
+  if (input.sodiumMg != null)
+    facts.sodiumMgPer100 = Math.round(input.sodiumMg * scale);
   return facts;
 }
 
@@ -268,10 +281,14 @@ export function factsToInput(
     fatMg: Math.round(facts.fatMgPer100 * scale),
     carbMg: Math.round(facts.carbMgPer100 * scale),
   };
-  if (facts.fibreMgPer100 != null) input.fibreMg = Math.round(facts.fibreMgPer100 * scale);
-  if (facts.sugarMgPer100 != null) input.sugarMg = Math.round(facts.sugarMgPer100 * scale);
-  if (facts.satFatMgPer100 != null) input.satFatMg = Math.round(facts.satFatMgPer100 * scale);
-  if (facts.sodiumMgPer100 != null) input.sodiumMg = Math.round(facts.sodiumMgPer100 * scale);
+  if (facts.fibreMgPer100 != null)
+    input.fibreMg = Math.round(facts.fibreMgPer100 * scale);
+  if (facts.sugarMgPer100 != null)
+    input.sugarMg = Math.round(facts.sugarMgPer100 * scale);
+  if (facts.satFatMgPer100 != null)
+    input.satFatMg = Math.round(facts.satFatMgPer100 * scale);
+  if (facts.sodiumMgPer100 != null)
+    input.sodiumMg = Math.round(facts.sodiumMgPer100 * scale);
   return input;
 }
 
@@ -283,7 +300,9 @@ export function factsToInput(
  * rejection: real labels disagree with their own macros, and alcohol and polyols make the
  * check inexact by construction.
  */
-export function macroEnergyMismatch(facts: NutritionFacts): { impliedKcal: number } | undefined {
+export function macroEnergyMismatch(
+  facts: NutritionFacts,
+): { impliedKcal: number } | undefined {
   const impliedKcal = Math.round(
     (facts.proteinMgPer100 * KCAL_PER_G.protein +
       facts.carbMgPer100 * KCAL_PER_G.carb +
@@ -448,11 +467,18 @@ export function mealSuggestions(input: {
 }): MealSuggestion[] {
   const day = toDay(input.day);
   const perSlot = input.perSlot ?? SUGGESTIONS_PER_SLOT;
-  const earliest = addDays(day, -(input.lookbackDays ?? SUGGESTION_LOOKBACK_DAYS));
-  const catalogue = new Map(input.foods.filter((food) => !food.archived).map((f) => [f.id, f]));
+  const earliest = addDays(
+    day,
+    -(input.lookbackDays ?? SUGGESTION_LOOKBACK_DAYS),
+  );
+  const catalogue = new Map(
+    input.foods.filter((food) => !food.archived).map((f) => [f.id, f]),
+  );
 
   const alreadyLogged = new Set(
-    input.entries.filter((e) => toDay(e.day) === day).map((e) => `${e.slot}:${e.foodId}`),
+    input.entries
+      .filter((e) => toDay(e.day) === day)
+      .map((e) => `${e.slot}:${e.foodId}`),
   );
 
   interface Candidate {
@@ -470,8 +496,15 @@ export function mealSuggestions(input: {
     if (alreadyLogged.has(key)) continue;
     if (!catalogue.has(row.foodId)) continue;
 
-    const candidate = candidates.get(key) ?? { slot: row.slot, foodId: row.foodId, perDay: new Map() };
-    candidate.perDay.set(entryDay, (candidate.perDay.get(entryDay) ?? 0) + row.amount);
+    const candidate = candidates.get(key) ?? {
+      slot: row.slot,
+      foodId: row.foodId,
+      perDay: new Map(),
+    };
+    candidate.perDay.set(
+      entryDay,
+      (candidate.perDay.get(entryDay) ?? 0) + row.amount,
+    );
     candidates.set(key, candidate);
   }
 
@@ -524,13 +557,15 @@ export function ageOn(birthDate: string, today: string): number {
 }
 
 /** The most recent weigh-in that is not in the future. */
-export function currentWeighIn(weighIns: WeighIn[], today: string): WeighIn | undefined {
+export function currentWeighIn(
+  weighIns: WeighIn[],
+  today: string,
+): WeighIn | undefined {
   return weighIns
     .filter((row) => !isAfter(row.day, today))
-    .reduce<WeighIn | undefined>(
-      (latest, row) => (latest == null || isAfter(row.day, latest.day) ? row : latest),
-      undefined,
-    );
+    .reduce<
+      WeighIn | undefined
+    >((latest, row) => (latest == null || isAfter(row.day, latest.day) ? row : latest), undefined);
 }
 
 export function leanMassGrams(weightGrams: number, bodyFatPct: number): number {
@@ -556,7 +591,10 @@ export function estimateBodyFatPct(input: {
 }): Estimate<number> {
   const index = bmi(input.weightGrams, input.heightCm);
   const raw =
-    1.2 * index + 0.23 * input.age - 10.8 * (input.sex === 'male' ? 1 : 0) - 5.4;
+    1.2 * index +
+    0.23 * input.age -
+    10.8 * (input.sex === 'male' ? 1 : 0) -
+    5.4;
   const value = Math.min(0.6, Math.max(0.03, Math.round(raw) / 100));
   return {
     value,
@@ -564,7 +602,11 @@ export function estimateBodyFatPct(input: {
       'Deurenberg (1991) from BMI, age and sex. A population formula, not a measurement — it ' +
       'reads high for muscular builds and low for slight ones, so it is shown for reference ' +
       'and never used to derive the calorie target.',
-    assumptions: { bmi: Math.round(index * 10) / 10, age: input.age, sex: input.sex },
+    assumptions: {
+      bmi: Math.round(index * 10) / 10,
+      age: input.age,
+      sex: input.sex,
+    },
     confidence: 'low',
   };
 }
@@ -574,7 +616,10 @@ export function estimateBodyFatPct(input: {
  * the owner's own measurement, then lean mass when it was measured, then body weight.
  */
 export function basalRate(input: {
-  profile: Pick<NutritionProfile, 'basalRateKcal' | 'sex' | 'heightCm' | 'birthDate'>;
+  profile: Pick<
+    NutritionProfile,
+    'basalRateKcal' | 'sex' | 'heightCm' | 'birthDate'
+  >;
   weighIn: WeighIn;
   today: string;
 }): TargetFigure {
@@ -587,7 +632,8 @@ export function basalRate(input: {
   const weightKg = weighIn.weightGrams / 1000;
 
   if (weighIn.bodyFatPct != null) {
-    const leanKg = leanMassGrams(weighIn.weightGrams, weighIn.bodyFatPct) / 1000;
+    const leanKg =
+      leanMassGrams(weighIn.weightGrams, weighIn.bodyFatPct) / 1000;
     return {
       value: Math.round(370 + 21.6 * leanKg),
       basis:
@@ -614,16 +660,25 @@ export function basalRate(input: {
       'Mifflin–St Jeor (1990): 10 × kg + 6.25 × cm − 5 × age, plus 5 for men or minus 161 for ' +
       'women. The best-validated predictive equation for the general population. Record a ' +
       'body-fat percentage with a weigh-in to switch to the lean-mass equation.',
-    assumptions: { weightKg: Math.round(weightKg * 10) / 10, heightCm, age, sex },
+    assumptions: {
+      weightKg: Math.round(weightKg * 10) / 10,
+      heightCm,
+      age,
+      sex,
+    },
     confidence: 'medium',
   };
 }
 
-export function figureValue(figure: TargetFigure | undefined): number | undefined {
+export function figureValue(
+  figure: TargetFigure | undefined,
+): number | undefined {
   return figure?.value;
 }
 
-export function isRecorded(figure: TargetFigure | undefined): figure is Recorded<number> {
+export function isRecorded(
+  figure: TargetFigure | undefined,
+): figure is Recorded<number> {
   return figure != null && (figure as Recorded<number>).recorded === true;
 }
 
@@ -667,7 +722,11 @@ export function nutritionTargets(input: TargetsInput): NutritionTargets {
   const tdee: Estimate<number> = {
     value: tdeeValue,
     basis: `Basal rate × ${factor} for "${ACTIVITY_LABELS[profile.activityLevel]}". Activity is the biggest single lever here, and it is self-reported — if your weight moves differently from the projection, this is the number to adjust first.`,
-    assumptions: { bmr: bmrValue, activityLevel: profile.activityLevel, factor },
+    assumptions: {
+      bmr: bmrValue,
+      activityLevel: profile.activityLevel,
+      factor,
+    },
     confidence: 'medium',
   };
 
@@ -698,11 +757,14 @@ export function nutritionTargets(input: TargetsInput): NutritionTargets {
       ? leanMassGrams(weighIn.weightGrams, bodyFatRecordedPct) / 1000
       : undefined;
   const massKg = leanKg ?? bodyKg;
-  const proteinPerKg = leanKg != null ? plan.proteinPerKgLean : plan.proteinPerKg;
+  const proteinPerKg =
+    leanKg != null ? plan.proteinPerKgLean : plan.proteinPerKg;
 
   let proteinG = Math.round(proteinPerKg * massKg);
   const proteinCap = plan.proteinEnergyCap ?? PROTEIN_ENERGY_CAP;
-  const proteinCapG = Math.floor((energyKcal * proteinCap) / KCAL_PER_G.protein);
+  const proteinCapG = Math.floor(
+    (energyKcal * proteinCap) / KCAL_PER_G.protein,
+  );
   let proteinCapped = false;
   if (proteinG > proteinCapG) {
     proteinG = proteinCapG;
@@ -722,7 +784,8 @@ export function nutritionTargets(input: TargetsInput): NutritionTargets {
 
   let macroAdjustment: NutritionTargets['macroAdjustment'];
   let carbG = Math.round(
-    (energyKcal - proteinG * KCAL_PER_G.protein - fatG * KCAL_PER_G.fat) / KCAL_PER_G.carb,
+    (energyKcal - proteinG * KCAL_PER_G.protein - fatG * KCAL_PER_G.fat) /
+      KCAL_PER_G.carb,
   );
 
   if (carbG < 0) {
@@ -730,7 +793,10 @@ export function nutritionTargets(input: TargetsInput): NutritionTargets {
     // the floors — the alternative is a target that silently does not add up.
     let overshootKcal = -carbG * KCAL_PER_G.carb;
     const fatFloorG = Math.round(FAT_PER_KG_FLOOR * bodyKg);
-    const fatCutG = Math.min(Math.max(0, fatG - fatFloorG), Math.ceil(overshootKcal / KCAL_PER_G.fat));
+    const fatCutG = Math.min(
+      Math.max(0, fatG - fatFloorG),
+      Math.ceil(overshootKcal / KCAL_PER_G.fat),
+    );
     const reasons: string[] = [];
     if (fatCutG > 0) {
       reasons.push(`fat cut from ${fatG} g to ${fatG - fatCutG} g`);
@@ -750,7 +816,9 @@ export function nutritionTargets(input: TargetsInput): NutritionTargets {
         Math.ceil(overshootKcal / KCAL_PER_G.protein),
       );
       if (proteinCutG > 0) {
-        reasons.push(`protein cut from ${proteinG} g to ${proteinG - proteinCutG} g`);
+        reasons.push(
+          `protein cut from ${proteinG} g to ${proteinG - proteinCutG} g`,
+        );
         macroAdjustment = {
           what: 'protein',
           fromG: proteinG,
@@ -766,7 +834,8 @@ export function nutritionTargets(input: TargetsInput): NutritionTargets {
     carbG = Math.max(
       0,
       Math.round(
-        (energyKcal - proteinG * KCAL_PER_G.protein - fatG * KCAL_PER_G.fat) / KCAL_PER_G.carb,
+        (energyKcal - proteinG * KCAL_PER_G.protein - fatG * KCAL_PER_G.fat) /
+          KCAL_PER_G.carb,
       ),
     );
   }
@@ -779,15 +848,24 @@ export function nutritionTargets(input: TargetsInput): NutritionTargets {
       : `${proteinPerKg} g per kg of body weight (${Math.round(bodyKg * 10) / 10} kg)`;
 
   const projectedWeeklyChangeKg =
-    Math.round(((energyKcal - tdeeValue) * 7 * 100) / KCAL_PER_KG_BODY_MASS) / 100;
+    Math.round(((energyKcal - tdeeValue) * 7 * 100) / KCAL_PER_KG_BODY_MASS) /
+    100;
   const ratePct = Math.abs(projectedWeeklyChangeKg) / bodyKg;
   let rateVerdict: NutritionTargets['rateVerdict'] = 'sane';
   if (projectedWeeklyChangeKg < 0) {
     rateVerdict =
-      ratePct > LOSS_RATE_BAND.max ? 'fast' : ratePct < LOSS_RATE_BAND.min ? 'slow' : 'sane';
+      ratePct > LOSS_RATE_BAND.max
+        ? 'fast'
+        : ratePct < LOSS_RATE_BAND.min
+          ? 'slow'
+          : 'sane';
   } else if (projectedWeeklyChangeKg > 0) {
     rateVerdict =
-      ratePct > GAIN_RATE_BAND.max ? 'fast' : ratePct < GAIN_RATE_BAND.min ? 'slow' : 'sane';
+      ratePct > GAIN_RATE_BAND.max
+        ? 'fast'
+        : ratePct < GAIN_RATE_BAND.min
+          ? 'slow'
+          : 'sane';
   }
 
   const energyBasis = `${plan.label}: maintenance ${tdeeValue} kcal × ${plan.energyFactor}.${
@@ -804,7 +882,11 @@ export function nutritionTargets(input: TargetsInput): NutritionTargets {
       : {
           value: energyKcal,
           basis: energyBasis,
-          assumptions: { tdee: tdeeValue, goal: profile.goal, factor: plan.energyFactor },
+          assumptions: {
+            tdee: tdeeValue,
+            goal: profile.goal,
+            factor: plan.energyFactor,
+          },
           confidence: 'medium',
         },
     proteinG:
@@ -813,7 +895,11 @@ export function nutritionTargets(input: TargetsInput): NutritionTargets {
         : {
             value: proteinG,
             basis: `${massBasis}.${proteinCapped ? ` Capped at ${Math.round(proteinCap * 100)}% of the calorie target.` : ''} Protein is the macro worth hitting: in a deficit it is what decides whether the weight lost is fat or muscle.`,
-            assumptions: { perKg: proteinPerKg, massKg: Math.round(massKg * 10) / 10, capped: proteinCapped },
+            assumptions: {
+              perKg: proteinPerKg,
+              massKg: Math.round(massKg * 10) / 10,
+              capped: proteinCapped,
+            },
             confidence: 'medium',
           },
     fatG:
@@ -822,7 +908,10 @@ export function nutritionTargets(input: TargetsInput): NutritionTargets {
         : {
             value: fatG,
             basis: `${plan.fatPerKg} g per kg, floored at ${FAT_PER_KG_FLOOR} g per kg of body weight and at ${Math.round(FAT_ENERGY_FLOOR * 100)}% of energy — hormones and satiety both suffer below that.`,
-            assumptions: { perKg: plan.fatPerKg, massKg: Math.round(massKg * 10) / 10 },
+            assumptions: {
+              perKg: plan.fatPerKg,
+              massKg: Math.round(massKg * 10) / 10,
+            },
             confidence: 'medium',
           },
     carbG:
@@ -830,7 +919,8 @@ export function nutritionTargets(input: TargetsInput): NutritionTargets {
         ? { value: carbG, recorded: true }
         : {
             value: carbG,
-            basis: 'Whatever energy is left after protein and fat. Carbohydrate is the flexible one on purpose — it fuels training, and moving it is how the target absorbs a heavy day.',
+            basis:
+              'Whatever energy is left after protein and fat. Carbohydrate is the flexible one on purpose — it fuels training, and moving it is how the target absorbs a heavy day.',
             assumptions: { energyKcal, proteinG, fatG },
             confidence: 'medium',
           },
@@ -911,8 +1001,14 @@ export function defaultSlot(hour: number, minute = 0): MealSlot {
 }
 
 /** Convenience for the browser: the day and slot for a given instant. */
-export function localMealContext(now: Date, dayStartHour = 4): { day: string; slot: MealSlot } {
-  return { day: localDay(now, dayStartHour), slot: defaultSlot(now.getHours(), now.getMinutes()) };
+export function localMealContext(
+  now: Date,
+  dayStartHour = 4,
+): { day: string; slot: MealSlot } {
+  return {
+    day: localDay(now, dayStartHour),
+    slot: defaultSlot(now.getHours(), now.getMinutes()),
+  };
 }
 
 // ------------------------------------------------------------------ cheat day
@@ -925,7 +1021,9 @@ export function nextCheatDay(
   today: string,
   cheatDays: number[],
 ): { day: string; daysUntil: number; isToday: boolean } | undefined {
-  const wanted = new Set(cheatDays.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6));
+  const wanted = new Set(
+    cheatDays.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6),
+  );
   if (wanted.size === 0) return undefined;
   for (let offset = 0; offset < 7; offset += 1) {
     const day = addDays(today, offset);
@@ -948,7 +1046,9 @@ export function cheatDayInfo(input: {
     isToday: next?.isToday ?? false,
     queue: input.queue,
     queueTotals: sumTotals(
-      input.queue.filter((row) => !row.eaten && row.totals).map((row) => row.totals as EntryTotals),
+      input.queue
+        .filter((row) => !row.eaten && row.totals)
+        .map((row) => row.totals as EntryTotals),
     ),
     bankedKcal: input.bankedKcal,
   };
@@ -961,7 +1061,7 @@ export function cheatDayInfo(input: {
 
 // ------------------------------------------------------------------ summary
 
-/** The three numbers on the dashboard card, plus the cheat-day countdown. */
+/** Calorie/macro progress for Home, plus the cheat-day countdown. */
 export function summariseNutrition(input: {
   day: string;
   totals: EntryTotals;
@@ -978,6 +1078,8 @@ export function summariseNutrition(input: {
     day: input.day,
     eatenKcal: input.totals.energyKcal,
     proteinEatenG,
+    carbEatenG: mgToG(input.totals.carbMg),
+    fatEatenG: mgToG(input.totals.fatMg),
     entryCount: input.entryCount,
     targetsAvailable: input.targets.available,
     goal: input.goal,
@@ -990,6 +1092,17 @@ export function summariseNutrition(input: {
     summary.proteinTargetG = proteinTargetG;
     summary.proteinLeftG = proteinTargetG - proteinEatenG;
   }
+  if (input.targets.carbG) summary.carbTargetG = input.targets.carbG.value;
+  if (input.targets.fatG) summary.fatTargetG = input.targets.fatG.value;
+  summary.targetBasis = {};
+  for (const [key, figure] of [
+    ['calories', input.targets.energyKcal],
+    ['protein', input.targets.proteinG],
+    ['carbs', input.targets.carbG],
+    ['fat', input.targets.fatG],
+  ] as const) {
+    if (figure && !isRecorded(figure)) summary.targetBasis[key] = figure.basis;
+  }
   if (input.cheat?.nextDay) {
     summary.nextCheatDay = input.cheat.nextDay;
     summary.daysUntilCheat = input.cheat.daysUntil;
@@ -998,7 +1111,9 @@ export function summariseNutrition(input: {
 }
 
 /** Reconstructs a logged entry's derived fields. Used wherever entries are serialised. */
-export function decorateEntry(row: Omit<MealEntry, 'totals' | 'servings'>): MealEntry {
+export function decorateEntry(
+  row: Omit<MealEntry, 'totals' | 'servings'>,
+): MealEntry {
   return {
     ...row,
     totals: entryTotals(row.amount, row.facts),
@@ -1025,11 +1140,17 @@ export function snapshotFacts(food: Food): EntryFacts {
 }
 
 /** Days until the next cheat day, or `undefined` when none is configured. */
-export function daysUntilCheatDay(today: string, cheatDays: number[]): number | undefined {
+export function daysUntilCheatDay(
+  today: string,
+  cheatDays: number[],
+): number | undefined {
   return nextCheatDay(today, cheatDays)?.daysUntil;
 }
 
 /** Exported for the UI's "x of y" copy, so the same rounding is used everywhere. */
-export function remainingOf(target: number | undefined, eaten: number): number | undefined {
+export function remainingOf(
+  target: number | undefined,
+  eaten: number,
+): number | undefined {
   return target == null ? undefined : target - eaten;
 }

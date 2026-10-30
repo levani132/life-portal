@@ -151,7 +151,7 @@ function Nutrition() {
             )}
             <Link
               href="/settings/mcp"
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-ink-muted transition hover:border-sky-500/40 hover:text-sky-400"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-ink-muted transition hover:border-sky-500/40 hover:text-accent-hover"
               title="Connect AI assistant"
             >
               <svg
@@ -617,7 +617,7 @@ function SlotSection({
                 </span>
                 {onShare && (
                   <button
-                    className="text-xs text-sky-300"
+                    className="text-xs text-accent"
                     onClick={() =>
                       onShare({ kind: 'entry', entryId: entry.id })
                     }
@@ -1098,7 +1098,7 @@ function FoodsTab({
                 <div className="min-w-0">
                   {onShare && !food.archived && (
                     <button
-                      className="mb-1 text-xs text-sky-300"
+                      className="mb-1 text-xs text-accent"
                       onClick={() => onShare({ kind: 'food', foodId: food.id })}
                       aria-label={`Share ${food.name}`}
                     >
@@ -1144,7 +1144,7 @@ function FoodsTab({
                     {food.source === 'openfoodfacts' && ' · imported from OFF'}
                     {food.source === 'imported' && ' · imported from user'}
                     {food.visibility === 'public' && (
-                      <span className="ml-1 text-sky-400">· public</span>
+                      <span className="ml-1 text-accent">· public</span>
                     )}
                   </p>
                 </div>

@@ -78,23 +78,23 @@ const milk: Food = {
   fibreMgPer100: undefined,
 };
 
-function entry(overrides: Partial<MealEntry> & Pick<MealEntry, 'day' | 'slot'>): MealEntry {
+function entry(
+  overrides: Partial<MealEntry> & Pick<MealEntry, 'day' | 'slot'>,
+): MealEntry {
   const food = overrides.foodId === milk.id ? milk : oats;
   const amount = overrides.amount ?? 100;
-  return decorateEntry(
-    {
-      id: overrides.id ?? `entry-${overrides.day}-${overrides.slot}-${amount}`,
-      userId: 'u1',
-      day: overrides.day,
-      slot: overrides.slot,
-      foodId: food.id,
-      amount,
-      unit: food.unit,
-      facts: snapshotFacts(food),
-      createdAt: '2026-08-19T08:00:00.000Z',
-      updatedAt: '2026-08-19T08:00:00.000Z',
-    },
-  );
+  return decorateEntry({
+    id: overrides.id ?? `entry-${overrides.day}-${overrides.slot}-${amount}`,
+    userId: 'u1',
+    day: overrides.day,
+    slot: overrides.slot,
+    foodId: food.id,
+    amount,
+    unit: food.unit,
+    facts: snapshotFacts(food),
+    createdAt: '2026-08-19T08:00:00.000Z',
+    updatedAt: '2026-08-19T08:00:00.000Z',
+  });
 }
 
 const profile: NutritionProfile = {
@@ -175,7 +175,13 @@ describe('entry maths', () => {
 describe('food entry modes', () => {
   it('normalises per-serving input to per-100 storage', () => {
     const facts = factsFromInput(
-      { energyKcal: 152, proteinMg: 5_200, fatMg: 2_800, carbMg: 24_000, fibreMg: 4_000 },
+      {
+        energyKcal: 152,
+        proteinMg: 5_200,
+        fatMg: 2_800,
+        carbMg: 24_000,
+        fibreMg: 4_000,
+      },
       'per_serving',
       40,
     );
@@ -195,14 +201,21 @@ describe('food entry modes', () => {
   });
 
   it('round-trips back to the numbers the owner typed', () => {
-    const typed = { energyKcal: 152, proteinMg: 5_200, fatMg: 2_800, carbMg: 24_000 };
+    const typed = {
+      energyKcal: 152,
+      proteinMg: 5_200,
+      fatMg: 2_800,
+      carbMg: 24_000,
+    };
     const stored = factsFromInput(typed, 'per_serving', 40);
     expect(factsToInput(stored, 'per_serving', 40)).toEqual(typed);
   });
 
   it('flags macros that cannot account for the stated energy', () => {
     // Per-serving numbers typed into a per-100 field: energy far below its own macros.
-    expect(macroEnergyMismatch({ ...oats, energyKcalPer100: 120 })).toEqual({ impliedKcal: 355 });
+    expect(macroEnergyMismatch({ ...oats, energyKcalPer100: 120 })).toEqual({
+      impliedKcal: 355,
+    });
     expect(macroEnergyMismatch(oats)).toBeUndefined();
     expect(
       macroEnergyMismatch({
@@ -240,7 +253,9 @@ describe('totals', () => {
   });
 
   it('keeps fibre absent when nothing eaten reported it', () => {
-    const totals = slotTotals([entry({ day: TODAY, slot: 'lunch', foodId: milk.id, amount: 200 })]);
+    const totals = slotTotals([
+      entry({ day: TODAY, slot: 'lunch', foodId: milk.id, amount: 200 }),
+    ]);
     expect(totals[1].totals.fibreMg).toBeUndefined();
   });
 
@@ -304,11 +319,16 @@ describe('week balance', () => {
 // ------------------------------------------------------------------ suggestions
 
 describe('meal suggestions', () => {
-  const suggest = (entries: MealEntry[], day = TODAY, foods: Food[] = [oats, milk]) =>
-    mealSuggestions({ entries, foods, day });
+  const suggest = (
+    entries: MealEntry[],
+    day = TODAY,
+    foods: Food[] = [oats, milk],
+  ) => mealSuggestions({ entries, foods, day });
 
-  it('offers yesterday\'s breakfast back, in the slot it was eaten in', () => {
-    const offers = suggest([entry({ day: '2026-08-18', slot: 'breakfast', amount: 40 })]);
+  it("offers yesterday's breakfast back, in the slot it was eaten in", () => {
+    const offers = suggest([
+      entry({ day: '2026-08-18', slot: 'breakfast', amount: 40 }),
+    ]);
     expect(offers).toHaveLength(1);
     expect(offers[0]).toMatchObject({
       slot: 'breakfast',
@@ -324,7 +344,9 @@ describe('meal suggestions', () => {
   });
 
   it('keeps a slot to itself: lunch does not offer what breakfast ate', () => {
-    const offers = suggest([entry({ day: '2026-08-18', slot: 'breakfast', amount: 40 })]);
+    const offers = suggest([
+      entry({ day: '2026-08-18', slot: 'breakfast', amount: 40 }),
+    ]);
     expect(offers.filter((row) => row.slot === 'lunch')).toHaveLength(0);
   });
 
@@ -336,7 +358,12 @@ describe('meal suggestions', () => {
       entry({ day: '2026-08-17', slot: 'breakfast', amount: 40 }),
       entry({ day: '2026-08-18', slot: 'breakfast', amount: 40 }),
       // Milk once, yesterday.
-      entry({ day: '2026-08-18', slot: 'breakfast', foodId: milk.id, amount: 200 }),
+      entry({
+        day: '2026-08-18',
+        slot: 'breakfast',
+        foodId: milk.id,
+        amount: 200,
+      }),
     ]);
     expect(offers.map((row) => row.foodId)).toEqual([oats.id, milk.id]);
   });
@@ -344,7 +371,12 @@ describe('meal suggestions', () => {
   it('prefers the more recent of two meals eaten once each', () => {
     const offers = suggest([
       entry({ day: '2026-08-10', slot: 'dinner', amount: 100 }),
-      entry({ day: '2026-08-18', slot: 'dinner', foodId: milk.id, amount: 200 }),
+      entry({
+        day: '2026-08-18',
+        slot: 'dinner',
+        foodId: milk.id,
+        amount: 200,
+      }),
     ]);
     expect(offers.map((row) => row.foodId)).toEqual([milk.id, oats.id]);
   });
@@ -352,9 +384,17 @@ describe('meal suggestions', () => {
   it('breaks a dead heat on the name, so the order does not depend on the log order', () => {
     const eaten = [
       entry({ day: '2026-08-18', slot: 'dinner', amount: 100 }),
-      entry({ day: '2026-08-18', slot: 'dinner', foodId: milk.id, amount: 200 }),
+      entry({
+        day: '2026-08-18',
+        slot: 'dinner',
+        foodId: milk.id,
+        amount: 200,
+      }),
     ];
-    expect(suggest(eaten).map((row) => row.name)).toEqual(['Milk 2%', 'Rolled oats']);
+    expect(suggest(eaten).map((row) => row.name)).toEqual([
+      'Milk 2%',
+      'Rolled oats',
+    ]);
     expect(suggest([...eaten].reverse()).map((row) => row.name)).toEqual([
       'Milk 2%',
       'Rolled oats',
@@ -409,21 +449,32 @@ describe('meal suggestions', () => {
 
   it('drops a food that has been archived or deleted', () => {
     const eaten = [entry({ day: '2026-08-18', slot: 'lunch', amount: 100 })];
-    expect(suggest(eaten, TODAY, [{ ...oats, archived: true }])).toHaveLength(0);
+    expect(suggest(eaten, TODAY, [{ ...oats, archived: true }])).toHaveLength(
+      0,
+    );
     expect(suggest(eaten, TODAY, [milk])).toHaveLength(0);
   });
 
   it('ignores the log beyond the lookback window', () => {
     // Fifteen days back, one day outside the fortnight.
-    expect(suggest([entry({ day: '2026-08-04', slot: 'lunch', amount: 100 })])).toHaveLength(0);
-    expect(suggest([entry({ day: '2026-08-05', slot: 'lunch', amount: 100 })])).toHaveLength(1);
+    expect(
+      suggest([entry({ day: '2026-08-04', slot: 'lunch', amount: 100 })]),
+    ).toHaveLength(0);
+    expect(
+      suggest([entry({ day: '2026-08-05', slot: 'lunch', amount: 100 })]),
+    ).toHaveLength(1);
   });
 
   it('caps each slot and returns them in menu order', () => {
     const offers = mealSuggestions({
       entries: [
         entry({ day: '2026-08-18', slot: 'dinner', amount: 100 }),
-        entry({ day: '2026-08-18', slot: 'dinner', foodId: milk.id, amount: 200 }),
+        entry({
+          day: '2026-08-18',
+          slot: 'dinner',
+          foodId: milk.id,
+          amount: 200,
+        }),
         entry({ day: '2026-08-17', slot: 'breakfast', amount: 40 }),
       ],
       foods: [oats, milk],
@@ -464,12 +515,22 @@ describe('body model', () => {
   });
 
   it('estimates body fat from BMI, and says how confident it is', () => {
-    const estimate = estimateBodyFatPct({ sex: 'male', weightGrams: 80_000, heightCm: 180, age: 30 });
+    const estimate = estimateBodyFatPct({
+      sex: 'male',
+      weightGrams: 80_000,
+      heightCm: 180,
+      age: 30,
+    });
     expect(estimate.value).toBeCloseTo(0.2, 2);
     expect(estimate.confidence).toBe('low');
     expect(estimate.basis).toContain('Deurenberg');
     // Same body, female: the formula reads about eleven points higher.
-    const female = estimateBodyFatPct({ sex: 'female', weightGrams: 80_000, heightCm: 180, age: 30 });
+    const female = estimateBodyFatPct({
+      sex: 'female',
+      weightGrams: 80_000,
+      heightCm: 180,
+      age: 30,
+    });
     expect(female.value).toBeGreaterThan(estimate.value);
   });
 });
@@ -486,7 +547,11 @@ describe('basal rate', () => {
   });
 
   it('uses Katch–McArdle when body fat was recorded', () => {
-    const figure = basalRate({ profile, weighIn: { ...weighIn, bodyFatPct: 0.2 }, today: TODAY });
+    const figure = basalRate({
+      profile,
+      weighIn: { ...weighIn, bodyFatPct: 0.2 },
+      today: TODAY,
+    });
     // 370 + 21.6 × 64 = 1752.4
     expect(figure.value).toBe(1_752);
     expect(isRecorded(figure)).toBe(false);
@@ -501,7 +566,11 @@ describe('basal rate', () => {
   });
 
   it('applies the female constant', () => {
-    const figure = basalRate({ profile: { ...profile, sex: 'female' }, weighIn, today: TODAY });
+    const figure = basalRate({
+      profile: { ...profile, sex: 'female' },
+      weighIn,
+      today: TODAY,
+    });
     // 10×80 + 6.25×180 − 5×30 − 161 = 1614
     expect(figure.value).toBe(1_614);
   });
@@ -513,22 +582,42 @@ describe('nutritionTargets', () => {
   const targetsFor = (
     overrides: Partial<NutritionProfile> = {},
     weighIns: WeighIn[] = [weighIn],
-  ) => nutritionTargets({ profile: { ...profile, ...overrides }, weighIns, today: TODAY });
+  ) =>
+    nutritionTargets({
+      profile: { ...profile, ...overrides },
+      weighIns,
+      today: TODAY,
+    });
 
   it('names every missing input and stays unavailable', () => {
     const empty = nutritionTargets({
-      profile: { ...profile, sex: undefined, heightCm: undefined, birthDate: undefined },
+      profile: {
+        ...profile,
+        sex: undefined,
+        heightCm: undefined,
+        birthDate: undefined,
+      },
       weighIns: [],
       today: TODAY,
     });
     expect(empty.available).toBe(false);
-    expect(empty.missingInputs).toEqual(['sex', 'weighIn', 'heightCm', 'birthDate']);
+    expect(empty.missingInputs).toEqual([
+      'sex',
+      'weighIn',
+      'heightCm',
+      'birthDate',
+    ]);
     expect(empty.energyKcal).toBeUndefined();
   });
 
   it('needs only sex and a weigh-in when the basal rate was measured', () => {
     const targets = nutritionTargets({
-      profile: { ...profile, heightCm: undefined, birthDate: undefined, basalRateKcal: 1_700 },
+      profile: {
+        ...profile,
+        heightCm: undefined,
+        birthDate: undefined,
+        basalRateKcal: 1_700,
+      },
       weighIns: [weighIn],
       today: TODAY,
     });
@@ -541,9 +630,13 @@ describe('nutritionTargets', () => {
   });
 
   it('multiplies the basal rate by the activity factor', () => {
-    for (const level of Object.keys(ACTIVITY_FACTORS) as (keyof typeof ACTIVITY_FACTORS)[]) {
+    for (const level of Object.keys(
+      ACTIVITY_FACTORS,
+    ) as (keyof typeof ACTIVITY_FACTORS)[]) {
       const targets = targetsFor({ activityLevel: level });
-      expect(targets.tdee?.value).toBe(Math.round(1_780 * ACTIVITY_FACTORS[level]));
+      expect(targets.tdee?.value).toBe(
+        Math.round(1_780 * ACTIVITY_FACTORS[level]),
+      );
     }
   });
 
@@ -560,33 +653,45 @@ describe('nutritionTargets', () => {
   it('uses body weight for protein when body fat is unknown', () => {
     const targets = targetsFor({ goal: 'fat_loss' });
     expect(targets.proteinG?.value).toBe(160); // 2.0 g/kg × 80 kg
-    expect((targets.proteinG as { basis: string }).basis).toContain('body weight');
+    expect((targets.proteinG as { basis: string }).basis).toContain(
+      'body weight',
+    );
     expect(targets.bodyFatPct?.confidence).toBe('low');
     expect(targets.bodyFatRecordedPct).toBeUndefined();
   });
 
   it('switches to lean mass, and a higher figure per kg, when body fat was recorded', () => {
-    const targets = targetsFor({ goal: 'fat_loss' }, [{ ...weighIn, bodyFatPct: 0.2 }]);
+    const targets = targetsFor({ goal: 'fat_loss' }, [
+      { ...weighIn, bodyFatPct: 0.2 },
+    ]);
     expect(targets.proteinG?.value).toBe(147); // 2.3 g/kg × 64 kg
-    expect((targets.proteinG as { basis: string }).basis).toContain('lean mass');
+    expect((targets.proteinG as { basis: string }).basis).toContain(
+      'lean mass',
+    );
     expect(targets.bodyFatRecordedPct).toBe(0.2);
     expect(targets.bodyFatPct).toBeUndefined();
   });
 
   it('caps protein at 40% of the calorie target', () => {
     // A heavy, sedentary cut: 2.2 g/kg would take protein past 40% of a floored target.
-    const targets = targetsFor({
-      goal: 'pure_weight_loss',
-      activityLevel: 'sedentary',
-      basalRateKcal: 1_500,
-    }, [{ ...weighIn, weightGrams: 140_000 }]);
+    const targets = targetsFor(
+      {
+        goal: 'pure_weight_loss',
+        activityLevel: 'sedentary',
+        basalRateKcal: 1_500,
+      },
+      [{ ...weighIn, weightGrams: 140_000 }],
+    );
     const energy = targets.energyKcal?.value as number;
     expect(targets.proteinG?.value).toBe(Math.floor((energy * 0.4) / 4));
     expect((targets.proteinG as { basis: string }).basis).toContain('Capped');
   });
 
   it('raises a too-deep deficit to the floor and explains it', () => {
-    const targets = targetsFor({ goal: 'pure_weight_loss', activityLevel: 'sedentary' });
+    const targets = targetsFor({
+      goal: 'pure_weight_loss',
+      activityLevel: 'sedentary',
+    });
     const floor = Math.max(1_780, 1_500);
     expect(targets.energyKcal?.value).toBe(floor);
     expect(targets.floorApplied?.floorKcal).toBe(floor);
@@ -596,7 +701,12 @@ describe('nutritionTargets', () => {
 
   it('uses the female floor when the basal rate is lower still', () => {
     const targets = nutritionTargets({
-      profile: { ...profile, sex: 'female', goal: 'pure_weight_loss', basalRateKcal: 1_000 },
+      profile: {
+        ...profile,
+        sex: 'female',
+        goal: 'pure_weight_loss',
+        basalRateKcal: 1_000,
+      },
       weighIns: [{ ...weighIn, weightGrams: 55_000 }],
       today: TODAY,
     });
@@ -607,7 +717,9 @@ describe('nutritionTargets', () => {
     const targets = targetsFor({ goal: 'pure_weight_loss' });
     const energy = targets.energyKcal?.value as number;
     expect(targets.fatG?.value).toBeGreaterThanOrEqual(Math.round(0.5 * 80));
-    expect((targets.fatG?.value as number) * 9).toBeGreaterThanOrEqual(energy * 0.15 - 9);
+    expect((targets.fatG?.value as number) * 9).toBeGreaterThanOrEqual(
+      energy * 0.15 - 9,
+    );
   });
 
   it('leaves carbohydrate as the remainder', () => {
@@ -631,7 +743,9 @@ describe('nutritionTargets', () => {
     // Fat gave way before protein, and neither went below its floor.
     expect(targets.fatG?.value).toBeLessThan(150);
     expect(targets.fatG?.value).toBeGreaterThanOrEqual(Math.round(0.5 * 80));
-    expect(targets.proteinG?.value).toBeGreaterThanOrEqual(Math.round(1.2 * 80));
+    expect(targets.proteinG?.value).toBeGreaterThanOrEqual(
+      Math.round(1.2 * 80),
+    );
   });
 
   it('treats every override as recorded, not estimated', () => {
@@ -659,25 +773,37 @@ describe('nutritionTargets', () => {
 
     const sane = targetsFor({ goal: 'fat_loss' });
     expect(sane.projectedWeeklyChangeKg).toBeCloseTo(
-      ((sane.energyKcal?.value as number) - maintenance) * 7 / 7_700,
+      (((sane.energyKcal?.value as number) - maintenance) * 7) / 7_700,
       2,
     );
     expect(sane.rateVerdict).toBe('sane');
 
     // A 1200 kcal deficit on an 80 kg frame is over 1% of body weight a week.
-    expect(targetsFor({ energyOverrideKcal: maintenance - 1_200 }).rateVerdict).toBe('fast');
+    expect(
+      targetsFor({ energyOverrideKcal: maintenance - 1_200 }).rateVerdict,
+    ).toBe('fast');
     expect(targetsFor({ goal: 'maintain' }).rateVerdict).toBe('sane');
-    expect(targetsFor({ energyOverrideKcal: maintenance - 100 }).rateVerdict).toBe('slow');
-    expect(targetsFor({ energyOverrideKcal: maintenance + 900 }).rateVerdict).toBe('fast');
-    expect(targetsFor({ energyOverrideKcal: maintenance + 50 }).rateVerdict).toBe('slow');
+    expect(
+      targetsFor({ energyOverrideKcal: maintenance - 100 }).rateVerdict,
+    ).toBe('slow');
+    expect(
+      targetsFor({ energyOverrideKcal: maintenance + 900 }).rateVerdict,
+    ).toBe('fast');
+    expect(
+      targetsFor({ energyOverrideKcal: maintenance + 50 }).rateVerdict,
+    ).toBe('slow');
   });
 
   it('sets recomposition apart: a small deficit and much more protein', () => {
     const recomp = targetsFor({ goal: 'recomp' });
     const fatLoss = targetsFor({ goal: 'fat_loss' });
     // A shallower deficit than fat loss, and more protein — that combination *is* the goal.
-    expect(recomp.energyKcal?.value).toBeGreaterThan(fatLoss.energyKcal?.value as number);
-    expect(recomp.proteinG?.value).toBeGreaterThan(fatLoss.proteinG?.value as number);
+    expect(recomp.energyKcal?.value).toBeGreaterThan(
+      fatLoss.energyKcal?.value as number,
+    );
+    expect(recomp.proteinG?.value).toBeGreaterThan(
+      fatLoss.proteinG?.value as number,
+    );
     expect(recomp.proteinG?.value).toBe(192); // 2.4 g/kg × 80 kg
     expect(recomp.goalNote).toContain('resistance');
   });
@@ -685,7 +811,12 @@ describe('nutritionTargets', () => {
   it('lets recomposition protein past the usual 40% ceiling, but not past its own', () => {
     // 2.4 g/kg of a 140 kg frame is 336 g; at the goal's own 50% cap on a floored target it clips.
     const targets = nutritionTargets({
-      profile: { ...profile, goal: 'recomp', activityLevel: 'sedentary', basalRateKcal: 1_500 },
+      profile: {
+        ...profile,
+        goal: 'recomp',
+        activityLevel: 'sedentary',
+        basalRateKcal: 1_500,
+      },
       weighIns: [{ ...weighIn, weightGrams: 140_000 }],
       today: TODAY,
     });
@@ -696,7 +827,12 @@ describe('nutritionTargets', () => {
 
   it('holds the owner’s own numbers steady (100 kg, 197 cm, light, recomp)', () => {
     const targets = nutritionTargets({
-      profile: { ...profile, heightCm: 197, activityLevel: 'light', goal: 'recomp' },
+      profile: {
+        ...profile,
+        heightCm: 197,
+        activityLevel: 'light',
+        goal: 'recomp',
+      },
       weighIns: [{ ...weighIn, weightGrams: 100_000 }],
       today: TODAY,
     });
@@ -776,7 +912,11 @@ describe('cheat day', () => {
   });
 
   it('treats today as zero days away', () => {
-    expect(nextCheatDay(TODAY, [3])).toEqual({ day: TODAY, daysUntil: 0, isToday: true });
+    expect(nextCheatDay(TODAY, [3])).toEqual({
+      day: TODAY,
+      daysUntil: 0,
+      isToday: true,
+    });
   });
 
   it('picks the nearest of several cheat days', () => {
@@ -815,7 +955,12 @@ describe('cheat day', () => {
   });
 
   it('reports no next day when none is configured', () => {
-    const info = cheatDayInfo({ today: TODAY, cheatDays: [], queue: [], bankedKcal: 0 });
+    const info = cheatDayInfo({
+      today: TODAY,
+      cheatDays: [],
+      queue: [],
+      bankedKcal: 0,
+    });
     expect(info.nextDay).toBeUndefined();
     expect(info.daysUntil).toBeUndefined();
     expect(info.isToday).toBe(false);
@@ -825,7 +970,11 @@ describe('cheat day', () => {
 // ------------------------------------------------------------------ summary and snapshot
 
 describe('summary', () => {
-  const targets = nutritionTargets({ profile, weighIns: [weighIn], today: TODAY });
+  const targets = nutritionTargets({
+    profile,
+    weighIns: [weighIn],
+    today: TODAY,
+  });
 
   it('reports what is left when targets exist', () => {
     const totals = entryTotals(100, oats);
@@ -840,6 +989,11 @@ describe('summary', () => {
     expect(summary.eatenKcal).toBe(380);
     expect(summary.leftKcal).toBe((targets.energyKcal?.value as number) - 380);
     expect(summary.proteinEatenG).toBe(13);
+    expect(summary.carbEatenG).toBe(60);
+    expect(summary.fatEatenG).toBe(7);
+    expect(summary.carbTargetG).toBe(targets.carbG?.value);
+    expect(summary.fatTargetG).toBe(targets.fatG?.value);
+    expect(summary.targetBasis?.calories).toBeTruthy();
     expect(summary.proteinLeftG).toBe((targets.proteinG?.value as number) - 13);
     expect(summary.daysUntilCheat).toBe(3);
     expect(summary.targetsAvailable).toBe(true);
@@ -858,6 +1012,33 @@ describe('summary', () => {
     expect(summary.leftKcal).toBeUndefined();
     expect(summary.proteinLeftG).toBeUndefined();
     expect(summary.nextCheatDay).toBeUndefined();
+    expect(summary.carbEatenG).toBe(60);
+    expect(summary.fatEatenG).toBe(7);
+    expect(summary.carbTargetG).toBeUndefined();
+    expect(summary.fatTargetG).toBeUndefined();
+    expect(summary.targetBasis).toEqual({});
+  });
+
+  it('keeps recorded zero targets and over-target consumption without estimate labels', () => {
+    const summary = summariseNutrition({
+      day: TODAY,
+      totals: entryTotals(100, oats),
+      entryCount: 1,
+      goal: 'maintain',
+      targets: {
+        available: true,
+        missingInputs: [],
+        energyKcal: { value: 100, recorded: true },
+        proteinG: { value: 5, recorded: true },
+        carbG: { value: 0, recorded: true },
+        fatG: { value: 0, recorded: true },
+      },
+    });
+    expect(summary.leftKcal).toBe(-280);
+    expect(summary.proteinLeftG).toBe(-8);
+    expect(summary.carbTargetG).toBe(0);
+    expect(summary.fatTargetG).toBe(0);
+    expect(summary.targetBasis).toEqual({});
   });
 });
 

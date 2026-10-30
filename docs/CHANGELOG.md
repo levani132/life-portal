@@ -423,3 +423,7 @@ nutrition logic.
 ### 2026-10-22 — Prevent accidental refresh while scrolling
 
 Pull-to-refresh now requires a fresh downward drag starting at the page top and release beyond the threshold. Scrolling or momentum reaching the top, short pulls, canceled gestures and multiple touches no longer trigger refresh.
+
+### 2026-10-31 — Light and dark appearance
+
+Added an Appearance panel in Settings with Light, System default and Dark choices. Theme controls stay out of the main header and sign-in/register screens. The preference stays in this browser and applies before the first paint. Shared backgrounds, cards, text, borders, accents and chart furniture adapt to the palette; status text remains readable in light mode while nutrition progress fills retain their existing colors.

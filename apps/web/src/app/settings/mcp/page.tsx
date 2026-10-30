@@ -255,7 +255,7 @@ function McpSetup() {
 function ToolCard({ name, description }: { name: string; description: string }) {
   return (
     <div className="rounded-lg border border-line/60 bg-surface-sunken/40 p-3">
-      <code className="text-xs font-medium text-sky-400">{name}</code>
+      <code className="text-xs font-medium text-accent">{name}</code>
       <p className="mt-1 text-xs text-ink-muted">{description}</p>
     </div>
   );

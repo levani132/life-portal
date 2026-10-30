@@ -114,7 +114,7 @@ function PreferencesEditor({
     <div className="mx-auto max-w-2xl">
       {isSetup && (
         <>
-          <p className="mb-3 text-xs font-medium uppercase tracking-widest text-sky-300">
+          <p className="mb-3 text-xs font-medium uppercase tracking-widest text-accent">
             Make room for what matters
           </p>
           <div className="mb-6 flex gap-2" aria-label={`Step ${step + 1} of 4`}>
@@ -358,7 +358,7 @@ function PreferencesEditor({
         <div className="mt-6 space-y-3 text-sm">
           {initial.access.social && (
             <Link
-              className="block text-sky-300 hover:underline"
+              className="block text-accent hover:underline"
               href="/profile"
             >
               Preview my shared profile →
@@ -368,7 +368,7 @@ function PreferencesEditor({
             <p className="text-ink-muted">
               Food also keeps separate controls for meals, weight and targets.{' '}
               <Link
-                className="text-sky-300 hover:underline"
+                className="text-accent hover:underline"
                 href="/nutrition?tab=you"
               >
                 Choose Food details →

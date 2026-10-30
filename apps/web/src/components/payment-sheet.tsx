@@ -574,7 +574,7 @@ function ConfirmForm({
           {leftoverCents !== 0 && (
             <button
               type="button"
-              className="mt-2 block text-[11px] text-sky-400 underline hover:text-sky-300"
+              className="mt-2 block text-[11px] text-accent underline hover:text-accent-hover"
               onClick={() =>
                 update(row.key, {
                   amountCents: Math.max(0, (row.amountCents ?? 0) + leftoverCents),

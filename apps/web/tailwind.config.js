@@ -16,8 +16,25 @@ module.exports = {
   ],
   theme: {
     extend: {
+      // Text-only adaptations keep status/progress fills at their original colors.
+      textColor: Object.fromEntries(
+        ['emerald', 'amber', 'rose', 'lime'].map((hue) => [
+          hue,
+          Object.fromEntries(
+            [100, 200, 300, 400].map((shade) => [
+              shade,
+              `var(--text-${hue}-${shade}, var(--text-${hue}))`,
+            ]),
+          ),
+        ]),
+      ),
       colors: {
         // Semantic tokens, so a card's colour is chosen by meaning rather than by hue.
+        accent: 'rgb(var(--accent) / <alpha-value>)',
+        'accent-hover': 'rgb(var(--accent-hover) / <alpha-value>)',
+        'accent-solid': 'rgb(var(--accent-solid) / <alpha-value>)',
+        'accent-solid-hover': 'rgb(var(--accent-solid-hover) / <alpha-value>)',
+        'on-accent': 'rgb(var(--on-accent) / <alpha-value>)',
         surface: 'rgb(var(--surface) / <alpha-value>)',
         'surface-raised': 'rgb(var(--surface-raised) / <alpha-value>)',
         border: 'rgb(var(--border) / <alpha-value>)',

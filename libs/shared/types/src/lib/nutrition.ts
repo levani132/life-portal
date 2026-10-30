@@ -426,6 +426,14 @@ export interface NutritionSummary {
   day: IsoDate;
   eatenKcal: number;
   proteinEatenG: number;
+  carbEatenG: number;
+  fatEatenG: number;
+  carbTargetG?: number;
+  fatTargetG?: number;
+  /** Present only for calculated targets; recorded overrides have no estimate marker. */
+  targetBasis?: Partial<
+    Record<'calories' | 'protein' | 'carbs' | 'fat', string>
+  >;
   entryCount: number;
   targetsAvailable: boolean;
   targetKcal?: number;

@@ -17,6 +17,8 @@ function fixture(selectedModules: string[]) {
     targetsAvailable: false,
     eatenKcal: 0,
     proteinEatenG: 0,
+    carbEatenG: 0,
+    fatEatenG: 0,
     entryCount: 0,
     targetKcal: 0,
   });

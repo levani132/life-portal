@@ -2,18 +2,89 @@
 @tailwind components;
 @tailwind utilities;
 
-/*
- * One dark palette, defined as RGB triples so Tailwind's `<alpha-value>` syntax works.
- * A life dashboard gets looked at in the evening more than the morning, so dark is the only
- * theme rather than a toggle nobody flips.
- */
+/* Shared palette tokens; nutrition and status hues keep their existing meanings. */
 :root {
+  color-scheme: light;
+  --text-emerald: #047857;
+  --text-amber: #92400e;
+  --text-rose: #be123c;
+  --text-lime: #4d7c0f;
+  --surface: 245 247 250;
+  --surface-raised: 255 255 255;
+  --border: 210 217 228;
+  --ink: 24 32 47;
+  --ink-muted: 77 90 110;
+  --ink-faint: 100 114 134;
+  --accent: 3 105 161;
+  --accent-hover: 7 89 133;
+  --accent-solid: 3 105 161;
+  --accent-solid-hover: 7 89 133;
+  --on-accent: 255 255 255;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --text-emerald-100: #d1fae5;
+  --text-emerald-200: #a7f3d0;
+  --text-emerald-300: #6ee7b7;
+  --text-emerald-400: #34d399;
+  --text-amber-100: #fef3c7;
+  --text-amber-200: #fde68a;
+  --text-amber-300: #fcd34d;
+  --text-amber-400: #fbbf24;
+  --text-rose-100: #ffe4e6;
+  --text-rose-200: #fecdd3;
+  --text-rose-300: #fda4af;
+  --text-rose-400: #fb7185;
+  --text-lime-100: #ecfccb;
+  --text-lime-200: #d9f99d;
+  --text-lime-300: #bef264;
+  --text-lime-400: #a3e635;
   --surface: 12 14 20;
   --surface-raised: 22 25 34;
   --border: 40 45 58;
   --ink: 237 240 245;
   --ink-muted: 155 163 180;
-  --ink-faint: 106 114 130;
+  --ink-faint: 133 143 162;
+  --accent: 125 211 252;
+  --accent-hover: 186 230 253;
+  --accent-solid: 14 165 233;
+  --accent-solid-hover: 56 189 248;
+  --on-accent: 12 14 20;
+}
+
+/* Follow the OS even before JavaScript runs. Explicit preferences take priority. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --text-emerald-100: #d1fae5;
+    --text-emerald-200: #a7f3d0;
+    --text-emerald-300: #6ee7b7;
+    --text-emerald-400: #34d399;
+    --text-amber-100: #fef3c7;
+    --text-amber-200: #fde68a;
+    --text-amber-300: #fcd34d;
+    --text-amber-400: #fbbf24;
+    --text-rose-100: #ffe4e6;
+    --text-rose-200: #fecdd3;
+    --text-rose-300: #fda4af;
+    --text-rose-400: #fb7185;
+    --text-lime-100: #ecfccb;
+    --text-lime-200: #d9f99d;
+    --text-lime-300: #bef264;
+    --text-lime-400: #a3e635;
+    --surface: 12 14 20;
+    --surface-raised: 22 25 34;
+    --border: 40 45 58;
+    --ink: 237 240 245;
+    --ink-muted: 155 163 180;
+    --ink-faint: 133 143 162;
+    --accent: 125 211 252;
+    --accent-hover: 186 230 253;
+    --accent-solid: 14 165 233;
+    --accent-solid-hover: 56 189 248;
+    --on-accent: 12 14 20;
+  }
 }
 
 @layer base {
@@ -33,7 +104,6 @@
   }
 
   html {
-    color-scheme: dark;
     /*
      * No rubber band at the page edges. Overscrolling the top dragged the whole document —
      * sticky header included — down with the finger, which read as the header "not sticking";
@@ -64,11 +134,18 @@
      */
     overscroll-behavior-y: none;
     font-family:
-      ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      Roboto,
+      Helvetica,
+      Arial,
+      sans-serif;
   }
 
   ::selection {
-    @apply bg-sky-500/30;
+    @apply bg-accent/25;
   }
 }
 
@@ -88,7 +165,11 @@
   }
 
   .btn-primary {
-    @apply btn bg-sky-500 text-white hover:bg-sky-400;
+    @apply btn bg-accent-solid text-on-accent hover:bg-accent-solid-hover;
+  }
+
+  :focus-visible {
+    @apply outline outline-2 outline-offset-2 outline-accent;
   }
 
   .btn-ghost {
@@ -101,7 +182,7 @@
 
   .field {
     @apply w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink
-      placeholder:text-ink-faint focus:border-sky-500 focus:outline-none;
+      placeholder:text-ink-faint focus:border-accent focus:outline-none;
   }
 
   /*
@@ -240,5 +321,45 @@
 
   .portal-sweep {
     stroke-dasharray: 707 942.5;
+  }
+}
+
+/* Home's focus strip stays in the document flow, independently of the header. */
+.widget-carousel-viewport {
+  touch-action: pan-y;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  border-radius: 1rem;
+}
+.widget-carousel-viewport::-webkit-scrollbar {
+  display: none;
+}
+.nutrition-ring {
+  position: relative;
+  width: clamp(44px, 100%, 88px);
+  aspect-ratio: 1;
+  margin-inline: auto;
+}
+.nutrition-ring svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.home-widget {
+  container-type: inline-size;
+}
+.nutrition-ring-value {
+  font-size: clamp(10px, 4cqw, 18px);
+  font-weight: 650;
+}
+.nutrition-ring-compact {
+  width: 38px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .widget-carousel-viewport .widget-slot {
+    transition: none !important;
+  }
+  .portal-header {
+    transition: none !important;
   }
 }

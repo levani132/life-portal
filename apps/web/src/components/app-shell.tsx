@@ -3,7 +3,7 @@
 import clsx from 'clsx';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Home, Menu, Search, Users, Newspaper } from 'lucide-react';
 import type { PortalState } from '@life-portal/shared-types';
 import { moduleForPath } from '@life-portal/shared-domain';
@@ -65,18 +65,23 @@ export function AppShell({ children }: { children: ReactNode }) {
     pathname === '/profile';
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-40 border-b border-border bg-surface/95 pt-[env(safe-area-inset-top)] backdrop-blur">
+      <ScrollHeader hideOnScroll={pathname === '/'}>
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
           <Link href="/" className="font-semibold tracking-tight">
-            Life<span className="text-sky-400">Portal</span>
+            Life<span className="text-accent">Portal</span>
           </Link>
           <Link href="/menu" className="text-sm text-ink-muted">
             {user.name}
           </Link>
         </div>
-      </header>
+      </ScrollHeader>
       <PullToRefresh>
-        <main className="mx-auto max-w-7xl px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))]">
+        <main
+          className={clsx(
+            'mx-auto max-w-7xl px-4 pb-[calc(6rem+env(safe-area-inset-bottom))]',
+            pathname === '/' ? 'pt-2' : 'pt-6',
+          )}
+        >
           {allowed ? (
             children
           ) : (
@@ -150,7 +155,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               aria-current={active ? 'page' : undefined}
               className={clsx(
                 'flex min-h-16 flex-1 flex-col items-center justify-center gap-1 text-xs',
-                active ? 'text-sky-300' : 'text-ink-muted',
+                active ? 'text-accent' : 'text-ink-muted',
               )}
             >
               <Icon size={21} aria-hidden />
@@ -171,6 +176,57 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </nav>
     </div>
+  );
+}
+
+/** Only the header follows scroll direction; widgets stay in the page flow. */
+function ScrollHeader({
+  children,
+  hideOnScroll,
+}: {
+  children: ReactNode;
+  hideOnScroll: boolean;
+}) {
+  const [hidden, setHidden] = useState(false);
+  const header = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!hideOnScroll) {
+      setHidden(false);
+      return;
+    }
+    let anchor = Math.max(0, window.scrollY);
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const y = Math.max(0, window.scrollY);
+      if (y < (header.current?.offsetHeight ?? 60)) {
+        setHidden(false);
+        anchor = y;
+      } else if (Math.abs(y - anchor) > 8) {
+        setHidden(y > anchor);
+        anchor = y;
+      }
+    };
+    const scroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    window.addEventListener('scroll', scroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', scroll);
+      cancelAnimationFrame(frame);
+    };
+  }, [hideOnScroll]);
+  return (
+    <header
+      ref={header}
+      onFocusCapture={() => setHidden(false)}
+      className={clsx(
+        'portal-header sticky top-0 z-40 bg-surface/95 pt-[env(safe-area-inset-top)] backdrop-blur transition-transform duration-200',
+        hidden && '-translate-y-full',
+      )}
+    >
+      {children}
+    </header>
   );
 }
 

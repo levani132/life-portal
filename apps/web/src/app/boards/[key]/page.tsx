@@ -432,7 +432,7 @@ function PersonRow({ person }: { person: Person & { oneOnOneOverdue: boolean } }
           </Select>
           <button
             type="button"
-            className="text-[11px] text-sky-400 hover:underline"
+            className="text-[11px] text-accent hover:underline"
             disabled={pending}
             onClick={() => void run(() => api.post(`/boards/people/${person.id}/one-on-one`, {}))}
           >

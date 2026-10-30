@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { ThemePreferenceControl } from '../../components/theme-preference';
 import type {
   Currency,
   FxRatePoint,
@@ -66,6 +67,7 @@ function Settings() {
           title="Settings"
           subtitle="Make Life Portal work for you."
         />
+        <div className="mb-4"><ThemePreferenceControl /></div>
         <div className="card divide-y divide-border">
           {[
             { href: '/settings/modules', label: 'Manage modules' },
@@ -112,6 +114,7 @@ function Settings() {
       {error && <ErrorNote message={error} />}
 
       <div className="grid gap-4 lg:grid-cols-2">
+        <ThemePreferenceControl />
         <Panel
           title="Display currency"
           description="Everything is converted into this on the way out. Amounts keep the currency they were entered in."

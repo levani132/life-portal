@@ -1,6 +1,5 @@
 'use client';
 
-import clsx from 'clsx';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
@@ -13,53 +12,23 @@ import type {
 import {
   arrangeWidgets,
   formatCents,
-  formatDay,
+  moduleForPath,
 } from '@life-portal/shared-domain';
 import { AppShell } from '../components/app-shell';
+import { HomeWidget } from '../components/home-widget';
+import { WidgetCarousel } from '../components/widget-carousel';
 import { LogFoodModal } from '../components/log-food-modal';
-import { SortableGrid, type SortableState } from '../components/sortable-grid';
+import { PostsList } from '../components/posts';
 import {
-  Chip,
   EmptyState,
   ErrorNote,
   EstimateMark,
-  ProgressBar,
+  Modal,
   Spinner,
-  TONE_TEXT,
 } from '../components/ui';
 import { api } from '../lib/api';
 import { revalidate, useApi } from '../lib/hooks';
 import { mealContextNow } from '../lib/local-day';
-
-/**
- * Accent → classes. Written out rather than interpolated, because Tailwind's scanner reads
- * source text and would strip a class built as `border-${accent}-500`.
- */
-const ACCENT_RING: Record<string, string> = {
-  rose: 'hover:border-rose-500/50',
-  emerald: 'hover:border-emerald-500/50',
-  amber: 'hover:border-amber-500/50',
-  sky: 'hover:border-sky-500/50',
-  violet: 'hover:border-violet-500/50',
-  indigo: 'hover:border-indigo-500/50',
-  teal: 'hover:border-teal-500/50',
-  cyan: 'hover:border-cyan-500/50',
-  fuchsia: 'hover:border-fuchsia-500/50',
-  lime: 'hover:border-lime-500/50',
-};
-
-const ACCENT_DOT: Record<string, string> = {
-  rose: 'bg-rose-500',
-  emerald: 'bg-emerald-500',
-  amber: 'bg-amber-500',
-  sky: 'bg-sky-500',
-  violet: 'bg-violet-500',
-  indigo: 'bg-indigo-500',
-  teal: 'bg-teal-500',
-  cyan: 'bg-cyan-500',
-  fuchsia: 'bg-fuchsia-500',
-  lime: 'bg-lime-500',
-};
 
 export default function DashboardPage() {
   return (
@@ -72,23 +41,15 @@ export default function DashboardPage() {
 function Dashboard() {
   const { data, error, isLoading } = useApi<DashboardResponse>('/dashboard');
   const portal = useApi<PortalState>('/portal');
-  // The one quick action a card may carry (constitution principle I, amended 1.1.0). The foods
-  // and the profile's day-start hour come from the food widget's own endpoint, so the dashboard
-  // payload stays a summary.
   const [logging, setLogging] = useState<MealSlot | null>(null);
   const { data: food } = useApi<{ foods: FoodWithUsage[] }>(
     logging ? '/nutrition' : null,
   );
-
   const [editing, setEditing] = useState(false);
-  /**
-   * The arrangement while it is being dragged, before the server has it. `null` means "whatever
-   * the payload says", which is the normal state — the API already returns the cards in the
-   * user's order, so this only exists to keep a drag responsive.
-   */
+  const [menuCard, setMenuCard] = useState<WidgetCard | null>(null);
+  const [removing, setRemoving] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<string[] | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-
   const cards = useMemo(
     () =>
       pendingOrder
@@ -101,9 +62,8 @@ function Dashboard() {
     setSaveError(null);
     try {
       await api.put('/dashboard/order', { order });
-      // Only the dashboard changed, so only the dashboard is refetched. Clearing the local
-      // arrangement afterwards hands ownership back to the payload.
       await revalidate('/dashboard');
+      await revalidate('/portal');
       setPendingOrder(null);
     } catch {
       setSaveError(
@@ -112,18 +72,31 @@ function Dashboard() {
     }
   }, []);
 
-  const reset = useCallback(async () => {
+  const reset = async () => {
     setPendingOrder(null);
+    await save([]);
+  };
+
+  async function removeWidget(card: WidgetCard) {
+    const module = moduleForPath(card.href);
+    if (!portal.data || !module) return;
+    setRemoving(true);
     setSaveError(null);
     try {
-      await api.put('/dashboard/order', { order: [] });
-      await revalidate('/dashboard');
+      await api.put('/portal', {
+        selectedModules: portal.data.selectedModules.filter(
+          (id) => id !== module,
+        ),
+      });
+      await Promise.all([revalidate('/portal'), revalidate('/dashboard')]);
+      setMenuCard(null);
     } catch {
-      setSaveError('Could not reset the arrangement.');
+      setSaveError('Could not remove this widget. Please try again.');
+    } finally {
+      setRemoving(false);
     }
-  }, []);
+  }
 
-  // Escape is the way out of every other overlay in this app; edit mode is no different.
   useEffect(() => {
     if (!editing) return;
     const onKey = (event: KeyboardEvent) => {
@@ -133,310 +106,173 @@ function Dashboard() {
     return () => window.removeEventListener('keydown', onKey);
   }, [editing]);
 
-  if (isLoading) return <Spinner label="Working out where you stand…" />;
+  if (isLoading) return <Spinner label="Opening Home…" />;
   if (error) return <ErrorNote message={(error as Error).message} />;
   if (!data) return null;
+  const canReadPosts =
+    portal.data?.access.social &&
+    portal.data.access.nutrition &&
+    portal.data.access.foodPosts;
 
   return (
-    <>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Your Home</h1>
-          <p className="mt-1 text-sm text-ink-muted">{formatDay(data.today)}</p>
-        </div>
-        {data.netPositionCents != null && (
-          <div className="text-right">
-            <p className="text-xs uppercase tracking-wide text-ink-faint">
-              Net position
-            </p>
-            <p
-              className={clsx(
-                'tabular text-2xl font-semibold',
-                data.netPositionCents >= 0
-                  ? 'text-emerald-400'
-                  : 'text-rose-400',
-              )}
-            >
-              {formatCents(data.netPositionCents, data.displayCurrency)}
-            </p>
-            <p className="text-xs text-ink-faint">
-              cash + items + shares − debts
-              <EstimateMark basis="Items at their realistic price; shares at market value where a quote exists, at cost otherwise." />
-            </p>
-          </div>
-        )}
-      </div>
-
-      {portal.data && !portal.data.setupCompleted && (
-        <div className="card mb-6 flex flex-wrap items-center justify-between gap-4 border-sky-500/30 p-5">
-          <div>
-            <h2 className="font-medium">Make this portal yours</h2>
-            <p className="mt-1 text-sm text-ink-muted">
-              Choose your modules, arrange Home and review your privacy.
-            </p>
-          </div>
-          <Link href="/setup" className="btn btn-primary">
-            {portal.data.setupStep > 0 ? 'Continue setup' : 'Set up my portal'}
-          </Link>
-        </div>
-      )}
-
-      {data.attention.length > 0 && (
-        <ul className="mb-6 space-y-2">
-          {data.attention.map((item, index) => (
-            <li key={`${item.tone}-${index}`}>
-              <Link
-                href={item.href ?? '/'}
-                className={clsx(
-                  'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:brightness-125',
-                  item.tone === 'bad'
-                    ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
-                    : item.tone === 'warn'
-                      ? 'border-amber-500/40 bg-amber-500/10 text-amber-200'
-                      : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200',
-                )}
-              >
-                {item.message}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-
+    <div className="mx-auto max-w-3xl">
+      <h1 className="sr-only">Home</h1>
       {saveError && (
-        <div className="mb-3">
+        <div className="mb-3" role="alert">
           <ErrorNote message={saveError} />
         </div>
       )}
-
       {cards.length === 0 ? (
         <div className="card p-6">
           <EmptyState message="A little space for what matters to you. Choose a module to get started." />
-          <Link href="/settings/modules" className="btn btn-primary mt-4">
-            Add a module
+          <Link href="/settings/modules" className="btn-primary mt-4">
+            Add widgets
           </Link>
         </div>
       ) : (
-        <>
-          {/*
-            One row, one button, the same height either way — a long press enters edit mode with a
-            finger already holding a card, and anything that changed the page's height at that
-            moment would pull the grid out from under it. The instructions live in a fixed bar
-            instead, for the same reason.
-          */}
-          <div className="mb-3 flex justify-end">
-            <button
-              type="button"
-              className={clsx(
-                'text-xs transition',
-                editing
-                  ? 'font-medium text-sky-300 hover:text-sky-200'
-                  : 'text-ink-faint hover:text-ink',
-              )}
-              onClick={() => setEditing(!editing)}
-            >
-              {editing ? 'Done' : 'Arrange Home'}
-            </button>
-          </div>
-
-          <SortableGrid
-            items={cards}
-            getId={(card) => card.id}
-            getLabel={(card) => card.title}
-            editing={editing}
-            onEditingChange={setEditing}
-            onOrderChange={setPendingOrder}
-            onCommit={(order) => void save(order)}
-            className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-          >
-            {(card, state) => (
-              <SummaryCard
-                card={card}
-                state={state}
-                onQuickAction={
-                  card.quickAction?.kind === 'log-food'
-                    ? () => setLogging(mealContextNow().slot)
-                    : undefined
-                }
-              />
-            )}
-          </SortableGrid>
-
-          {/* Room for the floating bar, so it cannot sit permanently over the last card. */}
-          {editing && <div className="h-16" aria-hidden />}
-
-          {editing && (
-            <div className="pointer-events-none fixed inset-x-0 bottom-16 z-40 flex justify-center p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-              <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-sky-500/40 bg-surface-raised/95 px-4 py-2 text-xs shadow-2xl shadow-black/50 backdrop-blur">
-                <span className="text-sky-200">Hold a card and drag it</span>
-                <span className="text-ink-faint" aria-hidden>
-                  ·
-                </span>
-                <button
-                  type="button"
-                  className="text-ink-muted transition hover:text-ink"
-                  onClick={() => void reset()}
-                >
-                  Reset order
-                </button>
-              </div>
-            </div>
+        <WidgetCarousel
+          cards={cards}
+          editing={editing}
+          onEditingChange={setEditing}
+          onOrderChange={setPendingOrder}
+          onCommit={(order) => void save(order)}
+        >
+          {(card, state, expanded, select) => (
+            <HomeWidget
+              card={card}
+              nutrition={
+                card.key === 'nutrition' ? data.summaries.nutrition : undefined
+              }
+              state={state}
+              expanded={expanded}
+              onSelect={select}
+              onMenu={() => {
+                setSaveError(null);
+                setMenuCard(card);
+              }}
+              onQuickAction={
+                card.quickAction?.kind === 'log-food'
+                  ? () => setLogging(mealContextNow().slot)
+                  : undefined
+              }
+            />
           )}
-        </>
+        </WidgetCarousel>
       )}
 
+      {canReadPosts && (
+        <section className="mt-5" aria-label="Friends feed">
+          <div className="mb-3 flex items-center justify-between text-xs text-ink-muted">
+            <h2 className="font-medium">From your friends</h2>
+            <Link href="/wall" className="hover:text-accent">
+              Open Wall →
+            </Link>
+          </div>
+          <PostsList />
+        </section>
+      )}
+
+      {portal.data && !portal.data.setupCompleted && (
+        <Link
+          href="/setup"
+          className="mt-5 block rounded-xl border border-border p-4 text-sm text-ink-muted hover:text-ink"
+        >
+          Make this portal yours ·{' '}
+          {portal.data.setupStep > 0
+            ? 'Continue setup'
+            : 'Review your modules and privacy'}{' '}
+          →
+        </Link>
+      )}
+      {(data.attention.length > 0 || data.netPositionCents !== undefined) && (
+        <details className="mt-5 rounded-xl border border-border p-4 text-sm text-ink-muted">
+          <summary className="cursor-pointer">Around your portal</summary>
+          {data.netPositionCents !== undefined && (
+            <p className="mt-3">
+              Net position:{' '}
+              <strong className="text-ink">
+                {formatCents(data.netPositionCents, data.displayCurrency)}
+              </strong>
+              <EstimateMark basis="Cash + realistic item values + shares − debts." />
+            </p>
+          )}
+          {data.attention.map((item, index) => (
+            <Link
+              key={index}
+              href={item.href ?? '/'}
+              className="mt-3 block hover:text-accent"
+            >
+              {item.message} →
+            </Link>
+          ))}
+        </details>
+      )}
+
+      {editing && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-16 z-40 flex justify-center p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-border bg-surface-raised/95 px-4 py-2 text-xs shadow-xl backdrop-blur">
+            <span className="text-ink-muted">
+              Drag widgets or use arrow keys
+            </span>
+            <button
+              type="button"
+              className="text-ink-muted hover:text-ink"
+              onClick={() => void reset()}
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              className="btn-primary rounded-full"
+              onClick={() => setEditing(false)}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+      {menuCard && (
+        <Modal
+          open
+          onClose={() => setMenuCard(null)}
+          title={`${menuCard.title} widget`}
+        >
+          <div className="grid gap-2">
+            <button
+              className="btn-ghost justify-start"
+              onClick={() => {
+                setMenuCard(null);
+                setEditing(true);
+              }}
+            >
+              Arrange widgets
+            </button>
+            <Link className="btn-ghost justify-start" href="/settings/modules">
+              Add widgets
+            </Link>
+            <button
+              className="btn-ghost justify-start text-rose-400"
+              disabled={removing}
+              onClick={() => void removeWidget(menuCard)}
+            >
+              {removing ? 'Removing…' : 'Remove widget'}
+            </button>
+          </div>
+          <p className="mt-3 text-xs text-ink-faint">
+            Removing a widget keeps its data. You can add it again anytime.
+          </p>
+          {saveError && <ErrorNote message={saveError} />}
+        </Modal>
+      )}
       {logging && (
         <LogFoodModal
           open
           onClose={() => setLogging(null)}
           foods={food?.foods ?? []}
-          day={mealContextNow().day}
+          day={data.today}
           slot={logging}
         />
       )}
-    </>
-  );
-}
-
-/**
- * The dashboard card: at most three numbers and a link, nothing interactive
- * (constitution principle I). Everything else lives on the detail page.
- *
- * It stays an `<a>` even while the dashboard is being rearranged, with its navigation cancelled
- * rather than its element replaced. Swapping it for a `div` on entering edit mode looked tidier
- * and broke the gesture outright: the long press that turns edit mode on removes the very node
- * the finger is touching, and a browser answers that by cancelling the touch — the card lifted
- * and then died on the first millimetre of movement. See docs/DECISIONS.md.
- */
-function SummaryCard({
-  card,
-  state,
-  onQuickAction,
-}: {
-  card: WidgetCard;
-  state: SortableState;
-  onQuickAction?: () => void;
-}) {
-  const { editing, dragging, index } = state;
-
-  const body = (
-    <>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span
-            className={clsx(
-              'h-2 w-2 rounded-full',
-              ACCENT_DOT[card.accent] ?? 'bg-ink-faint',
-            )}
-          />
-          <div>
-            <h2 className="text-sm font-semibold">{card.title}</h2>
-            {card.subtitle && (
-              <p className="text-xs text-ink-faint">{card.subtitle}</p>
-            )}
-          </div>
-        </div>
-        {editing ? (
-          <GripIcon />
-        ) : card.quickAction && onQuickAction ? (
-          <button
-            type="button"
-            aria-label={card.quickAction.label}
-            title={card.quickAction.label}
-            onClick={(event) => {
-              // The card is a link; this one control is not, so navigation has to be stopped.
-              event.preventDefault();
-              event.stopPropagation();
-              onQuickAction();
-            }}
-            className="-m-1 flex h-9 w-9 items-center justify-center rounded-lg border border-border text-xl leading-none text-ink-muted transition hover:border-lime-500/50 hover:text-ink active:scale-95"
-          >
-            +
-          </button>
-        ) : (
-          <span className="text-ink-faint opacity-0 transition group-hover:opacity-100">
-            →
-          </span>
-        )}
-      </div>
-
-      <dl className="grid grid-cols-3 gap-2">
-        {card.stats.map((stat) => (
-          <div key={stat.label}>
-            <dd
-              className={clsx(
-                'tabular text-base font-semibold',
-                TONE_TEXT[stat.tone ?? 'neutral'],
-              )}
-            >
-              {stat.value}
-              {stat.estimated && <EstimateMark />}
-            </dd>
-            <dt className="mt-0.5 text-[11px] leading-tight text-ink-faint">
-              {stat.label}
-            </dt>
-          </div>
-        ))}
-      </dl>
-
-      {card.progress != null && <ProgressBar ratio={card.progress} />}
-
-      {card.alert && (
-        <div className="mt-auto">
-          <Chip tone={card.tone}>{card.alert}</Chip>
-        </div>
-      )}
-    </>
-  );
-
-  return (
-    <Link
-      href={card.href}
-      draggable={false}
-      // Tab reaches the card through its slot while rearranging, so the link steps out of the
-      // order rather than offering a second stop that does nothing.
-      tabIndex={editing ? -1 : undefined}
-      onClick={(event) => {
-        if (editing) event.preventDefault();
-      }}
-      className={clsx(
-        'card group flex h-full flex-col gap-4 p-5',
-        !editing &&
-          `transition ${ACCENT_RING[card.accent] ?? 'hover:border-ink-faint'}`,
-        editing && !dragging && 'widget-jiggle cursor-grab',
-        dragging &&
-          'scale-[1.02] cursor-grabbing border-sky-500/60 shadow-2xl shadow-black/50',
-      )}
-      // Staggered so the cards wobble independently rather than as one block.
-      style={
-        editing && !dragging
-          ? { animationDelay: `${(index % 4) * 90}ms` }
-          : undefined
-      }
-    >
-      {body}
-    </Link>
-  );
-}
-
-/** The handle marks a card as draggable while the dashboard is being rearranged. */
-function GripIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="currentColor"
-      className="mt-0.5 shrink-0 text-ink-faint"
-      aria-hidden
-      focusable="false"
-    >
-      <circle cx="5" cy="3" r="1.4" />
-      <circle cx="11" cy="3" r="1.4" />
-      <circle cx="5" cy="8" r="1.4" />
-      <circle cx="11" cy="8" r="1.4" />
-      <circle cx="5" cy="13" r="1.4" />
-      <circle cx="11" cy="13" r="1.4" />
-    </svg>
+    </div>
   );
 }
