@@ -141,12 +141,11 @@ it('accepts a Shortcut JSON-text array with the same nested validation as native
     errors[0].children?.[0].children?.map((error) => error.property),
   ).toEqual(expect.arrayContaining(['start', 'value', 'userId']));
 });
-it('rejects malformed text, non-arrays, double encoding and oversized Shortcut arrays', async () => {
+it('rejects malformed text, invalid objects and oversized Shortcut arrays', async () => {
   for (const samples of [
     'not JSON',
     '{}',
     'null',
-    JSON.stringify(JSON.stringify([])),
     JSON.stringify(Array(3001).fill({})),
   ]) {
     const dto = plainToInstance(HealthUploadDto, { samples });

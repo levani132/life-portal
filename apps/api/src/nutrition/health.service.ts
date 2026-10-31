@@ -40,6 +40,7 @@ import { Type, Transform, plainToInstance } from 'class-transformer';
 import { createHash, randomBytes } from 'crypto';
 import { addDays } from '@life-portal/shared-domain';
 import type { HealthSample } from '@life-portal/shared-types';
+import { normalizeHealthSamples } from './health-samples-input';
 import { CurrentUser, TokenAuth } from '../auth/current-user.decorator';
 import { AccessService, RequireModule } from '../access/access.module';
 
@@ -85,18 +86,15 @@ class SampleDto implements HealthSample {
   @Type(() => Number) @IsNumber() @Min(0) @Max(1000000) value!: number;
 }
 export class HealthUploadDto {
-  // Some Shortcuts JSON body fields serialize an array as JSON text.
-  // Decode exactly once, then validate real SampleDto instances as for native arrays.
+  // Normalize transport formats before applying the same nested sample validation.
   @Transform(
-    ({ value }: { value: unknown }) => {
-      if (typeof value !== 'string') return value;
-      try {
-        const rows: unknown = JSON.parse(value);
-        if (!Array.isArray(rows) || rows.length > 3000) return value;
-        return plainToInstance(SampleDto, rows);
-      } catch {
-        return value;
-      }
+    ({ value, obj }: { value: unknown; obj: Record<string, unknown> }) => {
+      const rows = normalizeHealthSamples(
+        value,
+        (obj.activeCount === 0 || obj.activeCount === '0') &&
+          (obj.stepCount === 0 || obj.stepCount === '0'),
+      );
+      return Array.isArray(rows) ? plainToInstance(SampleDto, rows) : rows;
     },
     { toClassOnly: true },
   )
@@ -446,6 +444,10 @@ export class HealthService {
       throw new BadRequestException(
         'Request the pending Health window before uploading.',
       );
+    Logger.log(
+      `batch samples received records=${dto.samples.length} activeCount=${dto.activeCount} stepCount=${dto.stepCount}`,
+      'HealthUpload',
+    );
     const truncated =
       dto.activeCount >= HEALTH_BATCH_LIMIT ||
       dto.stepCount >= HEALTH_BATCH_LIMIT;
