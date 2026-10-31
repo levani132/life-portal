@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { Logger, ValidationPipe } from '@nestjs/common';
+import { Request, Response, NextFunction } from 'express';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { McpOAuthService } from './mcp/oauth.service';
@@ -21,6 +22,19 @@ async function bootstrap() {
     app.getHttpAdapter().getInstance().set('trust proxy', 1);
     app.use(oauth.router());
   }
+
+  // TEMP DEBUG — before Nest routing/guards
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    Logger.log('[RAW HTTP]', {
+      method: req.method,
+      url: req.originalUrl,
+      contentType: req.headers['content-type'],
+      contentLength: req.headers['content-length'],
+      hasHealthTicket: !!req.headers['x-health-ticket'],
+    });
+
+    next();
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({

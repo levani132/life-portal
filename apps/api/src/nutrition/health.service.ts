@@ -7,6 +7,7 @@ import {
   ExecutionContext,
   Get,
   Injectable,
+  Logger,
   Post,
   Req,
   UnauthorizedException,
@@ -318,7 +319,7 @@ export class HealthUploadGuard implements CanActivate {
       headers: Record<string, string>;
       healthOwner: HealthOwner;
     }>();
-    console.log('headers', JSON.stringify(req.headers));
+    Logger.log('headers', JSON.stringify(req.headers));
     req.healthOwner = await this.health.verify(req.headers['x-health-ticket']);
     return true;
   }
