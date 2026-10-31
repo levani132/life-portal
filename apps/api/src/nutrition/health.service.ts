@@ -353,6 +353,11 @@ export class HealthController {
     @Req() req: { healthOwner: HealthOwner },
     @Body() dto: HealthUploadDto,
   ) {
+    Logger.log(
+      `[upload] controller entered: ${JSON.stringify({
+        sampleCount: dto?.samples?.length,
+      })}`,
+    );
     return this.health.upload(req.healthOwner, dto);
   }
 }
