@@ -319,8 +319,15 @@ export class HealthUploadGuard implements CanActivate {
       headers: Record<string, string>;
       healthOwner: HealthOwner;
     }>();
-    Logger.log('[upload] headers', JSON.stringify(req.headers));
+    Logger.log(
+      `[upload] guard entered: ${JSON.stringify({
+        hasTicket: !!req.headers['x-health-ticket'],
+        contentType: req.headers['content-type'],
+        contentLength: req.headers['content-length'],
+      })}`,
+    );
     req.healthOwner = await this.health.verify(req.headers['x-health-ticket']);
+    Logger.log('[upload] ticket verified');
     return true;
   }
 }
