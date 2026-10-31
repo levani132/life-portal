@@ -74,7 +74,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
         </div>
       </ScrollHeader>
-      <HealthSyncBridge key={user.id} enabled={portal.data.access.nutrition} />
+      <HealthSyncBridge
+        key={user.id}
+        enabled={portal.data.access.nutrition}
+        quiet={pathname === '/nutrition'}
+      />
       <PullToRefresh>
         <main
           className={clsx(

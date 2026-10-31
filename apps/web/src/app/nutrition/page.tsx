@@ -2,6 +2,7 @@
 
 import clsx from 'clsx';
 import Link from 'next/link';
+import { Bot, Info, Plus, Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type {
   PortalState,
@@ -18,7 +19,6 @@ import type {
   TargetFigure,
 } from '@life-portal/shared-types';
 import {
-  ACTIVITY_LABELS,
   addDays,
   figureValue,
   formatDay,
@@ -27,7 +27,7 @@ import {
   mgToG,
   relativeDays,
 } from '@life-portal/shared-domain';
-import { AppShell, PageHeader } from '../../components/app-shell';
+import { AppShell } from '../../components/app-shell';
 import { CheatQueue } from '../../components/cheat-queue';
 import { FoodForm } from '../../components/food-form';
 import { FoodPicker } from '../../components/food-picker';
@@ -133,76 +133,76 @@ function Nutrition() {
 
   return (
     <>
-      <PageHeader
-        title="Food"
-        subtitle={
-          targets.available
-            ? `${GOAL_PLAN[profile.goal].label} · ${ACTIVITY_LABELS[profile.activityLevel]}`
-            : 'Targets need a few numbers about you'
-        }
-        actions={
-          <>
-            {canPost && (
+      <header className="mb-3 space-y-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Food</h1>
+          <p className="mt-0.5 text-xs text-ink-muted">
+            {targets.available
+              ? GOAL_PLAN[profile.goal].label
+              : 'Targets need a few numbers about you'}
+          </p>
+        </div>
+        <div
+          className="flex items-center gap-1.5 overflow-x-auto pb-1"
+          aria-label="Food controls"
+        >
+          <div
+            className="flex h-10 shrink-0 items-center rounded-lg border border-border p-0.5 text-xs"
+            role="group"
+            aria-label="Food views"
+          >
+            {(['today', 'foods', 'you'] as Tab[]).map((option) => (
               <button
-                className="btn-ghost"
-                onClick={() => setSharing('choose')}
+                key={option}
+                type="button"
+                onClick={() => setTab(option)}
+                aria-pressed={tab === option}
+                className={clsx(
+                  'h-full rounded-md px-2',
+                  tab === option
+                    ? 'bg-surface-raised text-ink'
+                    : 'text-ink-muted hover:text-ink',
+                )}
               >
-                Share food
+                {option === 'today'
+                  ? 'Today'
+                  : option === 'foods'
+                    ? 'Foods'
+                    : 'You'}
               </button>
-            )}
-            <Link
-              href="/settings/mcp"
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-ink-muted transition hover:border-sky-500/40 hover:text-accent-hover"
-              title="Connect AI assistant"
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
-                <circle cx="7.5" cy="14.5" r="1.5" />
-                <circle cx="16.5" cy="14.5" r="1.5" />
-              </svg>
-            </Link>
-            <div className="flex items-center gap-1 rounded-lg border border-border p-1 text-sm">
-              {(['today', 'foods', 'you'] as Tab[]).map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => setTab(option)}
-                  className={clsx(
-                    'rounded-md px-2.5 py-1',
-                    tab === option
-                      ? 'bg-surface-raised text-ink'
-                      : 'text-ink-muted hover:text-ink',
-                  )}
-                >
-                  {option === 'today'
-                    ? 'Today'
-                    : option === 'foods'
-                      ? 'Foods'
-                      : 'You'}
-                </button>
-              ))}
-            </div>
+            ))}
+          </div>
+          <div className="flex-1" />
+          {canPost && (
             <button
               type="button"
-              className="btn-primary"
-              onClick={() =>
-                setLogging({ slot: mealContextNow(dayStartHour).slot })
-              }
+              className="flex h-10 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-ink-muted hover:text-ink"
+              aria-label="Share food"
+              title="Share food"
+              onClick={() => setSharing('choose')}
             >
-              + Log food
+              <Share2 size={17} />
             </button>
-          </>
-        }
-      />
+          )}
+          <Link
+            href="/settings/mcp"
+            className="flex h-10 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-ink-muted hover:text-ink"
+            aria-label="Connect AI assistant"
+            title="Connect AI assistant"
+          >
+            <Bot size={18} />
+          </Link>
+          <button
+            type="button"
+            className="flex h-10 shrink-0 items-center gap-1 rounded-lg bg-accent-solid px-2.5 text-xs font-medium text-on-accent hover:bg-accent-solid-hover"
+            onClick={() =>
+              setLogging({ slot: mealContextNow(dayStartHour).slot })
+            }
+          >
+            <Plus size={15} /> Log food
+          </button>
+        </div>
+      </header>
 
       {canPost && recentEntry && (
         <div className="card mb-5 flex flex-wrap items-center gap-3 p-4">
@@ -222,22 +222,18 @@ function Nutrition() {
         </div>
       )}
       {tab === 'today' && (
-        <div className="space-y-5">
+        <div className="space-y-3">
           <DayNavigator
             day={day}
             today={today}
             onChange={setDay}
             entryCount={dayTotals.entryCount}
+            onShare={
+              canPost && dayTotals.entryCount > 0
+                ? () => setSharing({ kind: 'day', day })
+                : undefined
+            }
           />
-
-          {canPost && dayTotals.entryCount > 0 && (
-            <button
-              className="btn-ghost"
-              onClick={() => setSharing({ kind: 'day', day })}
-            >
-              Share this day
-            </button>
-          )}
 
           <MacroTiles totals={dayTotals.totals} targets={targets} />
 
@@ -342,15 +338,17 @@ function DayNavigator({
   today,
   onChange,
   entryCount,
+  onShare,
 }: {
+  onShare?: () => void;
   day: string;
   today: string;
   onChange: (day: string) => void;
   entryCount: number;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex items-center gap-2">
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-1">
         <button
           type="button"
           className="btn-ghost"
@@ -376,15 +374,28 @@ function DayNavigator({
           →
         </button>
       </div>
-      {day !== today && (
-        <button
-          type="button"
-          className="btn-ghost"
-          onClick={() => onChange(today)}
-        >
-          Back to today
-        </button>
-      )}
+      <div className="flex shrink-0 items-center gap-1">
+        {onShare && (
+          <button
+            type="button"
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-ink-muted hover:bg-surface-raised"
+            aria-label="Share this day"
+            title="Share this day"
+            onClick={onShare}
+          >
+            <Share2 size={17} />
+          </button>
+        )}
+        {day !== today && (
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => onChange(today)}
+          >
+            Today
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -396,6 +407,7 @@ function MacroTiles({
   totals: SlotTotals['totals'];
   targets: NutritionTargets;
 }) {
+  const [healthOpen, setHealthOpen] = useState(false);
   const tiles = [
     {
       label: 'Calories',
@@ -452,21 +464,40 @@ function MacroTiles({
           </div>
         ))}
       </div>
-      <div className="card flex items-center justify-between border-violet-400/30 bg-violet-500/10 p-4">
-        <span>⚡ Activity adjustment</span>
-        <strong>
-          {(targets.activity?.adjustmentKcal ?? 0) >= 0 ? '+' : ''}
-          {targets.activity?.adjustmentKcal ?? 0} kcal
-        </strong>
+      <div className="card flex items-center justify-between gap-2 border-violet-400/30 bg-violet-500/10 px-3 py-2">
+        <span className="text-sm">⚡ Activity adjustment</span>
+        <div className="flex items-center gap-2">
+          <strong className="whitespace-nowrap text-sm">
+            {(targets.activity?.adjustmentKcal ?? 0) >= 0 ? '+' : ''}
+            {targets.activity?.adjustmentKcal ?? 0} kcal
+          </strong>
+          <button
+            type="button"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-violet-400 hover:bg-violet-500/10"
+            aria-label="Activity adjustment and Apple Health details"
+            title="Activity and Apple Health details"
+            onClick={() => setHealthOpen(true)}
+          >
+            <Info size={19} />
+          </button>
+        </div>
       </div>
-      <p className="text-xs text-ink-muted">
-        Starting target{' '}
-        {targets.activity?.startingTargetKcal ??
-          targets.energyKcal?.value ??
-          '—'}{' '}
-        kcal · activity is already included in the current calorie target.
-      </p>
-      <AppleHealthPanel activity={targets.activity} />
+      <Modal
+        open={healthOpen}
+        onClose={() => setHealthOpen(false)}
+        title="Activity & Apple Health"
+        wide
+      >
+        <p className="text-sm text-ink-muted">
+          Starting target{' '}
+          {targets.activity?.startingTargetKcal ??
+            targets.energyKcal?.value ??
+            '—'}{' '}
+          kcal. Activity adjustment is already included in your current calorie
+          target.
+        </p>
+        {healthOpen && <AppleHealthPanel activity={targets.activity} />}
+      </Modal>
     </div>
   );
 }

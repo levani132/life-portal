@@ -14,7 +14,13 @@ interface HealthStatus {
 const FRESH_MS = 300000;
 
 /** One bridge in AppShell owns launches; panels request a manual launch by event. */
-export function HealthSyncBridge({ enabled }: { enabled: boolean }) {
+export function HealthSyncBridge({
+  enabled,
+  quiet = false,
+}: {
+  enabled: boolean;
+  quiet?: boolean;
+}) {
   const { user } = useAuth();
   const [fallback, setFallback] = useState(false);
   const [message, setMessage] = useState('');
@@ -162,7 +168,12 @@ export function HealthSyncBridge({ enabled }: { enabled: boolean }) {
       window.removeEventListener('focus', resume);
     };
   }, [check]);
-  if (!fallback) return null;
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent('lp-health-status', { detail: message }),
+    );
+  }, [message]);
+  if (!fallback || quiet) return null;
   return (
     <div
       className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-2 text-xs text-ink-muted"
@@ -189,6 +200,13 @@ export function AppleHealthPanel({
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [syncMessage, setSyncMessage] = useState('');
+  useEffect(() => {
+    const receive = (event: Event) =>
+      setSyncMessage((event as CustomEvent<string>).detail);
+    window.addEventListener('lp-health-status', receive);
+    return () => window.removeEventListener('lp-health-status', receive);
+  }, []);
   async function pair() {
     setBusy(true);
     setError('');
@@ -247,6 +265,11 @@ export function AppleHealthPanel({
           <ErrorNote message={(status.error as Error).message} />
         )}
         {error && <ErrorNote message={error} />}
+        {syncMessage && (
+          <p role="status" className="text-xs text-ink-muted">
+            {syncMessage}
+          </p>
+        )}
         <p role="status" className="font-medium">
           {status.data?.lastSync
             ? `First sync received · ${new Date(status.data.lastSync).toLocaleString()}`
@@ -256,6 +279,7 @@ export function AppleHealthPanel({
         </p>
         <div className="flex flex-wrap gap-2">
           <button
+            type="button"
             disabled={busy || !status.data?.installationUrl}
             className="btn-primary"
             onClick={() =>
@@ -268,6 +292,7 @@ export function AppleHealthPanel({
           </button>
           {status.data?.paired && (
             <button
+              type="button"
               className="btn"
               disabled={busy}
               onClick={async () => {
