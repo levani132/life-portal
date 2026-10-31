@@ -31,6 +31,9 @@ async function bootstrap() {
       contentType: req.headers['content-type'],
       contentLength: req.headers['content-length'],
       hasHealthTicket: !!req.headers['x-health-ticket'],
+      body: req.body
+        ? `${JSON.stringify(req.body).substring(0, 200)}...`
+        : '(none)',
     });
 
     next();
