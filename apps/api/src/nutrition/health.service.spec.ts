@@ -117,3 +117,39 @@ it('lets Shortcut uploads reach the scoped Health guard without an account JWT',
     Reflect.getMetadata(GUARDS_METADATA, HealthController.prototype.upload),
   ).toContain(HealthUploadGuard);
 });
+
+it('accepts a Shortcut JSON-text array with the same nested validation as native arrays', async () => {
+  const input = { ...samples[0], value: '836.8' };
+  const options = { whitelist: true, forbidNonWhitelisted: true };
+  for (const payload of [[input], JSON.stringify([input])]) {
+    const dto = plainToInstance(HealthUploadDto, { samples: payload });
+    expect(await validate(dto, options)).toEqual([]);
+    expect(dto.samples[0].value).toBe(836.8);
+  }
+  const bad = plainToInstance(HealthUploadDto, {
+    samples: JSON.stringify([
+      {
+        ...input,
+        start: 'invalid',
+        value: 'not-a-number',
+        userId: 'another-account',
+      },
+    ]),
+  });
+  const errors = await validate(bad, options);
+  expect(
+    errors[0].children?.[0].children?.map((error) => error.property),
+  ).toEqual(expect.arrayContaining(['start', 'value', 'userId']));
+});
+it('rejects malformed text, non-arrays, double encoding and oversized Shortcut arrays', async () => {
+  for (const samples of [
+    'not JSON',
+    '{}',
+    'null',
+    JSON.stringify(JSON.stringify([])),
+    JSON.stringify(Array(3001).fill({})),
+  ]) {
+    const dto = plainToInstance(HealthUploadDto, { samples });
+    expect((await validate(dto)).length).toBeGreaterThan(0);
+  }
+});

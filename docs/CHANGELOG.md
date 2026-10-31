@@ -445,3 +445,7 @@ Added an Appearance panel in Settings with Light, System default and Dark choice
 ### Health payload validation diagnostics
 
 Uploads rejected before the controller now log bounded schema field paths and failed validation rules. Health values, tickets and arbitrary payload keys stay out of logs; existing 400 responses and validation requirements are unchanged.
+
+### Shortcut sample-array compatibility
+
+Health uploads now accept a sample array encoded as JSON text by Shortcuts, while preserving nested field validation and size limits. This fixes the observed `samplesShape=string` rejection without requiring an installed Shortcut edit.

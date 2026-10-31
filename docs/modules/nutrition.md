@@ -286,3 +286,8 @@ Main calorie denominator is already adjusted. Macro targets remain the starting 
 
 Weekly/cheat banking uses the starting target; today's Health adjustment is never copied to
 all historic days in the week. The Food day view and Home calorie ring use the adjusted target.
+
+Shortcut compatibility: `HealthUploadDto.samples` also accepts a JSON-encoded array string,
+decoded once before nested validation. All row validators, unknown-field rejection and the
+3,000-sample limit still apply. Invalid text, non-arrays and double encoding remain rejected.
+Stored samples and internal contracts remain native arrays.
