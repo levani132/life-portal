@@ -249,7 +249,9 @@ export function HomeWidget({
         href={card.href}
         draggable={false}
         tabIndex={state.editing ? -1 : undefined}
-        aria-label={expanded ? undefined : `Select ${card.title} widget summary`}
+        aria-label={
+          expanded ? undefined : `Select ${card.title} widget summary`
+        }
         title={expanded ? `View ${card.title} details` : undefined}
         onClick={(event) => {
           if (state.editing || !expanded) event.preventDefault();
@@ -264,10 +266,16 @@ export function HomeWidget({
       >
         {metrics ? (
           expanded ? (
-            <div className="grid grid-cols-4 items-start gap-1 sm:gap-4">
-              {metrics.map((metric) => (
-                <NutritionRing key={metric.label} metric={metric} />
-              ))}
+            <div>
+              <div className="grid grid-cols-4 items-start gap-1 sm:gap-4">
+                {metrics.map((metric) => (
+                  <NutritionRing key={metric.label} metric={metric} />
+                ))}
+              </div>
+              <p className="mt-3 text-center text-xs text-violet-400">
+                ⚡ Activity adjustment +
+                {nutrition?.activity?.adjustmentKcal ?? 0} kcal
+              </p>
             </div>
           ) : (
             <>

@@ -161,12 +161,13 @@ function Dashboard() {
       )}
 
       {canReadPosts && (
-        <section className="mt-5" aria-label="Friends feed">
+        <section
+          id="wall"
+          className="mt-5 scroll-mt-20"
+          aria-label="Friends feed"
+        >
           <div className="mb-3 flex items-center justify-between text-xs text-ink-muted">
             <h2 className="font-medium">From your friends</h2>
-            <Link href="/wall" className="hover:text-accent">
-              Open Wall →
-            </Link>
           </div>
           <PostsList />
         </section>

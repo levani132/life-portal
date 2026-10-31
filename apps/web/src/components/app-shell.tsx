@@ -1,10 +1,11 @@
 'use client';
+import { HealthSyncBridge } from './apple-health';
 
 import clsx from 'clsx';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Home, Menu, Search, Users, Newspaper } from 'lucide-react';
+import { Home, Menu, Search, Users } from 'lucide-react';
 import type { PortalState } from '@life-portal/shared-types';
 import { moduleForPath } from '@life-portal/shared-domain';
 import { useAuth } from '../lib/auth-context';
@@ -26,9 +27,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     { revalidateOnFocus: true, refreshInterval: 30000 },
   );
   const needsSetup =
-    portal.data?.cohort === 'production' &&
-    !portal.data.setupCompleted &&
-    !portal.data.setupDismissed;
+    !!portal.data && !portal.data.setupCompleted && !portal.data.setupDismissed;
   useEffect(() => {
     if (!loading && !user) router.replace('/login');
     else if (needsSetup && pathname !== '/setup') router.replace('/setup');
@@ -75,6 +74,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
         </div>
       </ScrollHeader>
+      <HealthSyncBridge key={user.id} enabled={portal.data.access.nutrition} />
       <PullToRefresh>
         <main
           className={clsx(
@@ -132,18 +132,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                     active:
                       pathname === '/friends' ||
                       pathname.startsWith('/people/'),
-                  },
-                ]
-              : []),
-            ...(canPost
-              ? [
-                  {
-                    href: '/wall',
-                    label: 'Wall',
-                    icon: Newspaper,
-                    active:
-                      pathname.startsWith('/wall') ||
-                      pathname.startsWith('/posts'),
                   },
                 ]
               : []),

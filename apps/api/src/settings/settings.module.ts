@@ -82,6 +82,8 @@ export class UserSettings {
   @Prop({ type: Object }) moduleVisibility?: Partial<
     Record<ModuleId, Audience>
   >;
+  @Prop({ type: [String], default: undefined })
+  completedSetupSteps?: import('@life-portal/shared-types').SetupStep[];
   @Prop({ default: 0 }) setupStep?: number;
   @Prop({ default: false }) setupCompleted?: boolean;
   @Prop({ default: false }) setupDismissed?: boolean;
@@ -187,8 +189,14 @@ export class SettingsService {
     return this.write(userId, { spendOrder });
   }
 
-  async initializeModules(userId: string, selectedModules: ModuleId[]): Promise<void> {
-    await this.model.updateOne({ userId, selectedModules: { $exists: false } }, { $set: { selectedModules } });
+  async initializeModules(
+    userId: string,
+    selectedModules: ModuleId[],
+  ): Promise<void> {
+    await this.model.updateOne(
+      { userId, selectedModules: { $exists: false } },
+      { $set: { selectedModules } },
+    );
   }
 
   setPortalPreferences(

@@ -1,3 +1,5 @@
+import { HealthService } from './health.service';
+import { activityTargets } from '@life-portal/shared-domain';
 import type { SharedFoodDiary, SharedStat } from '@life-portal/shared-types';
 import { SocialGraphService } from '../social-graph/social-graph.module';
 import {
@@ -107,6 +109,7 @@ export class NutritionService {
   private readonly logger = new Logger(NutritionService.name);
 
   constructor(
+    private readonly health: HealthService,
     private readonly graph: SocialGraphService,
     @InjectModel(Food.name) private readonly foods: Model<Food>,
     @InjectModel(MealEntry.name) private readonly entries: Model<MealEntry>,
@@ -566,6 +569,13 @@ export class NutritionService {
     userId: string,
     dto: UpdateProfileDto,
   ): Promise<NutritionProfileDto> {
+    if (dto.timeZone) {
+      try {
+        new Intl.DateTimeFormat('en', { timeZone: dto.timeZone }).format();
+      } catch {
+        throw new BadRequestException('Choose a valid timezone.');
+      }
+    }
     const { updateExistingFoodsVisibility, ...profileFields } = dto;
 
     // Get current profile to check if defaultFoodVisibility is changing
@@ -646,12 +656,34 @@ export class NutritionService {
     return { id, deleted: true };
   }
 
+  private async withActivity(
+    userId: string,
+    targets: NutritionTargets,
+    profile: NutritionProfileDto,
+    day: string,
+  ) {
+    const health = await this.health.data(userId, day);
+    return activityTargets(
+      targets,
+      profile,
+      day,
+      health?.samples ?? [],
+      new Date().toISOString(),
+      health?.lastSync,
+    );
+  }
+
   async targets(userId: string, today: string): Promise<NutritionTargets> {
     const [profile, weighIns] = await Promise.all([
       this.profile(userId),
       this.listWeighIns(userId),
     ]);
-    return nutritionTargets({ profile, weighIns, today });
+    return this.withActivity(
+      userId,
+      nutritionTargets({ profile, weighIns, today }),
+      profile,
+      today,
+    );
   }
 
   // ---------------------------------------------------------------- entries
@@ -1166,7 +1198,11 @@ export class NutritionService {
       this.listEntries(userId, { from: weekStart(today), to: weekEnd(today) }),
       this.targets(userId, today),
     ]);
-    return weekBalance(entries, today, targets.energyKcal?.value);
+    return weekBalance(
+      entries,
+      today,
+      targets.activity?.startingTargetKcal ?? targets.energyKcal?.value,
+    );
   }
 
   async dayView(userId: string, day: string): Promise<DayTotals> {
@@ -1220,7 +1256,12 @@ export class NutritionService {
         this.listSavedMeals(userId),
         this.hasPublicFoodsToImport(userId),
       ]);
-    const targets = nutritionTargets({ profile, weighIns, today });
+    const targets = await this.withActivity(
+      userId,
+      nutritionTargets({ profile, weighIns, today }),
+      profile,
+      viewed,
+    );
 
     // One window covers both the day being viewed and the history its suggestions rank over.
     const [history, weekEntries, recent, cheat] = await Promise.all([
@@ -1239,7 +1280,11 @@ export class NutritionService {
       profile,
       targets,
       dayTotals: dayTotals(viewed, history),
-      week: weekBalance(weekEntries, today, targets.energyKcal?.value),
+      week: weekBalance(
+        weekEntries,
+        today,
+        targets.activity?.startingTargetKcal ?? targets.energyKcal?.value,
+      ),
       cheat,
       weighIns,
       foods,
@@ -1322,7 +1367,12 @@ export class NutritionService {
       this.listWeighIns(userId),
       this.listEntries(userId, { day: today }),
     ]);
-    const targets = nutritionTargets({ profile, weighIns, today });
+    const targets = await this.withActivity(
+      userId,
+      nutritionTargets({ profile, weighIns, today }),
+      profile,
+      today,
+    );
     const totals = dayTotals(today, entries);
     const next = nextCheatDay(today, profile.cheatDays);
 

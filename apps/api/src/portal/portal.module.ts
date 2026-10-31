@@ -22,6 +22,8 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
+  SETUP_STEPS,
+  type SetupStep,
   AUDIENCES,
   MODULE_IDS,
   type Audience,
@@ -30,6 +32,7 @@ import {
   type PortalState,
 } from '@life-portal/shared-types';
 import {
+  migratedSetupSteps,
   privateModuleVisibility,
   selectedAvailableModules,
 } from '@life-portal/shared-domain';
@@ -69,6 +72,12 @@ export class PortalPreferencesDto implements PortalPreferences {
   @ValidateIf((_, value: unknown) => value !== undefined)
   @IsArray()
   @ArrayUnique()
+  @ArrayMaxSize(32)
+  @IsIn(SETUP_STEPS, { each: true })
+  completedSetupSteps?: SetupStep[];
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsArray()
+  @ArrayUnique()
   @ArrayMaxSize(8)
   @IsIn(MODULE_IDS, { each: true })
   selectedModules?: ModuleId[];
@@ -85,7 +94,7 @@ export class PortalPreferencesDto implements PortalPreferences {
   @ValidateIf((_, value: unknown) => value !== undefined)
   @IsInt()
   @Min(0)
-  @Max(3)
+  @Max(5)
   setupStep?: number;
   @ValidateIf((_, value: unknown) => value !== undefined)
   @IsBoolean()
@@ -114,7 +123,20 @@ export class PortalService {
         selectedAvailableModules(undefined, identity.access),
       );
     }
+    const completedSetupSteps = migratedSetupSteps(settings);
+    if (!settings.completedSetupSteps)
+      await this.settings.setPortalPreferences(userId, {
+        completedSetupSteps,
+        setupDismissed: false,
+      });
+    const required = SETUP_STEPS.filter(
+      (id) =>
+        (!id.startsWith('nutrition-') && !id.startsWith('apple-')) ||
+        (identity.access.nutrition &&
+          (settings.selectedModules ?? ['nutrition']).includes('nutrition')),
+    );
     return {
+      completedSetupSteps,
       ...identity,
       selectedModules: selectedAvailableModules(
         settings.selectedModules,
@@ -127,8 +149,10 @@ export class PortalService {
       },
       widgetOrder: settings.widgetOrder,
       setupStep: settings.setupStep ?? 0,
-      setupCompleted: settings.setupCompleted ?? false,
-      setupDismissed: settings.setupDismissed ?? false,
+      setupCompleted: required.every((id) => completedSetupSteps.includes(id)),
+      setupDismissed: settings.completedSetupSteps
+        ? (settings.setupDismissed ?? false)
+        : false,
     };
   }
   async update(userId: string, dto: PortalPreferencesDto) {
@@ -138,6 +162,16 @@ export class PortalService {
     const stored = await this.settings.get(userId);
     const patch = {
       ...dto,
+      ...(dto.completedSetupSteps
+        ? {
+            completedSetupSteps: [
+              ...new Set([
+                ...(current.completedSetupSteps ?? []),
+                ...dto.completedSetupSteps,
+              ]),
+            ],
+          }
+        : {}),
       ...(dto.selectedModules
         ? {
             selectedModules: [

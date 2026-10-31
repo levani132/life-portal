@@ -241,7 +241,49 @@ export interface RecentMeal {
 
 // ------------------------------------------------------------------ profile
 
+export const EVERYDAY_MOVEMENT = [
+  'sitting',
+  'mixed',
+  'moving',
+  'demanding',
+  'varies',
+] as const;
+export type EverydayMovement = (typeof EVERYDAY_MOVEMENT)[number];
+export const EXERCISE_TYPES = [
+  'strength',
+  'walk_run',
+  'cycling',
+  'swimming',
+  'sports',
+  'mixed',
+] as const;
+export type ExerciseType = (typeof EXERCISE_TYPES)[number];
+export interface HealthSample {
+  id: string;
+  type: 'activeEnergy' | 'steps' | 'workout';
+  source: string;
+  start: string;
+  end: string;
+  value: number;
+}
+export interface ActivityAdjustment {
+  startingTargetKcal: number;
+  recordedActiveKcal: number;
+  expectedReplacedKcal: number;
+  adjustmentKcal: number;
+  currentTargetKcal: number;
+  steps: number;
+  workouts: number;
+  lastSync?: string;
+  status: 'missing' | 'stale' | 'partial';
+}
 export interface NutritionProfile extends Timestamped {
+  everydayMovement?: EverydayMovement;
+  exerciseSessionsPerWeek?: number;
+  exerciseMinutes?: number;
+  exerciseType?: ExerciseType;
+  nutritionPreferences?: string;
+  timeZone?: string;
   id: Id;
   userId: Id;
   sex?: Sex;
@@ -296,6 +338,13 @@ export interface Recorded<T = number> {
 export type TargetFigure = Estimate<number> | Recorded<number>;
 
 export interface NutritionTargets {
+  expenditure?: {
+    restingKcal: number;
+    digestionKcal: number;
+    everydayKcal: number;
+    exerciseKcal: number;
+  };
+  activity?: ActivityAdjustment;
   available: boolean;
   /** Named inputs the calculation is missing, e.g. `['birthDate', 'weighIn']`. */
   missingInputs: string[];
@@ -423,6 +472,7 @@ export interface BarcodeLookupResponse extends FoodLookupStatus {
 // ------------------------------------------------------------------ summary and overview
 
 export interface NutritionSummary {
+  activity?: ActivityAdjustment;
   day: IsoDate;
   eatenKcal: number;
   proteinEatenG: number;

@@ -13,7 +13,7 @@ import type { AuthSession, AuthTokens } from '@life-portal/shared-types';
  *    flattens them into something showable next to a form.
  */
 
-const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3333/api';
+export const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3333/api';
 const ACCESS_KEY = 'lp.accessToken';
 const REFRESH_KEY = 'lp.refreshToken';
 

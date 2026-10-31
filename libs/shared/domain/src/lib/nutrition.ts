@@ -718,10 +718,46 @@ export function nutritionTargets(input: TargetsInput): NutritionTargets {
   const bmrValue = bmrFigure.value;
 
   const factor = ACTIVITY_FACTORS[profile.activityLevel];
-  const tdeeValue = Math.round(bmrValue * factor);
+  // Legacy profiles retain their stable estimate until the new questions are answered.
+  // New model separates digestion (10% of maintenance) from replaceable movement.
+  const everydayFraction = {
+    sitting: 0.15,
+    mixed: 0.3,
+    moving: 0.5,
+    demanding: 0.75,
+    varies: 0.3,
+  };
+  const mets = {
+    strength: 3.5,
+    walk_run: 5,
+    cycling: 6,
+    swimming: 6,
+    sports: 6,
+    mixed: 4.5,
+  };
+  const everydayKcal = Math.round(
+    bmrValue *
+      (profile.everydayMovement
+        ? everydayFraction[profile.everydayMovement]
+        : 0),
+  );
+  const exerciseKcal = profile.everydayMovement
+    ? Math.round(
+        ((mets[profile.exerciseType ?? 'mixed'] - 1) *
+          bodyKg *
+          ((profile.exerciseMinutes ?? 30) / 60) *
+          (profile.exerciseSessionsPerWeek ?? 0)) /
+          7,
+      )
+    : 0;
+  const tdeeValue = profile.everydayMovement
+    ? Math.round((bmrValue + everydayKcal + exerciseKcal) / 0.9)
+    : Math.round(bmrValue * factor);
   const tdee: Estimate<number> = {
     value: tdeeValue,
-    basis: `Basal rate × ${factor} for "${ACTIVITY_LABELS[profile.activityLevel]}". Activity is the biggest single lever here, and it is self-reported — if your weight moves differently from the projection, this is the number to adjust first.`,
+    basis: profile.everydayMovement
+      ? `Resting ${bmrValue} + everyday movement ${everydayKcal} + weekly exercise averaged ${exerciseKcal} kcal/day, divided by 0.9 for estimated digestion. Movement fractions and METs are planning assumptions, not measurements; strength includes normal rests. Brain energy is already resting expenditure.`
+      : `Basal rate × ${factor} for "${ACTIVITY_LABELS[profile.activityLevel]}". Activity is the biggest single lever here, and it is self-reported — if your weight moves differently from the projection, this is the number to adjust first.`,
     assumptions: {
       bmr: bmrValue,
       activityLevel: profile.activityLevel,
@@ -874,6 +910,14 @@ export function nutritionTargets(input: TargetsInput): NutritionTargets {
 
   const targets: NutritionTargets = {
     available: true,
+    expenditure: profile.everydayMovement
+      ? {
+          restingKcal: bmrValue,
+          everydayKcal,
+          exerciseKcal,
+          digestionKcal: tdeeValue - bmrValue - everydayKcal - exerciseKcal,
+        }
+      : undefined,
     missingInputs: [],
     bmr: bmrFigure,
     tdee,
@@ -1075,6 +1119,7 @@ export function summariseNutrition(input: {
   const proteinEatenG = mgToG(input.totals.proteinMg);
 
   const summary: NutritionSummary = {
+    activity: input.targets.activity,
     day: input.day,
     eatenKcal: input.totals.energyKcal,
     proteinEatenG,

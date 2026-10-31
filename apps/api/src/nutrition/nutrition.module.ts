@@ -1,3 +1,12 @@
+import {
+  HealthDay,
+  HealthDaySchema,
+  HealthConnection,
+  HealthConnectionSchema,
+  HealthController,
+  HealthService,
+  HealthUploadGuard,
+} from './health.service';
 import { NutritionPublicationService } from './nutrition-publication.service';
 import { RequireModule } from '../access/access.module';
 import {
@@ -104,7 +113,10 @@ export class NutritionController {
   }
 
   @Post('foods/import')
-  importFood(@CurrentUser('userId') userId: string, @Body() dto: ImportFoodDto) {
+  importFood(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: ImportFoodDto,
+  ) {
     return this.nutrition.importFood(userId, dto.code);
   }
 
@@ -125,12 +137,18 @@ export class NutritionController {
   }
 
   @Post('foods/import-public/:id')
-  importPublicFood(@CurrentUser('userId') userId: string, @Param('id') id: string) {
+  importPublicFood(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+  ) {
     return this.nutrition.importPublicFood(userId, id);
   }
 
   @Post('foods')
-  createFood(@CurrentUser('userId') userId: string, @Body() dto: CreateFoodDto) {
+  createFood(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: CreateFoodDto,
+  ) {
     return this.nutrition.createFood(userId, dto);
   }
 
@@ -161,12 +179,18 @@ export class NutritionController {
   }
 
   @Post('entries')
-  createEntry(@CurrentUser('userId') userId: string, @Body() dto: CreateEntryDto) {
+  createEntry(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: CreateEntryDto,
+  ) {
     return this.nutrition.createEntry(userId, dto);
   }
 
   @Post('entries/repeat')
-  repeatMeal(@CurrentUser('userId') userId: string, @Body() dto: RepeatMealDto) {
+  repeatMeal(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: RepeatMealDto,
+  ) {
     return this.nutrition.repeatMeal(userId, dto);
   }
 
@@ -192,12 +216,18 @@ export class NutritionController {
   }
 
   @Post('meals')
-  createMeal(@CurrentUser('userId') userId: string, @Body() dto: CreateSavedMealDto) {
+  createMeal(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: CreateSavedMealDto,
+  ) {
     return this.nutrition.createSavedMeal(userId, dto);
   }
 
   @Post('meals/from-day')
-  saveSlotAsMeal(@CurrentUser('userId') userId: string, @Body() dto: SaveSlotAsMealDto) {
+  saveSlotAsMeal(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: SaveSlotAsMealDto,
+  ) {
     return this.nutrition.saveSlotAsMeal(userId, dto);
   }
 
@@ -261,7 +291,10 @@ export class NutritionController {
   }
 
   @Delete('weigh-ins/:id')
-  removeWeighIn(@CurrentUser('userId') userId: string, @Param('id') id: string) {
+  removeWeighIn(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+  ) {
     return this.nutrition.removeWeighIn(userId, id);
   }
 
@@ -319,6 +352,8 @@ export class NutritionController {
 @Module({
   imports: [
     MongooseModule.forFeature([
+      { name: HealthConnection.name, schema: HealthConnectionSchema },
+      { name: HealthDay.name, schema: HealthDaySchema },
       { name: Food.name, schema: FoodSchema },
       { name: MealEntry.name, schema: MealEntrySchema },
       { name: SavedMeal.name, schema: SavedMealSchema },
@@ -328,8 +363,14 @@ export class NutritionController {
       { name: User.name, schema: UserSchema },
     ]),
   ],
-  controllers: [NutritionController],
-  providers: [NutritionService, OpenFoodFactsProvider, NutritionPublicationService],
+  controllers: [NutritionController, HealthController],
+  providers: [
+    HealthService,
+    HealthUploadGuard,
+    NutritionService,
+    OpenFoodFactsProvider,
+    NutritionPublicationService,
+  ],
   exports: [NutritionService, NutritionPublicationService],
 })
 export class NutritionModule {}

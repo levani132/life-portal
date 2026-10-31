@@ -259,3 +259,30 @@ graph service. Previously imported independent copies are not revoked by later b
 ## Explicit food publications and imports (007)
 
 `NutritionPublicationService` owns the boundary for [food posts](posts.md). It projects only reviewed nutrition facts from owned entries, active foods or saved meals, retaining historical entry facts. Live `shareMeals`/weight/target preferences are not changed by explicit publishing. Imported foods always start private, retain attribution and use a partial unique `(userId, postImportKey)` index for retry/concurrency safety. Saved meals have an analogous optional key. Imports never add meal entries and never overwrite a previous copy. `Food.attribution` is an optional label/URL; `Food.postImportKey` and `SavedMeal.postImportKey` are optional server-owned markers; existing rows need no migration.
+
+## Separate activity model and Health uploads (010)
+
+Profiles add `everydayMovement`, `exerciseSessionsPerWeek` (0.5 represents less than weekly),
+`exerciseMinutes`, `exerciseType`, `nutritionPreferences`, and IANA `timeZone`. The original
+`activityLevel` remains for numeric compatibility until new inputs are answered. See
+[model, assumptions, receiver and device handoff](../APPLE_HEALTH_SETUP.md) for the new
+maintenance equation, interval replacement, source overlap policy, and remaining iPhone work.
+
+Two collections are necessary: `nutrition_health` holds scoped connection/ticket metadata;
+`nutrition_health_days` holds raw daily sample snapshots, preventing a rolling upload from
+losing historical activity. Unique `{userId, connectionId, day}` scopes raw data to a pairing.
+Neither targets nor adjustments are persisted. Revocation deletes connection and samples.
+
+JWT-scoped `/api/nutrition/health`: GET status and real installation URL, POST `/pair`, POST
+`/launch` (15-minute one-use ticket and 72-hour bounds), DELETE revoke. POST `/upload` has its
+own `@TokenAuth` guard using `x-health-ticket`, not an account JWT. DTO validates bounded
+absolute times, source/ID, finite value and explicit energy units. Input kcal/kJ normalizes to
+kcal; duplicates collapse. A validated successful receipt alone updates last-sync. Empty receipts
+remain partial. A callback never marks success. Five-minute freshness/cooldown, per-account
+session attempt storage, launch throttling and bounded polling prevent retry storms.
+
+Food retains calories/protein/carbs/fat and adds a distinct Activity adjustment without a ring.
+Main calorie denominator is already adjusted. Macro targets remain the starting model's goals.
+
+Weekly/cheat banking uses the starting target; today's Health adjustment is never copied to
+all historic days in the week. The Food day view and Home calorie ring use the adjusted target.

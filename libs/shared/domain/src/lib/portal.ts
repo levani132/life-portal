@@ -58,3 +58,16 @@ export function moduleForPath(path: string): FeatureId | undefined {
     } as Record<string, FeatureId>
   )[root];
 }
+
+/** Legacy completed flags represent only the original four steps. */
+export function migratedSetupSteps(settings: {
+  completedSetupSteps?: import('@life-portal/shared-types').SetupStep[];
+  setupCompleted?: boolean;
+  setupStep?: number;
+}): import('@life-portal/shared-types').SetupStep[] {
+  if (settings.completedSetupSteps) return settings.completedSetupSteps;
+  const old = ['modules', 'privacy', 'home', 'ready'] as const;
+  return settings.setupCompleted
+    ? [...old]
+    : old.slice(0, settings.setupStep ?? 0);
+}

@@ -28,7 +28,7 @@ Selection is a Home preference: it does not revoke API access to an available mo
 ## Preferences and setup
 
 `GET /api/portal` combines access and settings. `PUT /api/portal` accepts only:
-`selectedModules`, `moduleVisibility`, `widgetOrder`, `setupStep` (0–3), `setupCompleted`,
+`selectedModules`, `moduleVisibility`, `widgetOrder`, `setupStep` (0–5), `completedSetupSteps`, `setupCompleted`,
 `setupDismissed`. Module/audience IDs and order are bounded and validated. EPAM stays private.
 The first Portal read freezes the initial available-module selection, so a later flag release
 does not automatically add modules to Home. Unavailable modules cannot be newly selected. Previously selected unavailable modules remain
@@ -37,10 +37,10 @@ stored, so restoring access restores the user's choice; module data is never del
 Settings fields:
 - `selectedModules`: absent means all currently available modules; `[]` is intentionally empty.
 - `moduleVisibility`: per-module private/friends/public, missing values always private.
-- `setupStep`, `setupCompleted`, `setupDismissed`: independently persisted for resume and skip.
+- `completedSetupSteps`: stable step IDs; legacy completion migrates to modules/privacy/home/ready only.
+- `setupStep`, `setupCompleted`, `setupDismissed`: legacy/resume controls; completion is derived from required step IDs, with nutrition steps required only when selected and available. Migration clears old dismissal once. Writes union completed steps so stale forms cannot erase progress.
 
-Setup has modules, privacy, order and a first-action step. New production accounts are offered
-setup before Home; existing accounts see a review invitation and can keep working. Finish later
+Setup has modules, privacy, order, prefilled food/activity preferences, optional Apple Health, and a first-action step. All accounts see newly incomplete steps on their next visit; prior steps and widget choices remain complete. Finish later
 saves progress and allows Home. Completed users can revisit setup without resetting history.
 Menu always links module management, privacy, setup and settings.
 
@@ -55,11 +55,11 @@ contributing finance modules are selected, avoiding a partial number labelled as
 Alerts are built only from the summaries that were loaded.
 
 Home/Menu remain the production default. Social-enabled users also get Search and Friends;
-Wall will be added with publishing. The floating rearrangement bar sits above navigation and safe-area space.
+The wall stays on Home and /wall redirects to /#wall. The floating rearrangement bar sits above navigation and safe-area space.
 
 The independent `social` feature is stored in the same cohort/user policies, defaults off for
 production and on for internal/developer, and never appears in selectedModules.
 
 ## Food posts flag (007)
 
-`foodPosts` is a separate feature switch alongside `social`; publishing and reads additionally require `nutrition`. It defaults off for production and on for internal/developer accounts. Wall is the fourth tab when all three are enabled. Turning any dependency off revokes server access to that user's posts and import actions; widget selection/visibility does not automatically publish or withdraw intentional snapshots. See [food posts](posts.md).
+`foodPosts` is a separate feature switch alongside `social`; publishing and reads additionally require `nutrition`. It defaults off for production and on for internal/developer accounts. The wall appears on Home when all three are enabled; there is no separate Wall navigation tab. Turning any dependency off revokes server access to that user's posts and import actions; widget selection/visibility does not automatically publish or withdraw intentional snapshots. See [food posts](posts.md).

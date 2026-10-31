@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowDown, ArrowUp, Check, ShieldCheck } from 'lucide-react';
 import {
+  SETUP_STEPS,
   MODULES,
   type Audience,
   type ModuleId,
@@ -14,6 +15,8 @@ import {
 import { api } from '../lib/api';
 import { revalidate, useApi } from '../lib/hooks';
 import { ErrorNote, Select, Spinner } from './ui';
+import { NutritionOnboarding } from './nutrition-onboarding';
+import { AppleHealthPanel } from './apple-health';
 
 export function PortalPreferencesPanel({
   mode,
@@ -35,7 +38,14 @@ const CARD_ID: Record<ModuleId, string> = {
   projects: 'projects',
   epam: 'board:epam',
 };
-const STEPS = ['Your modules', 'Your privacy', 'Your Home', 'Ready to begin'];
+const STEPS = [
+  'Your modules',
+  'Your privacy',
+  'Your Home',
+  'Your food & activity',
+  'Apple Health',
+  'Ready to begin',
+];
 function PreferencesEditor({
   initial,
   mode,
@@ -57,8 +67,17 @@ function PreferencesEditor({
     return available.sort((a, b) => rank(a) - rank(b));
   });
   const [step, setStep] = useState(
-    initial.setupCompleted ? 0 : initial.setupStep,
+    Math.max(
+      0,
+      SETUP_STEPS.findIndex(
+        (id) =>
+          !(initial.completedSetupSteps ?? []).includes(id) &&
+          (selected.includes('nutrition') ||
+            !['nutrition-profile-v2', 'apple-health-v1'].includes(id)),
+      ),
+    ),
   );
+  const [completed, setCompleted] = useState(initial.completedSetupSteps ?? []);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -81,10 +100,15 @@ function PreferencesEditor({
           ...initial.widgetOrder.filter((id) => !ids.includes(id)),
         ],
         ...extra,
+        ...(isSetup ? { completedSetupSteps: completed } : {}),
+        ...(extra.completedSetupSteps
+          ? { completedSetupSteps: extra.completedSetupSteps }
+          : {}),
       });
       await revalidate('/portal');
       await revalidate('/dashboard');
       setSaved(true);
+      if (extra.completedSetupSteps) setCompleted(extra.completedSetupSteps);
       if (destination) router.push(destination);
       else if (extra.setupStep !== undefined) setStep(extra.setupStep);
     } catch (caught) {
@@ -96,6 +120,24 @@ function PreferencesEditor({
     } finally {
       setPending(false);
     }
+  }
+  function next() {
+    const done = [...new Set([...completed, SETUP_STEPS[step]])];
+    const nextStep = SETUP_STEPS.findIndex(
+      (id, i) =>
+        i > step &&
+        !done.includes(id) &&
+        (selected.includes('nutrition') ||
+          !['nutrition-profile-v2', 'apple-health-v1'].includes(id)),
+    );
+    void save(
+      {
+        completedSetupSteps: done,
+        setupDismissed: false,
+        setupStep: nextStep < 0 ? step : nextStep,
+      },
+      nextStep < 0 ? '/' : undefined,
+    );
   }
   function move(id: ModuleId, delta: number) {
     const from = visibleOrder.indexOf(id);
@@ -117,7 +159,10 @@ function PreferencesEditor({
           <p className="mb-3 text-xs font-medium uppercase tracking-widest text-accent">
             Make room for what matters
           </p>
-          <div className="mb-6 flex gap-2" aria-label={`Step ${step + 1} of 4`}>
+          <div
+            className="mb-6 flex gap-2"
+            aria-label={`Step ${step + 1} of ${STEPS.length}`}
+          >
             {STEPS.map((label, i) => (
               <span
                 key={label}
@@ -271,7 +316,9 @@ function PreferencesEditor({
             </p>
           </>
         )}
-        {active === 3 && (
+        {active === 3 && <NutritionOnboarding onSaved={next} />}
+        {active === 4 && <AppleHealthPanel />}
+        {active === 5 && (
           <div className="card p-6">
             <Check className="mb-4 text-emerald-400" size={28} />
             <p className="font-medium">
@@ -294,49 +341,24 @@ function PreferencesEditor({
               Back
             </button>
           )}
-          {isSetup && step < 3 ? (
-            <button
-              className="btn btn-primary"
-              type="button"
-              onClick={() => void save({ setupStep: step + 1 })}
-            >
-              {pending ? 'Saving…' : 'Continue'}
+          {isSetup && step < 5 ? (
+            <button className="btn btn-primary" type="button" onClick={next}>
+              {pending
+                ? 'Saving…'
+                : step === 3 || step === 4
+                  ? 'Skip for now / continue'
+                  : 'Continue'}
             </button>
           ) : (
             <button
               className="btn btn-primary"
               type="button"
-              onClick={() =>
-                void save(
-                  isSetup
-                    ? {
-                        setupCompleted: true,
-                        setupDismissed: false,
-                        setupStep: 3,
-                      }
-                    : {},
-                  isSetup ? '/' : undefined,
-                )
-              }
+              onClick={() => (isSetup ? next() : void save({}))}
             >
               {pending ? 'Saving…' : isSetup ? 'Go to my Home' : 'Save changes'}
             </button>
           )}
-          {isSetup && step === 3 && selected.includes('nutrition') && (
-            <button
-              className="btn"
-              type="button"
-              onClick={() =>
-                void save(
-                  { setupCompleted: true, setupDismissed: false, setupStep: 3 },
-                  '/nutrition?log=1',
-                )
-              }
-            >
-              Log my first food
-            </button>
-          )}
-          {isSetup && step < 3 && (
+          {isSetup && step < 5 && (
             <button
               className="px-2 py-3 text-sm text-ink-muted"
               type="button"
@@ -357,10 +379,7 @@ function PreferencesEditor({
       {active === 1 && (
         <div className="mt-6 space-y-3 text-sm">
           {initial.access.social && (
-            <Link
-              className="block text-accent hover:underline"
-              href="/profile"
-            >
+            <Link className="block text-accent hover:underline" href="/profile">
               Preview my shared profile →
             </Link>
           )}

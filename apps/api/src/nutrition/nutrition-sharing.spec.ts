@@ -6,7 +6,8 @@ function fixture(flags: {
   shareWeight?: boolean;
 }) {
   const service = new NutritionService(
-    ...(Array(9).fill({}) as [
+    ...(Array(10).fill({}) as [
+      never,
       never,
       never,
       never,
@@ -96,30 +97,28 @@ describe('explicit daily diary sharing', () => {
       carbMg: 11000,
       fatMg: 4000,
     };
-    const entries = jest
-      .spyOn(f.service, 'listEntries')
-      .mockResolvedValue([
-        {
-          id: 'PRIVATE_ENTRY_ID',
-          userId: 'PRIVATE_USER',
-          foodId: 'PRIVATE_FOOD',
-          day: '2026-10-22',
-          slot: 'breakfast',
-          amount: 100,
-          unit: 'g',
-          facts: {
-            name: 'Yogurt',
-            servingSize: 100,
-            energyKcalPer100: 120,
-            proteinMgPer100: 10000,
-            carbMgPer100: 11000,
-            fatMgPer100: 4000,
-            notes: 'PRIVATE_NOTE',
-          },
-          totals: { ...totals, notes: 'PRIVATE_TOTAL' },
-          note: 'PRIVATE_NOTE',
+    const entries = jest.spyOn(f.service, 'listEntries').mockResolvedValue([
+      {
+        id: 'PRIVATE_ENTRY_ID',
+        userId: 'PRIVATE_USER',
+        foodId: 'PRIVATE_FOOD',
+        day: '2026-10-22',
+        slot: 'breakfast',
+        amount: 100,
+        unit: 'g',
+        facts: {
+          name: 'Yogurt',
+          servingSize: 100,
+          energyKcalPer100: 120,
+          proteinMgPer100: 10000,
+          carbMgPer100: 11000,
+          fatMgPer100: 4000,
+          notes: 'PRIVATE_NOTE',
         },
-      ] as never);
+        totals: { ...totals, notes: 'PRIVATE_TOTAL' },
+        note: 'PRIVATE_NOTE',
+      },
+    ] as never);
     const result = await f.service.sharedDiary(
       'owner',
       '2026-10-22',

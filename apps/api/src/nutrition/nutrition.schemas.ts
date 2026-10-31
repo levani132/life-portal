@@ -203,6 +203,16 @@ SavedMealSchema.index({ userId: 1, name: 1 });
  */
 @Schema({ ...baseSchemaOptions, collection: 'nutrition_profiles' })
 export class NutritionProfile {
+  @Prop({ enum: ['sitting', 'mixed', 'moving', 'demanding', 'varies'] })
+  everydayMovement?: string;
+  @Prop({ min: 0, max: 21 }) exerciseSessionsPerWeek?: number;
+  @Prop({ min: 1, max: 300 }) exerciseMinutes?: number;
+  @Prop({
+    enum: ['strength', 'walk_run', 'cycling', 'swimming', 'sports', 'mixed'],
+  })
+  exerciseType?: string;
+  @Prop() nutritionPreferences?: string;
+  @Prop() timeZone?: string;
   @Prop({ required: true, index: true, unique: true }) userId!: string;
   @Prop({ enum: SEXES }) sex?: string;
   @Prop({ min: 100, max: 250 }) heightCm?: number;

@@ -2,19 +2,21 @@
 
 import { useState } from 'react';
 import type {
-  ActivityLevel,
+  EverydayMovement,
+  ExerciseType,
   FoodVisibility,
   NutritionGoal,
   NutritionProfile,
   Sex,
 } from '@life-portal/shared-types';
 import {
-  ACTIVITY_LEVELS,
+  EVERYDAY_MOVEMENT,
+  EXERCISE_TYPES,
   FOOD_VISIBILITY,
   NUTRITION_GOALS,
   SEXES,
 } from '@life-portal/shared-types';
-import { ACTIVITY_LABELS, GOAL_PLAN } from '@life-portal/shared-domain';
+import { GOAL_PLAN } from '@life-portal/shared-domain';
 import { api } from '../lib/api';
 import { useAction } from '../lib/hooks';
 import { Field, Input, Panel, Select } from './ui';
@@ -47,8 +49,21 @@ export function NutritionSettings({
     profile.heightCm ? String(profile.heightCm) : '',
   );
   const [birthDate, setBirthDate] = useState(profile.birthDate ?? '');
-  const [activityLevel, setActivityLevel] = useState<ActivityLevel>(
-    profile.activityLevel,
+  const [everydayMovement, setMovement] = useState<EverydayMovement | ''>(
+    profile.everydayMovement ?? '',
+  );
+  const [sessions, setSessions] = useState(
+    String(profile.exerciseSessionsPerWeek ?? 0),
+  );
+  const [minutes, setMinutes] = useState(String(profile.exerciseMinutes ?? 30));
+  const [exerciseType, setExerciseType] = useState<ExerciseType>(
+    profile.exerciseType ?? 'mixed',
+  );
+  const [preferences, setPreferences] = useState(
+    profile.nutritionPreferences ?? '',
+  );
+  const [timeZone, setTimeZone] = useState(
+    profile.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
   );
   const [goal, setGoal] = useState<NutritionGoal>(profile.goal);
   const [basalRateKcal, setBasalRateKcal] = useState(
@@ -107,7 +122,12 @@ export function NutritionSettings({
         sex: sex || null,
         heightCm: int(heightCm),
         birthDate: birthDate || null,
-        activityLevel,
+        ...(everydayMovement ? { everydayMovement } : {}),
+        exerciseSessionsPerWeek: Number(sessions),
+        exerciseMinutes: Number(minutes),
+        exerciseType,
+        nutritionPreferences: preferences,
+        timeZone,
         goal,
         basalRateKcal: int(basalRateKcal),
         cheatDays,
@@ -202,21 +222,35 @@ export function NutritionSettings({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <Field
-            label="How active are you?"
-            hint={ACTIVITY_LABELS[activityLevel]}
+            label="Outside of exercise, how much do you move on a typical day?"
+            hint="Think about work, getting around, chores, and caregiving."
           >
             <Select
-              value={activityLevel}
-              onChange={(event) =>
-                setActivityLevel(event.target.value as ActivityLevel)
-              }
+              value={everydayMovement}
+              onChange={(e) => setMovement(e.target.value as EverydayMovement)}
             >
-              {ACTIVITY_LEVELS.map((option) => (
+              <option value="">Choose everyday movement</option>
+              {EVERYDAY_MOVEMENT.map((option, i) => (
                 <option key={option} value={option}>
-                  {option} — {ACTIVITY_LABELS[option]}
+                  {
+                    [
+                      'Mostly sitting',
+                      'A mix of sitting and moving',
+                      'Moving much of the day',
+                      'Physically demanding days',
+                      'Not sure / my days vary',
+                    ][i]
+                  }
                 </option>
               ))}
             </Select>
+            <p className="mt-2 text-xs text-ink-muted">
+              Mostly sitting: desk work, short walks. A mix: regular walking,
+              errands or chores. Moving much of the day: sustained walking;
+              standing still uses less energy. Physically demanding: strenuous
+              carrying, lifting or manual work, beyond light movement. Varying
+              days use a cautious middle estimate.
+            </p>
           </Field>
           <Field
             label="What are you after?"
@@ -235,6 +269,84 @@ export function NutritionSettings({
           </Field>
         </div>
 
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Exercise sessions per week">
+            <Select
+              value={sessions}
+              onChange={(e) => setSessions(e.target.value)}
+            >
+              {[0, 0.5, 1, 2, 3, 4, 5, 6, 7, 10, 14, 21].map((n) => (
+                <option key={n} value={n}>
+                  {n === 0 ? 'None' : n === 0.5 ? 'Less than once a week' : n}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          {Number(sessions) > 0 && (
+            <>
+              <Field
+                label="Typical duration (minutes)"
+                hint="Strength sessions include normal rests; the estimate allows for them."
+              >
+                <Input
+                  type="number"
+                  min={1}
+                  max={300}
+                  list="exercise-durations"
+                  value={minutes}
+                  onChange={(e) => setMinutes(e.target.value)}
+                />
+                <datalist id="exercise-durations">
+                  {[15, 30, 45, 60, 90, 120].map((n) => (
+                    <option key={n} value={n} />
+                  ))}
+                </datalist>
+              </Field>
+              <Field label="Exercise type">
+                <Select
+                  value={exerciseType}
+                  onChange={(e) =>
+                    setExerciseType(e.target.value as ExerciseType)
+                  }
+                >
+                  {EXERCISE_TYPES.map((t, i) => (
+                    <option key={t} value={t}>
+                      {
+                        [
+                          'Strength training',
+                          'Walking/running',
+                          'Cycling',
+                          'Swimming',
+                          'Sports/classes',
+                          'Mixed/other',
+                        ][i]
+                      }
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </>
+          )}
+          <Field
+            label="Nutrition preferences"
+            hint="Optional: dietary needs, foods you avoid, or how you like to eat. Saved for reference; does not change the energy equation."
+          >
+            <Input
+              maxLength={500}
+              value={preferences}
+              onChange={(e) => setPreferences(e.target.value)}
+            />
+          </Field>
+          <Field
+            label="Timezone"
+            hint="Used for Health samples and your day boundary."
+          >
+            <Input
+              value={timeZone}
+              onChange={(e) => setTimeZone(e.target.value)}
+            />
+          </Field>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field
             label="Measured basal rate (kcal)"
@@ -255,7 +367,7 @@ export function NutritionSettings({
               value={dayStartHour}
               onChange={(event) => setDayStartHour(event.target.value)}
             >
-              {[0, 1, 2, 3, 4, 5, 6].map((hour) => (
+              {Array.from({ length: 13 }, (_, i) => i).map((hour) => (
                 <option key={hour} value={hour}>
                   {String(hour).padStart(2, '0')}:00
                 </option>

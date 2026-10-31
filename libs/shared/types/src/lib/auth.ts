@@ -79,6 +79,7 @@ export interface UserSettings extends Timestamped {
   widgetOrder: string[];
   selectedModules?: ModuleId[];
   moduleVisibility?: Partial<Record<ModuleId, Audience>>;
+  completedSetupSteps?: import('./portal').SetupStep[];
   setupStep?: number;
   setupCompleted?: boolean;
   setupDismissed?: boolean;

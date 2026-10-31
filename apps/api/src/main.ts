@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { McpOAuthService } from './mcp/oauth.service';
 import { AppModule } from './app/app.module';
 import { loadConfig } from './config/configuration';
@@ -10,7 +11,9 @@ async function bootstrap() {
   // message rather than midway through dependency injection.
   const config = loadConfig();
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // A bounded Health batch can exceed Express's 100 kB default. DTOs still cap row counts.
+  app.useBodyParser('json', { limit: '2mb' });
   app.setGlobalPrefix('api');
   const oauth = app.get(McpOAuthService);
   if (oauth.enabled) {
@@ -33,9 +36,15 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   await app.listen(config.port);
-  Logger.log(`Life Portal API listening on http://localhost:${config.port}/api`, 'Bootstrap');
+  Logger.log(
+    `Life Portal API listening on http://localhost:${config.port}/api`,
+    'Bootstrap',
+  );
   if (!config.finnhubApiKey) {
-    Logger.warn('FINNHUB_API_KEY is not set — share prices must be entered manually.', 'Bootstrap');
+    Logger.warn(
+      'FINNHUB_API_KEY is not set — share prices must be entered manually.',
+      'Bootstrap',
+    );
   }
 }
 

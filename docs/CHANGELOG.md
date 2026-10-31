@@ -427,3 +427,11 @@ Pull-to-refresh now requires a fresh downward drag starting at the page top and 
 ### 2026-10-31 — Light and dark appearance
 
 Added an Appearance panel in Settings with Light, System default and Dark choices. Theme controls stay out of the main header and sign-in/register screens. The preference stays in this browser and applies before the first paint. Shared backgrounds, cards, text, borders, accents and chart furniture adapt to the palette; status text remains readable in light mode while nutrition progress fills retain their existing colors.
+
+## 2026-10-31 — Food profile and activity
+
+- Setup remembers each completed step and offers new food/activity questions with saved inputs.
+- Everyday movement and exercise now have independent questions; preferences, timezone and day boundary remain editable.
+- Food uses colorful calorie/macro circles and a separate activity adjustment with sync details.
+- Added scoped Health receiver, revocation and freshness handoff. Apple Health installation is unavailable until the generated Shortcut is signed, checked on an iPhone and shared; estimates keep working.
+- Home keeps the wall; duplicate Wall tab/button removed and old links redirect Home.

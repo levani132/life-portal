@@ -33,6 +33,8 @@ import { FoodForm } from '../../components/food-form';
 import { FoodPicker } from '../../components/food-picker';
 import { PostComposer } from '../../components/post-composer';
 import { LogFoodModal } from '../../components/log-food-modal';
+import { NutritionRing } from '../../components/home-widget';
+import { AppleHealthPanel } from '../../components/apple-health';
 import { NutritionSettings } from '../../components/nutrition-settings';
 import { PublicFoodsPanel } from '../../components/public-foods-panel';
 import {
@@ -44,7 +46,6 @@ import {
   Input,
   Modal,
   Panel,
-  ProgressBar,
   Spinner,
 } from '../../components/ui';
 import { WeekBalancePanel } from '../../components/week-balance';
@@ -426,56 +427,46 @@ function MacroTiles({
     },
   ];
 
+  const colors = ['#fb923c', '#38bdf8', '#a78bfa', '#fbbf24'];
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      {tiles.map((tile) => {
-        const left = tile.target != null ? tile.target - tile.eaten : undefined;
-        const over = left != null && left < 0;
-        return (
-          <div key={tile.label} className="card p-4">
-            <div className="flex items-baseline justify-between">
-              <p className="label mb-0">{tile.label}</p>
-              {tile.figure && !isRecorded(tile.figure) && (
-                <EstimateMark basis={(tile.figure as Estimate<number>).basis} />
-              )}
-            </div>
-            <p className="tabular mt-1 text-2xl font-semibold">
-              {tile.eaten.toLocaleString()}{' '}
-              {/* Target and unit travel together, so a narrow tile wraps them as one phrase. */}
-              <span className="whitespace-nowrap text-sm font-normal text-ink-faint">
-                {tile.target != null && `/ ${tile.target.toLocaleString()} `}
-                <span className="text-xs">{tile.unit}</span>
-              </span>
-            </p>
-            <p
-              className={clsx(
-                'mt-0.5 text-xs',
-                over ? 'text-rose-400' : 'text-ink-faint',
-              )}
-            >
-              {left == null
-                ? 'no target yet'
-                : over
-                  ? `${Math.abs(left).toLocaleString()} ${tile.unit} over`
-                  : `${left.toLocaleString()} ${tile.unit} left`}
-            </p>
-            {tile.target != null && tile.target > 0 && (
-              <div className="mt-2">
-                <ProgressBar
-                  ratio={tile.eaten / tile.target}
-                  tone={
-                    over
-                      ? 'bad'
-                      : tile.eaten / tile.target > 0.9
-                        ? 'warn'
-                        : 'good'
-                  }
-                />
-              </div>
-            )}
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {tiles.map((tile, i) => (
+          <div
+            key={tile.label}
+            className="card bg-gradient-to-br from-violet-500/10 to-sky-500/5 p-4"
+          >
+            <NutritionRing
+              metric={{
+                label: tile.label,
+                value: tile.eaten,
+                target: tile.target,
+                unit: tile.unit,
+                color: colors[i],
+                basis:
+                  tile.figure && !isRecorded(tile.figure)
+                    ? (tile.figure as Estimate<number>).basis
+                    : undefined,
+              }}
+            />
           </div>
-        );
-      })}
+        ))}
+      </div>
+      <div className="card flex items-center justify-between border-violet-400/30 bg-violet-500/10 p-4">
+        <span>⚡ Activity adjustment</span>
+        <strong>
+          {(targets.activity?.adjustmentKcal ?? 0) >= 0 ? '+' : ''}
+          {targets.activity?.adjustmentKcal ?? 0} kcal
+        </strong>
+      </div>
+      <p className="text-xs text-ink-muted">
+        Starting target{' '}
+        {targets.activity?.startingTargetKcal ??
+          targets.energyKcal?.value ??
+          '—'}{' '}
+        kcal · activity is already included in the current calorie target.
+      </p>
+      <AppleHealthPanel activity={targets.activity} />
     </div>
   );
 }

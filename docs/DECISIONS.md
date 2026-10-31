@@ -944,3 +944,20 @@ Momentum and scroll-to-pull chaining caused accidental refreshes during normal n
 ### 2026-10-31 — Appearance is a browser preference
 
 Build light/dark mode on the existing RGB semantic tokens, with System as the default and a versioned local-storage override. Resolve the saved palette in the document head to prevent a wrong-theme first paint, and synchronize OS changes, other tabs, native controls and browser chrome after hydration. This preference needs no account schema or API change. Accent text uses shared tokens; text-only status overrides improve light-mode contrast without changing nutrition progress fills.
+
+## 2026-10-31 — Separate movement forecasts and conservative Health replacement
+
+New profiles separate resting energy, digestion, everyday movement and net exercise; legacy
+multipliers stay stable until reviewed. Only matching sampled periods can replace expected
+activity. No downward adjustments are enabled because missing/zero Shortcuts data does not
+establish complete wear/permission coverage. Steps and workouts never add calories on top of
+active energy. Scoped one-use upload tickets avoid storing account secrets in the shared
+Shortcut. Daily source snapshots preserve history. See `docs/APPLE_HEALTH_SETUP.md` for equations,
+source merging assumptions and the actual iCloud-signing/device-verification blocker.
+
+Setup completion now uses stable step IDs; legacy completion covers only the original steps.
+New questions do not reset widget choices. The homepage wall replaces duplicate Wall navigation.
+
+Constitution 1.6.0 explicitly permits the fifth Food quantity as a non-progress activity
+adjustment, matching the approved UI. Weekly/cheat banking continues to use the starting target;
+a sync adjustment for today must not be copied onto all other days' allowances.

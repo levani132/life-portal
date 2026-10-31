@@ -139,6 +139,16 @@ export class LogSavedMealDto {
 }
 
 export class UpdateProfileDto {
+  @IsOptional()
+  @IsIn(['sitting', 'mixed', 'moving', 'demanding', 'varies'])
+  everydayMovement?: string;
+  @IsOptional() @IsNumber() @Min(0) @Max(21) exerciseSessionsPerWeek?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(300) exerciseMinutes?: number;
+  @IsOptional()
+  @IsIn(['strength', 'walk_run', 'cycling', 'swimming', 'sports', 'mixed'])
+  exerciseType?: string;
+  @IsOptional() @IsString() @MaxLength(500) nutritionPreferences?: string;
+  @IsOptional() @IsString() @MaxLength(80) timeZone?: string;
   @IsOptional() @IsIn(SEXES) sex?: string;
   @IsOptional() @IsInt() @Min(100) @Max(250) heightCm?: number;
   @IsOptional() @Matches(DAY, DAY_MESSAGE) birthDate?: string;

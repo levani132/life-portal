@@ -72,7 +72,17 @@ export const MODULES: {
     href: '/boards/epam',
   },
 ];
+export const SETUP_STEPS = [
+  'modules',
+  'privacy',
+  'home',
+  'nutrition-profile-v2',
+  'apple-health-v1',
+  'ready',
+] as const;
+export type SetupStep = (typeof SETUP_STEPS)[number];
 export interface PortalState {
+  completedSetupSteps?: SetupStep[];
   cohort: UserCohort | 'developer';
   access: FeatureAccess;
   selectedModules: ModuleId[];
@@ -83,6 +93,7 @@ export interface PortalState {
   setupDismissed: boolean;
 }
 export interface PortalPreferences {
+  completedSetupSteps?: SetupStep[];
   selectedModules?: ModuleId[];
   moduleVisibility?: Partial<Record<ModuleId, Audience>>;
   widgetOrder?: string[];
