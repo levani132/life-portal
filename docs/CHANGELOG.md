@@ -455,3 +455,5 @@ Health uploads now accept a sample array encoded as JSON text by Shortcuts, whil
 - Keep Food tabs, sharing, assistant connection and Log food on one compact row; share a day from its date controls.
 - Move Apple Health setup, sync controls and activity explanations behind the Activity adjustment info button.
 - Hide the page-top sync banner on Food while retaining automatic sync and the manual fallback inside Health details.
+
+- Keep a visible Sync action beside Activity adjustment; setup and detailed explanations remain behind Info.

@@ -2,7 +2,7 @@
 
 import clsx from 'clsx';
 import Link from 'next/link';
-import { Bot, Info, Plus, Share2 } from 'lucide-react';
+import { Bot, Info, Plus, RefreshCw, Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type {
   PortalState,
@@ -471,6 +471,14 @@ function MacroTiles({
             {(targets.activity?.adjustmentKcal ?? 0) >= 0 ? '+' : ''}
             {targets.activity?.adjustmentKcal ?? 0} kcal
           </strong>
+          <button
+            type="button"
+            className="flex h-10 items-center gap-1 rounded-lg px-2 text-xs font-medium text-violet-400 hover:bg-violet-500/10"
+            aria-label="Sync Apple Health"
+            onClick={() => window.dispatchEvent(new Event('lp-health-sync'))}
+          >
+            <RefreshCw size={15} /> Sync
+          </button>
           <button
             type="button"
             className="flex h-10 w-10 items-center justify-center rounded-full text-violet-400 hover:bg-violet-500/10"
