@@ -91,20 +91,21 @@ export function HealthSyncBridge({ enabled }: { enabled: boolean }) {
         });
         const callback = `${window.location.origin}${window.location.pathname}?health-return=1`;
         const url = new URL('shortcuts://x-callback-url/run-shortcut');
-        url.searchParams.set('name', 'Life Portal Health');
         url.searchParams.set('input', 'text');
         url.searchParams.set('text', input);
         for (const key of ['x-success', 'x-cancel', 'x-error'])
           url.searchParams.set(key, callback);
+        // iOS Shortcuts requires the name parameter with spaces, not + or %20
+        const shortcutUrl = url.toString().replace('run-shortcut?', 'run-shortcut?name=Life Portal Health&');
         preparedLaunch.current = {
-          url: url.toString(),
+          url: shortcutUrl,
           expiresAt: Date.now() + 14 * 60000,
         };
         pollUntil.current = Date.now() + 90000;
         setMessage(
           'Waiting for a valid Health upload. If Shortcuts did not open, tap Sync Health.',
         );
-        window.location.assign(url.toString());
+        window.location.assign(shortcutUrl);
       } catch (e) {
         setMessage(
           e instanceof Error ? e.message : 'Health sync could not start.',
