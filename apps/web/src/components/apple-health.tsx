@@ -5,188 +5,182 @@ import type { ActivityAdjustment } from '@life-portal/shared-types';
 import { api, API_URL } from '../lib/api';
 import { revalidate, useApi } from '../lib/hooks';
 import { useAuth } from '../lib/auth-context';
+import { healthShortcutUrl, healthSyncDue } from '../lib/health-sync';
 import { ErrorNote, Panel } from './ui';
 interface HealthStatus {
   paired: boolean;
   lastSync?: string;
   installationUrl?: string;
+  pendingWindows?: number;
+  batchLastReceipt?: string;
+  batchBlocked?: boolean;
 }
-const FRESH_MS = 300000;
-
-/** One bridge in AppShell owns launches; panels request a manual launch by event. */
-export function HealthSyncBridge({
-  enabled,
-  quiet = false,
-}: {
-  enabled: boolean;
-  quiet?: boolean;
-}) {
+/** This bridge never launches on mount, resume, focus or a timer. Only a user action can launch. */
+export function HealthSyncBridge({ enabled }: { enabled: boolean }) {
   const { user } = useAuth();
-  const [fallback, setFallback] = useState(false);
   const [message, setMessage] = useState('');
   const running = useRef(false);
   const preparedLaunch = useRef<{ url: string; expiresAt: number } | null>(
     null,
   );
   const pollUntil = useRef(0);
-  const check = useCallback(
-    async (manual = false) => {
-      // Retry an already prepared URL synchronously within the user's tap.
-      // Awaiting another network request here could lose Safari's user gesture.
-      if (
-        manual &&
-        preparedLaunch.current &&
-        preparedLaunch.current.expiresAt > Date.now()
-      ) {
-        if (user)
-          sessionStorage.setItem(
-            `lp.health.attempt.v1.${user.id}`,
-            String(Date.now()),
-          );
-        pollUntil.current = Date.now() + 90000;
-        window.location.assign(preparedLaunch.current.url);
+  const previousReceipt = useRef<string | undefined>(undefined);
+  const launch = useCallback(async () => {
+    if (
+      !enabled ||
+      !user ||
+      running.current ||
+      document.visibilityState !== 'visible'
+    )
+      return;
+    // A retry of a prepared URL remains directly inside the tap's user gesture.
+    if (
+      preparedLaunch.current &&
+      preparedLaunch.current.expiresAt > Date.now()
+    ) {
+      pollUntil.current = Date.now() + 15 * 60000;
+      window.location.assign(preparedLaunch.current.url);
+      return;
+    }
+    running.current = true;
+    try {
+      const status = await api.get<HealthStatus>('/nutrition/health');
+      previousReceipt.current = status.lastSync;
+      if (!status.paired) {
+        window.dispatchEvent(new Event('lp-health-setup'));
+        setMessage('Open Activity info to connect Apple Health first.');
         return;
       }
-      if (
-        !enabled ||
-        !user ||
-        running.current ||
-        document.visibilityState !== 'visible'
-      )
+      const key = `lp.health.attempt.v1.${user.id}`;
+      if (Date.now() - Number(sessionStorage.getItem(key) ?? 0) < 15000) {
+        setMessage('Please wait a few seconds before retrying.');
         return;
-      running.current = true;
+      }
+      sessionStorage.setItem(key, String(Date.now()));
+      const ticket = await api.post<{
+        token: string;
+        from: string;
+        to: string;
+      }>('/nutrition/health/launch');
+      const url = healthShortcutUrl({
+        ...ticket,
+        batchUrl: new URL(
+          `${API_URL}/nutrition/health/batch`,
+          window.location.origin,
+        ).href,
+        uploadUrl: new URL(
+          `${API_URL}/nutrition/health/upload`,
+          window.location.origin,
+        ).href,
+      });
+      preparedLaunch.current = { url, expiresAt: Date.now() + 14 * 60000 };
+      pollUntil.current = Date.now() + 15 * 60000;
+      setMessage(
+        'Sync started. Return to this app when Shortcuts finishes. Tap Sync again if your browser blocked opening Shortcuts.',
+      );
+      window.location.assign(url);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : 'Health sync could not start.',
+      );
+    } finally {
+      running.current = false;
+    }
+  }, [enabled, user]);
+  useEffect(() => {
+    if (!enabled) return;
+    let disposed = false;
+    const refresh = async () => {
+      if (document.visibilityState !== 'visible') return;
       try {
         const status = await api.get<HealthStatus>('/nutrition/health');
-        if (!status.paired || !status.installationUrl) {
+        await revalidate('/nutrition/health');
+        if (!status.paired || status.lastSync !== previousReceipt.current) {
           preparedLaunch.current = null;
-          setFallback(false);
-          return;
+          previousReceipt.current = status.lastSync;
+          if (!disposed) setMessage('');
         }
-        const key = `lp.health.attempt.v1.${user.id}`;
-        const lastAttempt = Number(sessionStorage.getItem(key) ?? 0);
-        const stale =
-          !status.lastSync ||
-          Date.now() - Date.parse(status.lastSync) >= FRESH_MS;
-        if (!stale) {
-          preparedLaunch.current = null;
-          setFallback(false);
-          setMessage('');
-          return;
+        if (Date.now() < pollUntil.current) {
+          void revalidate('/nutrition');
+          void revalidate('/dashboard');
         }
-        setFallback(true);
-        if (
-          !manual &&
-          (!status.lastSync ||
-            Date.now() - lastAttempt < FRESH_MS ||
-            !/iPhone|iPad|iPod/.test(navigator.userAgent))
-        )
-          return;
-        if (manual && Date.now() - lastAttempt < 15000) {
-          setMessage('Please wait a few seconds before retrying.');
-          return;
-        }
-        sessionStorage.setItem(key, String(Date.now()));
-        const ticket = await api.post<{
-          token: string;
-          from: string;
-          to: string;
-        }>('/nutrition/health/launch');
-        const input = JSON.stringify({
-          ...ticket,
-          uploadUrl: new URL(
-            `${API_URL}/nutrition/health/upload`,
-            window.location.origin,
-          ).href,
-        });
-        const callback = `${window.location.origin}${window.location.pathname}?health-return=1`;
-        const url = new URL('shortcuts://x-callback-url/run-shortcut');
-        url.searchParams.set('input', 'text');
-        url.searchParams.set('text', input);
-        for (const key of ['x-success', 'x-cancel', 'x-error'])
-          url.searchParams.set(key, callback);
-        // iOS Shortcuts requires the name parameter with spaces, not + or %20
-        const shortcutUrl = url
-          .toString()
-          .replace('run-shortcut?', 'run-shortcut?name=Life Portal Health&');
-        preparedLaunch.current = {
-          url: shortcutUrl,
-          expiresAt: Date.now() + 14 * 60000,
-        };
-        pollUntil.current = Date.now() + 90000;
-        setMessage(
-          'Waiting for a valid Health upload. If Shortcuts did not open, tap Sync Health.',
-        );
-        window.location.assign(shortcutUrl);
-      } catch (e) {
-        setMessage(
-          e instanceof Error ? e.message : 'Health sync could not start.',
-        );
-        setFallback(true);
-      } finally {
-        running.current = false;
-      }
-    },
-    [enabled, user],
-  );
-  useEffect(() => {
-    const callback = new URL(window.location.href);
-    const returned = callback.searchParams.has('health-return');
-    if (returned) {
-      callback.searchParams.delete('health-return');
-      window.history.replaceState(null, '', callback);
-      pollUntil.current = Date.now() + 90000;
-      // A callback means only that Shortcuts returned; it never proves an upload succeeded.
-      void revalidate('/nutrition');
-      void revalidate('/dashboard');
-    } else void check();
-    const resume = () => {
-      if (document.visibilityState === 'visible') {
-        void revalidate('/nutrition/health');
-        void check();
+      } catch {
+        /* A later manual retry surfaces errors; background refresh never opens Shortcuts. */
       }
     };
     const manual = () => {
-      void check(true);
+      void launch();
+    };
+    const resume = () => {
+      void refresh();
     };
     window.addEventListener('lp-health-sync', manual);
-    document.addEventListener('visibilitychange', resume);
     window.addEventListener('focus', resume);
+    document.addEventListener('visibilitychange', resume);
     const timer = window.setInterval(() => {
-      if (
-        Date.now() < pollUntil.current &&
-        document.visibilityState === 'visible'
-      ) {
-        void revalidate('/nutrition');
-        void revalidate('/dashboard');
-        void check();
-      }
+      if (Date.now() < pollUntil.current) void refresh();
     }, 15000);
     return () => {
-      window.clearInterval(timer);
+      disposed = true;
+      clearInterval(timer);
       window.removeEventListener('lp-health-sync', manual);
-      document.removeEventListener('visibilitychange', resume);
       window.removeEventListener('focus', resume);
+      document.removeEventListener('visibilitychange', resume);
     };
-  }, [check]);
+  }, [enabled, launch]);
   useEffect(() => {
     window.dispatchEvent(
       new CustomEvent('lp-health-status', { detail: message }),
     );
   }, [message]);
-  if (!fallback || quiet) return null;
+  if (!message) return null;
   return (
     <div
-      className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-2 text-xs text-ink-muted"
       role="status"
+      className="fixed bottom-24 left-1/2 z-[60] flex w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 items-start gap-3 rounded-xl border border-border bg-surface p-3 text-xs text-ink shadow-xl"
     >
-      <button className="btn" onClick={() => void check(true)}>
-        <RefreshCw size={14} /> Sync Health
+      <p className="flex-1">{message}</p>
+      <button
+        type="button"
+        aria-label="Dismiss sync message"
+        className="shrink-0 px-2 py-1 text-ink-muted"
+        onClick={() => setMessage('')}
+      >
+        ✕
       </button>
-      <span>
-        {message ||
-          'Health is missing or stale. Tap to sync if your browser needs a gesture.'}
-      </span>
     </div>
+  );
+}
+
+export function HealthSyncButton() {
+  const status = useApi<HealthStatus>('/nutrition/health', {
+    revalidateOnFocus: true,
+    refreshInterval: 60000,
+  });
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+  const due = status.data?.paired && healthSyncDue(status.data.lastSync, now);
+  return (
+    <button
+      type="button"
+      className={`flex h-10 items-center gap-1 rounded-lg px-2 text-xs font-medium hover:bg-violet-500/10 ${due ? 'text-amber-400' : 'text-violet-400'}`}
+      aria-label={
+        due
+          ? 'Sync Apple Health — last sync missing or more than six hours ago'
+          : 'Sync Apple Health'
+      }
+      title={
+        due
+          ? 'Sync recommended: six hours since the last successful sync, or no sync received yet'
+          : 'Sync Apple Health'
+      }
+      onClick={() => window.dispatchEvent(new Event('lp-health-sync'))}
+    >
+      <RefreshCw size={15} /> {due ? 'Sync due' : 'Sync'}
+    </button>
   );
 }
 export function AppleHealthPanel({
@@ -251,15 +245,16 @@ export function AppleHealthPanel({
           shared with the Shortcut.
         </p>
         <p>
-          3. Return here and wait for “First sync received.” Missing permission
+          3. Return here and wait for “Last successful sync.” Missing permission
           or no samples does not establish inactivity. Workout export depends on
           what your iOS version exposes; unavailable workouts stay unknown.
         </p>
         <p className="text-xs text-ink-muted">
           The Shortcut requires an iPhone installation and export check. If
           installation or permissions fail, skip this step and retry here later.
-          Automatic opening can require iOS confirmation or a tap; background
-          execution is not guaranteed.
+          Sync opens Shortcuts only when you tap it. A reminder appears after
+          six hours. When finished, return to your existing Life Portal app; we
+          do not open a browser return link.
         </p>
         {status.error && (
           <ErrorNote message={(status.error as Error).message} />
@@ -272,11 +267,20 @@ export function AppleHealthPanel({
         )}
         <p role="status" className="font-medium">
           {status.data?.lastSync
-            ? `First sync received · ${new Date(status.data.lastSync).toLocaleString()}`
+            ? `Last successful sync · ${new Date(status.data.lastSync).toLocaleString()}`
             : status.data?.paired
               ? 'Paired — waiting for first valid upload'
               : 'Not connected'}
         </p>
+        {status.data?.batchLastReceipt && (
+          <p role="status" className="text-xs text-ink-muted">
+            {status.data.batchBlocked
+              ? 'An unusually dense interval needs attention; it has not been marked complete.'
+              : status.data.pendingWindows
+                ? `${status.data.pendingWindows} query windows pending. The next sync resumes them.`
+                : 'Requested query windows received. Tracking coverage remains uncertain.'}
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
           <button
             type="button"

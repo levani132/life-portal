@@ -145,3 +145,60 @@ describe('onboarding migration', () => {
     ).toEqual(['home']);
   });
 });
+
+it('marks Health receipts stale only at the six-hour reminder threshold', () => {
+  const received = '2026-10-31T06:00:00Z';
+  expect(
+    activityTargets(
+      targets,
+      profile,
+      '2026-10-31',
+      [],
+      '2026-10-31T11:59:59Z',
+      received,
+    ).activity?.status,
+  ).toBe('partial');
+  expect(
+    activityTargets(
+      targets,
+      profile,
+      '2026-10-31',
+      [],
+      '2026-10-31T12:00:00Z',
+      received,
+    ).activity?.status,
+  ).toBe('stale');
+});
+
+it('keeps source priority through nested overlaps and after the preferred source ends', () => {
+  const rows = [
+    sample(200, {
+      id: 'long',
+      source: 'b',
+      start: '2026-10-31T07:00:00Z',
+      end: '2026-10-31T09:00:00Z',
+    }),
+    sample(200, {
+      id: 'short',
+      source: 'a',
+      start: '2026-10-31T07:30:00Z',
+      end: '2026-10-31T08:30:00Z',
+    }),
+  ];
+  expect(calculate(rows).recordedActiveKcal).toBe(300);
+});
+it('merges thousands of adjacent samples from overlapping devices without adding both', () => {
+  const start = Date.parse('2026-10-31T07:00:00Z');
+  const rows = Array.from({ length: 2000 }, (_, i) =>
+    sample(1, {
+      id: String(i),
+      source: 'a',
+      start: new Date(start + i * 9000).toISOString(),
+      end: new Date(start + (i + 1) * 9000).toISOString(),
+    }),
+  );
+  expect(
+    calculate([...rows, ...rows.map((s) => ({ ...s, source: 'b' }))])
+      .recordedActiveKcal,
+  ).toBe(2000);
+});

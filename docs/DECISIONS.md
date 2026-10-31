@@ -961,3 +961,18 @@ New questions do not reset widget choices. The homepage wall replaces duplicate 
 Constitution 1.6.0 explicitly permits the fifth Food quantity as a non-progress activity
 adjustment, matching the approved UI. Weekly/cheat banking continues to use the starting target;
 a sync adjustment for today must not be copied onto all other days' allowances.
+
+## 2026-11-01 — Explicit Health sync, no browser callback, resumable query windows
+
+The actual iPhone handoff was disruptive: launching Shortcuts automatically and returning via
+an HTTPS callback opened a browser tab outside the installed PWA. Sync now requires a user tap;
+a six-hour reminder replaces the five-minute launch policy. No success/error/cancel browser
+callback is supplied. The existing PWA refreshes receipts on manual return. There is no claimed
+iOS API for forcing an existing PWA/tab to receive that external return.
+
+The new Shortcut uses acknowledged, server-owned hour windows rather than guessing how many
+samples a calorie total needs. Capped queries split; interruptions preserve the queue. Record
+identity upserts preserve previously known data when a query returns nothing, since permission
+loss and actual inactivity/deletion are indistinguishable. The legacy path remains compatible.
+Users build the updated Shortcut directly from the manual guide; generated plist source is
+not represented as an installable signed file.

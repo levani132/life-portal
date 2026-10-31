@@ -5,6 +5,9 @@ import { HealthUploadDto } from './health.service';
 const defaultException = new ValidationPipe().createExceptionFactory();
 const allowedFields = new Set([
   'samples',
+  'windowId',
+  'activeCount',
+  'stepCount',
   'id',
   'type',
   'source',

@@ -2,7 +2,7 @@
 
 import clsx from 'clsx';
 import Link from 'next/link';
-import { Bot, Info, Plus, RefreshCw, Share2 } from 'lucide-react';
+import { Bot, Info, Plus, Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type {
   PortalState,
@@ -34,7 +34,10 @@ import { FoodPicker } from '../../components/food-picker';
 import { PostComposer } from '../../components/post-composer';
 import { LogFoodModal } from '../../components/log-food-modal';
 import { NutritionRing } from '../../components/home-widget';
-import { AppleHealthPanel } from '../../components/apple-health';
+import {
+  AppleHealthPanel,
+  HealthSyncButton,
+} from '../../components/apple-health';
 import { NutritionSettings } from '../../components/nutrition-settings';
 import { PublicFoodsPanel } from '../../components/public-foods-panel';
 import {
@@ -408,6 +411,11 @@ function MacroTiles({
   targets: NutritionTargets;
 }) {
   const [healthOpen, setHealthOpen] = useState(false);
+  useEffect(() => {
+    const setup = () => setHealthOpen(true);
+    window.addEventListener('lp-health-setup', setup);
+    return () => window.removeEventListener('lp-health-setup', setup);
+  }, []);
   const tiles = [
     {
       label: 'Calories',
@@ -471,14 +479,7 @@ function MacroTiles({
             {(targets.activity?.adjustmentKcal ?? 0) >= 0 ? '+' : ''}
             {targets.activity?.adjustmentKcal ?? 0} kcal
           </strong>
-          <button
-            type="button"
-            className="flex h-10 items-center gap-1 rounded-lg px-2 text-xs font-medium text-violet-400 hover:bg-violet-500/10"
-            aria-label="Sync Apple Health"
-            onClick={() => window.dispatchEvent(new Event('lp-health-sync'))}
-          >
-            <RefreshCw size={15} /> Sync
-          </button>
+          <HealthSyncButton />
           <button
             type="button"
             className="flex h-10 w-10 items-center justify-center rounded-full text-violet-400 hover:bg-violet-500/10"

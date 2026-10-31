@@ -24,10 +24,13 @@ async function bootstrap() {
 
   // Trace only Health uploads; never log login bodies, credentials or health sample values.
   app.use((req: Request, res: Response, next: NextFunction) => {
-    if (req.path === '/api/nutrition/health/upload') {
+    if (
+      req.path === '/api/nutrition/health/upload' ||
+      req.path.startsWith('/api/nutrition/health/batch/')
+    ) {
       const started = Date.now();
       Logger.log(
-        `received method=${req.method} contentType=${req.headers['content-type'] ?? 'missing'} bytes=${req.headers['content-length'] ?? 'unknown'} hasTicket=${!!req.headers['x-health-ticket']}`,
+        `received path=${req.path} method=${req.method} contentType=${req.headers['content-type'] ?? 'missing'} bytes=${req.headers['content-length'] ?? 'unknown'} hasTicket=${!!req.headers['x-health-ticket']}`,
         'HealthUpload',
       );
       res.on('finish', () =>

@@ -5,33 +5,35 @@ preferences/timezone/day boundary, raw Health upload receiver, account-scoped pa
 revocation, single-use upload tickets, daily source snapshots, pure calorie adjustment, Food
 rings/activity details, Home freshness bridge and a tap fallback. No hosting deployment was run.
 
-## Actual blocker and remaining maintainer setup
+## Supported setup: build directly in Shortcuts
 
-This Mac has `/usr/bin/shortcuts`, but signing failed with:
-`Error: In order to do this, you must be signed into iCloud.`
-No installable signed artifact or iCloud sharing URL was fabricated. Pairing UI stays unavailable
-until `APPLE_HEALTH_SHORTCUT_URL` contains a real published iCloud Shortcut URL.
+Follow [the complete manual iPhone Shortcut guide](integrations/apple-health-shortcut-manual.md).
+The user has already built a working legacy Shortcut manually; the batching version requires
+rebuilding/adapting that Shortcut once. Plist files are reference source, not installable
+artifacts. Do not suggest renaming them to `.shortcut`. The signing CLI returned an iCloud
+sign-in error even though the user reports being signed in; no account-state diagnosis or
+installable artifact is claimed. Manual creation in the iPhone Shortcuts editor avoids import.
 
-The complete generated **unsigned, unverified source** is
-`tools/shortcuts/Life Portal Health.plist`; its generator is alongside it. It contains no
-account secrets or fixed upload URL. It reads Active Calories/Steps and passes source, time
-bounds, displayed unit and value. The app supplies a 72-hour window, upload URL and a one-use
-15-minute upload ticket through Shortcut input. Source keeps at most 1,400 samples of each
-kind; this is partial tracking, never proof of complete coverage.
+The new Shortcut reads app-supplied `token`, `batchUrl` and `to`, requests each pending window,
+queries Active Calories/Steps with at most 250 samples per kind, and uploads counts plus rows.
+Twelve windows per run bound foreground work. It uses no fixed server address or account JWT.
+The previous manually created Shortcut remains compatible with the legacy upload endpoint.
+The generated batching source has mechanical reference/control-flow checks only; actual iPhone
+filtering, units, serialization, prompts and timing remain to be verified.
 
-On an iCloud-signed-in Mac, copy the plist to a `.shortcut` file, convert to binary with
-`plutil -convert binary1`, then use `shortcuts sign --mode anyone --input ... --output ...`.
-Install the signed artifact on an iPhone and test it before publishing with Share → Copy iCloud
-Link. Set the API's `APPLE_HEALTH_SHORTCUT_URL` to that real link. Users then install the shared
-Shortcut and tap Pair & first sync; they do not edit URLs, actions, payloads or account tokens.
-Keep its name **Life Portal Health**.
+## Manual sync and returning to the PWA
 
-Source syntax was grounded in Apple's documented Find Health Samples and URL scheme plus
-captured iOS action parameter references. Plist parsing succeeds. A third-party static validator
-could not resolve its Repeat Item Health provenance and lacked a complete action catalog;
-this is not a runtime pass. Health field coercion, dictionary-to-JSON serialization, filtering,
-unit values and permission prompts remain unverified on device. Repair the source generator
-if the actual iPhone export differs, regenerate/sign, and publish only after a successful upload.
+Sync is now manual only. Mount, focus, resume and timers refresh receipt information without
+opening Shortcuts. The visible button says `Sync due` after six hours without a successful
+receipt (or when no receipt exists); it remains usable at any time. A receipt does not prove
+complete tracking. Pending batch windows are visible in Activity Info.
+
+Launch uses `shortcuts://run-shortcut` without `x-success`, `x-cancel` or `x-error` web callbacks.
+Do not add Open URL at the end of the manually created Shortcut. This removes the app's cause
+of the extra Safari tab. Return through the existing PWA's Home Screen icon or app switcher.
+We found no documented iOS mechanism to guarantee targeting that existing PWA/browser window;
+no native-app universal-link behavior is claimed for the PWA. Its manifest already has
+`display: standalone`, `id: /`, `scope: /`.
 
 ## Required iPhone acceptance check
 
@@ -42,9 +44,9 @@ if the actual iPhone export differs, regenerate/sign, and publish only after a s
 3. Retry/backfill; ensure source overlaps and repeated uploads do not multiply energy.
    Test 03:59/04:00 and a changed day boundary. Compare only matching sample periods.
 4. Revoke and try an old ticket; it must fail. Pair another account and verify isolation.
-5. Test Safari and installed Home Screen app, app resume, shortcut missing/cancelled, and
-   callback return. Confirm no launch loop or repeated prompts within the five-minute window.
-   If the browser blocks automatic opening, use the visible Sync Health button.
+5. Test Safari and installed Home Screen app, app resume, and shortcut missing/cancelled.
+   Confirm nothing opens automatically, no browser return tab appears, and manual return
+   refreshes receipts. Check the six-hour reminder and manual Sync retry.
 
 Apple documents Health sample queries, but a supported built-in action for exporting actual
 workout records has not been established here. The receiver accepts time-bounded workout
@@ -77,8 +79,9 @@ samples also use one interval rather than summing. Under-counting is possible an
 replaced. No downward adjustment is enabled: Shortcuts exposes neither assured wear coverage
 nor permission-denial evidence sufficient to prove inactivity. Steps are explanatory only;
 workout/step energy is never added to active energy. Macros retain their starting goals.
-Daily raw snapshots retain historical samples; resync replaces the window and preserves older
-periods. Revocation deletes stored uploads. Timestamps are normalized to UTC; displayed day
+Daily raw snapshots retain historical samples. Batch receipts replace matching source/type/ID
+records and preserve unreceived records, because missing permissions cannot prove deletion.
+Legacy snapshot uploads retain their original window replacement behavior. Revocation deletes stored uploads. Timestamps are normalized to UTC; displayed day
 assignment uses the profile timezone and day-start hour, including DST.
 
 ## Sources

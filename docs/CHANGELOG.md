@@ -457,3 +457,10 @@ Health uploads now accept a sample array encoded as JSON text by Shortcuts, whil
 - Hide the page-top sync banner on Food while retaining automatic sync and the manual fallback inside Health details.
 
 - Keep a visible Sync action beside Activity adjustment; setup and detailed explanations remain behind Info.
+
+## 2026-11-01 — Manual Health sync and resumable batches
+
+- Remove automatic Shortcuts launches and browser-return callbacks. Refresh results when users return to their existing PWA.
+- Keep Sync beside Activity adjustment and show Sync due after six hours without a successful receipt.
+- Add resumable hourly query windows, split capped results, retry acknowledgements safely, and preserve unreceived known samples.
+- Add complete manual iPhone Shortcut instructions; importing generated plist source is not required or supported.
