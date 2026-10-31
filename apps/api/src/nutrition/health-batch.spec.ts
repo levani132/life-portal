@@ -1,6 +1,7 @@
 import { HealthService } from './health.service';
 import {
   HEALTH_BATCH_LIMIT,
+  HEALTH_WINDOW_HOURS,
   healthWindowResponse,
   planHealthWindows,
   splitHealthWindow,
@@ -14,6 +15,14 @@ const w = {
 it('partitions first-sync time without gaps, newest first, and resumes unfinished windows', () => {
   const queue = planHealthWindows(end);
   expect(queue[0].to).toBe(end);
+  expect(queue).toHaveLength(12);
+  expect(
+    queue.every(
+      (window) =>
+        Date.parse(window.to) - Date.parse(window.from) ===
+        HEALTH_WINDOW_HOURS * 3600000,
+    ),
+  ).toBe(true);
   expect(queue.at(-1)?.from).toBe('2026-10-28T15:30:00.000Z');
   for (let i = 1; i < queue.length; i++)
     expect(queue[i].to).toBe(queue[i - 1].from);

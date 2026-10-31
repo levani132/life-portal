@@ -9,6 +9,8 @@ export interface HealthWindow {
 export const HEALTH_BATCH_LIMIT = 250; // Per kind: at most 500 combined rows.
 export const HEALTH_RUN_WINDOWS = 12;
 const HOUR = 3600000;
+export const HEALTH_WINDOW_HOURS = 6;
+const WINDOW = HEALTH_WINDOW_HOURS * HOUR;
 const window = (from: number, to: number): HealthWindow => ({
   id: randomBytes(16).toString('hex'),
   from: new Date(from).toISOString(),
@@ -16,10 +18,10 @@ const window = (from: number, to: number): HealthWindow => ({
 });
 
 /** Newest windows first; UTC boundaries partition raw samples, not the user's food day. */
-function hours(from: number, to: number): HealthWindow[] {
+function windows(from: number, to: number): HealthWindow[] {
   const result: HealthWindow[] = [];
   while (to > from) {
-    const start = Math.max(from, Math.floor((to - 1) / HOUR) * HOUR);
+    const start = Math.max(from, to - WINDOW);
     result.push(window(start, to));
     to = start;
   }
@@ -37,10 +39,10 @@ export function planHealthWindows(
     .map((w) =>
       Date.parse(w.from) < earliest ? window(earliest, Date.parse(w.to)) : w,
     );
-  if (!previousTo) return hours(earliest, end);
-  if (!remaining.length) return hours(end - 6 * HOUR, end); // Delayed Watch data is re-read.
+  if (!previousTo) return windows(earliest, end);
+  if (!remaining.length) return windows(end - 6 * HOUR, end); // Delayed Watch data is re-read.
   return [
-    ...hours(Math.max(earliest, Date.parse(previousTo)), end),
+    ...windows(Math.max(earliest, Date.parse(previousTo)), end),
     ...remaining,
   ];
 }
