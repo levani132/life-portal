@@ -1,3 +1,6 @@
+import { HealthController, HealthUploadGuard } from './health.service';
+import { IS_TOKEN_AUTH } from '../auth/current-user.decorator';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { HealthService, HealthUploadDto } from './health.service';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
@@ -104,4 +107,13 @@ it('rejects expired or revoked credentials', async () => {
   await expect(service.verify('revoked')).rejects.toThrow(
     'Expired, used or revoked',
   );
+});
+
+it('lets Shortcut uploads reach the scoped Health guard without an account JWT', () => {
+  expect(
+    Reflect.getMetadata(IS_TOKEN_AUTH, HealthController.prototype.upload),
+  ).toBe(true);
+  expect(
+    Reflect.getMetadata(GUARDS_METADATA, HealthController.prototype.upload),
+  ).toContain(HealthUploadGuard);
 });

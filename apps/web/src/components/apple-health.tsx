@@ -87,7 +87,10 @@ export function HealthSyncBridge({ enabled }: { enabled: boolean }) {
         }>('/nutrition/health/launch');
         const input = JSON.stringify({
           ...ticket,
-          uploadUrl: `${API_URL}/nutrition/health/upload`,
+          uploadUrl: new URL(
+            `${API_URL}/nutrition/health/upload`,
+            window.location.origin,
+          ).href,
         });
         const callback = `${window.location.origin}${window.location.pathname}?health-return=1`;
         const url = new URL('shortcuts://x-callback-url/run-shortcut');
@@ -96,7 +99,9 @@ export function HealthSyncBridge({ enabled }: { enabled: boolean }) {
         for (const key of ['x-success', 'x-cancel', 'x-error'])
           url.searchParams.set(key, callback);
         // iOS Shortcuts requires the name parameter with spaces, not + or %20
-        const shortcutUrl = url.toString().replace('run-shortcut?', 'run-shortcut?name=Life Portal Health&');
+        const shortcutUrl = url
+          .toString()
+          .replace('run-shortcut?', 'run-shortcut?name=Life Portal Health&');
         preparedLaunch.current = {
           url: shortcutUrl,
           expiresAt: Date.now() + 14 * 60000,

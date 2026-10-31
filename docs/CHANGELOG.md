@@ -435,3 +435,9 @@ Added an Appearance panel in Settings with Light, System default and Dark choice
 - Food uses colorful calorie/macro circles and a separate activity adjustment with sync details.
 - Added scoped Health receiver, revocation and freshness handoff. Apple Health installation is unavailable until the generated Shortcut is signed, checked on an iPhone and shared; estimates keep working.
 - Home keeps the wall; duplicate Wall tab/button removed and old links redirect Home.
+
+## 2026-10-31 — Health upload authentication and diagnostics
+
+- Restored scoped Health-ticket authentication so Shortcut uploads reach their guard without a login JWT.
+- Log upload arrival and response status before JSON parsing without printing request bodies or credentials.
+- Local development can proxy API requests through the web app; Shortcut upload URLs resolve to the current origin when configured relatively. No tunnel is started by the app.

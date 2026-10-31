@@ -13,8 +13,6 @@ async function bootstrap() {
   const config = loadConfig();
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  // A bounded Health batch can exceed Express's 100 kB default. DTOs still cap row counts.
-  app.useBodyParser('json', { limit: '2mb' });
   app.setGlobalPrefix('api');
   const oauth = app.get(McpOAuthService);
   if (oauth.enabled) {
@@ -23,21 +21,26 @@ async function bootstrap() {
     app.use(oauth.router());
   }
 
-  // TEMP DEBUG — before Nest routing/guards
+  // Trace only Health uploads; never log login bodies, credentials or health sample values.
   app.use((req: Request, res: Response, next: NextFunction) => {
-    Logger.log('[RAW HTTP]', {
-      method: req.method,
-      url: req.originalUrl,
-      contentType: req.headers['content-type'],
-      contentLength: req.headers['content-length'],
-      hasHealthTicket: !!req.headers['x-health-ticket'],
-      body: req.body
-        ? `${JSON.stringify(req.body).substring(0, 200)}...`
-        : '(none)',
-    });
-
+    if (req.path === '/api/nutrition/health/upload') {
+      const started = Date.now();
+      Logger.log(
+        `received method=${req.method} contentType=${req.headers['content-type'] ?? 'missing'} bytes=${req.headers['content-length'] ?? 'unknown'} hasTicket=${!!req.headers['x-health-ticket']}`,
+        'HealthUpload',
+      );
+      res.on('finish', () =>
+        Logger.log(
+          `completed status=${res.statusCode} durationMs=${Date.now() - started}`,
+          'HealthUpload',
+        ),
+      );
+    }
     next();
   });
+
+  // Trace receipt before JSON parsing, so malformed Shortcut bodies also have a status log.
+  app.useBodyParser('json', { limit: '2mb' });
 
   app.useGlobalPipes(
     new ValidationPipe({

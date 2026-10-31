@@ -14,6 +14,19 @@ const path = require('path');
  * @type {import('next').NextConfig}
  */
 const nextConfig = {
+  // Serve the local browser and API from one development origin.
+  ...(process.env.NODE_ENV === 'development'
+    ? {
+        async rewrites() {
+          return [
+            {
+              source: '/api/:path*',
+              destination: 'http://127.0.0.1:3333/api/:path*',
+            },
+          ];
+        },
+      }
+    : {}),
   // The monorepo root, so file tracing follows imports out of `apps/web` into `libs/`.
   outputFileTracingRoot: path.join(__dirname, '../../'),
 };
