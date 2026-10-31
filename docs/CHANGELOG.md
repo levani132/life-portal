@@ -441,3 +441,7 @@ Added an Appearance panel in Settings with Light, System default and Dark choice
 - Restored scoped Health-ticket authentication so Shortcut uploads reach their guard without a login JWT.
 - Log upload arrival and response status before JSON parsing without printing request bodies or credentials.
 - Local development can proxy API requests through the web app; Shortcut upload URLs resolve to the current origin when configured relatively. No tunnel is started by the app.
+
+### Health payload validation diagnostics
+
+Uploads rejected before the controller now log bounded schema field paths and failed validation rules. Health values, tickets and arbitrary payload keys stay out of logs; existing 400 responses and validation requirements are unchanged.

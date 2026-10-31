@@ -4,6 +4,7 @@ import { Request, Response, NextFunction } from 'express';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { McpOAuthService } from './mcp/oauth.service';
+import { healthValidationException } from './nutrition/health-validation';
 import { AppModule } from './app/app.module';
 import { loadConfig } from './config/configuration';
 
@@ -49,6 +50,7 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      exceptionFactory: healthValidationException,
     }),
   );
 
