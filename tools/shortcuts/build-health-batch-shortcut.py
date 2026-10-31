@@ -55,7 +55,7 @@ for label, kind in [('Active Calories', 'activeEnergy'), ('Steps', 'steps')]:
     details = {p: action('properties.health.quantity', WFContentItemPropertyName=p, WFInput=ref(var('Repeat Item'))) for p in ['Start Date', 'End Date', 'Source', 'Value', 'Unit']}
     dates = {p: action('format.date', WFDate=text(out(details[p], p)), WFDateFormatStyle='Custom', WFDateFormat='Custom', WFDateFormatString="yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX") for p in ['Start Date', 'End Date']}
     fields = {'id': text(out(dates['Start Date'], 'Formatted Date'), '/', out(dates['End Date'], 'Formatted Date')), 'type': text(kind), 'source': text(out(details['Source'], 'Source')), 'start': text(out(dates['Start Date'], 'Formatted Date')), 'end': text(out(dates['End Date'], 'Formatted Date')), 'value': text(out(details['Value'], 'Value')), 'unit': text(out(details['Unit'], 'Unit'))}
-    items = {'Value': {'WFDictionaryFieldValueItems': [{'WFItemType': 1 if k == 'value' else 0, 'WFKey': text(k), 'WFValue': v} for k, v in fields.items()]}, 'WFSerializationType': 'WFDictionaryFieldValue'}
+    items = {'Value': {'WFDictionaryFieldValueItems': [{'WFItemType': 0, 'WFKey': text(k), 'WFValue': v} for k, v in fields.items()]}, 'WFSerializationType': 'WFDictionaryFieldValue'}
     row = action('dictionary', WFItems=items)
     action('appendvariable', WFVariableName='Samples', WFInput=ref(out(row, 'Dictionary')))
     action('repeat.each', GroupingIdentifier=group, WFControlFlowMode=2)
@@ -72,6 +72,11 @@ path = output / 'Life Portal Health.plist'; path.write_bytes(plistlib.dumps(work
 uuids = {a['WFWorkflowActionParameters']['UUID'] for a in A}
 def check_refs(value):
     if isinstance(value, dict):
+        if 'WFItemType' in value:
+            # Our dictionaries intentionally use Text fields, including numeric text.
+            # 1 means Dictionary (not Number) and crashes Apple's loader with text state.
+            assert value['WFItemType'] == 0, 'Generated dictionary fields must be Text'
+            assert value['WFValue']['WFSerializationType'] == 'WFTextTokenString'
         if 'OutputUUID' in value: assert value['OutputUUID'] in uuids
         for v in value.values(): check_refs(v)
     elif isinstance(value, list):

@@ -464,3 +464,7 @@ Health uploads now accept a sample array encoded as JSON text by Shortcuts, whil
 - Keep Sync beside Activity adjustment and show Sync due after six hours without a successful receipt.
 - Add resumable hourly query windows, split capped results, retry acknowledgements safely, and preserve unreceived known samples.
 - Add complete manual iPhone Shortcut instructions; importing generated plist source is not required or supported.
+
+### Generated Shortcut dictionary-state correction
+
+Fixed an invalid field tag in the reference batching generator: `WFItemType=1` denotes a Dictionary, not a Number, and was paired with text state for sample values. The generator now consistently emits Text dictionary fields, which the receiver already validates and converts. Added a structural assertion to prevent that mismatch. Corrected output passes the local signer's loading stage; this environment still reports iCloud sharing unavailable, so signing and iPhone execution are not claimed verified.
