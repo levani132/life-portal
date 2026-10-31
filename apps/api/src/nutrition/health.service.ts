@@ -339,7 +339,6 @@ export class HealthController {
   @Post('launch') launch(@CurrentUser('userId') userId: string) {
     return this.health.launch(userId);
   }
-  @TokenAuth()
   @UseGuards(HealthUploadGuard)
   @Post('upload')
   upload(
