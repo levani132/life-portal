@@ -7,6 +7,17 @@ import { revalidate, useApi } from '../lib/hooks';
 import { useAuth } from '../lib/auth-context';
 import { healthShortcutUrl, healthSyncDue } from '../lib/health-sync';
 import { ErrorNote, Panel } from './ui';
+import { HealthShortcutDialog } from './health-shortcut-dialog';
+import {
+  healthShortcutPromptKind,
+  openHealthShortcut,
+  readHealthShortcutInstall,
+  snoozeHealthShortcut,
+  validHealthShortcutUrl,
+  writeHealthShortcutInstall,
+  type HealthShortcutInstall,
+  type HealthShortcutPromptKind,
+} from '../lib/health-shortcut-install';
 interface HealthStatus {
   paired: boolean;
   lastSync?: string;
@@ -19,10 +30,65 @@ interface HealthStatus {
 export function HealthSyncBridge({ enabled }: { enabled: boolean }) {
   const { user } = useAuth();
   const [message, setMessage] = useState('');
-  const running = useRef(false);
-  const preparedLaunch = useRef<{ url: string; expiresAt: number } | null>(
-    null,
+  const [shortcutPrompt, setShortcutPrompt] = useState<{
+    kind: HealthShortcutPromptKind;
+    url: string;
+    userId: string;
+  } | null>(null);
+  const installation = useRef<{
+    userId: string;
+    state: HealthShortcutInstall;
+  } | null>(null);
+  const reminderAt = useRef<number | null>(null);
+  const readInstallation = useCallback(() => {
+    if (!user) return {};
+    if (installation.current?.userId !== user.id)
+      installation.current = {
+        userId: user.id,
+        state: readHealthShortcutInstall(user.id),
+      };
+    return installation.current.state;
+  }, [user]);
+  const saveInstallation = (state: HealthShortcutInstall) => {
+    if (!user) return;
+    installation.current = { userId: user.id, state };
+    writeHealthShortcutInstall(user.id, state);
+    reminderAt.current = state.remindAt ?? null;
+  };
+  const checkInstallation = useCallback(
+    (status: HealthStatus, manual = false) => {
+      if (!user || !validHealthShortcutUrl(status.installationUrl))
+        return false;
+      const state = readInstallation();
+      reminderAt.current =
+        state.snoozedUrl === status.installationUrl
+          ? (state.remindAt ?? null)
+          : null;
+      const kind = healthShortcutPromptKind(
+        status.installationUrl,
+        state,
+        Date.now(),
+        manual,
+      );
+      if (!kind) return false;
+      const url = status.installationUrl;
+      setShortcutPrompt((current) =>
+        current?.url === url &&
+        current.userId === user.id &&
+        current.kind === kind
+          ? current
+          : { kind, url, userId: user.id },
+      );
+      return true;
+    },
+    [user, readInstallation],
   );
+  const running = useRef(false);
+  const preparedLaunch = useRef<{
+    url: string;
+    installationUrl: string;
+    expiresAt: number;
+  } | null>(null);
   const pollUntil = useRef(0);
   const previousReceipt = useRef<string | undefined>(undefined);
   const launch = useCallback(async () => {
@@ -33,23 +99,39 @@ export function HealthSyncBridge({ enabled }: { enabled: boolean }) {
       document.visibilityState !== 'visible'
     )
       return;
-    // A retry of a prepared URL remains directly inside the tap's user gesture.
+    // Keep retries inside the tap gesture when iOS blocks an asynchronous first launch.
     if (
       preparedLaunch.current &&
       preparedLaunch.current.expiresAt > Date.now()
     ) {
+      if (
+        checkInstallation(
+          {
+            paired: true,
+            installationUrl: preparedLaunch.current.installationUrl,
+          },
+          true,
+        )
+      )
+        return;
       pollUntil.current = Date.now() + 15 * 60000;
-      window.location.assign(preparedLaunch.current.url);
+      openHealthShortcut(preparedLaunch.current.url);
       return;
     }
     running.current = true;
     try {
       const status = await api.get<HealthStatus>('/nutrition/health');
-      previousReceipt.current = status.lastSync;
-      if (!status.paired) {
-        window.dispatchEvent(new Event('lp-health-setup'));
-        setMessage('Open Activity info to connect Apple Health first.');
+      previousReceipt.current = status.batchLastReceipt ?? status.lastSync;
+      if (!validHealthShortcutUrl(status.installationUrl)) {
+        setMessage(
+          'The Health Shortcut installation link is not available yet.',
+        );
         return;
+      }
+      if (checkInstallation(status, true)) return;
+      if (!status.paired) {
+        await api.post('/nutrition/health/pair');
+        await revalidate('/nutrition/health');
       }
       const key = `lp.health.attempt.v1.${user.id}`;
       if (Date.now() - Number(sessionStorage.getItem(key) ?? 0) < 15000) {
@@ -73,12 +155,16 @@ export function HealthSyncBridge({ enabled }: { enabled: boolean }) {
           window.location.origin,
         ).href,
       });
-      preparedLaunch.current = { url, expiresAt: Date.now() + 14 * 60000 };
+      preparedLaunch.current = {
+        url,
+        installationUrl: status.installationUrl,
+        expiresAt: Date.now() + 14 * 60000,
+      };
       pollUntil.current = Date.now() + 15 * 60000;
       setMessage(
         'Sync started. Return to this app when Shortcuts finishes. Tap Sync again if your browser blocked opening Shortcuts.',
       );
-      window.location.assign(url);
+      openHealthShortcut(url);
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : 'Health sync could not start.',
@@ -86,7 +172,7 @@ export function HealthSyncBridge({ enabled }: { enabled: boolean }) {
     } finally {
       running.current = false;
     }
-  }, [enabled, user]);
+  }, [enabled, user, checkInstallation]);
   useEffect(() => {
     if (!enabled) return;
     let disposed = false;
@@ -95,9 +181,17 @@ export function HealthSyncBridge({ enabled }: { enabled: boolean }) {
       try {
         const status = await api.get<HealthStatus>('/nutrition/health');
         await revalidate('/nutrition/health');
-        if (!status.paired || status.lastSync !== previousReceipt.current) {
+        if (!disposed && /iPhone|iPad|iPod/i.test(navigator.userAgent))
+          checkInstallation(status);
+        const receipt = status.batchLastReceipt ?? status.lastSync;
+        if (
+          !status.paired ||
+          receipt !== previousReceipt.current ||
+          (preparedLaunch.current &&
+            preparedLaunch.current.installationUrl !== status.installationUrl)
+        ) {
           preparedLaunch.current = null;
-          previousReceipt.current = status.lastSync;
+          previousReceipt.current = receipt;
           if (!disposed) setMessage('');
         }
         if (Date.now() < pollUntil.current) {
@@ -114,41 +208,114 @@ export function HealthSyncBridge({ enabled }: { enabled: boolean }) {
     const resume = () => {
       void refresh();
     };
+    const install = (event: Event) => {
+      const url = (event as CustomEvent<string>).detail;
+      if (!user || !validHealthShortcutUrl(url)) return;
+      const state = readInstallation();
+      setShortcutPrompt({
+        url,
+        userId: user.id,
+        kind:
+          state.installedUrl && state.installedUrl !== url
+            ? 'update'
+            : 'install',
+      });
+    };
+    const storage = () => {
+      installation.current = null;
+      void refresh();
+    };
+    void refresh();
+    window.addEventListener('lp-health-install', install);
+    window.addEventListener('storage', storage);
     window.addEventListener('lp-health-sync', manual);
     window.addEventListener('focus', resume);
     document.addEventListener('visibilitychange', resume);
     const timer = window.setInterval(() => {
-      if (Date.now() < pollUntil.current) void refresh();
+      if (
+        Date.now() < pollUntil.current ||
+        (reminderAt.current !== null && Date.now() >= reminderAt.current)
+      ) {
+        reminderAt.current = null;
+        void refresh();
+      }
     }, 15000);
     return () => {
       disposed = true;
       clearInterval(timer);
+      window.removeEventListener('lp-health-install', install);
+      window.removeEventListener('storage', storage);
       window.removeEventListener('lp-health-sync', manual);
       window.removeEventListener('focus', resume);
       document.removeEventListener('visibilitychange', resume);
     };
-  }, [enabled, launch]);
+  }, [enabled, launch, user, checkInstallation, readInstallation]);
   useEffect(() => {
     window.dispatchEvent(
       new CustomEvent('lp-health-status', { detail: message }),
     );
   }, [message]);
-  if (!message) return null;
+  const activePrompt =
+    enabled && shortcutPrompt?.userId === user?.id ? shortcutPrompt : null;
   return (
-    <div
-      role="status"
-      className="fixed bottom-24 left-1/2 z-[60] flex w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 items-start gap-3 rounded-xl border border-border bg-surface p-3 text-xs text-ink shadow-xl"
-    >
-      <p className="flex-1">{message}</p>
-      <button
-        type="button"
-        aria-label="Dismiss sync message"
-        className="shrink-0 px-2 py-1 text-ink-muted"
-        onClick={() => setMessage('')}
-      >
-        ✕
-      </button>
-    </div>
+    <>
+      {activePrompt && (
+        <HealthShortcutDialog
+          key={`${activePrompt.userId}:${activePrompt.url}`}
+          kind={activePrompt.kind}
+          onInstall={() => {
+            saveInstallation({
+              ...readInstallation(),
+              pendingUrl: activePrompt.url,
+            });
+            setShortcutPrompt({ ...activePrompt, kind: 'confirm' });
+            openHealthShortcut(activePrompt.url);
+          }}
+          onConfirm={() => {
+            saveInstallation({ installedUrl: activePrompt.url });
+            preparedLaunch.current = null;
+            setShortcutPrompt(null);
+            void launch();
+          }}
+          onLater={() => {
+            saveInstallation(
+              snoozeHealthShortcut(
+                activePrompt.url,
+                readInstallation(),
+                Date.now(),
+              ),
+            );
+            setShortcutPrompt(null);
+          }}
+          onDecline={() => {
+            saveInstallation({
+              ...readInstallation(),
+              pendingUrl: undefined,
+              declinedUrl: activePrompt.url,
+              snoozedUrl: undefined,
+              remindAt: undefined,
+            });
+            setShortcutPrompt(null);
+          }}
+        />
+      )}
+      {message && (
+        <div
+          role="status"
+          className="fixed bottom-24 left-1/2 z-[60] flex w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 items-start gap-3 rounded-xl border border-border bg-surface p-3 text-xs text-ink shadow-xl"
+        >
+          <p className="flex-1">{message}</p>
+          <button
+            type="button"
+            aria-label="Dismiss sync message"
+            className="shrink-0 px-2 py-1 text-ink-muted"
+            onClick={() => setMessage('')}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -227,6 +394,14 @@ export function AppleHealthPanel({
             <a
               className="text-accent underline"
               href={status.data.installationUrl}
+              onClick={(event) => {
+                event.preventDefault();
+                window.dispatchEvent(
+                  new CustomEvent('lp-health-install', {
+                    detail: status.data?.installationUrl,
+                  }),
+                );
+              }}
             >
               Life Portal Health
             </a>{' '}
