@@ -54,7 +54,7 @@ Inside the outer Repeat:
 | `to` | `Window end` |
 | `limitPerKind` | `Sample limit` |
 
-The server may return an hour or a smaller interval. Always use its values; do not advance
+The server normally returns a six-hour window or a smaller interval. Always use its values; do not advance
 hours yourself. `queryFrom` includes a small overlap so strict “is after” filtering does not
 lose records exactly on a boundary. The receiver handles the overlap.
 
@@ -124,7 +124,9 @@ Duplicate the Active Calories block, with these changes only:
 - Append to the **same** `Samples` variable. Do not reset it between Active Calories and Steps.
 
 The combined count is at most 100. If either query returns 50, the server conservatively
-splits the interval and asks for smaller windows. A capped query is never marked complete.
+saves any valid received samples, splits the interval, and asks for smaller windows.
+A capped query is never marked complete; repeated records are upserted by identity.
+On a fresh Sync, pending windows are processed before newly added intervals.
 
 ## 7. Upload the current window
 

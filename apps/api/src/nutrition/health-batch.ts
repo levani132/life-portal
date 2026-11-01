@@ -46,9 +46,10 @@ export function planHealthWindows(
       Math.max(earliest, Math.min(Date.parse(previousTo), end - 6 * HOUR)),
       end,
     );
+  // Preserve the cursor: repeated launches must not starve pending work with tiny new windows.
   return [
-    ...windows(Math.max(earliest, Date.parse(previousTo)), end),
     ...remaining,
+    ...windows(Math.max(earliest, Date.parse(previousTo)), end),
   ];
 }
 export function splitHealthWindow(w: HealthWindow): HealthWindow[] {

@@ -27,8 +27,8 @@ it('partitions first-sync time without gaps, newest first, and resumes unfinishe
   for (let i = 1; i < queue.length; i++)
     expect(queue[i].to).toBe(queue[i - 1].from);
   const resumed = planHealthWindows('2026-10-31T16:00:00.000Z', end, [w]);
-  expect(resumed.at(-1)).toEqual(w);
-  expect(resumed[0].from).toBe(end);
+  expect(resumed[0]).toEqual(w);
+  expect(resumed.at(-1)?.from).toBe(end);
   expect(planHealthWindows(end, end, []).at(-1)?.from).toBe(
     '2026-10-31T09:30:00.000Z',
   );
@@ -133,7 +133,7 @@ it('acknowledges only successfully stored windows and treats lost-response retri
   await service.batchUpload(owner, dto);
   expect(days.updateOne).toHaveBeenCalledTimes(1);
 });
-it('does not store or mark sync successful when a result cap is hit', async () => {
+it('splits metadata-only capped queries without claiming any stored data', async () => {
   const { owner, model, days, service } = fixture();
   expect(
     await service.batchUpload(owner, {
@@ -149,6 +149,86 @@ it('does not store or mark sync successful when a result cap is hit', async () =
   };
   expect(update.$set).not.toHaveProperty('lastSync');
 });
+const cappedSamples = () =>
+  Array.from({ length: HEALTH_BATCH_LIMIT }, (_, i) => ({
+    id: `capped-${i}`,
+    source: 'watch',
+    type: 'activeEnergy' as const,
+    start: w.from,
+    end: w.to,
+    value: 1,
+    unit: 'kcal',
+  }));
+it('stores validated capped samples before queuing smaller windows without claiming coverage is complete', async () => {
+  const { owner, model, days, service } = fixture();
+  const result = await service.batchUpload(owner, {
+    windowId: w.id,
+    activeCount: HEALTH_BATCH_LIMIT,
+    stepCount: 0,
+    samples: cappedSamples(),
+  });
+  expect(result).toMatchObject({
+    split: true,
+    stored: HEALTH_BATCH_LIMIT,
+    done: false,
+    remaining: 2,
+  });
+  expect(days.updateOne).toHaveBeenCalledTimes(1);
+  const pipeline = (
+    days.updateOne.mock.calls[0] as unknown as [
+      unknown,
+      {
+        $set: {
+          samples: { $concatArrays: [unknown, { $literal: unknown[] }] };
+        };
+      }[],
+    ]
+  )[1];
+  expect(pipeline[0].$set.samples.$concatArrays[1].$literal).toHaveLength(
+    HEALTH_BATCH_LIMIT,
+  );
+  const update = model.findOneAndUpdate.mock.calls[1][1] as {
+    $set: Record<string, unknown>;
+  };
+  expect(update.$set).not.toHaveProperty('lastSync');
+});
+it('rejects out-of-window or mismatched capped payloads before saving or advancing', async () => {
+  const { owner, model, days, service } = fixture();
+  const samples = cappedSamples();
+  samples[0].start = '2026-10-01T00:00:00.000Z';
+  await expect(
+    service.batchUpload(owner, {
+      windowId: w.id,
+      activeCount: HEALTH_BATCH_LIMIT,
+      stepCount: 0,
+      samples,
+    }),
+  ).rejects.toThrow('absolute time window');
+  await expect(
+    service.batchUpload(owner, {
+      windowId: w.id,
+      activeCount: HEALTH_BATCH_LIMIT,
+      stepCount: 0,
+      samples: cappedSamples().slice(1),
+    }),
+  ).rejects.toThrow('counts must match');
+  expect(days.updateOne).not.toHaveBeenCalled();
+  expect(model.findOneAndUpdate).not.toHaveBeenCalled();
+});
+it('keeps capped windows pending when storage fails', async () => {
+  const { owner, model, days, service } = fixture();
+  days.updateOne.mockRejectedValueOnce(new Error('write failed'));
+  await expect(
+    service.batchUpload(owner, {
+      windowId: w.id,
+      activeCount: HEALTH_BATCH_LIMIT,
+      stepCount: 0,
+      samples: cappedSamples(),
+    }),
+  ).rejects.toThrow('write failed');
+  expect(model.findOneAndUpdate).toHaveBeenCalledTimes(1);
+});
+
 it('leaves the cursor pending on database failure and rejects another window', async () => {
   const { owner, days, model, service } = fixture();
   await expect(

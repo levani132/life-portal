@@ -9,7 +9,7 @@ No query result establishes wear/permission completeness or enables downward adj
 Implementation: legacy upload remains compatible; a separate Health-only batch credential is
 bound to account, connection and a 15-minute session. Cursor advancement follows successful
 writes. First sync considers 72 recent hours; caught-up runs recheck six hours for delayed
-samples. At most 12 windows per Shortcut run, 250 rows per kind per query, adaptive splitting
+samples. At most 12 windows per Shortcut run, 50 rows per kind per query, adaptive splitting
 and an explicit blocked state for irreducibly dense one-second intervals. Preserve previously
 known records when permissions/data are missing. Replace matching source/type/ID records.
 

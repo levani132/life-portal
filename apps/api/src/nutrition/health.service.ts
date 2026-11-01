@@ -457,7 +457,7 @@ export class HealthService {
       dto.activeCount >= HEALTH_BATCH_LIMIT ||
       dto.stepCount >= HEALTH_BATCH_LIMIT;
     if (
-      !truncated &&
+      (!truncated || dto.samples.length > 0) &&
       (dto.samples.filter((s) => s.type === 'activeEnergy').length !==
         dto.activeCount ||
         dto.samples.filter((s) => s.type === 'steps').length !==
@@ -468,47 +468,49 @@ export class HealthService {
         'Health batch counts must match active-energy and step records.',
       );
     const rows: HealthSample[] = [];
-    if (!truncated)
-      for (const s of dto.samples) {
-        const start = Date.parse(s.start),
-          end = Date.parse(s.end);
-        const unit = s.unit.toLowerCase();
-        if (
-          !s.id.trim() ||
-          !s.source.trim() ||
-          !/(Z|[+-]\d{2}:\d{2})$/.test(s.start) ||
-          !/(Z|[+-]\d{2}:\d{2})$/.test(s.end) ||
-          end <= start ||
-          end > Date.parse(owner.to) ||
-          start < Date.parse(w.from) - 1000 ||
-          start >= Date.parse(w.to)
-        )
-          throw new BadRequestException(
-            'Health samples must match the requested absolute time window.',
-          );
-        if (s.type === 'activeEnergy' && !['kcal', 'cal', 'kj'].includes(unit))
-          throw new BadRequestException(
-            'Active energy must be exported in kcal or kJ.',
-          );
-        if (
-          s.type === 'steps' &&
-          !['count', 'steps', 'step', ''].includes(unit)
-        )
-          throw new BadRequestException('Steps must be counts.');
-        // Find's strict-after predicate gets a one-second query overlap; adjacent windows own those edge records.
-        if (start < Date.parse(w.from)) continue;
-        rows.push({
-          id: s.id,
-          type: s.type,
-          source: s.source,
-          start: new Date(start).toISOString(),
-          end: new Date(end).toISOString(),
-          value:
-            s.type === 'activeEnergy' && unit === 'kj'
-              ? s.value / 4.184
-              : s.value,
-        });
-      }
+    // Capped results can still contain useful records. Validate and store them before splitting.
+    for (const s of dto.samples) {
+      const start = Date.parse(s.start),
+        end = Date.parse(s.end);
+      const unit = s.unit.toLowerCase();
+      if (
+        !s.id.trim() ||
+        !s.source.trim() ||
+        !/(Z|[+-]\d{2}:\d{2})$/.test(s.start) ||
+        !/(Z|[+-]\d{2}:\d{2})$/.test(s.end) ||
+        end <= start ||
+        end > Date.parse(owner.to) ||
+        start < Date.parse(w.from) - 1000 ||
+        start >= Date.parse(w.to)
+      )
+        throw new BadRequestException(
+          'Health samples must match the requested absolute time window.',
+        );
+      if (s.type === 'activeEnergy' && !['kcal', 'cal', 'kj'].includes(unit))
+        throw new BadRequestException(
+          'Active energy must be exported in kcal or kJ.',
+        );
+      if (s.type === 'steps' && !['count', 'steps', 'step', ''].includes(unit))
+        throw new BadRequestException('Steps must be counts.');
+      // Find's strict-after predicate gets a one-second query overlap; adjacent windows own those edge records.
+      if (start < Date.parse(w.from)) continue;
+      rows.push({
+        id: s.id,
+        type: s.type,
+        source: s.source,
+        start: new Date(start).toISOString(),
+        end: new Date(end).toISOString(),
+        value:
+          s.type === 'activeEnergy' && unit === 'kj'
+            ? s.value / 4.184
+            : s.value,
+      });
+    }
+    const uniqueRows = [
+      ...new Map(
+        rows.map((s) => [`${s.type}:${s.source}:${s.id}`, s]),
+      ).values(),
+    ];
     const writeId = randomBytes(16).toString('hex');
     const acquired = await this.model.findOneAndUpdate(
       {
@@ -535,14 +537,10 @@ export class HealthService {
         ...(truncated ? splitHealthWindow(w) : []),
         ...(current.batchQueue ?? []).slice(1),
       ];
-      if (!truncated)
+      if (!truncated || uniqueRows.length > 0)
         await this.storeWindow(
           { ...owner, from: w.from, to: w.to },
-          [
-            ...new Map(
-              rows.map((s) => [`${s.type}:${s.source}:${s.id}`, s]),
-            ).values(),
-          ],
+          uniqueRows,
           true,
         );
       const acknowledged =
@@ -566,12 +564,13 @@ export class HealthService {
           'Health connection changed during upload; pending work can be resumed.',
         );
       Logger.log(
-        `batch ${truncated ? 'split' : 'acknowledged'} records=${rows.length} remaining=${queue.length}`,
+        `batch ${truncated ? 'split' : 'acknowledged'} records=${rows.length} stored=${uniqueRows.length} remaining=${queue.length}`,
         'HealthUpload',
       );
       return {
         acknowledged: w.id,
         split: truncated,
+        stored: uniqueRows.length,
         ...healthWindowResponse(queue),
       };
     } finally {
