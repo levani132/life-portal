@@ -72,9 +72,9 @@ window are not uploaded with the next window.
    - Start Date **is before** `Window end`.
    - End Date **is before** `Run end` (not Window end: a sample may span hours).
 2. Sort by **Start Date**, **Oldest First**.
-3. Enable **Limit** and use variable `Sample limit` for the number. The server supplies **250**.
+3. Enable **Limit** and use variable `Sample limit` for the number. The server supplies **50**.
    Use the number field's variable picker. If your editor cannot bind that field to a variable,
-   use the fixed value **250** once; do not change it to match a calorie total.
+   use the fixed value **50** once; do not change it to match a calorie total.
 4. Set Variable → `Active samples` from Find Health Samples.
 5. **Count** → **Items** in `Active samples`. Set Variable → `Active count`.
 6. **Repeat with Each** item in `Active samples`.
@@ -123,7 +123,7 @@ Duplicate the Active Calories block, with these changes only:
 - Dictionary `type` is literal **`steps`**.
 - Append to the **same** `Samples` variable. Do not reset it between Active Calories and Steps.
 
-The combined count is at most 500. If either query returns 250, the server conservatively
+The combined count is at most 100. If either query returns 50, the server conservatively
 splits the interval and asks for smaller windows. A capped query is never marked complete.
 
 ## 7. Upload the current window
@@ -167,12 +167,12 @@ Repeat 12 times
     If state is not ready → Stop and Output
     Read Window ID / Query start / Window end / Sample limit
     Empty Samples list
-    Find Active Calories (bounded dates, limit 250)
+    Find Active Calories (bounded dates, limit 50)
     Count → Active count
     Repeat each Active sample
         Read details → format dates → Dictionary → Add to Samples
     End Repeat
-    Find Steps (same bounds, limit 250)
+    Find Steps (same bounds, limit 50)
     Count → Step count
     Repeat each Step sample
         Read details → format dates → Dictionary → Add to Samples

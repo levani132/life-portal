@@ -6,7 +6,7 @@ export interface HealthWindow {
   to: string;
   blocked?: boolean;
 }
-export const HEALTH_BATCH_LIMIT = 250; // Per kind: at most 500 combined rows.
+export const HEALTH_BATCH_LIMIT = 50; // Per kind: at most 100 combined rows.
 export const HEALTH_RUN_WINDOWS = 12;
 const HOUR = 3600000;
 export const HEALTH_WINDOW_HOURS = 6;

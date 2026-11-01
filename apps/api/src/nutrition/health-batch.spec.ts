@@ -46,6 +46,11 @@ it('covers time since a completed plan instead of skipping gaps longer than six 
   expect(old.at(-1)?.from).toBe('2026-10-28T15:30:00.000Z');
 });
 
+it('advertises a 50-per-kind limit for at most 100 combined Shortcut items', () => {
+  expect(HEALTH_BATCH_LIMIT).toBe(50);
+  expect(healthWindowResponse([w]).window?.limitPerKind).toBe(50);
+});
+
 it('splits capped intervals and blocks an irreducibly dense second without claiming completion', () => {
   const split = splitHealthWindow(w);
   expect(split[0].from).toBe(split[1].to);
