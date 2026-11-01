@@ -33,6 +33,19 @@ it('partitions first-sync time without gaps, newest first, and resumes unfinishe
     '2026-10-31T09:30:00.000Z',
   );
 });
+it('covers time since a completed plan instead of skipping gaps longer than six hours', () => {
+  const previous = '2026-10-30T15:30:00.000Z';
+  const queue = planHealthWindows(end, previous, []);
+  expect(queue).toHaveLength(4);
+  expect(queue[0].to).toBe(end);
+  expect(queue.at(-1)?.from).toBe(previous);
+  for (let i = 1; i < queue.length; i++)
+    expect(queue[i].to).toBe(queue[i - 1].from);
+  const old = planHealthWindows(end, '2026-10-01T00:00:00.000Z', []);
+  expect(old).toHaveLength(12);
+  expect(old.at(-1)?.from).toBe('2026-10-28T15:30:00.000Z');
+});
+
 it('splits capped intervals and blocks an irreducibly dense second without claiming completion', () => {
   const split = splitHealthWindow(w);
   expect(split[0].from).toBe(split[1].to);

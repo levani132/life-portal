@@ -424,7 +424,12 @@ export class HealthService {
       throw new UnauthorizedException(
         'Expired or revoked Health batch session.',
       );
-    return healthWindowResponse(row.batchQueue ?? []);
+    const response = healthWindowResponse(row.batchQueue ?? []);
+    Logger.log(
+      `next window=${JSON.stringify(response.window ?? null)} state=${response.state} remaining=${response.remaining} syncTo=${owner.to}`,
+      'HealthUpload',
+    );
+    return response;
   }
   async batchUpload(owner: HealthOwner, dto: HealthBatchUploadDto) {
     const filter = this.batchFilter(owner);
@@ -445,7 +450,7 @@ export class HealthService {
         'Request the pending Health window before uploading.',
       );
     Logger.log(
-      `batch samples received records=${dto.samples.length} activeCount=${dto.activeCount} stepCount=${dto.stepCount}`,
+      `batch samples received from=${w.from} to=${w.to} syncTo=${owner.to} limitPerKind=${HEALTH_BATCH_LIMIT} records=${dto.samples.length} activeCount=${dto.activeCount} stepCount=${dto.stepCount}`,
       'HealthUpload',
     );
     const truncated =

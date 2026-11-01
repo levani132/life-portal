@@ -40,7 +40,12 @@ export function planHealthWindows(
       Date.parse(w.from) < earliest ? window(earliest, Date.parse(w.to)) : w,
     );
   if (!previousTo) return windows(earliest, end);
-  if (!remaining.length) return windows(end - 6 * HOUR, end); // Delayed Watch data is re-read.
+  // Cover time since the previous plan, with at least six hours of overlap for delayed Watch data.
+  if (!remaining.length)
+    return windows(
+      Math.max(earliest, Math.min(Date.parse(previousTo), end - 6 * HOUR)),
+      end,
+    );
   return [
     ...windows(Math.max(earliest, Date.parse(previousTo)), end),
     ...remaining,
