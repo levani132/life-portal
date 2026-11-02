@@ -230,8 +230,13 @@ export function WidgetCarousel({
   };
 
   if (!count) return null;
+  // On phones the strip runs almost edge to edge (2px gutters), like the feed below it.
   return (
-    <section aria-label="Home widgets" aria-roledescription="carousel">
+    <section
+      aria-label="Home widgets"
+      aria-roledescription="carousel"
+      className="-mx-3.5 sm:mx-0"
+    >
       <div
         ref={viewport}
         className={`widget-carousel-viewport overflow-x-auto ${editing ? '' : 'cursor-grab'} ${dragging ? 'cursor-grabbing select-none' : ''}`}

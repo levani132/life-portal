@@ -11,7 +11,8 @@ resize.
 
 The widget strip is shorter (184px, was 216px) and every widget was refitted to it. The food
 card drops its activity-adjustment line and its duplicate "set goals" alert. While scrolling
-the Home feed, the bottom tabs now hide and return together with the header.
+the Home feed, the bottom tabs now hide and return together with the header. On phones the widget strip
+now runs almost edge to edge, with a 2px gutter instead of 16px.
 
 ## 2026-10-21 — Fix assistant sign-in in the browser
 
