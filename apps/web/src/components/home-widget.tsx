@@ -42,11 +42,14 @@ function remainingText({ value, target, unit }: NutritionMetric) {
 
 export function NutritionRing({
   metric,
+  compact = false,
   shared = false,
   stagger,
 }: {
   metric: NutritionMetric;
-  /** The calories column on Home: the one piece that moves between the widget's two faces. */
+  /** Ring and number only, for the small food card on Home. */
+  compact?: boolean;
+  /** The calories ring on Home: the one piece that moves between the widget's two faces. */
   shared?: boolean;
   /** Position in the staggered entrance on Home's food widget. */
   stagger?: number;
@@ -62,7 +65,6 @@ export function NutritionRing({
   return (
     <div
       className="min-w-0 text-center"
-      data-shared={shared || undefined}
       data-fade={stagger !== undefined || undefined}
       style={
         stagger !== undefined
@@ -71,7 +73,8 @@ export function NutritionRing({
       }
     >
       <div
-        className="nutrition-ring"
+        className={clsx('nutrition-ring', compact && 'nutrition-ring-compact')}
+        data-shared={shared || undefined}
         role="img"
         aria-label={`${label}: ${value} ${unit} consumed. ${remainingText(metric)}.`}
       >
@@ -97,27 +100,37 @@ export function NutritionRing({
             transform="rotate(-90 40 40)"
           />
         </svg>
-        <span className="absolute inset-0 flex flex-col items-center justify-center tabular leading-tight">
-          <strong className="nutrition-ring-value">
+        <span className="nutrition-ring-text absolute inset-0 flex flex-col items-center justify-center tabular leading-tight">
+          <strong className={compact ? 'text-[10px]' : 'nutrition-ring-value'}>
             {value?.toLocaleString() ?? '—'}
           </strong>
-          <span className="text-[10px] text-ink-faint sm:text-[10px]">
-            {unit}
-          </span>
+          {!compact && (
+            <span className="text-[10px] text-ink-faint sm:text-[10px]">
+              {unit}
+            </span>
+          )}
         </span>
       </div>
-      <p className="mt-1 truncate text-[10px] font-medium sm:text-xs">
-        {label}
-      </p>
-      <p
-        className={clsx(
-          'text-[10px] leading-tight sm:text-[11px]',
-          over ? 'text-rose-400' : 'text-ink-muted',
-        )}
-      >
-        {remainingText(metric)}
-        {metric.basis && <EstimateMark basis={metric.basis} />}
-      </p>
+      {!compact && (
+        // Beside a moving ring, its captions fade in with the first of the macros.
+        <div
+          data-fade={shared || undefined}
+          style={shared ? ({ '--stagger': 1 } as CSSProperties) : undefined}
+        >
+          <p className="mt-1 truncate text-[10px] font-medium sm:text-xs">
+            {label}
+          </p>
+          <p
+            className={clsx(
+              'text-[10px] leading-tight sm:text-[11px]',
+              over ? 'text-rose-400' : 'text-ink-muted',
+            )}
+          >
+            {remainingText(metric)}
+            {metric.basis && <EstimateMark basis={metric.basis} />}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -188,8 +201,9 @@ export function HomeWidget({
   ];
   const root = useRef<HTMLElement>(null);
   const wasExpanded = useRef(expanded);
-  // The calories column is the same piece of content in both faces, so instead of crossfading
-  // it flies from where it was to where it now is (a FLIP), while everything else fades around it.
+  // The calories ring is the same piece of content in both faces, so instead of crossfading it
+  // flies and scales from where it was to where it now is (a FLIP), while everything else fades
+  // around it. Its number is styled differently in each face, so that part crossfades in flight.
   useLayoutEffect(() => {
     if (wasExpanded.current === expanded) return;
     wasExpanded.current = expanded;
@@ -203,10 +217,14 @@ export function HomeWidget({
       '.widget-face[data-shown="true"] [data-shared]',
     );
     if (!from || !to || typeof to.animate !== 'function') return;
-    to.getAnimations?.().forEach((animation) => animation.cancel());
+    const cancel = (node: HTMLElement) =>
+      node
+        .getAnimations?.({ subtree: true })
+        .forEach((animation) => animation.cancel());
+    cancel(to);
     const a = from.getBoundingClientRect();
     const b = to.getBoundingClientRect();
-    from.getAnimations?.().forEach((animation) => animation.cancel());
+    cancel(from);
     if (!b.width || !b.height) return;
     const dx = a.left + a.width / 2 - (b.left + b.width / 2);
     const dy = a.top + a.height / 2 - (b.top + b.height / 2);
@@ -218,6 +236,10 @@ export function HomeWidget({
         { transform: 'none' },
       ],
       { duration: 460, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' },
+    );
+    to.querySelector('.nutrition-ring-text')?.animate(
+      [{ opacity: 0 }, { opacity: 1 }],
+      { duration: 240, delay: 40, easing: 'ease-out', fill: 'backwards' },
     );
   });
   const select = (event: MouseEvent) => {
@@ -411,7 +433,17 @@ export function HomeWidget({
           className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-2"
         >
           {metrics ? (
-            <NutritionRing metric={metrics[0]} shared />
+            <>
+              <NutritionRing metric={metrics[0]} compact shared />
+              <span
+                className="text-center text-[10px] leading-tight text-ink-muted"
+                data-fade
+              >
+                {nutrition?.leftKcal !== undefined
+                  ? `${Math.abs(nutrition.leftKcal)} kcal ${nutrition.leftKcal < 0 ? 'over' : 'left'}`
+                  : `${nutrition?.eatenKcal} kcal eaten`}
+              </span>
+            </>
           ) : (
             <>
               <Icon size={21} className="text-ink-muted" aria-hidden />

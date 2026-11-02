@@ -15,9 +15,9 @@ the Home feed, the bottom tabs now hide and return together with the header. On 
 now runs almost edge to edge, with a 2px gutter instead of 16px.
 
 A widget you swipe to now expands the moment it lands instead of after the snap has fully
-stopped. On the food widget the calories ring glides between its small and full positions
-while protein, carbs and fat slide out from behind it one after another; the small food card
-is now just the calories column, without the + button.
+stopped. On the food widget the calories ring glides and grows between its small and full
+positions while protein, carbs and fat slide out from behind it one after another. The small
+food card no longer has a + button.
 
 ## 2026-10-21 — Fix assistant sign-in in the browser
 

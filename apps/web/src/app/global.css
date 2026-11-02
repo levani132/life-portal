@@ -416,6 +416,9 @@
   width: clamp(34px, 100%, 56px);
   container-type: inline-size;
 }
+.home-widget .nutrition-ring.nutrition-ring-compact {
+  width: 38px;
+}
 .home-widget .nutrition-ring-value {
   font-size: clamp(10px, 22cqi, 13px);
 }
