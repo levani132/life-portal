@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-02 — Home widgets follow your finger
+
+Swiping between Home widgets now tracks the finger one-to-one instead of racing ahead of it.
+The widget you leave switches to its compact view as soon as you start swiping, and the
+next one shows its full view only after it has settled, so nothing jumps while the cards
+resize.
+
 ## 2026-10-21 — Fix assistant sign-in in the browser
 
 Fixed the “Invalid form origin” error after submitting the assistant sign-in page,

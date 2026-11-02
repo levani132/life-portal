@@ -334,6 +334,35 @@
 .widget-carousel-viewport::-webkit-scrollbar {
   display: none;
 }
+/* A home widget's two faces, centred on the card at their final widths (set by the carousel).
+   The card's frame follows the finger; these only crossfade, so the content never reflows.
+   Leaving is quick so the outgoing face is gone before the card gets narrow; arriving is a
+   touch slower and slightly delayed, which reads as the content settling in. */
+.widget-face {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 100%;
+  transform: translateX(-50%);
+  transition-property: opacity, transform;
+  transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  transition-duration: 300ms;
+  transition-delay: 40ms;
+}
+.widget-face-full {
+  width: var(--widget-full, 100%);
+}
+.widget-face-compact {
+  width: var(--widget-peek, 100%);
+}
+.widget-face[data-shown='false'] {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) scale(0.94);
+  transition-duration: 160ms;
+  transition-delay: 0ms;
+}
 .nutrition-ring {
   position: relative;
   width: clamp(44px, 100%, 88px);
@@ -356,7 +385,8 @@
   width: 38px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .widget-carousel-viewport .widget-slot {
+  .widget-carousel-viewport .widget-slot,
+  .widget-face {
     transition: none !important;
   }
   .portal-header {
