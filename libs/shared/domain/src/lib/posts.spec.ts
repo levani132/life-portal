@@ -7,6 +7,7 @@ import {
   canReadFoodPost,
   canonicalPublication,
   publicationCalories,
+  publicationMacros,
   publicationFoodIdentity,
   validPostSelection,
 } from './posts';
@@ -79,6 +80,23 @@ describe('food publication contracts', () => {
       expect(canonicalPublication({ ...p, items: [item] })).not.toBe(
         canonicalPublication(p),
       );
+  });
+  it('scales macro grams by logged portions and fingerprints frozen targets', () => {
+    expect(publicationMacros([{ ...food, amount: 150 }])).toEqual({
+      energyKcal: 180,
+      proteinG: 15,
+      carbG: 16.5,
+      fatG: 6,
+    });
+    expect(publicationMacros([food])).toBeUndefined();
+    const day: FoodPublication = {
+      kind: 'day',
+      label: 'Diary',
+      items: [{ ...food, amount: 150 }],
+    };
+    expect(
+      canonicalPublication({ ...day, targets: { proteinG: 100 } }),
+    ).not.toBe(canonicalPublication(day));
   });
   it('adds portion calories only when all portions are known', () => {
     expect(

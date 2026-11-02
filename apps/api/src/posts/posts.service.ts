@@ -26,6 +26,7 @@ import {
   canReadFoodPost,
   canonicalPublication,
   publicationCalories,
+  publicationMacros,
 } from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
 import { NutritionPublicationService } from '../nutrition/nutrition-publication.service';
@@ -107,6 +108,8 @@ export class PostsService {
       itemCount: p.items.length,
       items: teaser ? p.items.slice(0, 3) : p.items,
       totalKcal: publicationCalories(p.items),
+      totalMacros: publicationMacros(p.items),
+      ...(p.kind === 'day' && p.targets ? { targets: p.targets } : {}),
       isOwner: row.userId === viewerId,
     };
   }

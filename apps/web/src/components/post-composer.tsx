@@ -9,9 +9,16 @@ import {
   type PostPreview,
   type PostSelection,
 } from '@life-portal/shared-types';
-import { publicationCalories } from '@life-portal/shared-domain';
+import {
+  publicationCalories,
+  publicationMacros,
+} from '@life-portal/shared-domain';
 import { api } from '../lib/api';
 import { revalidate, useApi } from '../lib/hooks';
+import {
+  PublishedFoodMacros,
+  PublishedNutritionSummary,
+} from './published-nutrition';
 import { mealContextNow } from '../lib/local-day';
 import {
   ErrorNote,
@@ -367,7 +374,17 @@ export function PostComposer({
                   ? ` · ${publicationCalories(items!)} kcal`
                   : ''}
               </p>
-              <ul className="max-h-64 space-y-2 overflow-y-auto text-sm">
+              <PublishedNutritionSummary
+                totals={publicationMacros(items ?? [])}
+                targets={preview.publication.targets}
+                diary={kind === 'day'}
+              />
+              {kind === 'day' && (
+                <p className="my-2 text-xs text-ink-muted">
+                  The displayed daily targets will be included in this post.
+                </p>
+              )}
+              <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto text-sm">
                 {items!.map((item) => (
                   <li key={item.key}>
                     {item.name}
@@ -378,6 +395,7 @@ export function PostComposer({
                         : `${item.amount} ${item.unit}`}
                       {item.slot ? ` · ${item.slot}` : ''}
                     </span>
+                    <PublishedFoodMacros food={item} />
                   </li>
                 ))}
               </ul>

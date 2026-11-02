@@ -19,7 +19,10 @@ import {
   type PostPage,
   type ReportReason,
 } from '@life-portal/shared-types';
-import { mgToG } from '@life-portal/shared-domain';
+import {
+  PublishedFoodMacros,
+  PublishedNutritionSummary,
+} from './published-nutrition';
 import { api } from '../lib/api';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { SOCIAL_REFRESH } from '../lib/social-hooks';
@@ -251,6 +254,11 @@ export function PostCard({
             </p>
           </div>
         </div>
+        <PublishedNutritionSummary
+          totals={post.totalMacros}
+          targets={post.targets}
+          diary={post.kind === 'day'}
+        />
         <ul
           className={`mt-3 divide-y divide-border/70 ${detail ? 'max-h-[32rem] overflow-y-auto' : ''}`}
         >
@@ -270,13 +278,7 @@ export function PostCard({
                   {food.slot ? ` · ${food.slot}` : ''}
                 </span>
               </div>
-              {detail && (
-                <p className="mt-1 text-xs text-ink-muted">
-                  Per 100 {food.unit}: {food.energyKcalPer100} kcal · P{' '}
-                  {mgToG(food.proteinMgPer100)}g · C {mgToG(food.carbMgPer100)}g
-                  · F {mgToG(food.fatMgPer100)}g
-                </p>
-              )}
+              <PublishedFoodMacros food={food} />
               {food.attribution && (
                 <p className="mt-1 text-xs text-ink-faint">
                   {food.attribution.url ? (

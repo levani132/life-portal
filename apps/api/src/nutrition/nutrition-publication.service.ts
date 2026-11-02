@@ -20,6 +20,7 @@ import {
   validPostSelection,
   toDay,
 } from '@life-portal/shared-domain';
+import { NutritionService } from './nutrition.service';
 import { Food, MealEntry, SavedMeal } from './nutrition.schemas';
 
 type FactsSource = Pick<
@@ -42,6 +43,7 @@ export class NutritionPublicationService {
     @InjectModel(Food.name) private readonly foods: Model<Food>,
     @InjectModel(MealEntry.name) private readonly entries: Model<MealEntry>,
     @InjectModel(SavedMeal.name) private readonly meals: Model<SavedMeal>,
+    private readonly nutrition: NutritionService,
   ) {}
   private attribution(food: Food): FoodAttribution | undefined {
     if (food.attribution)
@@ -202,6 +204,15 @@ export class NutritionPublicationService {
         label,
         ...(slot ? { slot } : {}),
         items,
+      };
+    }
+    if (source.kind === 'day' && publication.day) {
+      const summary = await this.nutrition.summary(userId, publication.day);
+      publication.targets = {
+        energyKcal: summary.targetKcal,
+        proteinG: summary.proteinTargetG,
+        carbG: summary.carbTargetG,
+        fatG: summary.fatTargetG,
       };
     }
     if (!publication.items.length || publication.items.length > MAX_POST_ITEMS)

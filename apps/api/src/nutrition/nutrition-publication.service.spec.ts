@@ -20,45 +20,41 @@ function query(rows: unknown) {
 }
 function fixture() {
   const foods = {
-    find: jest
-      .fn()
-      .mockReturnValue(
-        query([
-          {
-            _id: 'food',
-            userId: 'owner',
-            ...facts,
-            name: 'Current yogurt',
-            unit: 'g',
-            archived: false,
-            notes: 'SECRET',
-            visibility: 'private',
-            barcode: 'PRIVATE',
-            favourite: true,
-            source: 'manual',
-          },
-        ]),
-      ),
+    find: jest.fn().mockReturnValue(
+      query([
+        {
+          _id: 'food',
+          userId: 'owner',
+          ...facts,
+          name: 'Current yogurt',
+          unit: 'g',
+          archived: false,
+          notes: 'SECRET',
+          visibility: 'private',
+          barcode: 'PRIVATE',
+          favourite: true,
+          source: 'manual',
+        },
+      ]),
+    ),
     updateOne: jest.fn().mockResolvedValue({ upsertedCount: 1 }),
   };
   const entries = {
-    find: jest
-      .fn()
-      .mockReturnValue(
-        query([
-          {
-            _id: 'entry',
-            userId: 'owner',
-            foodId: 'food',
-            day: '2026-10-22',
-            slot: 'breakfast',
-            amount: 150,
-            unit: 'g',
-            facts: { ...facts, notes: 'SECRET' },
-            note: 'SECRET',
-          },
-        ]),
-      ),
+    find: jest.fn().mockReturnValue(
+      query([
+        {
+          _id: 'entry',
+          userId: 'owner',
+          foodId: 'food',
+          day: '2026-10-22',
+          slot: 'breakfast',
+          amount: 150,
+          unit: 'g',
+          facts: { ...facts, notes: 'SECRET' },
+          note: 'SECRET',
+        },
+      ]),
+    ),
   };
   const meals = {
     findOne: jest.fn().mockReturnValue(query(null)),
@@ -72,6 +68,14 @@ function fixture() {
       foods as never,
       entries as never,
       meals as never,
+      {
+        summary: jest.fn(async () => ({
+          targetKcal: 2000,
+          proteinTargetG: 100,
+          carbTargetG: 250,
+          fatTargetG: 60,
+        })),
+      } as never,
     ),
   };
 }
@@ -99,6 +103,18 @@ describe('nutrition publication boundary', () => {
       'favourite',
     ])
       expect(p.items[0]).not.toHaveProperty(key);
+  });
+  it('includes only the displayed daily target numbers in a diary snapshot', async () => {
+    const p = await fixture().service.snapshot('owner', {
+      kind: 'day',
+      day: '2026-10-22',
+    });
+    expect(p.targets).toEqual({
+      energyKcal: 2000,
+      proteinG: 100,
+      carbG: 250,
+      fatG: 60,
+    });
   });
   it('publishes only active owned catalogue foods without meal quantities', async () => {
     const f = fixture();

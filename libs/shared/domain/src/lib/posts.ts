@@ -3,6 +3,7 @@ import type {
   FoodPublication,
   PostSelection,
   PublishedFood,
+  PublishedMacros,
 } from '@life-portal/shared-types';
 import { entryTotals } from './nutrition';
 const FACT_KEYS = [
@@ -32,6 +33,16 @@ export function canonicalPublication(publication: FoodPublication): string {
     publication.label,
     publication.day ?? null,
     publication.slot ?? null,
+    ...(publication.targets
+      ? [
+          [
+            publication.targets.energyKcal ?? null,
+            publication.targets.proteinG ?? null,
+            publication.targets.carbG ?? null,
+            publication.targets.fatG ?? null,
+          ],
+        ]
+      : []),
     publication.items.map((item) => [
       item.key,
       item.name,
@@ -84,4 +95,22 @@ export function publicationCalories(
         0,
       )
     : undefined;
+}
+
+export function publicationMacros(
+  items: PublishedFood[],
+): PublishedMacros | undefined {
+  if (!items.every((item) => item.amount !== undefined)) return undefined;
+  return items.reduce(
+    (total, item) => {
+      const value = entryTotals(item.amount ?? 0, item);
+      return {
+        energyKcal: total.energyKcal + value.energyKcal,
+        proteinG: total.proteinG + value.proteinMg / 1000,
+        carbG: total.carbG + value.carbMg / 1000,
+        fatG: total.fatG + value.fatMg / 1000,
+      };
+    },
+    { energyKcal: 0, proteinG: 0, carbG: 0, fatG: 0 },
+  );
 }

@@ -23,7 +23,7 @@ export interface FoodAttribution {
   label: string;
   url?: string;
 }
-/** Published nutrition facts only: no private source IDs, notes, goals or measurements. */
+/** Published nutrition facts only: no private source IDs, notes or measurements. */
 export interface PublishedFood extends NutritionFacts {
   key: string;
   name: string;
@@ -35,7 +35,15 @@ export interface PublishedFood extends NutritionFacts {
   slot?: MealSlot;
   attribution?: FoodAttribution;
 }
+export interface PublishedMacros {
+  energyKcal: number;
+  proteinG: number;
+  carbG: number;
+  fatG: number;
+}
 export interface FoodPublication {
+  /** Frozen daily targets, explicitly included in the sharing preview. */
+  targets?: Partial<PublishedMacros>;
   kind: FoodPostKind;
   label: string;
   day?: string;
@@ -67,6 +75,8 @@ export interface FoodPost {
   /** Feed cards contain only a teaser; detail includes the full publication. */
   items: PublishedFood[];
   totalKcal?: number;
+  totalMacros?: PublishedMacros;
+  targets?: Partial<PublishedMacros>;
   isOwner: boolean;
 }
 export interface PostPage {
