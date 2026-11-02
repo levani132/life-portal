@@ -1,4 +1,5 @@
 import { HealthService } from './health.service';
+import { Logger } from '@nestjs/common';
 import {
   HEALTH_BATCH_LIMIT,
   HEALTH_WINDOW_HOURS,
@@ -215,6 +216,36 @@ it('rejects out-of-window or mismatched capped payloads before saving or advanci
   expect(days.updateOne).not.toHaveBeenCalled();
   expect(model.findOneAndUpdate).not.toHaveBeenCalled();
 });
+it('reports the failed timing rule without exposing record IDs or health values', async () => {
+  const { owner, service } = fixture();
+  const samples = cappedSamples();
+  samples[0] = {
+    ...samples[0],
+    id: 'private-id',
+    source: 'private-source',
+    start: '2026-10-31T13:00:00.000Z',
+    value: 12345,
+  };
+  const log = jest.spyOn(Logger, 'warn').mockImplementation();
+  try {
+    await expect(
+      service.batchUpload(owner, {
+        windowId: w.id,
+        activeCount: HEALTH_BATCH_LIMIT,
+        stepCount: 0,
+        samples,
+      }),
+    ).rejects.toThrow('Sample 1: start_before_window');
+    const output = JSON.stringify(log.mock.calls);
+    expect(output).toContain('startOffsetSeconds');
+    expect(output).toContain('-3600');
+    expect(output).not.toContain('private-');
+    expect(output).not.toContain('12345');
+  } finally {
+    log.mockRestore();
+  }
+});
+
 it('keeps capped windows pending when storage fails', async () => {
   const { owner, model, days, service } = fixture();
   days.updateOne.mockRejectedValueOnce(new Error('write failed'));

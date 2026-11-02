@@ -469,23 +469,42 @@ export class HealthService {
       );
     const rows: HealthSample[] = [];
     // Capped results can still contain useful records. Validate and store them before splitting.
-    for (const s of dto.samples) {
+    for (const [index, s] of dto.samples.entries()) {
       const start = Date.parse(s.start),
         end = Date.parse(s.end);
       const unit = s.unit.toLowerCase();
-      if (
-        !s.id.trim() ||
-        !s.source.trim() ||
-        !/(Z|[+-]\d{2}:\d{2})$/.test(s.start) ||
-        !/(Z|[+-]\d{2}:\d{2})$/.test(s.end) ||
-        end <= start ||
-        end > Date.parse(owner.to) ||
-        start < Date.parse(w.from) - 1000 ||
-        start >= Date.parse(w.to)
-      )
-        throw new BadRequestException(
-          'Health samples must match the requested absolute time window.',
+      const reasons = [
+        ...(!s.id.trim() ? ['empty_id'] : []),
+        ...(!s.source.trim() ? ['empty_source'] : []),
+        ...(!/(Z|[+-]\d{2}:\d{2})$/.test(s.start)
+          ? ['start_missing_timezone']
+          : []),
+        ...(!/(Z|[+-]\d{2}:\d{2})$/.test(s.end)
+          ? ['end_missing_timezone']
+          : []),
+        ...(end <= start ? ['end_not_after_start'] : []),
+        ...(end > Date.parse(owner.to) ? ['end_after_run_end'] : []),
+        ...(start < Date.parse(w.from) - 1000 ? ['start_before_window'] : []),
+        ...(start >= Date.parse(w.to) ? ['start_at_or_after_window_end'] : []),
+      ];
+      if (reasons.length) {
+        // Log relative timing only, never record IDs, sources, or health measurements.
+        const diagnostic = {
+          sampleIndex: index,
+          reasons,
+          startOffsetSeconds: (start - Date.parse(w.from)) / 1000,
+          windowSeconds: (Date.parse(w.to) - Date.parse(w.from)) / 1000,
+          durationSeconds: (end - start) / 1000,
+          endPastRunSeconds: (end - Date.parse(owner.to)) / 1000,
+        };
+        Logger.warn(
+          `batch sample rejected ${JSON.stringify(diagnostic)}`,
+          'HealthUpload',
         );
+        throw new BadRequestException(
+          `Health samples must match the requested absolute time window. Sample ${index + 1}: ${reasons.join(', ')}. Start offset from window: ${diagnostic.startOffsetSeconds}s; window length: ${diagnostic.windowSeconds}s; sample duration: ${diagnostic.durationSeconds}s.`,
+        );
+      }
       if (s.type === 'activeEnergy' && !['kcal', 'cal', 'kj'].includes(unit))
         throw new BadRequestException(
           'Active energy must be exported in kcal or kJ.',
