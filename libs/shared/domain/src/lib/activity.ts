@@ -1,5 +1,6 @@
 import type {
   HealthSample,
+  ActivityHour,
   NutritionProfile,
   NutritionTargets,
 } from '@life-portal/shared-types';
@@ -57,6 +58,13 @@ export function activityTargets(
         .map((s) => [`${s.type}:${s.source}:${s.id}`, s]),
     ).values(),
   ];
+  const timeline: ActivityHour[] = Array.from({ length: 24 }, (_, index) => ({
+    hour: (profile.dayStartHour + index) % 24,
+    activeKcal: 0,
+    steps: 0,
+    hasActiveEnergy: false,
+    hasSteps: false,
+  }));
   let recorded = 0,
     expected = 0,
     steps = 0;
@@ -126,8 +134,15 @@ export function activityTargets(
         const next = Math.min(end, (Math.floor(t / 60000) + 1) * 60000);
         const { date, hour } = context(t);
         if (date === day) {
-          if (type === 'steps') steps += rate * (next - t);
-          else {
+          const bucket = timeline[(hour - profile.dayStartHour + 24) % 24];
+          const amount = rate * (next - t);
+          if (type === 'steps') {
+            steps += amount;
+            bucket.steps += amount;
+            bucket.hasSteps = true;
+          } else {
+            bucket.activeKcal += amount;
+            bucket.hasActiveEnergy = true;
             recorded += rate * (next - t);
             // 07:00–23:00 is an explicit forecast assumption; no activity phased through sleep.
             if (hour >= 7 && hour < 23)
@@ -144,6 +159,11 @@ export function activityTargets(
     : 0;
   const starting = targets.energyKcal.value;
   const activity = {
+    timeline: timeline.map((bucket) => ({
+      ...bucket,
+      activeKcal: Math.round(bucket.activeKcal * 100) / 100,
+      steps: Math.round(bucket.steps * 100) / 100,
+    })),
     startingTargetKcal: starting,
     recordedActiveKcal: Math.round(recorded),
     expectedReplacedKcal: Math.round(expected),

@@ -31,6 +31,7 @@ import { Type, Transform, plainToInstance } from 'class-transformer';
 import { createHash, randomBytes } from 'crypto';
 import { addDays } from '@life-portal/shared-domain';
 import type { HealthSample } from '@life-portal/shared-types';
+import { HealthShortcutSettingsService } from './health-shortcut-settings';
 import { normalizeHealthSamples } from './health-samples-input';
 import { CurrentUser, TokenAuth } from '../auth/current-user.decorator';
 import { AccessService, RequireModule } from '../access/access.module';
@@ -93,15 +94,11 @@ export class HealthService {
     private readonly model: Model<HealthConnection>,
     @InjectModel(HealthDay.name) private readonly days: Model<HealthDay>,
     private readonly access: AccessService,
+    private readonly shortcutSettings: HealthShortcutSettingsService,
   ) {}
   async status(userId: string) {
     const row = await this.model.findOne({ userId }).lean();
-    const configured = process.env['APPLE_HEALTH_SHORTCUT_URL'];
-    const installationUrl =
-      configured &&
-      /^https:\/\/www\.icloud\.com\/shortcuts\/[a-f0-9]{32}$/i.test(configured)
-        ? configured
-        : undefined;
+    const installationUrl = await this.shortcutSettings.getUrl();
     return {
       paired: row?.paired ?? false,
       lastSync: row?.lastSync,

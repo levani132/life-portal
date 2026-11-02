@@ -13,7 +13,7 @@ run, with no date filters or window loop. The app supplies `{token, uploadUrl, l
 Its JSON upload body is only `{samples}`; `x-health-ticket` carries the scoped credential.
 The previous generated window-based sources are obsolete and must not be installed.
 Manual editing on the iPhone avoids the Mac signing/iCloud dependency. Share the tested copy
-via a fresh iCloud link and update the backend installation URL.
+via a fresh iCloud link and update Settings → Apple Health Shortcut (developer only).
 
 ## Manual sync and returning to the PWA
 

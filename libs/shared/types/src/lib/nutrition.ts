@@ -266,7 +266,16 @@ export interface HealthSample {
   end: string;
   value: number;
 }
+export interface ActivityHour {
+  hour: number;
+  activeKcal: number;
+  steps: number;
+  hasActiveEnergy: boolean;
+  hasSteps: boolean;
+}
 export interface ActivityAdjustment {
+  /** Local clock hours, ordered from the configured food-day boundary. Missing is not zero. */
+  timeline?: ActivityHour[];
   startingTargetKcal: number;
   recordedActiveKcal: number;
   expectedReplacedKcal: number;

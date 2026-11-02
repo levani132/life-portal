@@ -1,7 +1,7 @@
 # Life Portal Health: latest samples
 
 Create or edit **Life Portal Health** on your iPhone. No plist import or Mac signing is required.
-Share the tested Shortcut via iCloud and update `APPLE_HEALTH_SHORTCUT_URL` for each release.
+Share the tested Shortcut via iCloud. The developer updates its link in Settings → Apple Health Shortcut.
 Installation/update prompts compare that URL with the version confirmed on each device.
 
 ## App input

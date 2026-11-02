@@ -306,3 +306,14 @@ then uploads the combined list once. This does not establish complete historical
 more than 50 new records of a type between runs can leave gaps. Existing imported history
 remains available. Earlier batch routes, window planning and generated batch artifacts are
 retired. See [the iPhone setup guide](../integrations/apple-health-shortcut-manual.md).
+
+## Health info and Shortcut publishing
+
+The Activity info panel shows the per-device confirmed Shortcut state (installed, update
+available, or not confirmed), recorded hourly activity, and compact totals. Hourly bars
+use the same source-overlap priority and timezone/food-day boundary as activity targets;
+unimported periods stay missing rather than becoming measured zero.
+
+The configured developer alone can GET/PUT `/settings/health-shortcut`. Its validated
+iCloud URL lives in the singleton `health_shortcut_settings` document; the old environment
+variable is ignored. Publishing a different URL triggers existing per-device update prompts.

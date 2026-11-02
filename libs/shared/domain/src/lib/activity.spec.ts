@@ -46,6 +46,53 @@ const sample = (
 const calculate = (samples: HealthSample[], day = '2026-10-31', p = profile) =>
   activityTargets(targets, p, day, samples, now, now).activity!;
 describe('Health replacement model', () => {
+  it('builds hourly bars from merged sources and distinguishes imported zero from missing data', () => {
+    const energy = sample(60);
+    const result = calculate([
+      energy,
+      energy,
+      sample(60, { source: 'phone', id: 'overlap' }),
+      sample(120, { type: 'steps', id: 'steps' }),
+      sample(0, {
+        id: 'zero',
+        start: '2026-10-31T08:00:00Z',
+        end: '2026-10-31T09:00:00Z',
+      }),
+    ]);
+    expect(result.timeline).toHaveLength(24);
+    expect(result.timeline?.[0].hour).toBe(4);
+    expect(result.timeline?.find((row) => row.hour === 11)).toMatchObject({
+      activeKcal: 60,
+      steps: 120,
+      hasActiveEnergy: true,
+      hasSteps: true,
+    });
+    expect(result.timeline?.find((row) => row.hour === 12)).toMatchObject({
+      activeKcal: 0,
+      hasActiveEnergy: true,
+    });
+    expect(result.timeline?.find((row) => row.hour === 10)).toMatchObject({
+      hasActiveEnergy: false,
+      hasSteps: false,
+    });
+  });
+  it('places cross-boundary chart samples into the configured local food day', () => {
+    const rows = [
+      sample(100, {
+        start: '2026-10-30T23:00:00Z',
+        end: '2026-10-31T01:00:00Z',
+      }),
+    ];
+    const today = calculate(rows);
+    const yesterday = calculate(rows, '2026-10-30');
+    expect(today.timeline?.find((row) => row.hour === 4)?.activeKcal).toBe(50);
+    expect(today.timeline?.find((row) => row.hour === 3)?.hasActiveEnergy).toBe(
+      false,
+    );
+    expect(yesterday.timeline?.find((row) => row.hour === 3)?.activeKcal).toBe(
+      50,
+    );
+  });
   it('keeps no-data, zero, steps-only and low-energy targets stable', () => {
     for (const rows of [
       [],

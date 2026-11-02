@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { HealthShortcutAdminSetting } from '../../components/health-shortcut-admin-setting';
 import { ThemePreferenceControl } from '../../components/theme-preference';
 import type {
   Currency,
@@ -67,7 +68,10 @@ function Settings() {
           title="Settings"
           subtitle="Make Life Portal work for you."
         />
-        <div className="mb-4"><ThemePreferenceControl /></div>
+        <div className="mb-4">
+          <ThemePreferenceControl />
+        </div>
+        {portal.data.cohort === 'developer' && <HealthShortcutAdminSetting />}
         <div className="card divide-y divide-border">
           {[
             { href: '/settings/modules', label: 'Manage modules' },
@@ -115,6 +119,7 @@ function Settings() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <ThemePreferenceControl />
+        {portal.data.cohort === 'developer' && <HealthShortcutAdminSetting />}
         <Panel
           title="Display currency"
           description="Everything is converted into this on the way out. Amounts keep the currency they were entered in."

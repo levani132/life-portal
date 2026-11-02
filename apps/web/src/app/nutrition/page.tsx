@@ -497,14 +497,6 @@ function MacroTiles({
         title="Activity & Apple Health"
         wide
       >
-        <p className="text-sm text-ink-muted">
-          Starting target{' '}
-          {targets.activity?.startingTargetKcal ??
-            targets.energyKcal?.value ??
-            '—'}{' '}
-          kcal. Activity adjustment is already included in your current calorie
-          target.
-        </p>
         {healthOpen && <AppleHealthPanel activity={targets.activity} />}
       </Modal>
     </div>

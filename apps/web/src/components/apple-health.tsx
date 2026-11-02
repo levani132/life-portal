@@ -1,15 +1,18 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Heart, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, RefreshCw, XCircle } from 'lucide-react';
 import type { ActivityAdjustment } from '@life-portal/shared-types';
 import { api, API_URL } from '../lib/api';
 import { revalidate, useApi } from '../lib/hooks';
 import { useAuth } from '../lib/auth-context';
 import { healthShortcutUrl, healthSyncDue } from '../lib/health-sync';
 import { ErrorNote, Panel } from './ui';
+import { HealthActivityChart } from './health-activity-chart';
 import { HealthShortcutDialog } from './health-shortcut-dialog';
 import {
   healthShortcutPromptKind,
+  healthShortcutInstallStatus,
+  HEALTH_SHORTCUT_INSTALL_EVENT,
   openHealthShortcut,
   readHealthShortcutInstall,
   snoozeHealthShortcut,
@@ -359,6 +362,33 @@ export function AppleHealthPanel({
     revalidateOnFocus: true,
     refreshInterval: 15000,
   });
+  const { user } = useAuth();
+  const [installation, setInstallation] = useState<HealthShortcutInstall>({});
+  useEffect(() => {
+    const refresh = (event?: Event) => {
+      const update = (
+        event as
+          | CustomEvent<{ userId: string; state: HealthShortcutInstall }>
+          | undefined
+      )?.detail;
+      setInstallation(
+        user
+          ? update?.userId === user.id
+            ? update.state
+            : readHealthShortcutInstall(user.id)
+          : {},
+      );
+    };
+    refresh();
+    window.addEventListener(HEALTH_SHORTCUT_INSTALL_EVENT, refresh);
+    window.addEventListener('storage', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.removeEventListener(HEALTH_SHORTCUT_INSTALL_EVENT, refresh);
+      window.removeEventListener('storage', refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [user]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
@@ -381,55 +411,67 @@ export function AppleHealthPanel({
       setBusy(false);
     }
   }
+  const installState = healthShortcutInstallStatus(
+    status.data?.installationUrl,
+    installation,
+  );
+  const InstallIcon =
+    installState === 'installed'
+      ? CheckCircle2
+      : installState === 'update'
+        ? AlertTriangle
+        : XCircle;
+  const installLabel =
+    installState === 'installed'
+      ? 'Installed · confirmed on this device'
+      : installState === 'update'
+        ? 'Update available'
+        : installState === 'missing'
+          ? 'Not installed on this device'
+          : 'Setup link unavailable';
   return (
-    <Panel
-      title="Apple Health"
-      description="A shared Apple Shortcut reads Health on your iPhone and sends a scoped upload. You control permissions; you can revoke this connection anytime."
-    >
-      <div className="space-y-3 text-sm">
-        <Heart className="text-rose-400" />
-        {status.data?.installationUrl ? (
-          <p>
-            1. Install{' '}
-            <a
-              className="text-accent underline"
-              href={status.data.installationUrl}
-              onClick={(event) => {
-                event.preventDefault();
-                window.dispatchEvent(
-                  new CustomEvent('lp-health-install', {
-                    detail: status.data?.installationUrl,
-                  }),
-                );
-              }}
-            >
-              Life Portal Health
-            </a>{' '}
-            on your iPhone. Keep its name so Life Portal can open it.
-          </p>
-        ) : (
-          <p role="status" className="rounded-xl bg-amber-500/10 p-3">
-            Apple Health setup is waiting for the shared Shortcut to be signed
-            and published. Your profile-based estimates remain available. You
-            can skip this step and return later.
+    <Panel title="Apple Health">
+      <div className="space-y-4 text-sm">
+        <button
+          type="button"
+          disabled={!status.data?.installationUrl}
+          className="flex w-full items-center gap-3 rounded-xl border border-border p-3 text-left disabled:opacity-60"
+          onClick={() =>
+            window.dispatchEvent(
+              new CustomEvent('lp-health-install', {
+                detail: status.data?.installationUrl,
+              }),
+            )
+          }
+        >
+          <InstallIcon
+            aria-hidden="true"
+            size={22}
+            className={
+              installState === 'installed'
+                ? 'text-emerald-400'
+                : installState === 'update'
+                  ? 'text-amber-400'
+                  : 'text-rose-400'
+            }
+          />
+          <span className="flex-1">
+            <span className="block font-medium">Life Portal Health</span>
+            <span className="text-xs text-ink-muted">{installLabel}</span>
+          </span>
+          <span className="text-xs text-accent">
+            {installState === 'installed'
+              ? 'Manage'
+              : installState === 'update'
+                ? 'Update'
+                : 'Install'}
+          </span>
+        </button>
+        {installState === 'missing' && (
+          <p className="text-xs text-ink-muted">
+            Install the Shortcut, allow Health access, then return here to sync.
           </p>
         )}
-        <p>
-          2. Tap Pair & first sync. Allow Shortcuts to read Active Energy and
-          Steps, and allow the upload to Life Portal. No account password is
-          shared with the Shortcut.
-        </p>
-        <p>
-          3. Return here and wait for “Last data received.” Missing permission
-          or no samples does not establish inactivity.
-        </p>
-        <p className="text-xs text-ink-muted">
-          The Shortcut requires an iPhone installation and export check. If
-          installation or permissions fail, skip this step and retry here later.
-          Sync opens Shortcuts only when you tap it. A reminder appears after
-          six hours. When finished, return to your existing Life Portal app; we
-          do not open a browser return link.
-        </p>
         {status.error && (
           <ErrorNote message={(status.error as Error).message} />
         )}
@@ -439,106 +481,92 @@ export function AppleHealthPanel({
             {syncMessage}
           </p>
         )}
-        <p role="status" className="font-medium">
-          {status.data?.lastSync
-            ? `Last data received · ${new Date(status.data.lastSync).toLocaleString()}`
-            : status.data?.paired
-              ? 'Paired — waiting for Health samples'
-              : 'Not connected'}
-        </p>
-        <p className="text-xs text-ink-muted">
-          Imports up to {status.data?.limitPerKind ?? 50} recent samples each
-          for Steps and Active Energy. Earlier imports are kept. A sync may not
-          include all activity since the previous upload.
-        </p>
-        {status.data?.lastUploadAt && (
-          <p role="status" className="text-xs text-ink-muted">
-            Last upload · {new Date(status.data.lastUploadAt).toLocaleString()}{' '}
-            · {status.data.lastReceivedCount ?? 0} samples received
-          </p>
+        {activity && (
+          <>
+            <dl className="grid grid-cols-3 gap-2">
+              {[
+                ['Active kcal', activity.recordedActiveKcal.toLocaleString()],
+                ['Steps', activity.steps.toLocaleString()],
+                ['Adjustment', `+${activity.adjustmentKcal} kcal`],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl bg-violet-500/10 p-3">
+                  <dt className="text-[11px] text-ink-muted">{label}</dt>
+                  <dd className="mt-1 font-semibold tabular-nums">{value}</dd>
+                </div>
+              ))}
+            </dl>
+            <HealthActivityChart activity={activity} />
+          </>
         )}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <p role="status" className="text-xs text-ink-muted">
+            {status.data?.lastSync
+              ? `Last data · ${new Date(status.data.lastSync).toLocaleString()}`
+              : 'No Health data received yet'}
+          </p>
           <button
             type="button"
             disabled={busy || !status.data?.installationUrl}
-            className="btn-primary"
+            className="btn-primary shrink-0"
             onClick={() =>
               status.data?.paired
                 ? window.dispatchEvent(new Event('lp-health-sync'))
                 : void pair()
             }
           >
-            {status.data?.paired ? 'Sync / retry' : 'Pair & first sync'}
+            {busy ? 'Connecting…' : 'Sync'}
           </button>
-          {status.data?.paired && (
-            <button
-              type="button"
-              className="btn"
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  await api.delete('/nutrition/health');
-                  await status.mutate();
-                  await revalidate('/nutrition');
-                  await revalidate('/dashboard');
-                } catch (e) {
-                  setError(
-                    e instanceof Error ? e.message : 'Could not revoke.',
-                  );
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              Revoke connection & delete uploads
-            </button>
-          )}
         </div>
-        {activity && (
-          <dl className="grid grid-cols-2 gap-2 rounded-xl bg-violet-500/10 p-4">
-            {[
-              ['Starting target', `${activity.startingTargetKcal} kcal`],
-              ['Active energy recorded', `${activity.recordedActiveKcal} kcal`],
-              [
-                'Expected activity replaced',
-                `${activity.expectedReplacedKcal} kcal`,
-              ],
-              [
-                'Activity adjustment',
-                `${activity.adjustmentKcal >= 0 ? '+' : ''}${activity.adjustmentKcal} kcal`,
-              ],
-              ['Current target', `${activity.currentTargetKcal} kcal`],
-              ['Steps received', activity.steps.toLocaleString()],
-              [
-                'Workouts received',
-                activity.workouts
-                  ? String(activity.workouts)
-                  : 'No workout data received',
-              ],
-              [
-                'Tracking',
-                activity.status === 'missing'
-                  ? 'Missing — forecast retained'
-                  : activity.status === 'stale'
-                    ? 'Stale / partial — forecast retained'
-                    : 'Partial — uncertain periods retain forecast',
-              ],
-            ].map(([label, value]) => (
-              <div key={label}>
-                <dt className="text-xs text-ink-muted">{label}</dt>
-                <dd>{value}</dd>
-              </div>
-            ))}
-            <p className="col-span-2 mt-2 text-xs text-ink-muted">
-              Energy is an estimate. Only matching sampled periods replace
-              expected movement, with a 07:00–23:00 forecast. Uncertain tracking
-              never lowers your target. Step and workout calories are already
-              part of active energy and are not added again. Steps-only data
-              does not change your target.
+        <details className="rounded-xl border border-border p-3">
+          <summary className="cursor-pointer text-xs text-ink-muted">
+            Details & connection
+          </summary>
+          <div className="mt-3 space-y-3 text-xs text-ink-muted">
+            <p>
+              Each sync imports up to {status.data?.limitPerKind ?? 50} recent
+              samples per type. Gaps keep your activity estimate; syncing may
+              not capture the full day.
             </p>
-          </dl>
-        )}
+            {activity && (
+              <p>
+                Starting target {activity.startingTargetKcal} kcal → current
+                target {activity.currentTargetKcal} kcal. The adjustment is
+                already included.
+              </p>
+            )}
+            {status.data?.lastUploadAt && (
+              <p>
+                Last upload ·{' '}
+                {new Date(status.data.lastUploadAt).toLocaleString()} ·{' '}
+                {status.data.lastReceivedCount ?? 0} samples received
+              </p>
+            )}
+            {status.data?.paired && (
+              <button
+                type="button"
+                className="text-rose-400 underline"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    await api.delete('/nutrition/health');
+                    await status.mutate();
+                    await revalidate('/nutrition');
+                    await revalidate('/dashboard');
+                  } catch (e) {
+                    setError(
+                      e instanceof Error ? e.message : 'Could not disconnect.',
+                    );
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Disconnect & delete imports
+              </button>
+            )}
+          </div>
+        </details>
       </div>
     </Panel>
   );

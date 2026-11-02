@@ -7,6 +7,7 @@ export interface HealthShortcutInstall {
   snoozedUrl?: string;
   remindAt?: number;
 }
+export const HEALTH_SHORTCUT_INSTALL_EVENT = 'lp-health-shortcut-installation';
 export type HealthShortcutPromptKind = 'install' | 'update' | 'confirm';
 export const healthShortcutInstallKey = (userId: string) =>
   `lp.health.shortcut.v1.${userId}`;
@@ -56,6 +57,19 @@ export function writeHealthShortcutInstall(
   } catch {
     /* Storage can be disabled; the current tab also keeps this state in memory. */
   }
+  window.dispatchEvent(
+    new CustomEvent(HEALTH_SHORTCUT_INSTALL_EVENT, {
+      detail: { userId, state },
+    }),
+  );
+}
+export function healthShortcutInstallStatus(
+  url: string | undefined,
+  state: HealthShortcutInstall,
+) {
+  if (!validHealthShortcutUrl(url)) return 'unavailable' as const;
+  if (state.installedUrl === url) return 'installed' as const;
+  return state.installedUrl ? ('update' as const) : ('missing' as const);
 }
 export function healthShortcutPromptKind(
   url: string,

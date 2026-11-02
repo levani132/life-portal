@@ -1,4 +1,10 @@
 import {
+  HealthShortcutSettings,
+  HealthShortcutSettingsSchema,
+  HealthShortcutSettingsService,
+  HealthShortcutSettingsController,
+} from './health-shortcut-settings';
+import {
   HealthDay,
   HealthDaySchema,
   HealthConnection,
@@ -352,6 +358,10 @@ export class NutritionController {
 @Module({
   imports: [
     MongooseModule.forFeature([
+      {
+        name: HealthShortcutSettings.name,
+        schema: HealthShortcutSettingsSchema,
+      },
       { name: HealthConnection.name, schema: HealthConnectionSchema },
       { name: HealthDay.name, schema: HealthDaySchema },
       { name: Food.name, schema: FoodSchema },
@@ -363,9 +373,14 @@ export class NutritionController {
       { name: User.name, schema: UserSchema },
     ]),
   ],
-  controllers: [NutritionController, HealthController],
+  controllers: [
+    NutritionController,
+    HealthController,
+    HealthShortcutSettingsController,
+  ],
   providers: [
     HealthService,
+    HealthShortcutSettingsService,
     HealthUploadGuard,
     NutritionService,
     OpenFoodFactsProvider,

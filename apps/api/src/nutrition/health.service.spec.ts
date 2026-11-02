@@ -85,13 +85,33 @@ function fixture() {
     deleteMany: jest.fn(),
   };
   const access = { require: jest.fn() };
+  const shortcutSettings = {
+    getUrl: jest.fn(async (): Promise<string | undefined> => undefined),
+  };
   const service = new HealthService(
     model as never,
     days as never,
     access as never,
+    shortcutSettings as never,
   );
-  return { service, model, days, access, row };
+  return { service, model, days, access, row, shortcutSettings };
 }
+
+it('uses the database Shortcut URL and ignores the retired environment variable', async () => {
+  const previous = process.env['APPLE_HEALTH_SHORTCUT_URL'];
+  process.env['APPLE_HEALTH_SHORTCUT_URL'] =
+    `https://www.icloud.com/shortcuts/${'a'.repeat(32)}`;
+  try {
+    const { service, shortcutSettings } = fixture();
+    expect((await service.status('accountA')).installationUrl).toBeUndefined();
+    const configured = `https://www.icloud.com/shortcuts/${'b'.repeat(32)}`;
+    shortcutSettings.getUrl.mockResolvedValue(configured);
+    expect((await service.status('accountA')).installationUrl).toBe(configured);
+  } finally {
+    if (previous === undefined) delete process.env['APPLE_HEALTH_SHORTCUT_URL'];
+    else process.env['APPLE_HEALTH_SHORTCUT_URL'] = previous;
+  }
+});
 
 it('launches a recent-only sync with a token and limit and retires queue metadata without deleting samples', async () => {
   const { service, model, days } = fixture();
