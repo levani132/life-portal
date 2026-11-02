@@ -2,7 +2,7 @@
 
 import clsx from 'clsx';
 import Link from 'next/link';
-import { Bot, Info, Plus, Share2 } from 'lucide-react';
+import { BookmarkPlus, Bot, Info, Plus, Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type {
   PortalState,
@@ -569,29 +569,34 @@ function SlotSection({
         <>
           {onShare && slot.entries.length > 0 && (
             <button
-              className="btn-ghost"
+              type="button"
+              className="flex h-11 w-10 items-center justify-center rounded-lg text-ink-muted transition hover:bg-violet-500/10 hover:text-ink active:scale-95"
+              aria-label={`Share ${SLOT_LABELS[slot.slot].toLowerCase()}`}
+              title="Share meal"
               onClick={() => onShare({ kind: 'meal', day, slot: slot.slot })}
             >
-              Share meal
+              <Share2 size={18} aria-hidden="true" />
             </button>
           )}
           {slot.entries.length > 0 && (
             <button
               type="button"
-              className="btn-ghost"
+              className="flex h-11 w-10 items-center justify-center rounded-lg text-ink-muted transition hover:bg-violet-500/10 hover:text-ink active:scale-95"
               onClick={() => setSaving(true)}
-              title="Save this as a meal you can log in one tap"
+              aria-label={`Save ${SLOT_LABELS[slot.slot].toLowerCase()} as a meal`}
+              title="Save as meal"
             >
-              Save as meal
+              <BookmarkPlus size={18} aria-hidden="true" />
             </button>
           )}
           <button
             type="button"
-            className="btn-ghost px-3.5 text-lg leading-none active:scale-95"
+            className="flex h-11 w-10 items-center justify-center rounded-lg text-accent transition hover:bg-violet-500/10 active:scale-95"
+            title={`Add to ${SLOT_LABELS[slot.slot].toLowerCase()}`}
             onClick={onAdd}
             aria-label={`Add to ${SLOT_LABELS[slot.slot]}`}
           >
-            +
+            <Plus size={20} aria-hidden="true" />
           </button>
         </>
       }
@@ -727,14 +732,18 @@ function SlotSuggestions({
     });
 
   return (
-    <div className="mt-3 border-t border-border pt-3">
-      <p className="label mb-2">Again</p>
+    <div className="mt-3 rounded-xl border border-dashed border-violet-500/25 bg-violet-500/5 p-3">
+      <p className="text-xs font-medium text-ink-muted">Suggestions</p>
+      <p className="mb-2 mt-0.5 text-[11px] text-ink-faint">
+        From your recent meals · Tap to add to {slotLabel.toLowerCase()}.
+      </p>
       <div className="flex flex-wrap gap-2">
         {suggestions.map((suggestion) => (
           <button
             key={suggestion.foodId}
             type="button"
-            className="max-w-full rounded-lg border border-border px-2.5 py-1.5 text-left text-xs text-ink-muted transition hover:border-lime-500/40 hover:text-ink active:scale-95 disabled:opacity-50"
+            className="flex min-h-11 max-w-full items-center gap-3 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-left text-xs text-ink-muted transition hover:border-lime-500/40 hover:text-ink active:scale-95 disabled:opacity-50"
+            aria-label={`Add suggested ${suggestion.name} to ${slotLabel.toLowerCase()}`}
             onClick={() => log(suggestion)}
             disabled={pending}
             title={
@@ -743,14 +752,21 @@ function SlotSuggestions({
                 : `${slotLabel}, ${formatDay(suggestion.lastDay)}`
             }
           >
-            <span className="block truncate font-medium text-ink">
-              {suggestion.name}
+            <span className="min-w-0">
+              <span className="block truncate font-medium text-ink">
+                {suggestion.name}
+              </span>
+              <span className="tabular block text-ink-faint">
+                {suggestion.amount} {suggestion.unit} ·{' '}
+                {suggestion.totals.energyKcal} kcal
+                {suggestion.dayCount > 1 && ` · ${suggestion.dayCount} days`}
+              </span>
             </span>
-            <span className="tabular block text-ink-faint">
-              {suggestion.amount} {suggestion.unit} ·{' '}
-              {suggestion.totals.energyKcal} kcal
-              {suggestion.dayCount > 1 && ` · ${suggestion.dayCount} days`}
-            </span>
+            <Plus
+              size={15}
+              className="shrink-0 text-accent"
+              aria-hidden="true"
+            />
           </button>
         ))}
       </div>
@@ -1240,7 +1256,7 @@ function SavedMealsPanel({
       description="Groups of foods you log together. Build one by logging a meal and saving the slot."
     >
       {overview.savedMeals.length === 0 ? (
-        <EmptyState message="None yet. Log a breakfast you repeat, then use “Save as meal” on it." />
+        <EmptyState message="None yet. Log a breakfast you repeat, then tap its bookmark icon to save it." />
       ) : (
         <ul className="divide-y divide-border">
           {overview.savedMeals.map((meal) => (
