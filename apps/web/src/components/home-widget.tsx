@@ -92,10 +92,12 @@ export function NutritionRing({
       </div>
       {!compact && (
         <>
-          <p className="mt-1.5 text-[10px] font-medium sm:text-xs">{label}</p>
+          <p className="mt-1 truncate text-[10px] font-medium sm:text-xs">
+            {label}
+          </p>
           <p
             className={clsx(
-              'mt-0.5 text-[10px] leading-tight sm:text-[11px]',
+              'text-[10px] leading-tight sm:text-[11px]',
               over ? 'text-rose-400' : 'text-ink-muted',
             )}
           >
@@ -212,12 +214,12 @@ export function HomeWidget({
       data-expanded={expanded}
     >
       <div
-        className="widget-face widget-face-full flex flex-col px-3 py-3 sm:px-5"
+        className="widget-face widget-face-full flex flex-col px-3 pb-2 pt-2.5 sm:px-5"
         data-shown={expanded}
         aria-hidden={!expanded}
         inert={!expanded}
       >
-        <div className="mb-3 flex w-full items-center justify-between gap-2">
+        <div className="mb-1.5 flex w-full items-center justify-between gap-2">
           <Link
             href={card.href}
             draggable={false}
@@ -228,7 +230,7 @@ export function HomeWidget({
           >
             {card.title}
             {card.key === 'nutrition' && (
-              <span className="ml-2 text-xs font-normal text-ink-faint">
+              <span className="widget-today ml-2 text-xs font-normal text-ink-faint">
                 Today
               </span>
             )}
@@ -255,7 +257,7 @@ export function HomeWidget({
           tabIndex={state.editing ? -1 : undefined}
           title={`View ${card.title} details`}
           onClick={open}
-          className="flex min-h-0 flex-1 flex-col justify-center"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden [justify-content:safe_center]"
         >
           {metrics ? (
             <div>
@@ -264,50 +266,48 @@ export function HomeWidget({
                   <NutritionRing key={metric.label} metric={metric} />
                 ))}
               </div>
-              <p className="mt-3 text-center text-xs text-violet-400">
-                ⚡ Activity adjustment +
-                {nutrition?.activity?.adjustmentKcal ?? 0} kcal
-              </p>
             </div>
           ) : (
             <>
               {card.subtitle && (
-                <p className="mb-3 text-xs text-ink-muted">{card.subtitle}</p>
+                <p className="mb-2 truncate text-xs text-ink-muted">
+                  {card.subtitle}
+                </p>
               )}
               <dl className="grid grid-cols-3 gap-2">
                 {card.stats.map((stat) => (
                   <div key={stat.label}>
                     <dd
                       className={clsx(
-                        'break-words text-sm font-semibold tabular sm:text-lg',
+                        'break-words text-sm font-semibold leading-tight tabular sm:text-lg',
                         TONE_TEXT[stat.tone ?? 'neutral'],
                       )}
                     >
                       {stat.value}
                       {stat.estimated && <EstimateMark />}
                     </dd>
-                    <dt className="mt-1 text-[10px] leading-tight text-ink-faint sm:text-xs">
+                    <dt className="mt-1 truncate text-[10px] leading-tight text-ink-faint sm:text-xs">
                       {stat.label}
                     </dt>
                   </div>
                 ))}
               </dl>
               {card.progress !== undefined && (
-                <div className="mt-4">
+                <div className="mt-3">
                   <ProgressBar ratio={card.progress} />
                 </div>
               )}
             </>
           )}
         </Link>
-        {card.alert && (
-          <div className="mt-2 line-clamp-2 text-[10px] leading-tight text-ink-muted">
+        {card.alert && !metrics && (
+          <div className="mt-2 line-clamp-1 text-[10px] leading-tight text-ink-muted">
             {card.alert}
           </div>
         )}
         {nutrition && !nutrition.targetsAvailable && (
           <Link
-            className="mt-2 text-center text-[10px] text-accent"
+            className="mt-1 text-center text-[10px] text-accent"
             href="/nutrition?tab=you"
           >
             Set nutrition goals →
@@ -327,7 +327,7 @@ export function HomeWidget({
             tabIndex={state.editing ? -1 : undefined}
             aria-label={`Select ${card.title} widget`}
             onClick={select}
-            className="text-center text-[10px] font-semibold leading-tight hover:text-accent"
+            className="line-clamp-2 text-center text-[10px] font-semibold leading-tight hover:text-accent"
           >
             {card.title}
           </Link>

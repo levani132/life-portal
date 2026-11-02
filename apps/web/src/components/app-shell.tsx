@@ -4,7 +4,7 @@ import { HealthSyncBridge } from './apple-health';
 import clsx from 'clsx';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Home, Menu, Search, Users } from 'lucide-react';
 import type { PortalState } from '@life-portal/shared-types';
 import { moduleForPath } from '@life-portal/shared-domain';
@@ -32,6 +32,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (!loading && !user) router.replace('/login');
     else if (needsSetup && pathname !== '/setup') router.replace('/setup');
   }, [loading, user, needsSetup, pathname, router]);
+  const [chromeHidden, revealChrome] = useScrollHidden(pathname === '/');
   if (loading || !user || portal.isLoading)
     return <PortalLoader label="Opening your portal…" />;
   if (portal.error)
@@ -64,7 +65,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     pathname === '/profile';
   return (
     <div className="min-h-screen">
-      <ScrollHeader hideOnScroll={pathname === '/'}>
+      <ScrollHeader hidden={chromeHidden} onReveal={revealChrome}>
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
           <Link href="/" className="font-semibold tracking-tight">
             Life<span className="text-accent">Portal</span>
@@ -101,7 +102,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       </PullToRefresh>
       <nav
         aria-label="Main navigation"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+        onFocusCapture={revealChrome}
+        className={clsx(
+          'portal-tabbar fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur transition-transform duration-200',
+          chromeHidden && 'translate-y-full',
+        )}
       >
         <div className="mx-auto flex max-w-xl">
           {[
@@ -167,18 +172,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-/** Only the header follows scroll direction; widgets stay in the page flow. */
-function ScrollHeader({
-  children,
-  hideOnScroll,
-}: {
-  children: ReactNode;
-  hideOnScroll: boolean;
-}) {
+/**
+ * On the feed, the header and the bottom tabs both get out of the way while scrolling down
+ * and come back on any scroll up, the way Safari's toolbars do. Elsewhere they stay put.
+ */
+function useScrollHidden(enabled: boolean) {
   const [hidden, setHidden] = useState(false);
-  const header = useRef<HTMLElement>(null);
   useEffect(() => {
-    if (!hideOnScroll) {
+    if (!enabled) {
       setHidden(false);
       return;
     }
@@ -187,7 +188,13 @@ function ScrollHeader({
     const update = () => {
       frame = 0;
       const y = Math.max(0, window.scrollY);
-      if (y < (header.current?.offsetHeight ?? 60)) {
+      const bottom =
+        y + window.innerHeight >= document.documentElement.scrollHeight - 4;
+      if (y < 60) {
+        setHidden(false);
+        anchor = y;
+      } else if (bottom) {
+        // Reaching the end brings the tabs back, so there is always a way out of the feed.
         setHidden(false);
         anchor = y;
       } else if (Math.abs(y - anchor) > 8) {
@@ -203,11 +210,22 @@ function ScrollHeader({
       window.removeEventListener('scroll', scroll);
       cancelAnimationFrame(frame);
     };
-  }, [hideOnScroll]);
+  }, [enabled]);
+  return [hidden, () => setHidden(false)] as const;
+}
+
+function ScrollHeader({
+  children,
+  hidden,
+  onReveal,
+}: {
+  children: ReactNode;
+  hidden: boolean;
+  onReveal: () => void;
+}) {
   return (
     <header
-      ref={header}
-      onFocusCapture={() => setHidden(false)}
+      onFocusCapture={onReveal}
       className={clsx(
         'portal-header sticky top-0 z-40 bg-surface/95 pt-[env(safe-area-inset-top)] backdrop-blur transition-transform duration-200',
         hidden && '-translate-y-full',

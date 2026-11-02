@@ -360,7 +360,7 @@ export function WidgetCarousel({
               onEditingChange={onEditingChange}
               onOrderChange={onOrderChange}
               onCommit={onCommit}
-              className="flex h-[216px] items-stretch"
+              className="flex h-[184px] items-stretch"
               getItemStyle={(_card, index) =>
                 ({
                   flexShrink: 0,

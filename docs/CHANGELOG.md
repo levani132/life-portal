@@ -9,6 +9,10 @@ The widget you leave switches to its compact view as soon as you start swiping, 
 next one shows its full view only after it has settled, so nothing jumps while the cards
 resize.
 
+The widget strip is shorter (184px, was 216px) and every widget was refitted to it. The food
+card drops its activity-adjustment line and its duplicate "set goals" alert. While scrolling
+the Home feed, the bottom tabs now hide and return together with the header.
+
 ## 2026-10-21 — Fix assistant sign-in in the browser
 
 Fixed the “Invalid form origin” error after submitting the assistant sign-in page,
