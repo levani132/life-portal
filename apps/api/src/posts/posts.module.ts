@@ -1,4 +1,11 @@
 import {
+  PostEngagementService,
+  PostLikeRecord,
+  PostLikeSchema,
+  PostCommentRecord,
+  PostCommentSchema,
+} from './post-engagement.service';
+import {
   Body,
   Controller,
   Delete,
@@ -7,6 +14,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseInterceptors,
 } from '@nestjs/common';
@@ -17,6 +25,8 @@ import { NutritionModule } from '../nutrition/nutrition.module';
 import { SocialModule, SocialNoStore } from '../social/social.module';
 import {
   CreatePostDto,
+  AddPostCommentDto,
+  UpdatePostAudienceDto,
   ImportPostDto,
   PostListDto,
   PreviewPostDto,
@@ -34,7 +44,10 @@ import { PostsService } from './posts.service';
 @UseInterceptors(SocialNoStore)
 @Controller('posts')
 class PostsController {
-  constructor(private readonly posts: PostsService) {}
+  constructor(
+    private readonly posts: PostsService,
+    private readonly engagement: PostEngagementService,
+  ) {}
   @Post('preview') preview(
     @CurrentUser('userId') userId: string,
     @Body() dto: PreviewPostDto,
@@ -61,6 +74,52 @@ class PostsController {
     @Param('id') id: string,
   ) {
     return this.posts.moderate(userId, id);
+  }
+  @Get(':id/engagement') engagementStats(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.engagement.stats(userId, id);
+  }
+  @Put(':id/like') like(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.engagement.setLike(userId, id, true);
+  }
+  @Delete(':id/like') unlike(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.engagement.setLike(userId, id, false);
+  }
+  @Get(':id/comments') comments(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Query('before') before?: string,
+  ) {
+    return this.engagement.list(userId, id, before);
+  }
+  @Post(':id/comments') addComment(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Body() dto: AddPostCommentDto,
+  ) {
+    return this.engagement.add(userId, id, dto.text, dto.requestId);
+  }
+  @Delete(':id/comments/:commentId') removeComment(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Param('commentId') commentId: string,
+  ) {
+    return this.engagement.remove(userId, id, commentId);
+  }
+  @Patch(':id/audience') audience(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdatePostAudienceDto,
+  ) {
+    return this.posts.updateAudience(userId, id, dto.audience);
   }
   @Get(':id') detail(
     @CurrentUser('userId') userId: string,
@@ -108,10 +167,12 @@ class PostsController {
     SocialModule,
     MongooseModule.forFeature([
       { name: FoodPostRecord.name, schema: FoodPostSchema },
+      { name: PostLikeRecord.name, schema: PostLikeSchema },
+      { name: PostCommentRecord.name, schema: PostCommentSchema },
       { name: PostReportRecord.name, schema: PostReportSchema },
     ]),
   ],
   controllers: [PostsController],
-  providers: [PostsService],
+  providers: [PostsService, PostEngagementService],
 })
 export class PostsModule {}

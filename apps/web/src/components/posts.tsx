@@ -24,6 +24,12 @@ import {
   PublishedNutritionSummary,
 } from './published-nutrition';
 import { api } from '../lib/api';
+import {
+  PostAudienceControl,
+  PostDateLink,
+  PostOptions,
+} from './post-header-controls';
+import { PostEngagement } from './post-engagement';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { SOCIAL_REFRESH } from '../lib/social-hooks';
 import {
@@ -188,29 +194,30 @@ export function PostCard({
           >
             {post.author.displayName}
           </Link>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-ink-faint">
-            Shared {presentation.label.toLowerCase()} ·{' '}
-            <time
-              dateTime={post.createdAt}
-              title={new Date(post.createdAt).toLocaleString()}
+          <div className="mt-0.5 flex items-center gap-1 text-[11px] text-ink-faint">
+            <PostDateLink id={post.id} date={post.createdAt} />
+            <span aria-hidden="true">·</span>
+            <span
+              title={`Shared ${presentation.label.toLowerCase()}`}
+              aria-label={`Shared ${presentation.label.toLowerCase()}`}
             >
-              {new Date(post.createdAt).toLocaleString(undefined, {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </time>
-          </p>
-          <p className="text-[10px] text-ink-faint">
-            @{post.author.username} ·{' '}
-            {post.audience === 'private'
-              ? 'Only me'
-              : post.audience === 'friends'
-                ? 'Friends'
-                : 'Everyone in Life Portal'}
-          </p>
+              <PreviewIcon size={13} aria-hidden="true" />
+            </span>
+            <PostAudienceControl
+              id={post.id}
+              audience={post.audience}
+              isOwner={post.isOwner}
+            />
+          </div>
         </div>
+        <PostOptions
+          owner={post.isOwner}
+          busy={action.pending}
+          onEdit={() => setEditing(true)}
+          onDelete={() => void remove()}
+          onImport={() => setImporting(true)}
+          onReport={() => setReporting(true)}
+        />
       </div>
       {post.title && post.title !== post.contentLabel && (
         <h2 className="mt-4 whitespace-pre-wrap break-words text-lg font-semibold">
@@ -312,49 +319,7 @@ export function PostCard({
           </Link>
         )}
       </div>
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3">
-        {!detail && (
-          <Link href={`/posts/${post.id}`} className="btn-ghost">
-            Open post
-          </Link>
-        )}
-        {!post.isOwner && (
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => setImporting(true)}
-          >
-            Import foods
-          </button>
-        )}
-        {post.isOwner ? (
-          <>
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={() => setEditing(true)}
-            >
-              Edit audience / caption
-            </button>
-            <button
-              type="button"
-              className="btn-ghost text-rose-300"
-              disabled={action.pending}
-              onClick={() => void remove()}
-            >
-              Delete post
-            </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            className="btn-ghost"
-            onClick={() => setReporting(true)}
-          >
-            Report / hide
-          </button>
-        )}
-      </div>
+      <PostEngagement post={post} />
       {action.error && <ErrorNote message={action.error} />}
       {editing && <EditPost post={post} onClose={() => setEditing(false)} />}
       {reporting && (

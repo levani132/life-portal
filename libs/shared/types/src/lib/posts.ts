@@ -114,3 +114,20 @@ export interface PostReport {
   reason: ReportReason;
   createdAt: string;
 }
+
+export interface PostEngagement {
+  liked: boolean;
+  likeCount: number;
+  commentCount: number;
+}
+export interface PostComment {
+  id: string;
+  author: PostAuthor;
+  text: string;
+  createdAt: string;
+  canDelete: boolean;
+}
+export interface PostCommentsPage {
+  comments: PostComment[];
+  nextCursor?: string;
+}

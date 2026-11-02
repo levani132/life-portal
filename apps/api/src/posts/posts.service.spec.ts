@@ -174,3 +174,18 @@ describe('post read authorization and publish retries', () => {
     );
   });
 });
+
+it('updates only the audience and only for the post owner', async () => {
+  const f = fixture();
+  const id = String(f.row._id);
+  f.posts.updateOne.mockResolvedValue({ matchedCount: 1 });
+  await f.service.updateAudience('owner', id, 'friends');
+  expect(f.posts.updateOne).toHaveBeenCalledWith(
+    { _id: id, userId: 'owner', deleted: { $ne: true } },
+    { $set: { audience: 'friends' } },
+  );
+  f.posts.updateOne.mockResolvedValue({ matchedCount: 0 });
+  await expect(
+    f.service.updateAudience('stranger', id, 'public'),
+  ).rejects.toThrow(NotFoundException);
+});

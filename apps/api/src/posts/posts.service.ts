@@ -326,6 +326,20 @@ export class PostsService {
       ...(last ? { nextCursor: this.encode(last) } : {}),
     };
   }
+  async updateAudience(
+    userId: string,
+    id: string,
+    audience: FoodPost['audience'],
+  ) {
+    await this.requireEnabled(userId);
+    this.id(id);
+    const result = await this.posts.updateOne(
+      { _id: id, userId, deleted: { $ne: true } },
+      { $set: { audience } },
+    );
+    if (!result.matchedCount) throw new NotFoundException('Post not found.');
+    return { audience };
+  }
   async update(userId: string, id: string, dto: UpdatePostDto) {
     await this.requireEnabled(userId);
     this.id(id);

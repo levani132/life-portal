@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -101,4 +101,18 @@ export class ImportPostDto {
 }
 export class ReportPostDto {
   @IsIn(REPORT_REASONS) reason!: ReportReason;
+}
+
+export class UpdatePostAudienceDto {
+  @IsIn(AUDIENCES) audience!: Audience;
+}
+export class AddPostCommentDto {
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString()
+  @Matches(/\S/)
+  @MaxLength(1000)
+  text!: string;
+  @IsUUID() requestId!: string;
 }
