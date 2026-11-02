@@ -60,76 +60,108 @@ it('gives a single widget the full available width', () => {
   expect(screen.getByRole('listitem').style.width).toBe('768px');
   expect(screen.queryByRole('button', { name: 'Next widget' })).toBeNull();
 });
-it('initially focuses Food without changing persisted order and expands a tapped neighbor', () => {
-  mount(cards.slice(0, 2));
-  expect(
-    screen
-      .getAllByRole('listitem', { hidden: true })
-      .map((el) => el.style.width),
-  ).toEqual(['128px', '628px']);
-  fireEvent.click(screen.getByRole('button', { name: 'Select stocks' }));
-  expect(
-    screen
-      .getAllByRole('listitem', { hidden: true })
-      .map((el) => el.style.width),
-  ).toEqual(['628px', '128px']);
-});
-it('shows both compact neighbors for a middle selection and only one at the end', () => {
+it('keeps Food expanded and scrolls to the next widget without swapping widths before scrolling', () => {
   mount();
-  expect(
-    screen
-      .getAllByRole('listitem', { hidden: true })
-      .map((el) => el.style.width),
-  ).toEqual(['128px', '488px', '128px']);
+  expect(screen.getAllByRole('listitem').map((el) => el.style.width)).toEqual([
+    '128px',
+    '488px',
+    '128px',
+  ]);
+  expect(scrollTo).toHaveBeenLastCalledWith({ left: 140, behavior: 'instant' });
   fireEvent.click(screen.getByRole('button', { name: 'Next widget' }));
-  expect(
-    screen
-      .getAllByRole('listitem', { hidden: true })
-      .map((el) => el.style.width),
-  ).toEqual(['128px', '128px', '628px']);
-  expect(scrollTo).toHaveBeenLastCalledWith({ left: 140, behavior: 'smooth' });
+  expect(scrollTo).toHaveBeenLastCalledWith({ left: 280, behavior: 'smooth' });
+  expect(screen.getAllByRole('listitem').map((el) => el.style.width)).toEqual([
+    '128px',
+    '488px',
+    '128px',
+  ]);
 });
-it('uses narrow previews on mobile while keeping the strip height independent of selection', () => {
+it('uses a native scrolling mobile strip and follows its actual scroll position', () => {
   viewportWidth = 360;
   mount();
-  expect(
-    screen
-      .getAllByRole('listitem', { hidden: true })
-      .map((el) => el.style.width),
-  ).toEqual(['56px', '232px', '56px']);
   const viewport = screen.getByLabelText(/Food selected/);
+  expect(viewport.className).toContain('overflow-x-auto');
+  expect(viewport.style.scrollSnapType).toBe('x mandatory');
+  expect(screen.getAllByRole('listitem').map((el) => el.style.width)).toEqual([
+    '56px',
+    '232px',
+    '56px',
+  ]);
+  scrollTo.mockClear();
+  fireEvent.scroll(viewport, { target: { scrollLeft: 96 } });
+  expect(screen.getAllByRole('listitem').map((el) => el.style.width)).toEqual([
+    '56px',
+    '160px',
+    '160px',
+  ]);
+  fireEvent.scroll(viewport, { target: { scrollLeft: 128 } });
+  expect(screen.getAllByRole('listitem').map((el) => el.style.width)).toEqual([
+    '56px',
+    '56px',
+    '296px',
+  ]);
+  expect(screen.getByText('projects · 3 / 3')).toBeTruthy();
+  // Observing a native scroll must never jump the viewport back or start another animation.
+  expect(scrollTo).not.toHaveBeenCalled();
+});
+it('does not turn touch release or trackpad input into a widget swap', () => {
+  mount();
+  const viewport = screen.getByLabelText(/Food selected/);
+  scrollTo.mockClear();
   fireEvent.touchStart(viewport, { touches: [{ clientX: 200, clientY: 100 }] });
+  fireEvent.touchMove(viewport, { touches: [{ clientX: 80, clientY: 104 }] });
   fireEvent.touchEnd(viewport, {
     changedTouches: [{ clientX: 80, clientY: 104 }],
   });
-  expect(screen.getByText('projects: expanded')).toBeTruthy();
-  expect(
-    screen
-      .getAllByRole('listitem', { hidden: true })
-      .map((el) => el.style.width),
-  ).toEqual(['56px', '56px', '296px']);
+  const wheel = new Event('wheel', { bubbles: true, cancelable: true });
+  Object.assign(wheel, { deltaX: 80, deltaY: 0 });
+  fireEvent(viewport, wheel);
+  expect(wheel.defaultPrevented).toBe(false);
+  expect(scrollTo).not.toHaveBeenCalled();
+  expect(screen.getByText('Food · 2 / 3')).toBeTruthy();
 });
-it('leaves vertical touch gestures for page scrolling and supports horizontal wheel selection', () => {
+it('drags with a mouse continuously, suppresses the resulting click, then snaps on release', () => {
   mount();
   const viewport = screen.getByLabelText(/Food selected/);
-  fireEvent.touchStart(viewport, { touches: [{ clientX: 200, clientY: 100 }] });
-  fireEvent.touchEnd(viewport, {
-    changedTouches: [{ clientX: 180, clientY: 250 }],
-  });
-  expect(screen.getByText('Food: expanded')).toBeTruthy();
-  jest.spyOn(performance, 'now').mockReturnValue(500);
-  fireEvent.wheel(viewport, { deltaX: 80, deltaY: 0 });
-  expect(screen.getByText('projects: expanded')).toBeTruthy();
-  jest.restoreAllMocks();
+  viewport.scrollLeft = 140;
+  viewport.setPointerCapture = jest.fn();
+  viewport.hasPointerCapture = jest.fn(() => true);
+  viewport.releasePointerCapture = jest.fn();
+  const pointer = (type: string, x: number) => {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.assign(event, {
+      button: 0,
+      pointerType: 'mouse',
+      pointerId: 1,
+      clientX: x,
+      clientY: 100,
+    });
+    fireEvent(viewport, event);
+  };
+  pointer('pointerdown', 200);
+  pointer('pointermove', 100);
+  expect(viewport.scrollLeft).toBe(240);
+  expect(viewport.style.scrollSnapType).toBe('none');
+  pointer('pointermove', 60);
+  expect(viewport.scrollLeft).toBe(280);
+  pointer('pointerup', 60);
+  expect(viewport.style.scrollSnapType).toBe('x mandatory');
+  expect(scrollTo).toHaveBeenLastCalledWith({ left: 280, behavior: 'smooth' });
+  const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+  fireEvent(screen.getByRole('button', { name: 'Select stocks' }), click);
+  expect(click.defaultPrevented).toBe(true);
+  expect(screen.getByText('projects · 3 / 3')).toBeTruthy();
 });
-it('supports keyboard selection and turns off smooth scrolling for reduced motion', () => {
+it('supports keyboard navigation and reduced-motion preferences', () => {
   window.matchMedia = jest.fn().mockReturnValue({ matches: true });
   mount();
   fireEvent.keyDown(screen.getByLabelText(/Food selected/), {
     key: 'ArrowRight',
   });
-  expect(screen.getByText('projects: expanded')).toBeTruthy();
-  expect(scrollTo).toHaveBeenLastCalledWith({ left: 140, behavior: 'instant' });
+  expect(scrollTo).toHaveBeenLastCalledWith({
+    left: 280,
+    behavior: 'instant',
+  });
 });
 it('keeps keyboard arrangement connected to the existing persistence callback', () => {
   const { onOrderChange, onCommit } = mount(cards, true);
