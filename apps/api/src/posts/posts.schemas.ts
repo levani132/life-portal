@@ -13,7 +13,7 @@ export class FoodPostRecord {
   @Prop({ required: true }) requestId!: string;
   @Prop({ required: true }) previewHash!: string;
   @Prop({ type: Object, required: true }) publication!: FoodPublication;
-  @Prop({ required: true, maxlength: 120 }) title!: string;
+  @Prop({ default: '', maxlength: 120 }) title!: string;
   @Prop({ default: '', maxlength: 1000 }) caption!: string;
   @Prop({ type: String, enum: AUDIENCES, default: 'private' })
   audience!: Audience;

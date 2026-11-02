@@ -95,7 +95,7 @@ function Nutrition() {
     portal.data?.access.foodPosts &&
     portal.data.access.social &&
     portal.data.access.nutrition;
-  const [sharing, setSharing] = useState<PostSelection | 'choose' | null>(null);
+  const [sharing, setSharing] = useState<PostSelection | null>(null);
   const [recentEntry, setRecentEntry] = useState<MealEntry | null>(null);
   const [logging, setLogging] = useState<{
     slot: MealSlot;
@@ -176,17 +176,6 @@ function Nutrition() {
             ))}
           </div>
           <div className="flex-1" />
-          {canPost && (
-            <button
-              type="button"
-              className="flex h-10 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-ink-muted hover:text-ink"
-              aria-label="Share food"
-              title="Share food"
-              onClick={() => setSharing('choose')}
-            >
-              <Share2 size={17} />
-            </button>
-          )}
           <Link
             href="/settings/mcp"
             className="flex h-10 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-ink-muted hover:text-ink"
@@ -311,8 +300,8 @@ function Nutrition() {
 
       {sharing && (
         <PostComposer
-          initialDay={day}
-          initialSource={sharing === 'choose' ? undefined : sharing}
+          initialSource={sharing}
+          defaultAudience={data.profile.defaultFoodVisibility}
           onClose={() => setSharing(null)}
         />
       )}
@@ -1119,15 +1108,6 @@ function FoodsTab({
                 className="flex items-center justify-between gap-3 py-2 text-sm"
               >
                 <div className="min-w-0">
-                  {onShare && !food.archived && (
-                    <button
-                      className="mb-1 text-xs text-accent"
-                      onClick={() => onShare({ kind: 'food', foodId: food.id })}
-                      aria-label={`Share ${food.name}`}
-                    >
-                      share
-                    </button>
-                  )}
                   <p className="truncate">
                     <button
                       type="button"
@@ -1172,6 +1152,16 @@ function FoodsTab({
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
+                  {onShare && !food.archived && (
+                    <button
+                      type="button"
+                      className="text-xs text-accent"
+                      aria-label={`Share ${food.name}`}
+                      onClick={() => onShare({ kind: 'food', foodId: food.id })}
+                    >
+                      Share
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="text-xs text-ink-faint hover:text-ink"
@@ -1196,7 +1186,11 @@ function FoodsTab({
         )}
       </Panel>
 
-      <SavedMealsPanel overview={overview} onChanged={onChanged} />
+      <SavedMealsPanel
+        overview={overview}
+        onChanged={onChanged}
+        onShare={onShare}
+      />
 
       <PublicFoodsPanel
         hasPublicFoods={overview.hasPublicFoodsToImport}
@@ -1227,9 +1221,11 @@ function FoodsTab({
 function SavedMealsPanel({
   overview,
   onChanged,
+  onShare,
 }: {
   overview: NutritionOverview;
   onChanged: () => void;
+  onShare?: (source: PostSelection) => void;
 }) {
   const { run, pending } = useAction();
 
@@ -1257,15 +1253,29 @@ function SavedMealsPanel({
                     {mgToG(meal.totals.proteinMg)}g
                   </span>
                 </p>
-                <button
-                  type="button"
-                  className="p-1 text-xs text-ink-faint hover:text-rose-300"
-                  onClick={() => remove(meal.id)}
-                  disabled={pending}
-                  aria-label={`Delete ${meal.name}`}
-                >
-                  ✕
-                </button>
+                <div className="flex shrink-0 items-center gap-3">
+                  {onShare && meal.loggable && (
+                    <button
+                      type="button"
+                      className="text-xs text-accent"
+                      aria-label={`Share ${meal.name}`}
+                      onClick={() =>
+                        onShare({ kind: 'combination', savedMealId: meal.id })
+                      }
+                    >
+                      Share
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="p-1 text-xs text-ink-faint hover:text-rose-300"
+                    onClick={() => remove(meal.id)}
+                    disabled={pending}
+                    aria-label={`Delete ${meal.name}`}
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
               <p className="mt-0.5 text-xs text-ink-faint">
                 {meal.components

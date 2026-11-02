@@ -212,6 +212,11 @@ export function PostCard({
           </p>
         </div>
       </div>
+      {post.title && post.title !== post.contentLabel && (
+        <h2 className="mt-4 whitespace-pre-wrap break-words text-lg font-semibold">
+          {post.title}
+        </h2>
+      )}
       {post.caption && (
         <p className="my-4 whitespace-pre-wrap break-words text-sm leading-relaxed">
           {post.caption}
@@ -234,13 +239,13 @@ export function PostCard({
             </p>
             <h2 className="break-words text-sm font-semibold sm:text-base">
               {detail ? (
-                post.title
+                post.contentLabel || post.title || presentation.label
               ) : (
                 <Link
                   href={`/posts/${post.id}`}
                   className="hover:text-accent-hover"
                 >
-                  {post.title}
+                  {post.contentLabel || post.title || presentation.label}
                 </Link>
               )}
             </h2>
@@ -396,7 +401,6 @@ function EditPost({ post, onClose }: { post: FoodPost; onClose: () => void }) {
     >
       <Field label="Post title">
         <Input
-          required
           maxLength={120}
           value={title}
           onChange={(e) => setTitle(e.target.value)}

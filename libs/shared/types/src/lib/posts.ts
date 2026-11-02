@@ -62,6 +62,7 @@ export interface PostAuthor {
 export interface FoodPost {
   id: string;
   author: PostAuthor;
+  contentLabel?: string;
   title: string;
   caption: string;
   audience: Audience;

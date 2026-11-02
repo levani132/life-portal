@@ -97,6 +97,7 @@ export class PostsService {
       id: String(row._id),
       author,
       title: row.title,
+      contentLabel: p.label,
       caption: row.caption,
       audience: row.audience,
       kind: p.kind,
@@ -134,8 +135,6 @@ export class PostsService {
         false,
       );
     }
-    if (!dto.title.trim())
-      throw new BadRequestException('Give the post a title.');
     const preview = await this.preview(userId, dto);
     if (preview.previewHash !== dto.previewHash)
       throw new ConflictException(
@@ -330,8 +329,6 @@ export class PostsService {
   async update(userId: string, id: string, dto: UpdatePostDto) {
     await this.requireEnabled(userId);
     this.id(id);
-    if (!dto.title.trim())
-      throw new BadRequestException('Give the post a title.');
     const changed = await this.posts.updateOne(
       { _id: id, userId, deleted: { $ne: true } },
       {
@@ -380,7 +377,7 @@ export class PostsService {
       dto.itemKeys,
       dto.duplicatePolicy,
       dto.saveAsMeal,
-      dto.mealName?.trim() || row.title,
+      dto.mealName?.trim() || row.title || row.publication.label,
     );
   }
   async report(userId: string, id: string, dto: ReportPostDto) {

@@ -1,115 +1,81 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  MEAL_SLOTS,
-  POST_KINDS,
-  type Audience,
-  type NutritionOverview,
-  type PostPreview,
-  type PostSelection,
+import { ChevronDown, Globe, Lock, Users } from 'lucide-react';
+import type {
+  Audience,
+  PostPreview,
+  PostSelection,
 } from '@life-portal/shared-types';
-import {
-  publicationCalories,
-  publicationMacros,
-} from '@life-portal/shared-domain';
+import { publicationMacros } from '@life-portal/shared-domain';
 import { api } from '../lib/api';
-import { revalidate, useApi } from '../lib/hooks';
+import { revalidate } from '../lib/hooks';
+import { splitPostDraft } from '../lib/post-draft';
 import {
   PublishedFoodMacros,
   PublishedNutritionSummary,
 } from './published-nutrition';
-import { mealContextNow } from '../lib/local-day';
-import {
-  ErrorNote,
-  Field,
-  Input,
-  Modal,
-  Select,
-  Spinner,
-  Textarea,
-} from './ui';
-export const POST_KIND_LABELS = {
-  entry: 'One logged food',
-  meal: 'A whole meal',
-  day: 'A whole day',
-  food: 'A food from my database',
-  combination: 'A food combination',
-  database: 'My food database',
-} as const;
+import { ErrorNote, Modal, Spinner } from './ui';
+
+const audiences = {
+  private: { label: 'Only me', icon: Lock },
+  friends: { label: 'Friends', icon: Users },
+  public: { label: 'Everyone in Life Portal', icon: Globe },
+};
 export function PostComposer({
   onClose,
-  initialSource,
-  initialDay,
+  initialSource: source,
+  defaultAudience = 'private',
 }: {
   onClose: () => void;
-  initialSource?: PostSelection;
-  initialDay?: string;
+  initialSource: PostSelection;
+  defaultAudience?: Audience;
 }) {
-  const [kind, setKind] = useState<PostSelection['kind']>(
-    initialSource?.kind ?? 'entry',
-  );
-  const [day, setDay] = useState(
-    initialSource?.day ?? initialDay ?? mealContextNow().day,
-  );
-  const [slot, setSlot] = useState(initialSource?.slot ?? 'breakfast');
-  const [entryId, setEntryId] = useState(initialSource?.entryId ?? '');
-  const [foodId, setFoodId] = useState(initialSource?.foodId ?? '');
-  const [savedMealId, setSavedMealId] = useState(
-    initialSource?.savedMealId ?? '',
-  );
-  const [components, setComponents] = useState(initialSource?.components ?? []);
   const [preview, setPreview] = useState<PostPreview | null>(null);
-  const [title, setTitle] = useState('');
-  const [caption, setCaption] = useState('');
-  const [audience, setAudience] = useState<Audience>('private');
+  const [draft, setDraft] = useState({ title: '', caption: '' });
+  const [captionOnly, setCaptionOnly] = useState(false);
+  const [audience, setAudience] = useState<Audience>(defaultAudience);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
   const [requestId] = useState(() => crypto.randomUUID());
+  const titleInput = useRef<HTMLTextAreaElement>(null);
+  const captionInput = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
-  const overview = useApi<NutritionOverview>(
-    `/nutrition?day=${day}&today=${mealContextNow().day}`,
-  );
-  const entries =
-    overview.data?.dayTotals.slots.flatMap((s) => s.entries) ?? [];
-  const source: PostSelection =
-    kind === 'entry'
-      ? { kind, entryId }
-      : kind === 'meal'
-        ? { kind, day, slot }
-        : kind === 'day'
-          ? { kind, day }
-          : kind === 'food'
-            ? { kind, foodId }
-            : kind === 'database'
-              ? { kind }
-              : savedMealId
-                ? { kind, savedMealId }
-                : { kind, components };
-  async function prepare() {
-    setPending(true);
+  useEffect(() => {
+    let active = true;
     setError(null);
-    try {
-      const next = await api.post<PostPreview>('/posts/preview', { source });
-      setPreview(next);
-      setTitle(next.publication.label.slice(0, 120));
-    } catch (e) {
-      setError(
-        e instanceof Error ? e.message : 'Could not preview this selection.',
-      );
-    } finally {
-      setPending(false);
-    }
+    void api
+      .post<PostPreview>('/posts/preview', { source })
+      .then((result) => {
+        if (active) setPreview(result);
+      })
+      .catch((e: unknown) => {
+        if (active)
+          setError(
+            e instanceof Error ? e.message : 'Could not prepare this post.',
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, [source, retry]);
+  function focusCaption() {
+    requestAnimationFrame(() => {
+      const input = captionInput.current;
+      input?.focus();
+      input?.setSelectionRange(input.value.length, input.value.length);
+    });
   }
   async function publish() {
-    if (!preview) return;
+    if (!preview || pending) return;
     setPending(true);
     setError(null);
     try {
       const post = await api.post<{ id: string }>('/posts', {
         source,
-        title,
-        caption,
+        title: draft.title.trim(),
+        caption: draft.caption.trim(),
         audience,
         previewHash: preview.previewHash,
         requestId,
@@ -123,322 +89,188 @@ export function PostComposer({
       setPending(false);
     }
   }
-  const items = preview?.publication.items;
+  const AudienceIcon = audiences[audience].icon;
   return (
-    <Modal
-      open
-      onClose={onClose}
-      title={preview ? 'Review your food post' : 'Share something from Food'}
-      wide
-    >
-      <fieldset disabled={pending} className="space-y-4">
-        {error && (
-          <div role="alert">
-            <ErrorNote message={error} />
-          </div>
-        )}
-        {!preview ? (
-          <>
-            <p className="text-sm text-ink-muted">
-              Choose exactly what you want to share. You’ll review the post and
-              its audience before publishing.
-            </p>
-            <Field label="What to share">
-              <Select
-                value={kind}
-                onChange={(e) =>
-                  setKind(e.target.value as PostSelection['kind'])
-                }
-              >
-                {POST_KINDS.map((value) => (
-                  <option value={value} key={value}>
-                    {POST_KIND_LABELS[value]}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            {['entry', 'meal', 'day'].includes(kind) && (
-              <Field label="Day">
-                <Input
-                  type="date"
-                  value={day}
-                  onChange={(e) => {
-                    setDay(e.target.value);
-                    setEntryId('');
+    <Modal open onClose={onClose} title="Share post" wide>
+      {error && <ErrorNote message={error} />}
+      {error && preview && (
+        <button
+          type="button"
+          className="btn-ghost mb-3"
+          disabled={pending}
+          onClick={() => {
+            setPreview(null);
+            setRetry((value) => value + 1);
+          }}
+        >
+          Refresh preview
+        </button>
+      )}
+      {!preview ? (
+        error ? (
+          <button
+            type="button"
+            className="btn"
+            onClick={() => setRetry((value) => value + 1)}
+          >
+            Retry preview
+          </button>
+        ) : (
+          <Spinner label="Preparing your post…" />
+        )
+      ) : (
+        <>
+          <fieldset
+            disabled={pending}
+            className="overflow-hidden rounded-2xl border border-border"
+          >
+            <div className="space-y-2 p-4">
+              {!captionOnly && (
+                <textarea
+                  ref={titleInput}
+                  rows={1}
+                  maxLength={1000}
+                  aria-label="Post title"
+                  placeholder="Write a title…"
+                  value={draft.title}
+                  className="w-full resize-none border-0 bg-transparent text-lg font-semibold text-ink outline-none placeholder:text-ink-faint"
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === 'Enter' &&
+                      !event.nativeEvent.isComposing
+                    ) {
+                      event.preventDefault();
+                      if (!draft.title) setCaptionOnly(true);
+                      focusCaption();
+                    }
+                  }}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    event.currentTarget.style.height = 'auto';
+                    event.currentTarget.style.height = `${Math.max(28, event.currentTarget.scrollHeight)}px`;
+                    const next = splitPostDraft(
+                      value + (draft.caption ? `\n${draft.caption}` : ''),
+                    );
+                    setDraft(next);
+                    if (!next.title && next.caption) {
+                      setCaptionOnly(true);
+                      focusCaption();
+                    } else if (value.includes('\n')) focusCaption();
                   }}
                 />
-              </Field>
-            )}
-            {overview.error ? (
-              <ErrorNote message={(overview.error as Error).message} />
-            ) : !overview.data ? (
-              <Spinner />
-            ) : (
-              <>
-                {kind === 'entry' && (
-                  <Field label="Logged food">
-                    <Select
-                      value={entryId}
-                      onChange={(e) => setEntryId(e.target.value)}
-                    >
-                      <option value="">Choose a logged food</option>
-                      {entries.map((entry) => (
-                        <option key={entry.id} value={entry.id}>
-                          {entry.facts.name} · {entry.amount} {entry.unit} ·{' '}
-                          {entry.slot}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
-                )}
-                {kind === 'meal' && (
-                  <Field label="Meal">
-                    <Select
-                      value={slot}
-                      onChange={(e) => setSlot(e.target.value as typeof slot)}
-                    >
-                      {MEAL_SLOTS.map((value) => (
-                        <option key={value} value={value}>
-                          {value[0].toUpperCase() + value.slice(1)}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
-                )}
-                {kind === 'food' && (
-                  <Field label="Food">
-                    <Select
-                      value={foodId}
-                      onChange={(e) => setFoodId(e.target.value)}
-                    >
-                      <option value="">Choose a food</option>
-                      {overview.data.foods
-                        .filter((food) => !food.archived)
-                        .map((food) => (
-                          <option key={food.id} value={food.id}>
-                            {food.name}
-                            {food.brand ? ` · ${food.brand}` : ''}
-                          </option>
-                        ))}
-                    </Select>
-                  </Field>
-                )}
-                {kind === 'combination' && (
-                  <>
-                    <Field label="Start from">
-                      <Select
-                        value={savedMealId}
-                        onChange={(e) => setSavedMealId(e.target.value)}
-                      >
-                        <option value="">Choose foods and amounts</option>
-                        {overview.data.savedMeals
-                          .filter((meal) => meal.loggable)
-                          .map((meal) => (
-                            <option key={meal.id} value={meal.id}>
-                              {meal.name}
-                            </option>
-                          ))}
-                      </Select>
-                    </Field>
-                    {!savedMealId && (
-                      <div className="space-y-3">
-                        {overview.data.foods
-                          .filter((food) => !food.archived)
-                          .map((food) => {
-                            const chosen = components.find(
-                              (c) => c.foodId === food.id,
-                            );
-                            return (
-                              <div
-                                key={food.id}
-                                className="flex flex-wrap items-center gap-3 rounded-xl border border-border p-3"
-                              >
-                                <label className="flex flex-1 items-center gap-2">
-                                  <input
-                                    type="checkbox"
-                                    checked={!!chosen}
-                                    onChange={(e) =>
-                                      setComponents((current) =>
-                                        e.target.checked
-                                          ? [
-                                              ...current,
-                                              {
-                                                foodId: food.id,
-                                                amount: food.servingSize,
-                                              },
-                                            ]
-                                          : current.filter(
-                                              (c) => c.foodId !== food.id,
-                                            ),
-                                      )
-                                    }
-                                  />
-                                  <span>{food.name}</span>
-                                </label>
-                                {chosen && (
-                                  <label className="flex items-center gap-2 text-sm">
-                                    <Input
-                                      type="number"
-                                      min={1}
-                                      max={20000}
-                                      step={1}
-                                      aria-label={`${food.name} amount`}
-                                      className="w-24"
-                                      value={chosen.amount}
-                                      onChange={(e) =>
-                                        setComponents((current) =>
-                                          current.map((c) =>
-                                            c.foodId === food.id
-                                              ? {
-                                                  ...c,
-                                                  amount: Number(
-                                                    e.target.value,
-                                                  ),
-                                                }
-                                              : c,
-                                          ),
-                                        )
-                                      }
-                                    />
-                                    {food.unit}
-                                  </label>
-                                )}
-                              </div>
-                            );
-                          })}
-                      </div>
-                    )}
-                  </>
-                )}
-                {kind === 'database' && (
-                  <div className="rounded-xl border border-border p-4 text-sm text-ink-muted">
-                    This creates a frozen collection of all{' '}
-                    {
-                      overview.data.foods.filter((food) => !food.archived)
-                        .length
-                    }{' '}
-                    active foods in your database. Private food notes,
-                    favourites, meal history, goals and body measurements are
-                    excluded.
-                  </div>
-                )}
-                {['entry', 'meal', 'day'].includes(kind) &&
-                  entries.length === 0 && (
-                    <p className="text-sm text-ink-muted">
-                      Nothing logged on this day. Choose another day or share a
-                      food from your database.
-                    </p>
-                  )}
-                <button
-                  type="button"
-                  className="btn-primary"
-                  disabled={pending}
-                  onClick={() => void prepare()}
-                >
-                  {pending ? 'Preparing…' : 'Preview post'}
-                </button>
-              </>
-            )}
-          </>
-        ) : (
-          <>
-            <Field label="Post title">
-              <Input
-                value={title}
-                maxLength={120}
-                required
-                onChange={(e) => setTitle(e.target.value)}
-              />
-            </Field>
-            <Field label="Caption" hint="Optional">
-              <Textarea
-                value={caption}
-                maxLength={1000}
-                onChange={(e) => setCaption(e.target.value)}
-              />
-            </Field>
-            <Field label="Who can see this post">
-              <Select
-                value={audience}
-                onChange={(e) => setAudience(e.target.value as Audience)}
-              >
-                <option value="private">Only me</option>
-                <option value="friends">Friends</option>
-                <option value="public">Everyone in Life Portal</option>
-              </Select>
-            </Field>
-            <div className="rounded-xl border border-border p-4">
-              <p className="mb-3 text-sm font-medium">
-                {items!.length} food{items!.length === 1 ? '' : 's'}
-                {publicationCalories(items!) !== undefined
-                  ? ` · ${publicationCalories(items!)} kcal`
-                  : ''}
-              </p>
-              <PublishedNutritionSummary
-                totals={publicationMacros(items ?? [])}
-                targets={preview.publication.targets}
-                diary={kind === 'day'}
-              />
-              {kind === 'day' && (
-                <p className="my-2 text-xs text-ink-muted">
-                  The displayed daily targets will be included in this post.
-                </p>
               )}
-              <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto text-sm">
-                {items!.map((item) => (
-                  <li key={item.key}>
-                    {item.name}
-                    {item.brand ? ` · ${item.brand}` : ''}{' '}
-                    <span className="text-ink-muted">
-                      {item.amount === undefined
-                        ? `${item.energyKcalPer100} kcal / 100 ${item.unit}`
-                        : `${item.amount} ${item.unit}`}
-                      {item.slot ? ` · ${item.slot}` : ''}
-                    </span>
+              <textarea
+                ref={captionInput}
+                rows={captionOnly ? 4 : 2}
+                maxLength={1000}
+                aria-label="Post caption"
+                placeholder={
+                  captionOnly ? 'Write your post…' : 'Add a caption…'
+                }
+                value={draft.caption}
+                className="w-full resize-y border-0 bg-transparent text-sm text-ink outline-none placeholder:text-ink-faint"
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    caption: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="mx-3 mb-3 rounded-xl bg-surface p-3 ring-1 ring-border/60">
+              <h3 className="text-sm font-semibold">
+                {preview.publication.label}
+              </h3>
+              <PublishedNutritionSummary
+                totals={publicationMacros(preview.publication.items)}
+                targets={preview.publication.targets}
+                diary={source.kind === 'day'}
+              />
+              <ul className="mt-3 max-h-64 divide-y divide-border overflow-y-auto text-sm">
+                {preview.publication.items.map((item) => (
+                  <li key={item.key} className="py-2">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="font-medium">{item.name}</span>
+                      <span className="shrink-0 text-xs text-ink-muted">
+                        {item.amount === undefined
+                          ? `Per 100 ${item.unit}`
+                          : `${item.amount} ${item.unit}`}
+                      </span>
+                    </div>
                     <PublishedFoodMacros food={item} />
                   </li>
                 ))}
               </ul>
             </div>
-            <p className="text-xs text-ink-muted">
-              This post shares only the foods above. Your live widget and diary
-              settings won’t change. Shared facts stay as posted; edits to your
-              database won’t update this post. Imported copies belong to their
-              recipients and cannot be recalled.
-            </p>
-            {kind === 'database' && (
-              <p className="text-xs text-ink-muted">
-                Collection version 1. Publishing a later update creates a new
-                post.
-              </p>
-            )}
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => {
-                  setPreview(null);
-                  setError(null);
-                }}
+            <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2">
+              <span className="text-[11px] text-ink-muted">
+                {captionOnly ? (
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={() => {
+                      setCaptionOnly(false);
+                      requestAnimationFrame(() => titleInput.current?.focus());
+                    }}
+                  >
+                    Add a title
+                  </button>
+                ) : (
+                  'Enter adds a caption · Long titles become captions'
+                )}
+              </span>
+              <div
+                className="relative flex h-9 w-12 shrink-0 items-center justify-center gap-1 rounded-lg hover:bg-violet-500/10 focus-within:ring-2 focus-within:ring-accent"
+                title={audiences[audience].label}
               >
-                Change selection
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={!title.trim() || pending}
-                onClick={() => void publish()}
-              >
-                {pending
-                  ? 'Posting…'
-                  : audience === 'private'
-                    ? 'Post for only me'
-                    : 'Publish post'}
-              </button>
+                <AudienceIcon size={17} aria-hidden="true" />
+                <ChevronDown size={12} aria-hidden="true" />
+                <select
+                  aria-label="Post audience"
+                  value={audience}
+                  onChange={(event) =>
+                    setAudience(event.target.value as Audience)
+                  }
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                >
+                  {Object.entries(audiences).map(([key, value]) => (
+                    <option key={key} value={key}>
+                      {value.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-          </>
-        )}
-      </fieldset>
+          </fieldset>
+          {source.kind === 'day' && (
+            <p className="mt-2 text-xs text-ink-muted">
+              Includes the displayed daily targets.
+            </p>
+          )}
+          {draft.caption.length > 1000 && (
+            <p role="alert" className="mt-2 text-xs text-rose-400">
+              Keep the caption within 1,000 characters.
+            </p>
+          )}
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <p className="text-xs text-ink-muted">
+              Sharing with: {audiences[audience].label}
+            </p>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={pending || draft.caption.length > 1000}
+              onClick={() => void publish()}
+            >
+              {pending
+                ? 'Posting…'
+                : audience === 'private'
+                  ? 'Post for only me'
+                  : 'Publish post'}
+            </button>
+          </div>
+        </>
+      )}
     </Modal>
   );
 }

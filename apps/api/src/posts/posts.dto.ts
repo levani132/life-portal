@@ -14,7 +14,6 @@ import {
   Max,
   MaxLength,
   Min,
-  MinLength,
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
@@ -61,12 +60,12 @@ export class PreviewPostDto {
 export class CreatePostDto extends PreviewPostDto {
   @Matches(/^[a-f0-9]{64}$/) previewHash!: string;
   @IsUUID() requestId!: string;
-  @IsString() @MinLength(1) @MaxLength(120) title!: string;
+  @IsString() @MaxLength(120) title!: string;
   @IsString() @MaxLength(1000) caption!: string;
   @IsIn(AUDIENCES) audience!: Audience;
 }
 export class UpdatePostDto {
-  @IsString() @MinLength(1) @MaxLength(120) title!: string;
+  @IsString() @MaxLength(120) title!: string;
   @IsString() @MaxLength(1000) caption!: string;
   @IsIn(AUDIENCES) audience!: Audience;
 }
