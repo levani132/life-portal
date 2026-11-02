@@ -69,9 +69,11 @@ export function PostsList({
     return <Spinner label="Loading posts…" />;
   return (
     <div className="space-y-5">
-      {result.data.posts.map((post) => (
-        <PostCard key={post.id} post={post} />
-      ))}
+      <div className="-mx-4 space-y-0.5 sm:mx-0 sm:space-y-5">
+        {result.data.posts.map((post) => (
+          <PostCard key={post.id} post={post} />
+        ))}
+      </div>
       {result.data.posts.length === 0 && (
         <div className="card p-6 text-sm text-ink-muted">
           {authorId
@@ -178,7 +180,9 @@ export function PostCard({
   }[post.kind];
   const PreviewIcon = presentation.icon;
   return (
-    <article className="card overflow-hidden rounded-2xl p-4 sm:p-5">
+    <article
+      className={`card overflow-hidden p-4 sm:p-5 ${detail ? 'rounded-2xl' : 'rounded-none border-0 sm:rounded-2xl sm:border'}`}
+    >
       <div className="flex items-start gap-3">
         <Link
           href={`/people/${post.author.userId}`}
