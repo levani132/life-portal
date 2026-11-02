@@ -488,10 +488,19 @@ export class HealthService {
         ...(start >= Date.parse(w.to) ? ['start_at_or_after_window_end'] : []),
       ];
       if (reasons.length) {
-        // Log relative timing only, never record IDs, sources, or health measurements.
+        // Log timestamps for the rejected sample only; omit IDs, sources, and measurements.
         const diagnostic = {
           sampleIndex: index,
           reasons,
+          requestedFrom: w.from,
+          requestedTo: w.to,
+          runEnd: owner.to,
+          sampleStart: Number.isFinite(start)
+            ? new Date(start).toISOString()
+            : 'invalid',
+          sampleEnd: Number.isFinite(end)
+            ? new Date(end).toISOString()
+            : 'invalid',
           startOffsetSeconds: (start - Date.parse(w.from)) / 1000,
           windowSeconds: (Date.parse(w.to) - Date.parse(w.from)) / 1000,
           durationSeconds: (end - start) / 1000,

@@ -238,6 +238,10 @@ it('reports the failed timing rule without exposing record IDs or health values'
     ).rejects.toThrow('Sample 1: start_before_window');
     const output = JSON.stringify(log.mock.calls);
     expect(output).toContain('startOffsetSeconds');
+    expect(output).toContain('requestedFrom');
+    expect(output).toContain(w.from);
+    expect(output).toContain('sampleStart');
+    expect(output).toContain(samples[0].start);
     expect(output).toContain('-3600');
     expect(output).not.toContain('private-');
     expect(output).not.toContain('12345');
