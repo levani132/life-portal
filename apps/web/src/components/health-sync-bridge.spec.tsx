@@ -71,8 +71,7 @@ it('requires explicit installation confirmation before pairing and launching', a
     path.endsWith('/launch')
       ? {
           token: 'ticket',
-          from: '2026-10-31T00:00:00Z',
-          to: '2026-11-01T00:00:00Z',
+          limitPerKind: 50,
         }
       : {},
   );
@@ -103,6 +102,14 @@ it('requires explicit installation confirmation before pairing and launching', a
   expect((openHealthShortcut as jest.Mock).mock.calls.at(-1)[0]).toMatch(
     /^shortcuts:\/\/run-shortcut/,
   );
+  const runUrl = new URL(
+    (openHealthShortcut as jest.Mock).mock.calls.at(-1)[0],
+  );
+  expect(JSON.parse(runUrl.searchParams.get('text')!)).toEqual({
+    token: 'ticket',
+    limitPerKind: 50,
+    uploadUrl: 'https://example.com/api/nutrition/health/upload',
+  });
   view.unmount();
 });
 

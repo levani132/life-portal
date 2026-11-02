@@ -1,5 +1,5 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
-import { HealthBatchUploadDto, HealthUploadDto } from './health.service';
+import { HealthUploadDto } from './health.service';
 
 const sample = {
   id: 'private-id',
@@ -15,20 +15,8 @@ const pipe = new ValidationPipe({
   whitelist: true,
   forbidNonWhitelisted: true,
 });
-const batch = (
-  samples: unknown,
-  activeCount: number | string = 0,
-  stepCount: number | string = 1,
-) =>
-  pipe.transform(
-    {
-      windowId: 'a'.repeat(32),
-      samples,
-      activeCount,
-      stepCount,
-    },
-    { type: 'body', metatype: HealthBatchUploadDto },
-  );
+const batch = (samples: unknown) =>
+  pipe.transform({ samples }, { type: 'body', metatype: HealthUploadDto });
 
 let log: jest.SpyInstance;
 beforeEach(() => {
@@ -59,18 +47,9 @@ it.each(
   },
 );
 
-it('accepts empty text only for a batch explicitly reporting zero samples', async () => {
-  expect((await batch('', '0', '0')).samples).toEqual([]);
-  await expect(batch('')).rejects.toThrow();
-  await expect(
-    pipe.transform(
-      { samples: '' },
-      {
-        type: 'body',
-        metatype: HealthUploadDto,
-      },
-    ),
-  ).rejects.toThrow();
+it('accepts empty recent snapshots without requiring counts or window metadata', async () => {
+  expect((await batch('')).samples).toEqual([]);
+  expect((await batch([])).samples).toEqual([]);
 });
 
 it.each([

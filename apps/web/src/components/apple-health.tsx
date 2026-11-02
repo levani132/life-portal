@@ -22,9 +22,9 @@ interface HealthStatus {
   paired: boolean;
   lastSync?: string;
   installationUrl?: string;
-  pendingWindows?: number;
-  batchLastReceipt?: string;
-  batchBlocked?: boolean;
+  lastUploadAt?: string;
+  lastReceivedCount?: number;
+  limitPerKind?: number;
 }
 /** This bridge never launches on mount, resume, focus or a timer. Only a user action can launch. */
 export function HealthSyncBridge({ enabled }: { enabled: boolean }) {
@@ -121,7 +121,7 @@ export function HealthSyncBridge({ enabled }: { enabled: boolean }) {
     running.current = true;
     try {
       const status = await api.get<HealthStatus>('/nutrition/health');
-      previousReceipt.current = status.batchLastReceipt ?? status.lastSync;
+      previousReceipt.current = status.lastUploadAt ?? status.lastSync;
       if (!validHealthShortcutUrl(status.installationUrl)) {
         setMessage(
           'The Health Shortcut installation link is not available yet.',
@@ -141,15 +141,15 @@ export function HealthSyncBridge({ enabled }: { enabled: boolean }) {
       sessionStorage.setItem(key, String(Date.now()));
       const ticket = await api.post<{
         token: string;
-        from: string;
-        to: string;
+        limitPerKind: number;
       }>('/nutrition/health/launch');
+      if (!Number.isInteger(ticket.limitPerKind) || ticket.limitPerKind < 1)
+        throw new Error(
+          'The Health sync update is still deploying. Please retry shortly.',
+        );
       const url = healthShortcutUrl({
-        ...ticket,
-        batchUrl: new URL(
-          `${API_URL}/nutrition/health/batch`,
-          window.location.origin,
-        ).href,
+        token: ticket.token,
+        limitPerKind: ticket.limitPerKind,
         uploadUrl: new URL(
           `${API_URL}/nutrition/health/upload`,
           window.location.origin,
@@ -183,7 +183,7 @@ export function HealthSyncBridge({ enabled }: { enabled: boolean }) {
         await revalidate('/nutrition/health');
         if (!disposed && /iPhone|iPad|iPod/i.test(navigator.userAgent))
           checkInstallation(status);
-        const receipt = status.batchLastReceipt ?? status.lastSync;
+        const receipt = status.lastUploadAt ?? status.lastSync;
         if (
           !status.paired ||
           receipt !== previousReceipt.current ||
@@ -420,9 +420,8 @@ export function AppleHealthPanel({
           shared with the Shortcut.
         </p>
         <p>
-          3. Return here and wait for “Last successful sync.” Missing permission
-          or no samples does not establish inactivity. Workout export depends on
-          what your iOS version exposes; unavailable workouts stay unknown.
+          3. Return here and wait for “Last data received.” Missing permission
+          or no samples does not establish inactivity.
         </p>
         <p className="text-xs text-ink-muted">
           The Shortcut requires an iPhone installation and export check. If
@@ -442,18 +441,20 @@ export function AppleHealthPanel({
         )}
         <p role="status" className="font-medium">
           {status.data?.lastSync
-            ? `Last successful sync · ${new Date(status.data.lastSync).toLocaleString()}`
+            ? `Last data received · ${new Date(status.data.lastSync).toLocaleString()}`
             : status.data?.paired
-              ? 'Paired — waiting for first valid upload'
+              ? 'Paired — waiting for Health samples'
               : 'Not connected'}
         </p>
-        {status.data?.batchLastReceipt && (
+        <p className="text-xs text-ink-muted">
+          Imports up to {status.data?.limitPerKind ?? 50} recent samples each
+          for Steps and Active Energy. Earlier imports are kept. A sync may not
+          include all activity since the previous upload.
+        </p>
+        {status.data?.lastUploadAt && (
           <p role="status" className="text-xs text-ink-muted">
-            {status.data.batchBlocked
-              ? 'An unusually dense interval needs attention; it has not been marked complete.'
-              : status.data.pendingWindows
-                ? `${status.data.pendingWindows} query windows pending. The next sync resumes them.`
-                : 'Requested query windows received. Tracking coverage remains uncertain.'}
+            Last upload · {new Date(status.data.lastUploadAt).toLocaleString()}{' '}
+            · {status.data.lastReceivedCount ?? 0} samples received
           </p>
         )}
         <div className="flex flex-wrap gap-2">

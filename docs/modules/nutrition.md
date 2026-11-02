@@ -273,13 +273,20 @@ Two collections are necessary: `nutrition_health` holds scoped connection/ticket
 losing historical activity. Unique `{userId, connectionId, day}` scopes raw data to a pairing.
 Neither targets nor adjustments are persisted. Revocation deletes connection and samples.
 
-JWT-scoped `/api/nutrition/health`: GET status and real installation URL, POST `/pair`, POST
-`/launch` (15-minute one-use ticket and 72-hour bounds), DELETE revoke. POST `/upload` has its
-own `@TokenAuth` guard using `x-health-ticket`, not an account JWT. DTO validates bounded
-absolute times, source/ID, finite value and explicit energy units. Input kcal/kJ normalizes to
-kcal; duplicates collapse. A validated successful receipt alone updates last-sync. Empty receipts
-remain partial. A callback never marks success. Manual-only launches, per-account session attempt storage, launch throttling and bounded
-receipt polling prevent retry storms. The reminder threshold is six hours.
+JWT-scoped `/api/nutrition/health`: GET status and installation URL, POST `/pair`, POST
+`/launch` (15-minute single-use ticket and `limitPerKind: 50`), DELETE revoke. The app
+passes exactly `{token, uploadUrl, limitPerKind}` to Shortcuts. POST `/upload` uses its
+own `@TokenAuth` guard with `x-health-ticket`, not an account JWT. Its body contains only
+`samples`, at most 50 each for Steps and Active Energy. No date-window protocol is used.
+Absolute sample dates, source/ID, finite values and explicit energy units are validated.
+Samples may be older than the former rolling window. kcal/kJ normalize to kcal.
+
+Storage merges source/type/ID records per UTC start-date bucket without deleting earlier
+imports. The ticket is consumed after successful writes; failed storage leaves it retryable.
+An account/connection lease prevents concurrent uploads. Revocation cleans up racing writes.
+`lastUploadAt`/`lastReceivedCount` describe any accepted upload; `lastSync` describes the last
+nonempty data receipt. Empty results do not erase data or establish inactivity. Launches are
+manual only, reminders are six-hourly, and no browser return callback is used.
 
 Food retains calories/protein/carbs/fat and adds a distinct Activity adjustment without a ring.
 Main calorie denominator is already adjusted. Macro targets remain the starting model's goals.
@@ -287,37 +294,15 @@ Main calorie denominator is already adjusted. Macro targets remain the starting 
 Weekly/cheat banking uses the starting target; today's Health adjustment is never copied to
 all historic days in the week. The Food day view and Home calorie ring use the adjusted target.
 
-Shortcut compatibility: `HealthUploadDto.samples` also accepts a JSON-encoded array string,
-decoded once before nested validation. All row validators, unknown-field rejection and the
-3,000-sample limit still apply. Invalid text, non-arrays and double encoding remain rejected.
-Stored samples and internal contracts remain native arrays.
+Shortcut compatibility: `HealthUploadDto.samples` accepts native arrays, JSON-text arrays,
+JSON dictionaries, bounded double encoding and newline-separated JSON dictionaries.
+Empty text means an empty snapshot. Malformed content and invalid nested fields are rejected.
+The combined maximum is 100; each type is independently limited to 50.
 
-## Resumable Health query batches (v2)
+## Recent Health samples
 
-`nutrition_health` adds `batchTicketHash`, `batchExpiresAt`, `batchPlannedTo`, `batchQueue`,
-`batchAcknowledgedIds`, `batchWriteId`, and `batchLastReceipt`. These are receipt/cursor/lease
-metadata, not calorie projections. Existing single-use legacy uploads remain supported.
-
-A JWT `/launch` also prepares a 15-minute Health-only batching session. It uses the supplied
-Health ticket on `POST /health/batch/next` and `/health/batch/upload`, each guarded separately
-by `HealthBatchGuard`. Next returns the pending window and its query bounds. Upload takes
-`windowId`, `activeCount`, `stepCount`, and `samples` (array or one JSON-array string).
-
-First sync queues up to 72 hours, newest first. Subsequent runs resume unfinished windows,
-prioritizing newly elapsed time. Once caught up, six recent hours are re-read for delayed Watch
-samples. Each query caps at 250 per kind, 500 combined; hitting either cap splits the interval
-instead of marking it complete. An irreducibly dense one-second interval stays blocked/pending.
-A Shortcut run handles at most 12 windows; there is no background or automatic re-launch.
-
-A short account/connection-scoped write lease prevents concurrent acknowledgements. Raw rows
-are written before the cursor advances. Failed writes remain pending; retrying a lost response
-is idempotent. Receipt IDs are bounded to the latest 256 within a session. Empty or absent data
-never deletes previously received batch records. Matching source/type/ID values are replaced;
-Health deletions cannot be inferred without an explicit deletion feed. Query completion is not
-proof of wear coverage or permissions, and never enables downward calorie adjustment.
-
-Food keeps its visible Sync action; a six-hour `Sync due` indicator uses last successful
-receipt. All launches require a tap. A temporary, dismissible message reports a requested launch
-or error without adding a persistent page-top banner. No browser callback URL is passed, avoiding the extra
-Safari return tab; users return to their existing PWA manually. See the
-[manual Shortcut instructions](../integrations/apple-health-shortcut-manual.md).
+The Shortcut retrieves the newest `limitPerKind` samples of each type with no date filters,
+then uploads the combined list once. This does not establish complete historical coverage:
+more than 50 new records of a type between runs can leave gaps. Existing imported history
+remains available. Earlier batch routes, window planning and generated batch artifacts are
+retired. See [the iPhone setup guide](../integrations/apple-health-shortcut-manual.md).

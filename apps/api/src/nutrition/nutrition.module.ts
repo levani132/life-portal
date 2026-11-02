@@ -6,7 +6,6 @@ import {
   HealthController,
   HealthService,
   HealthUploadGuard,
-  HealthBatchGuard,
 } from './health.service';
 import { NutritionPublicationService } from './nutrition-publication.service';
 import { RequireModule } from '../access/access.module';
@@ -368,7 +367,6 @@ export class NutritionController {
   providers: [
     HealthService,
     HealthUploadGuard,
-    HealthBatchGuard,
     NutritionService,
     OpenFoodFactsProvider,
     NutritionPublicationService,

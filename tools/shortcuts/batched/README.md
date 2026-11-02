@@ -1,6 +1,5 @@
-# Reference source only
+# Retired batch Shortcut
 
-The plist here is not an installable Shortcut. Renaming it does not sign it.
-Use [the manual iPhone guide](../../../docs/integrations/apple-health-shortcut-manual.md)
-to create the actions directly in Shortcuts. No further plist import attempts are needed.
-The generator's structural checks are not an iPhone execution test.
+The window protocol is no longer supported. Follow
+`docs/integrations/apple-health-shortcut-manual.md` for the recent-sample Shortcut.
+Local user-created `.shortcut` files in this directory remain untouched.

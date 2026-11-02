@@ -15,14 +15,20 @@ it('opens Shortcuts with input but never supplies a browser return callback', ()
   const url = new URL(
     healthShortcutUrl({
       token: 'test-ticket',
-      batchUrl: 'https://example.com/api',
+      uploadUrl: 'https://example.com/api/nutrition/health/upload',
+      limitPerKind: 50,
     }),
   );
   expect(url.hostname).toBe('run-shortcut');
   expect(url.searchParams.get('name')).toBe('Life Portal Health');
   expect(JSON.parse(url.searchParams.get('text')!)).toMatchObject({
     token: 'test-ticket',
+    uploadUrl: 'https://example.com/api/nutrition/health/upload',
+    limitPerKind: 50,
   });
+  expect(Object.keys(JSON.parse(url.searchParams.get('text')!)).sort()).toEqual(
+    ['limitPerKind', 'token', 'uploadUrl'],
+  );
   for (const key of ['x-success', 'x-error', 'x-cancel'])
     expect(url.searchParams.has(key)).toBe(false);
 });

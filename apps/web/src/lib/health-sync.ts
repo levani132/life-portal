@@ -9,6 +9,11 @@ export function healthSyncDue(
   );
 }
 /** No web callback: returning to an HTTPS URL can open another Safari tab on iOS. */
-export function healthShortcutUrl(input: object): string {
+export interface HealthShortcutInput {
+  token: string;
+  uploadUrl: string;
+  limitPerKind: number;
+}
+export function healthShortcutUrl(input: HealthShortcutInput): string {
   return `shortcuts://run-shortcut?name=Life Portal Health&input=text&text=${encodeURIComponent(JSON.stringify(input))}`;
 }

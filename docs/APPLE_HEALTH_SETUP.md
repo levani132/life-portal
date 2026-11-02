@@ -8,25 +8,20 @@ rings/activity details, Home freshness bridge and a tap fallback. No hosting dep
 ## Supported setup: build directly in Shortcuts
 
 Follow [the complete manual iPhone Shortcut guide](integrations/apple-health-shortcut-manual.md).
-The user has already built a working legacy Shortcut manually; the batching version requires
-rebuilding/adapting that Shortcut once. Plist files are reference source, not installable
-artifacts. Do not suggest renaming them to `.shortcut`. The signing CLI returned an iCloud
-sign-in error even though the user reports being signed in; no account-state diagnosis or
-installable artifact is claimed. Manual creation in the iPhone Shortcuts editor avoids import.
-
-The new Shortcut reads app-supplied `token`, `batchUrl` and `to`, requests each pending window,
-queries Active Calories/Steps with at most 250 samples per kind, and uploads counts plus rows.
-Twelve windows per run bound foreground work. It uses no fixed server address or account JWT.
-The previous manually created Shortcut remains compatible with the legacy upload endpoint.
-The generated batching source has mechanical reference/control-flow checks only; actual iPhone
-filtering, units, serialization, prompts and timing remain to be verified.
+The supported Shortcut imports the newest 50 Active Energy and 50 Steps samples once per
+run, with no date filters or window loop. The app supplies `{token, uploadUrl, limitPerKind}`.
+Its JSON upload body is only `{samples}`; `x-health-ticket` carries the scoped credential.
+The previous generated window-based sources are obsolete and must not be installed.
+Manual editing on the iPhone avoids the Mac signing/iCloud dependency. Share the tested copy
+via a fresh iCloud link and update the backend installation URL.
 
 ## Manual sync and returning to the PWA
 
 Sync is now manual only. Mount, focus, resume and timers refresh receipt information without
 opening Shortcuts. The visible button says `Sync due` after six hours without a successful
 receipt (or when no receipt exists); it remains usable at any time. A receipt does not prove
-complete tracking. Pending batch windows are visible in Activity Info.
+complete tracking. Activity Info shows the last upload and its sample count separately from
+the last nonempty data receipt. More than 50 new samples between syncs can leave gaps.
 
 Launch uses `shortcuts://run-shortcut` without `x-success`, `x-cancel` or `x-error` web callbacks.
 Do not add Open URL at the end of the manually created Shortcut. This removes the app's cause
@@ -41,18 +36,15 @@ no native-app universal-link behavior is claimed for the PWA. Its manifest alrea
    network access. Match one sample's exact time/source/unit against Health. Test kcal and kJ.
 2. Verify valid receipt changes last-sync and records nonzero samples. Denied read permissions,
    an empty list, cancel, browser return or callback alone must never claim complete tracking.
-3. Retry/backfill; ensure source overlaps and repeated uploads do not multiply energy.
+3. Repeat an upload; ensure source overlaps and repeated uploads do not multiply energy.
    Test 03:59/04:00 and a changed day boundary. Compare only matching sample periods.
 4. Revoke and try an old ticket; it must fail. Pair another account and verify isolation.
 5. Test Safari and installed Home Screen app, app resume, and shortcut missing/cancelled.
    Confirm nothing opens automatically, no browser return tab appears, and manual return
    refreshes receipts. Check the six-hour reminder and manual Sync retry.
 
-Apple documents Health sample queries, but a supported built-in action for exporting actual
-workout records has not been established here. The receiver accepts time-bounded workout
-records for forward compatibility; this Shortcut exports none. UI says **No workout data
-received**, never **no workout occurred**. No walking/lifting calorie split is inferred.
-This limitation must not be hidden behind a successful active-energy upload.
+This Shortcut and receiver currently import Active Energy and Steps only. They do not
+establish that no workouts occurred or infer a walking/lifting calorie split.
 
 ## Model and coverage policy
 
@@ -79,9 +71,9 @@ samples also use one interval rather than summing. Under-counting is possible an
 replaced. No downward adjustment is enabled: Shortcuts exposes neither assured wear coverage
 nor permission-denial evidence sufficient to prove inactivity. Steps are explanatory only;
 workout/step energy is never added to active energy. Macros retain their starting goals.
-Daily raw snapshots retain historical samples. Batch receipts replace matching source/type/ID
-records and preserve unreceived records, because missing permissions cannot prove deletion.
-Legacy snapshot uploads retain their original window replacement behavior. Revocation deletes stored uploads. Timestamps are normalized to UTC; displayed day
+Daily storage buckets retain historical samples. Recent uploads replace only matching
+source/type/ID records and preserve all unreceived records. Empty uploads never delete data.
+Revocation deletes stored uploads. Timestamps are normalized to UTC; displayed day
 assignment uses the profile timezone and day-start hour, including DST.
 
 ## Sources
