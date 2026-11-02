@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Heart, MessageCircle, Send, Share2, Trash2 } from 'lucide-react';
 import type {
   FoodPost,
@@ -79,7 +79,9 @@ export function PostEngagement({ post }: { post: FoodPost }) {
     }
   }
   return (
-    <div className="mt-3">
+    <div
+      className={`mt-3 ${commentsOpen || error || stats.error || notice ? '' : '-mb-4 sm:-mb-5'}`}
+    >
       {value?.likeCount || value?.commentCount ? (
         <div
           className="mb-2 flex items-center justify-between text-xs text-ink-muted"
@@ -102,7 +104,9 @@ export function PostEngagement({ post }: { post: FoodPost }) {
           )}
         </div>
       ) : null}
-      <div className="grid grid-cols-3 border-y border-border py-1">
+      <div
+        className={`grid grid-cols-3 border-t border-border py-1 ${commentsOpen ? 'border-b' : ''}`}
+      >
         <button
           type="button"
           aria-pressed={value?.liked ?? false}
@@ -214,6 +218,13 @@ function PostComments({
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleted, setDeleted] = useState<string[]>([]);
+  const input = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const field = input.current;
+    if (!field) return;
+    field.style.height = '40px';
+    field.style.height = `${Math.min(118, Math.max(40, field.scrollHeight + 2))}px`;
+  }, [text]);
   const requestId = useRef<string | null>(null);
   const locked = useRef(false);
   const comments = [
@@ -359,11 +370,13 @@ function PostComments({
         <textarea
           aria-label="Write a comment"
           placeholder="Write a comment…"
-          rows={2}
+          ref={input}
+          rows={1}
+          style={{ minHeight: 40, maxHeight: 118, lineHeight: '20px' }}
           maxLength={1000}
           value={text}
           disabled={pending}
-          className="field min-w-0 flex-1 resize-y text-sm"
+          className="field min-w-0 flex-1 resize-none overflow-y-auto text-sm leading-5"
           onChange={(event) => {
             setText(event.target.value);
             requestId.current = null;

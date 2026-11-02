@@ -137,14 +137,6 @@ function Nutrition() {
   return (
     <>
       <header className="mb-3 space-y-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Food</h1>
-          <p className="mt-0.5 text-xs text-ink-muted">
-            {targets.available
-              ? GOAL_PLAN[profile.goal].label
-              : 'Targets need a few numbers about you'}
-          </p>
-        </div>
         <div
           className="flex items-center gap-1.5 overflow-x-auto pb-1"
           aria-label="Food controls"
@@ -228,6 +220,11 @@ function Nutrition() {
           />
 
           <MacroTiles totals={dayTotals.totals} targets={targets} />
+          {targets.available && (
+            <p className="text-xs text-ink-faint">
+              Goal: {GOAL_PLAN[profile.goal].label}
+            </p>
+          )}
 
           {!targets.available && (
             <MissingInputs targets={targets} onFix={() => setTab('you')} />
