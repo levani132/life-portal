@@ -197,12 +197,14 @@ export function PostCard({
           <div className="mt-0.5 flex items-center gap-1 text-[11px] text-ink-faint">
             <PostDateLink id={post.id} date={post.createdAt} />
             <span aria-hidden="true">·</span>
-            <span
-              title={`Shared ${presentation.label.toLowerCase()}`}
-              aria-label={`Shared ${presentation.label.toLowerCase()}`}
-            >
-              <PreviewIcon size={13} aria-hidden="true" />
-            </span>
+            {post.kind !== 'day' && (
+              <span
+                title={`Shared ${presentation.label.toLowerCase()}`}
+                aria-label={`Shared ${presentation.label.toLowerCase()}`}
+              >
+                <PreviewIcon size={13} aria-hidden="true" />
+              </span>
+            )}
             <PostAudienceControl
               id={post.id}
               audience={post.audience}
