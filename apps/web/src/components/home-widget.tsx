@@ -1,7 +1,12 @@
 'use client';
 
 import clsx from 'clsx';
-import type React from 'react';
+import {
+  useLayoutEffect,
+  useRef,
+  type CSSProperties,
+  type MouseEvent,
+} from 'react';
 import Link from 'next/link';
 import {
   MoreHorizontal,
@@ -37,10 +42,14 @@ function remainingText({ value, target, unit }: NutritionMetric) {
 
 export function NutritionRing({
   metric,
-  compact = false,
+  shared = false,
+  stagger,
 }: {
   metric: NutritionMetric;
-  compact?: boolean;
+  /** The calories column on Home: the one piece that moves between the widget's two faces. */
+  shared?: boolean;
+  /** Position in the staggered entrance on Home's food widget. */
+  stagger?: number;
 }) {
   const { value, target, unit, label } = metric;
   const ratio =
@@ -51,9 +60,18 @@ export function NutritionRing({
         : 0;
   const over = target !== undefined && value > target;
   return (
-    <div className="min-w-0 text-center">
+    <div
+      className="min-w-0 text-center"
+      data-shared={shared || undefined}
+      data-fade={stagger !== undefined || undefined}
+      style={
+        stagger !== undefined
+          ? ({ '--stagger': stagger } as CSSProperties)
+          : undefined
+      }
+    >
       <div
-        className={clsx('nutrition-ring', compact && 'nutrition-ring-compact')}
+        className="nutrition-ring"
         role="img"
         aria-label={`${label}: ${value} ${unit} consumed. ${remainingText(metric)}.`}
       >
@@ -80,32 +98,26 @@ export function NutritionRing({
           />
         </svg>
         <span className="absolute inset-0 flex flex-col items-center justify-center tabular leading-tight">
-          <strong className={compact ? 'text-[10px]' : 'nutrition-ring-value'}>
+          <strong className="nutrition-ring-value">
             {value?.toLocaleString() ?? '—'}
           </strong>
-          {!compact && (
-            <span className="text-[10px] text-ink-faint sm:text-[10px]">
-              {unit}
-            </span>
-          )}
+          <span className="text-[10px] text-ink-faint sm:text-[10px]">
+            {unit}
+          </span>
         </span>
       </div>
-      {!compact && (
-        <>
-          <p className="mt-1 truncate text-[10px] font-medium sm:text-xs">
-            {label}
-          </p>
-          <p
-            className={clsx(
-              'text-[10px] leading-tight sm:text-[11px]',
-              over ? 'text-rose-400' : 'text-ink-muted',
-            )}
-          >
-            {remainingText(metric)}
-            {metric.basis && <EstimateMark basis={metric.basis} />}
-          </p>
-        </>
-      )}
+      <p className="mt-1 truncate text-[10px] font-medium sm:text-xs">
+        {label}
+      </p>
+      <p
+        className={clsx(
+          'text-[10px] leading-tight sm:text-[11px]',
+          over ? 'text-rose-400' : 'text-ink-muted',
+        )}
+      >
+        {remainingText(metric)}
+        {metric.basis && <EstimateMark basis={metric.basis} />}
+      </p>
     </div>
   );
 }
@@ -174,11 +186,45 @@ export function HomeWidget({
       basis: nutrition.targetBasis?.fat,
     },
   ];
-  const select = (event: React.MouseEvent) => {
+  const root = useRef<HTMLElement>(null);
+  const wasExpanded = useRef(expanded);
+  // The calories column is the same piece of content in both faces, so instead of crossfading
+  // it flies from where it was to where it now is (a FLIP), while everything else fades around it.
+  useLayoutEffect(() => {
+    if (wasExpanded.current === expanded) return;
+    wasExpanded.current = expanded;
+    const el = root.current;
+    if (!el || !metrics) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const from = el.querySelector<HTMLElement>(
+      '.widget-face[data-shown="false"] [data-shared]',
+    );
+    const to = el.querySelector<HTMLElement>(
+      '.widget-face[data-shown="true"] [data-shared]',
+    );
+    if (!from || !to || typeof to.animate !== 'function') return;
+    to.getAnimations?.().forEach((animation) => animation.cancel());
+    const a = from.getBoundingClientRect();
+    const b = to.getBoundingClientRect();
+    from.getAnimations?.().forEach((animation) => animation.cancel());
+    if (!b.width || !b.height) return;
+    const dx = a.left + a.width / 2 - (b.left + b.width / 2);
+    const dy = a.top + a.height / 2 - (b.top + b.height / 2);
+    to.animate(
+      [
+        {
+          transform: `translate(${dx}px, ${dy}px) scale(${a.width / b.width})`,
+        },
+        { transform: 'none' },
+      ],
+      { duration: 460, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' },
+    );
+  });
+  const select = (event: MouseEvent) => {
     event.preventDefault();
     if (!state.editing) onSelect();
   };
-  const open = (event: React.MouseEvent) => {
+  const open = (event: MouseEvent) => {
     if (state.editing) event.preventDefault();
   };
   const menuButton = (
@@ -201,6 +247,7 @@ export function HomeWidget({
   // changes the frame and the widget crossfades between faces. See widget-carousel.tsx.
   return (
     <article
+      ref={root}
       className={clsx(
         'card home-widget relative h-full overflow-hidden rounded-2xl',
         state.editing && !state.dragging && 'widget-jiggle',
@@ -214,12 +261,18 @@ export function HomeWidget({
       data-expanded={expanded}
     >
       <div
-        className="widget-face widget-face-full flex flex-col px-3 pb-2 pt-2.5 sm:px-5"
+        className={clsx(
+          'widget-face widget-face-full flex flex-col px-3 pb-2 pt-2.5 sm:px-5',
+          metrics && 'widget-face-staged',
+        )}
         data-shown={expanded}
         aria-hidden={!expanded}
         inert={!expanded}
       >
-        <div className="mb-1.5 flex w-full items-center justify-between gap-2">
+        <div
+          className="mb-1.5 flex w-full items-center justify-between gap-2"
+          data-fade
+        >
           <Link
             href={card.href}
             draggable={false}
@@ -262,9 +315,17 @@ export function HomeWidget({
           {metrics ? (
             <div>
               <div className="grid grid-cols-4 items-start gap-1 sm:gap-4">
-                {metrics.map((metric) => (
-                  <NutritionRing key={metric.label} metric={metric} />
-                ))}
+                {metrics.map((metric, index) =>
+                  index === 0 ? (
+                    <NutritionRing key={metric.label} metric={metric} shared />
+                  ) : (
+                    <NutritionRing
+                      key={metric.label}
+                      metric={metric}
+                      stagger={index}
+                    />
+                  ),
+                )}
               </div>
             </div>
           ) : (
@@ -309,18 +370,26 @@ export function HomeWidget({
           <Link
             className="mt-1 text-center text-[10px] text-accent"
             href="/nutrition?tab=you"
+            data-fade
+            style={{ '--stagger': 4 } as CSSProperties}
           >
             Set nutrition goals →
           </Link>
         )}
       </div>
       <div
-        className="widget-face widget-face-compact flex flex-col items-center px-1 py-2"
+        className={clsx(
+          'widget-face widget-face-compact flex flex-col items-center px-1 py-2',
+          metrics && 'widget-face-staged',
+        )}
         data-shown={!expanded}
         aria-hidden={expanded}
         inert={expanded}
       >
-        <div className="mb-1 flex flex-col-reverse items-center gap-1">
+        <div
+          className="mb-1 flex flex-col-reverse items-center gap-1"
+          data-fade
+        >
           <Link
             href={card.href}
             draggable={false}
@@ -342,14 +411,7 @@ export function HomeWidget({
           className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-2"
         >
           {metrics ? (
-            <>
-              <NutritionRing metric={metrics[0]} compact />
-              <span className="text-center text-[10px] leading-tight text-ink-muted">
-                {nutrition?.leftKcal !== undefined
-                  ? `${Math.abs(nutrition.leftKcal)} kcal ${nutrition.leftKcal < 0 ? 'over' : 'left'}`
-                  : `${nutrition?.eatenKcal} kcal eaten`}
-              </span>
-            </>
+            <NutritionRing metric={metrics[0]} shared />
           ) : (
             <>
               <Icon size={21} className="text-ink-muted" aria-hidden />
@@ -362,18 +424,6 @@ export function HomeWidget({
             </>
           )}
         </Link>
-        {onQuickAction && (
-          <button
-            type="button"
-            data-widget-action
-            aria-label={card.quickAction?.label ?? 'Log food'}
-            title="Log food"
-            className="mt-1 flex h-8 w-8 items-center justify-center rounded-lg text-emerald-400 hover:bg-emerald-500/10"
-            onClick={onQuickAction}
-          >
-            <Plus size={18} aria-hidden />
-          </button>
-        )}
       </div>
     </article>
   );

@@ -27,9 +27,17 @@ interface Props {
   ) => ReactNode;
 }
 
-/** Moving the strip further than this off its resting widget hands the content over to compact. */
+/** With a finger down, moving this far off the resting widget hands its content over to compact. */
 const MOVE_SLOP_PX = 6;
-/** Quiet time after the last scroll event before the strip counts as at rest. */
+/** Without one (trackpad, the tail of a snap) it takes more, so a landing never re-collapses. */
+const FREE_SLOP_PX = 16;
+/**
+ * A released strip this close to a snap point and moving this slowly has landed. Snapping ends
+ * in a long sub-pixel tail; waiting for it to stop made the full view arrive visibly late.
+ */
+const ARRIVE_PX = 10;
+const ARRIVE_SPEED_PX = 6;
+/** Fallback: quiet time after the last scroll event before the strip counts as at rest. */
 const SETTLE_MS = 90;
 
 /**
@@ -66,6 +74,11 @@ export function WidgetCarousel({
     undefined,
   );
   const settleTries = useRef(0);
+  const lastLeft = useRef(0);
+  const movingNow = useRef(false);
+  /** Where a button, key or tap is sending the strip; a gesture may land anywhere. */
+  const target = useRef<number | null>(null);
+  movingNow.current = moving;
   const touching = useRef(false);
   const swipeClick = useRef(false);
   const mouse = useRef<{
@@ -131,12 +144,16 @@ export function WidgetCarousel({
       Math.min(cards.length - 1, Math.round(el.scrollLeft / step)),
     );
     // A snap that has not started yet would otherwise expand a widget that is still moving.
-    if (Math.abs(el.scrollLeft - index * step) > 2 && settleTries.current < 4) {
+    if (
+      Math.abs(el.scrollLeft - index * step) > ARRIVE_PX &&
+      settleTries.current < 4
+    ) {
       settleTries.current += 1;
       settleTimer.current = setTimeout(settle, SETTLE_MS);
       return;
     }
     settleTries.current = 0;
+    target.current = null;
     restIndex.current = index;
     const card = cards[index];
     if (card) setSelectedId(card.id);
@@ -155,6 +172,8 @@ export function WidgetCarousel({
     if (!card) return;
     setSelectedId(card.id);
     if (index !== Math.round(progress.current) && !editing) {
+      movingNow.current = true;
+      target.current = index;
       setMoving(true);
       // Normally the scroll events re-arm this; it only covers a scroll that never happens.
       scheduleSettle(800);
@@ -250,8 +269,33 @@ export function WidgetCarousel({
           progress.current = p;
           applyLayout(p);
           if (editing) return;
-          if (Math.abs(p - restIndex.current) * step > MOVE_SLOP_PX)
+          const speed = Math.abs(left - lastLeft.current);
+          lastLeft.current = left;
+          const held = touching.current || !!mouse.current?.moved;
+          const away = Math.abs(p - restIndex.current) * step;
+          if (away > (held ? MOVE_SLOP_PX : FREE_SLOP_PX)) {
+            movingNow.current = true;
             setMoving(true);
+          }
+          const nearest = Math.round(p);
+          if (
+            movingNow.current &&
+            !held &&
+            speed < ARRIVE_SPEED_PX &&
+            Math.abs(left - nearest * step) < ARRIVE_PX &&
+            (target.current === null || target.current === nearest)
+          ) {
+            target.current = null;
+            // Landed: expand now rather than after the snap's tail has died out.
+            clearTimeout(settleTimer.current);
+            settleTries.current = 0;
+            restIndex.current = nearest;
+            movingNow.current = false;
+            const landed = cards[nearest];
+            if (landed) setSelectedId(landed.id);
+            setMoving(false);
+            return;
+          }
           // The footer names the widget nearest the middle while the strip is still moving.
           const card = cards[Math.round(p)];
           if (card && card.id !== activeId) setSelectedId(card.id);
@@ -309,6 +353,7 @@ export function WidgetCarousel({
         onTouchStart={(event) => {
           swipeClick.current = false;
           touching.current = true;
+          target.current = null;
           clearTimeout(settleTimer.current);
           const first = event.touches[0];
           touch.current =

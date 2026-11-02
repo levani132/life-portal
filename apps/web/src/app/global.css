@@ -348,7 +348,6 @@
   transition-property: opacity, transform;
   transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
   transition-duration: 300ms;
-  transition-delay: 40ms;
 }
 .widget-face-full {
   width: var(--widget-full, 100%);
@@ -363,9 +362,34 @@
   transition-duration: 160ms;
   transition-delay: 0ms;
 }
+/* Food on Home: the calories column flies between faces (see home-widget.tsx), so these faces
+   stay put and only their other parts fade. Macros slide out from behind the calories ring,
+   one after another; on the way out everything leaves at once, quickly. */
+.widget-face.widget-face-staged,
+.widget-face.widget-face-staged[data-shown='false'] {
+  opacity: 1;
+  transform: translateX(-50%);
+  transition: none;
+}
+.widget-face-staged [data-fade] {
+  transition-property: opacity, transform;
+  transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  transition-duration: 420ms;
+  transition-delay: calc(60ms + var(--stagger, 0) * 45ms);
+}
+.widget-face-staged[data-shown='false'] [data-fade] {
+  opacity: 0;
+  transform: translateX(calc(var(--stagger, 0) * -14px))
+    scale(calc(1 - min(var(--stagger, 0), 1) * 0.15));
+  transition-duration: 140ms;
+  transition-delay: 0ms;
+}
+.widget-face-staged[data-shown='false'] [data-shared] {
+  visibility: hidden;
+}
 .nutrition-ring {
   position: relative;
-  width: clamp(34px, 100%, 56px);
+  width: clamp(44px, 100%, 88px);
   aspect-ratio: 1;
   margin-inline: auto;
 }
@@ -387,12 +411,18 @@
     display: none;
   }
 }
-.nutrition-ring-compact {
-  width: 38px;
+/* On Home the ring sizes its number to itself, so it reads the same in both faces. */
+.home-widget .nutrition-ring {
+  width: clamp(34px, 100%, 56px);
+  container-type: inline-size;
+}
+.home-widget .nutrition-ring-value {
+  font-size: clamp(10px, 22cqi, 13px);
 }
 @media (prefers-reduced-motion: reduce) {
   .widget-carousel-viewport .widget-slot,
-  .widget-face {
+  .widget-face,
+  .widget-face-staged [data-fade] {
     transition: none !important;
   }
   .portal-header,

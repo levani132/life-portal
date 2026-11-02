@@ -219,3 +219,36 @@ it('retains the long-press shortcut to arrangement mode', () => {
   expect(onEditingChange).toHaveBeenCalledWith(true);
   jest.useRealTimers();
 });
+it('expands the landing widget as soon as a released strip is settling onto it', () => {
+  jest.useFakeTimers();
+  viewportWidth = 360;
+  mount();
+  const viewport = screen.getByLabelText(/Food selected/);
+  fireEvent.touchStart(viewport, { touches: [{ clientX: 300, clientY: 100 }] });
+  fireEvent.scroll(viewport, { target: { scrollLeft: 400 } });
+  fireEvent.touchEnd(viewport, { touches: [] });
+  // Still travelling fast: not landed.
+  fireEvent.scroll(viewport, { target: { scrollLeft: 460 } });
+  expect(screen.getByText('projects: compact')).toBeTruthy();
+  // Slow and within a few pixels of the snap point: landed, with no timer involved.
+  fireEvent.scroll(viewport, { target: { scrollLeft: 474 } });
+  fireEvent.scroll(viewport, { target: { scrollLeft: 477 } });
+  expect(screen.getByText('projects: expanded')).toBeTruthy();
+  // The rest of the snap's tail does not collapse it again.
+  fireEvent.scroll(viewport, { target: { scrollLeft: 479.5 } });
+  expect(screen.getByText('projects: expanded')).toBeTruthy();
+  jest.useRealTimers();
+});
+it('lets a button-driven scroll land only on the widget it is heading for', () => {
+  viewportWidth = 360;
+  mount();
+  const viewport = screen.getByLabelText(/Food selected/);
+  fireEvent.click(screen.getByRole('button', { name: 'Next widget' }));
+  // A smooth scroll starts slowly, right next to the widget it is leaving.
+  fireEvent.scroll(viewport, { target: { scrollLeft: 241 } });
+  fireEvent.scroll(viewport, { target: { scrollLeft: 243 } });
+  expect(screen.queryByText(/: expanded/)).toBeNull();
+  fireEvent.scroll(viewport, { target: { scrollLeft: 476 } });
+  fireEvent.scroll(viewport, { target: { scrollLeft: 479 } });
+  expect(screen.getByText('projects: expanded')).toBeTruthy();
+});
