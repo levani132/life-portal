@@ -31,6 +31,9 @@ class SocialConnection {
   @Prop() requestedBy?: string;
   @Prop({ type: [String], default: [] }) blockedBy!: string[];
   @Prop({ type: [String], default: [] }) mutedBy!: string[];
+  /** When the pending request became a friendship. Unset whenever the pair returns to none. */
+  @Prop() acceptedAt?: Date;
+  updatedAt!: Date;
 }
 const ConnectionSchema = SchemaFactory.createForClass(SocialConnection);
 @Injectable()
@@ -59,6 +62,43 @@ export class SocialGraphService {
     const rows = await this.connections.find({ $or: [{ lowId: userId }, { highId: userId }], state: 'accepted', 'blockedBy.0': { $exists: false }, mutedBy: { $ne: userId } }).select('lowId highId').lean();
     return rows.map((row) => row.lowId === userId ? row.highId : row.lowId);
   }
+  /**
+   * Connection events addressed to `userId` for Activity: incoming pending requests (by
+   * `updatedAt`) and requests they sent that were accepted (by `acceptedAt`). Blocked pairs
+   * never appear.
+   */
+  async activity(userId: string, since: Date, before: Date | undefined, limit: number) {
+    const range = (field: string) => ({
+      [field]: { $gte: since, ...(before ? { $lt: before } : {}) },
+    });
+    const mine = { $or: [{ lowId: userId }, { highId: userId }], 'blockedBy.0': { $exists: false } };
+    const [incoming, accepted] = await Promise.all([
+      this.connections
+        .find({ ...mine, state: 'pending', requestedBy: { $ne: userId }, ...range('updatedAt') })
+        .sort({ updatedAt: -1 })
+        .limit(limit)
+        .lean(),
+      this.connections
+        .find({ ...mine, state: 'accepted', requestedBy: userId, ...range('acceptedAt') })
+        .sort({ acceptedAt: -1 })
+        .limit(limit)
+        .lean(),
+    ]);
+    const other = (row: { lowId: string; highId: string }) =>
+      row.lowId === userId ? row.highId : row.lowId;
+    return [
+      ...incoming.map((row) => ({
+        kind: 'incoming' as const,
+        otherId: other(row),
+        at: row.updatedAt,
+      })),
+      ...accepted.flatMap((row) =>
+        row.acceptedAt
+          ? [{ kind: 'accepted' as const, otherId: other(row), at: row.acceptedAt }]
+          : [],
+      ),
+    ];
+  }
   async list(userId: string, kind: ConnectionList, skip: number) {
     const filter: Record<string, unknown> =
       kind === 'blocked'
@@ -79,7 +119,12 @@ export class SocialGraphService {
       .limit(21)
       .lean();
   }
-  async act(actor: string, target: string, action: ConnectionAction) {
+  /** Applies one action. Returns false when it was a harmless repeat that changed nothing. */
+  async act(
+    actor: string,
+    target: string,
+    action: ConnectionAction,
+  ): Promise<boolean> {
     const pair = connectionPair(actor, target);
     const [lowId, highId] = [actor, target].sort();
     let row = await this.between(actor, target);
@@ -114,7 +159,7 @@ export class SocialGraphService {
       !row.blockedBy.length &&
       relationshipFor(row, actor, target) === 'outgoing'
     )
-      return;
+      return false;
     if (!transitionAllowed(row, actor, action))
       throw new ConflictException(
         'This connection changed. Refresh and try again.',
@@ -125,7 +170,7 @@ export class SocialGraphService {
       update = {
         $addToSet: { blockedBy: actor },
         $set: { state: 'none', mutedBy: [] },
-        $unset: { requestedBy: '' },
+        $unset: { requestedBy: '', acceptedAt: '' },
       };
     else if (action === 'unblock') {
       filter['blockedBy'] = actor;
@@ -136,7 +181,8 @@ export class SocialGraphService {
       if (row.state === 'pending') filter['requestedBy'] = row.requestedBy;
       if (action === 'request')
         update = { $set: { state: 'pending', requestedBy: actor } };
-      else if (action === 'accept') update = { $set: { state: 'accepted' } };
+      else if (action === 'accept')
+        update = { $set: { state: 'accepted', acceptedAt: new Date() } };
       else if (action === 'mute' || action === 'unmute')
         update =
           action === 'mute'
@@ -145,7 +191,7 @@ export class SocialGraphService {
       else
         update = {
           $set: { state: 'none', mutedBy: [] },
-          $unset: { requestedBy: '' },
+          $unset: { requestedBy: '', acceptedAt: '' },
         };
     }
     const changed = await this.connections.findOneAndUpdate(filter, update);
@@ -156,12 +202,13 @@ export class SocialGraphService {
         !latest.blockedBy.length &&
         relationshipFor(latest, actor, target) === 'outgoing'
       )
-        return;
+        return false;
     }
     if (!changed)
       throw new ConflictException(
         'This connection changed. Refresh and try again.',
       );
+    return true;
   }
 }
 @Global()

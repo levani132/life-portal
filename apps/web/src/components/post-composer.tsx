@@ -16,6 +16,7 @@ import {
   PublishedNutritionSummary,
 } from './published-nutrition';
 import { ErrorNote, Modal, Spinner } from './ui';
+import { requestNotificationOffer } from './notifications';
 
 const audiences = {
   private: { label: 'Only me', icon: Lock },
@@ -83,6 +84,7 @@ export function PostComposer({
       await revalidate('/posts');
       onClose();
       router.push(`/posts/${post.id}`);
+      requestNotificationOffer('post');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not publish.');
     } finally {

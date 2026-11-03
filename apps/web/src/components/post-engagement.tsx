@@ -12,6 +12,7 @@ import { api } from '../lib/api';
 import { useApi } from '../lib/hooks';
 import { PostRelativeTime } from './post-header-controls';
 import { ErrorNote, Modal } from './ui';
+import { requestNotificationOffer } from './notifications';
 
 export function PostEngagement({ post }: { post: FoodPost }) {
   const stats = useApi<Engagement>(`/posts/${post.id}/engagement`, {
@@ -254,6 +255,7 @@ function PostComments({
       requestId.current = null;
       await result.mutate().catch(() => undefined);
       onChanged();
+      requestNotificationOffer('comment');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not post your comment.');
     } finally {

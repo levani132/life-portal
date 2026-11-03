@@ -10,6 +10,7 @@ import type { PortalState } from '@life-portal/shared-types';
 import { moduleForPath } from '@life-portal/shared-domain';
 import { useAuth } from '../lib/auth-context';
 import { useApi } from '../lib/hooks';
+import { ActivityBell, NotificationsBridge } from './notifications';
 import { PortalLoader } from './portal-loader';
 import { PullToRefresh } from './pull-to-refresh';
 import { ErrorNote } from './ui';
@@ -70,12 +71,16 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Link href="/" className="font-semibold tracking-tight">
             Life<span className="text-accent">Portal</span>
           </Link>
-          <Link href="/menu" className="text-sm text-ink-muted">
-            {user.name}
-          </Link>
+          <div className="flex items-center gap-2">
+            <ActivityBell access={portal.data.access} />
+            <Link href="/menu" className="text-sm text-ink-muted">
+              {user.name}
+            </Link>
+          </div>
         </div>
       </ScrollHeader>
       <HealthSyncBridge key={user.id} enabled={portal.data.access.nutrition} />
+      <NotificationsBridge key={`push-${user.id}`} access={portal.data.access} />
       <PullToRefresh>
         <main
           className={clsx(

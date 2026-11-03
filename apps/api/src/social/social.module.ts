@@ -9,6 +9,7 @@ import {
   Module,
   NestInterceptor,
   NotFoundException,
+  OnModuleInit,
   Param,
   Put,
   Query,
@@ -54,6 +55,7 @@ import { User, UserSchema } from '../auth/schemas/user.schema';
 import { baseSchemaOptions } from '../common/mongoose';
 import { Today } from '../common/today';
 import { SocialGraphService } from '../social-graph/social-graph.module';
+import { NotificationsService } from '../notifications/notifications.service';
 import { NutritionModule } from '../nutrition/nutrition.module';
 import { SettingsModule } from '../settings/settings.module';
 import { CashflowModule } from '../cashflow/cashflow.module';
@@ -123,7 +125,7 @@ export class SocialNoStore implements NestInterceptor {
   }
 }
 @Injectable()
-export class SocialService {
+export class SocialService implements OnModuleInit {
   constructor(
     @InjectModel(SocialProfile.name)
     private readonly profiles: Model<SocialProfile>,
@@ -131,7 +133,48 @@ export class SocialService {
     private readonly graph: SocialGraphService,
     private readonly access: AccessService,
     private readonly shared: SharedWidgetsService,
+    private readonly notifications: NotificationsService,
   ) {}
+  /** Friend notifications and their Activity rows (docs/modules/notifications.md). */
+  onModuleInit() {
+    this.notifications.register({
+      type: 'friendRequest',
+      requires: ['social'],
+      windowMs: 0,
+      collapseKey: (event) => event.actorId,
+      url: () => '/friends',
+    });
+    this.notifications.register({
+      type: 'friendAccepted',
+      requires: ['social'],
+      windowMs: 0,
+      collapseKey: (event) => event.actorId,
+      url: (event) => `/people/${event.actorId}`,
+    });
+    this.notifications.registerActivitySource({
+      rows: async (userId, since, before, limit) => {
+        const events = await this.graph.activity(userId, since, before, limit);
+        const names = await this.displayNames(events.map((e) => e.otherId));
+        return events.map((e) => ({
+          type: e.kind === 'incoming' ? ('friendRequest' as const) : ('friendAccepted' as const),
+          actorId: e.otherId,
+          actorName: names.get(e.otherId) ?? 'Former member',
+          targetId: e.otherId,
+          url: e.kind === 'incoming' ? '/friends' : `/people/${e.otherId}`,
+          createdAt: e.at,
+        }));
+      },
+    });
+  }
+  /** Display names for Activity and notification text. */
+  async displayNames(userIds: string[]): Promise<Map<string, string>> {
+    if (!userIds.length) return new Map();
+    const rows = await this.profiles
+      .find({ userId: { $in: [...new Set(userIds)] } })
+      .select('userId displayName')
+      .lean();
+    return new Map(rows.map((row) => [row.userId, row.displayName]));
+  }
   private async enabled(userId: string) {
     try {
       return (await this.access.forUser(userId)).access.social;
@@ -374,8 +417,17 @@ export class SocialService {
       )
         throw new NotFoundException('Profile not found.');
     }
-    await this.own(userId);
-    await this.graph.act(userId, targetId, dto.action);
+    const actor = await this.own(userId);
+    const changed = await this.graph.act(userId, targetId, dto.action);
+    // Not awaited: a failing push service must never fail the request itself.
+    if (changed && (dto.action === 'request' || dto.action === 'accept'))
+      void this.notifications.notify({
+        type: dto.action === 'request' ? 'friendRequest' : 'friendAccepted',
+        recipientId: targetId,
+        actorId: userId,
+        actorName: actor.displayName,
+        targetId: userId,
+      });
     return { success: true };
   }
 }

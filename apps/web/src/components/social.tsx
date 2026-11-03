@@ -16,6 +16,7 @@ import type { PortalState } from '@life-portal/shared-types';
 import { api } from '../lib/api';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { ErrorNote, Input, Select, Spinner } from './ui';
+import { requestNotificationOffer } from './notifications';
 
 export function SharedWidgets({
   widgets,
@@ -100,7 +101,10 @@ export function ConnectionActions({
       },
       { revalidate: false },
     );
-    if (success) onChanged?.();
+    if (success) {
+      if (value === 'request') requestNotificationOffer('friend');
+      onChanged?.();
+    }
   }
   const relationship = person.relationship;
   return (

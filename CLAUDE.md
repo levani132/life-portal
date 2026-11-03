@@ -144,6 +144,11 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   rate — `fx_rate_history` archives a rate per day so a past figure does not move when the lari
   does. Pass `fx` into `projectCash()` and the summary functions; without it they add dollars to
   lari. See `docs/modules/fx.md`.
+- **Every push must show a notification; never decide to drop one in `sw.js`.** iOS revokes a
+  subscription that receives pushes which show nothing, so "don't notify" is decided on the
+  server (`NotificationTypeDef.suppress`). `notify()` is never awaited by the action that caused
+  it, and it never throws. A new notification type is registered by its own module; see
+  `docs/modules/notifications.md`.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for

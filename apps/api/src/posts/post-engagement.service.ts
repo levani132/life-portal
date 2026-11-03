@@ -2,14 +2,18 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectModel, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Model, isValidObjectId } from 'mongoose';
 import type {
+  FoodPost,
   PostComment,
   PostCommentsPage,
   PostEngagement,
 } from '@life-portal/shared-types';
+import type { ActivityRow } from '@life-portal/shared-domain';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PostsService } from './posts.service';
 import { SocialService } from '../social/social.module';
 import { SocialGraphService } from '../social-graph/social-graph.module';
@@ -18,6 +22,7 @@ import { SocialGraphService } from '../social-graph/social-graph.module';
 export class PostLikeRecord {
   @Prop({ required: true }) postId!: string;
   @Prop({ required: true }) userId!: string;
+  createdAt!: Date;
 }
 export const PostLikeSchema = SchemaFactory.createForClass(PostLikeRecord);
 PostLikeSchema.index({ postId: 1, userId: 1 }, { unique: true });
@@ -39,8 +44,11 @@ PostCommentSchema.index(
 );
 PostCommentSchema.index({ postId: 1, deleted: 1, _id: -1 });
 
+const LIKE_WINDOW_MS = 15 * 60_000;
+const COMMENT_WINDOW_MS = 2 * 60_000;
+
 @Injectable()
-export class PostEngagementService {
+export class PostEngagementService implements OnModuleInit {
   constructor(
     @InjectModel(PostLikeRecord.name)
     private readonly likes: Model<PostLikeRecord>,
@@ -49,7 +57,84 @@ export class PostEngagementService {
     private readonly posts: PostsService,
     private readonly social: SocialService,
     private readonly graph: SocialGraphService,
+    private readonly notifications: NotificationsService,
   ) {}
+  /** Like and comment notifications, and their Activity rows (docs/modules/notifications.md). */
+  onModuleInit() {
+    const common = {
+      requires: ['social' as const, 'foodPosts' as const],
+      collapseKey: (event: { targetId: string }) => event.targetId,
+      url: (event: { targetId: string }) => `/posts/${event.targetId}`,
+    };
+    this.notifications.register({ type: 'postLike', windowMs: LIKE_WINDOW_MS, ...common });
+    this.notifications.register({
+      type: 'postComment',
+      windowMs: COMMENT_WINDOW_MS,
+      ...common,
+    });
+    this.notifications.registerActivitySource({
+      rows: (userId, since, before, limit) => this.activity(userId, since, before, limit),
+    });
+  }
+  /** Likes and live comments by others on the owner's posts. Blocks are filtered by the caller. */
+  async activity(
+    userId: string,
+    since: Date,
+    before: Date | undefined,
+    limit: number,
+  ): Promise<ActivityRow[]> {
+    const titles = await this.posts.ownTitles(userId);
+    if (!titles.size) return [];
+    const filter = {
+      postId: { $in: [...titles.keys()] },
+      userId: { $ne: userId },
+      createdAt: { $gte: since, ...(before ? { $lt: before } : {}) },
+    };
+    const [likes, comments] = await Promise.all([
+      this.likes.find(filter).sort({ createdAt: -1 }).limit(limit).lean(),
+      this.comments
+        .find({ ...filter, deleted: false })
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .lean(),
+    ]);
+    const names = await this.social.displayNames([
+      ...likes.map((row) => row.userId),
+      ...comments.map((row) => row.userId),
+    ]);
+    const row = (
+      type: 'postLike' | 'postComment',
+      r: { postId: string; userId: string; createdAt: Date },
+    ): ActivityRow => ({
+      type,
+      actorId: r.userId,
+      actorName: names.get(r.userId) ?? 'Former member',
+      targetId: r.postId,
+      url: `/posts/${r.postId}`,
+      postTitle: titles.get(r.postId),
+      createdAt: r.createdAt,
+    });
+    return [
+      ...likes.map((r) => row('postLike', r)),
+      ...comments.map((r) => row('postComment', r)),
+    ];
+  }
+  /** Tells the post's owner. Not awaited by callers, and never throws. */
+  private notifyOwner(
+    post: FoodPost,
+    userId: string,
+    actorName: string,
+    extra: { type: 'postLike' } | { type: 'postComment'; commentText: string },
+  ) {
+    void this.notifications.notify({
+      ...extra,
+      recipientId: post.author.userId,
+      actorId: userId,
+      actorName,
+      targetId: post.id,
+      postTitle: post.title,
+    });
+  }
   private async counts(
     userId: string,
     postId: string,
@@ -66,14 +151,19 @@ export class PostEngagementService {
     return this.counts(userId, postId);
   }
   async setLike(userId: string, postId: string, liked: boolean) {
-    await this.posts.detail(userId, postId);
+    const post = await this.posts.detail(userId, postId);
     if (liked) {
       try {
-        await this.likes.updateOne(
+        const result = await this.likes.updateOne(
           { postId, userId },
           { $setOnInsert: { postId, userId } },
           { upsert: true },
         );
+        // Only a new like notifies; repeating a like is a no-op.
+        if (result.upsertedCount) {
+          const actor = await this.social.postAuthor(userId);
+          if (actor) this.notifyOwner(post, userId, actor.displayName, { type: 'postLike' });
+        }
       } catch (error) {
         if ((error as { code?: number }).code !== 11000) throw error;
       }
@@ -135,14 +225,20 @@ export class PostEngagementService {
     const value = text.trim();
     if (!value || value.length > 1000)
       throw new BadRequestException('Write a comment of 1–1,000 characters.');
-    await this.social.own(userId);
+    const actor = await this.social.own(userId);
     const filter = { postId, userId, requestId };
     try {
-      await this.comments.updateOne(
+      const result = await this.comments.updateOne(
         filter,
         { $setOnInsert: { ...filter, text: value, deleted: false } },
         { upsert: true },
       );
+      // A retried requestId returns the original comment and must not notify again.
+      if (result.upsertedCount)
+        this.notifyOwner(post, userId, actor.displayName, {
+          type: 'postComment',
+          commentText: value,
+        });
     } catch (error) {
       if ((error as { code?: number }).code !== 11000) throw error;
     }

@@ -40,6 +40,11 @@ export interface AppConfig {
   offUserAgent: string;
   /** Skips the scheduled quote refresh — useful locally and in tests. */
   disableSchedules: boolean;
+  /**
+   * Web Push signing keys. All three or none: absent means the notifications feature is
+   * hidden (graceful degradation); a partial set is a misconfiguration and refuses to boot.
+   */
+  push?: { publicKey: string; privateKey: string; subject: string };
 }
 
 function positiveInt(name: string, value: string | undefined, fallback: number): number {
@@ -81,6 +86,33 @@ function oauthIssuer(): string | undefined {
   return url.origin;
 }
 
+const BASE64URL = /^[A-Za-z0-9_-]+$/;
+
+/** See `AppConfig.push`. Exported for its unit test. */
+export function pushConfig(env: NodeJS.ProcessEnv): AppConfig['push'] {
+  const values = {
+    VAPID_PUBLIC_KEY: env['VAPID_PUBLIC_KEY']?.trim() || '',
+    VAPID_PRIVATE_KEY: env['VAPID_PRIVATE_KEY']?.trim() || '',
+    VAPID_SUBJECT: env['VAPID_SUBJECT']?.trim() || '',
+  };
+  const missing = Object.entries(values).filter(([, value]) => !value).map(([name]) => name);
+  if (missing.length === 3) return undefined;
+  if (missing.length) {
+    throw new Error(`Push notifications need all three VAPID variables; missing ${missing.join(', ')}.`);
+  }
+  if (!BASE64URL.test(values.VAPID_PUBLIC_KEY) || !BASE64URL.test(values.VAPID_PRIVATE_KEY)) {
+    throw new Error('VAPID keys must be base64url. Generate them with `npx web-push generate-vapid-keys`.');
+  }
+  if (!/^(mailto:|https:\/\/)/.test(values.VAPID_SUBJECT)) {
+    throw new Error('VAPID_SUBJECT must start with mailto: or https://.');
+  }
+  return {
+    publicKey: values.VAPID_PUBLIC_KEY,
+    privateKey: values.VAPID_PRIVATE_KEY,
+    subject: values.VAPID_SUBJECT,
+  };
+}
+
 export function loadConfig(): AppConfig {
   const jwtSecret = required('JWT_SECRET', process.env['JWT_SECRET']);
   if (jwtSecret.length < 32) {
@@ -103,6 +135,7 @@ export function loadConfig(): AppConfig {
     finnhubApiKey: process.env['FINNHUB_API_KEY']?.trim() || undefined,
     offUserAgent: openFoodFactsUserAgent(),
     disableSchedules: process.env['DISABLE_SCHEDULES'] === 'true',
+    push: pushConfig(process.env),
   };
 }
 

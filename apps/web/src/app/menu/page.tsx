@@ -9,6 +9,7 @@ import {
   Plug,
   Flag,
   UserRound,
+  Bell,
 } from 'lucide-react';
 import { MODULES, type PortalState } from '@life-portal/shared-types';
 import { AppShell, PageHeader } from '../../components/app-shell';
@@ -27,6 +28,9 @@ function MenuContent() {
   const links = [
     ...(data?.access.social
       ? [{ href: '/profile', label: 'My profile', icon: UserRound }]
+      : []),
+    ...(data?.access.push && data.access.social
+      ? [{ href: '/settings/notifications', label: 'Notifications', icon: Bell }]
       : []),
     { href: '/settings/modules', label: 'Manage modules', icon: Layers },
     {

@@ -37,11 +37,13 @@ export function selectedAvailableModules(
 }
 export function moduleForPath(path: string): FeatureId | undefined {
   if (path === '/settings/profile') return 'social';
+  if (path === '/settings/notifications') return 'push';
   const root = path.split('/').filter(Boolean)[0];
   return (
     {
       wall: 'foodPosts',
       posts: 'foodPosts',
+      activity: 'push',
       search: 'social',
       friends: 'social',
       people: 'social',

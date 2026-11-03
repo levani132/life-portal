@@ -13,3 +13,4 @@ export * from './lib/dashboard';
 export * from './lib/portal';
 export * from './lib/social';
 export * from './lib/posts';
+export * from './lib/notifications';

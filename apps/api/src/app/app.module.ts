@@ -6,6 +6,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AccessModule, ModuleAccessGuard } from '../access/access.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { PortalModule } from '../portal/portal.module';
 import { AuthModule } from '../auth/auth.module';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -38,6 +39,7 @@ import { StocksModule } from '../stocks/stocks.module';
     AuthModule,
     AccessModule,
     SocialGraphModule,
+    NotificationsModule,
     SocialModule,
     PostsModule,
     PortalModule,

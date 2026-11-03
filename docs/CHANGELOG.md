@@ -2,6 +2,23 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-03 — Push notifications and Activity
+
+With notifications turned on, you hear about friend requests, accepted requests, and comments
+and likes on your posts, including on iPhone from the Home Screen app. Tapping a notification
+opens the app on the right screen. Bursts of likes are grouped ("Ana and 4 others liked…").
+Notifications show names and what happened, never food, weight or money. Comment text appears
+only if you turn on previews.
+
+The app offers notifications after you send a friend request, publish or comment, never when
+it opens. In Safari on iPhone it explains how to add the app to the Home Screen first. Menu ›
+Notifications has a main switch, a switch per type, comment previews and your devices. A new
+bell in the header opens Activity, and the app icon shows how many items you haven't seen.
+Signing out stops notifications on that device.
+
+The feature is behind the `push` feature flag (on for internal accounts) and needs the three
+VAPID keys in the API's environment.
+
 ## 2026-11-02 — Likes, comments and sharing on posts
 
 Food posts now have Like, Comment and Share in their footer. Comments can be deleted by

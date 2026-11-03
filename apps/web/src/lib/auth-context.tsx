@@ -14,6 +14,7 @@ import {
 } from 'react';
 import type { User } from '@life-portal/shared-types';
 import { api, ApiError, tokens } from './api';
+import { unregisterThisDevice } from './push';
 
 interface AuthState {
   user: User | null;
@@ -80,6 +81,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
+    // This device stops receiving the account's notifications before the session ends, so
+    // whoever signs in next on it does not get them (bounded at 2s, errors ignored).
+    await unregisterThisDevice().catch(() => undefined);
     // A failed logout still clears locally — the user asked to be signed out, and the
     // refresh token expires on its own.
     await api.post('/auth/logout').catch((error: unknown) => {

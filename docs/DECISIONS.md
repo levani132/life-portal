@@ -976,3 +976,34 @@ identity upserts preserve previously known data when a query returns nothing, si
 loss and actual inactivity/deletion are indistinguishable. The legacy path remains compatible.
 Users build the updated Shortcut directly from the manual guide; generated plist source is
 not represented as an installable signed file.
+
+## 2026-11-03 — Push notifications: one shared system, decided on the server, no worker
+
+Notifications are a global module that other modules register types with (who receives it,
+access re-check, collapse key, URL, optional `suppress`) rather than a feature of Social or
+Posts. Chat and challenges will register their own types and badge sources without touching it.
+
+- **Whether to notify is always decided on the server, never in `sw.js`.** iOS revokes
+  subscriptions that receive pushes showing nothing, so the service worker must show every push
+  it gets. "Skip while the recipient is looking at the conversation" is therefore a
+  server-side `suppress` hook.
+- **No worker.** `notify()` is called after the write and not awaited, with a 5-second limit per
+  device, because the constitution requires the app to run on free tiers. The cost is that a
+  push in flight during a restart is lost. Activity still shows the item because it is derived
+  on read.
+- **Collapsing without a timer**, using one atomic `findOneAndUpdate` on
+  `notification_deliveries`. The first like in a window sends; the rest are counted, and the
+  next push after the window says "and N others". On the device, a shared `tag` replaces rather
+  than stacks.
+- **Activity and the badge are derived** from likes, comments and connections, with only
+  `activitySeenAt` stored. Withdrawn likes, deleted comments and new blocks drop out with no
+  cleanup code.
+- **Subscription endpoints are allow-listed** to known push services. Otherwise a client could
+  make the API POST to any URL, including internal addresses.
+- **Development registers `/sw.js?mode=push`.** This makes push testable on localhost while
+  keeping the old rule that development never caches bundles.
+- **`web-push` (3.6.7) is used despite having no release since January 2024.** The protocol is
+  frozen, and only `push-sender.ts` imports it.
+
+The lockfile was updated by hand-merging the seven new entries. On this machine npm 11 also
+pruned the Linux optional builds (rolldown) that Render and Vercel need.

@@ -29,6 +29,7 @@ Authenticated `/api/posts` routes require **social + nutrition + foodPosts**, ev
 - `GET /:id/comments?before=` lists 20 comments newest first, with `nextCursor` (a comment ID) when more exist. Comments by someone blocked in either direction are left out. Authors who have left show as "Former member".
 - `POST /:id/comments {text, requestId}` adds a comment; a retried `requestId` returns the original. `DELETE /:id/comments/:commentId` is allowed for the comment's author and the post's owner.
 - Every engagement route first runs the same read authorization as `GET /:id`, so a viewer who cannot read a post cannot like it, comment on it or see its counts.
+- A newly inserted like or comment notifies the post owner, without awaiting it. Repeats and retried `requestId`s never notify. `PostEngagementService` registers `postLike` (15-minute collapse per post) and `postComment` (2 minutes), plus the Activity source for others' likes and live comments on the owner's 500 most recent posts. See [notifications](notifications.md).
 - `GET /:id/import` previews already-imported foods and matching names.
 - `POST /:id/import {itemKeys,duplicatePolicy:skip|copy,saveAsMeal,mealName?}` copies selected foods privately. `skip` is the default for matching name/brand/unit. Whole meals/combinations can additionally become saved meals; select every item and explicitly copy conflicting names. No import logs a meal.
 - `POST /:id/report {reason}` reports and hides a readable, non-owned post. Repeats are safe.
@@ -53,6 +54,6 @@ Wall is the fourth bottom tab when all three features are enabled. Food offers e
 
 ## Verification and boundaries
 
-Domain tests cover source selection, canonicalisation, duplicates, calorie calculation and the audience matrix. API tests cover owned allowlists, historical snapshots, invalid combinations and private/import retry behavior. Isolated API/browser checks exercise the complete publication/import flow with separate accounts. Engagement tests cover idempotent likes and comments, delete rights and blocked commenters. Reactions beyond a like, comment replies, notifications, images, financial posts, automatic posting, public web links and collection updates are future work.
+Domain tests cover source selection, canonicalisation, duplicates, calorie calculation and the audience matrix. API tests cover owned allowlists, historical snapshots, invalid combinations and private/import retry behavior. Isolated API/browser checks exercise the complete publication/import flow with separate accounts. Engagement tests cover idempotent likes and comments, delete rights, blocked commenters and notifying only on new rows. Reactions beyond a like, comment replies, images, financial posts, automatic posting, public web links and collection updates are future work.
 
 Related: [social](social.md), [nutrition](nutrition.md), [portal](portal.md), [007 specification](../../specs/007-food-posts/spec.md).

@@ -223,6 +223,16 @@ export class PostsService {
     const { row, author } = await this.read(userId, id);
     return this.dto(row, author, userId, false);
   }
+  /** The owner's live posts, newest first, as id → title. Used for their Activity. */
+  async ownTitles(userId: string, limit = 500): Promise<Map<string, string>> {
+    const rows = await this.posts
+      .find({ userId, deleted: { $ne: true } })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .select('title')
+      .lean();
+    return new Map(rows.map((row) => [String(row._id), row.title]));
+  }
   private cursorKey() {
     return createHash('sha256')
       .update(this.config.jwtSecret)

@@ -22,10 +22,19 @@ conditional atomic writes rather than conflicting mutations of mirrored friendsh
 - Blocking removes the friendship/request and mutes, and applies in both directions.
 - Each actor can remove only their own block. Unblocking never restores a friendship.
 - Mute is private to the viewer, preserves friendship, and is available to the later Wall.
+  Muting someone also stops their notifications to you.
+- `acceptedAt` is set when a request is accepted and unset whenever the pair returns to
+  none. Activity uses it to sort "accepted your request". Rows accepted before it existed have
+  none and simply don't appear there; there is no backfill.
+- `act()` returns whether the state changed, so a retried request never notifies twice.
 
 The global SocialGraphModule owns graph reads/writes, including block lookups used by Nutrition.
 SocialModule orchestrates profiles and explicit shared responses; it never queries another
 module's tracking collections directly.
+
+SocialService registers the `friendRequest` and `friendAccepted` notification types and the
+Activity source for incoming requests and accepted requests
+([notifications](notifications.md)). It sends after a state-changing `request` or `accept`.
 
 ## API
 

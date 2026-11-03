@@ -12,7 +12,7 @@ export const MODULE_IDS = [
 export type ModuleId = (typeof MODULE_IDS)[number];
 export const COHORTS = ['production', 'internal'] as const;
 export type UserCohort = (typeof COHORTS)[number];
-export const FEATURE_IDS = [...MODULE_IDS, 'social', 'foodPosts'] as const;
+export const FEATURE_IDS = [...MODULE_IDS, 'social', 'foodPosts', 'push'] as const;
 export type FeatureId = (typeof FEATURE_IDS)[number];
 export type FeatureAccess = Record<FeatureId, boolean>;
 export const AUDIENCES = ['private', 'friends', 'public'] as const;
@@ -117,4 +117,5 @@ export const FEATURES: { id: FeatureId; name: string }[] = [
   ...MODULES,
   { id: 'social', name: 'Social connections' },
   { id: 'foodPosts', name: 'Wall and food posts' },
+  { id: 'push', name: 'Push notifications' },
 ];

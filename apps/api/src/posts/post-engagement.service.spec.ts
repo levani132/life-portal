@@ -9,7 +9,7 @@ function fixture() {
   const likes = {
     countDocuments: jest.fn(async () => 1),
     exists: jest.fn(async () => ({})),
-    updateOne: jest.fn(),
+    updateOne: jest.fn(async (..._args: unknown[]) => ({ upsertedCount: 0 })),
     deleteOne: jest.fn(),
   };
   const row = {
@@ -46,6 +46,7 @@ function fixture() {
   const graph = {
     between: jest.fn(async () => ({ blockedBy: [] as string[] })),
   };
+  const notifications = { notify: jest.fn(async () => undefined) };
   return {
     likes,
     comments,
@@ -53,12 +54,15 @@ function fixture() {
     row,
     chain,
     graph,
+    social,
+    notifications,
     service: new PostEngagementService(
       likes as never,
       comments as never,
       posts as never,
       social as never,
       graph as never,
+      notifications as never,
     ),
   };
 }
@@ -165,4 +169,40 @@ it('hides blocked commenters and returns bounded pages', async () => {
   f.graph.between.mockResolvedValue({ blockedBy: ['reader'] });
   expect((await f.service.list('reader', 'post')).comments).toEqual([]);
   expect(f.chain.limit).toHaveBeenCalledWith(21);
+});
+
+it('notifies the post owner once for a new like or comment, never for repeats', async () => {
+  const f = fixture();
+  const post = { id: 'post', title: 'Lunch', isOwner: false, author: { userId: 'owner' } };
+  f.posts.detail.mockResolvedValue(post as never);
+  f.social.own.mockResolvedValue({ displayName: 'Reader' } as never);
+  f.likes.updateOne.mockResolvedValueOnce({ upsertedCount: 1 });
+  await f.service.setLike('reader', 'post', true);
+  await f.service.setLike('reader', 'post', true);
+  f.comments.updateOne.mockResolvedValueOnce({ matchedCount: 0, upsertedCount: 1 } as never);
+  await f.service.add('reader', 'post', 'Looks great', 'request');
+  await f.service.add('reader', 'post', 'Looks great', 'request');
+  expect(f.notifications.notify.mock.calls).toEqual([
+    [
+      {
+        type: 'postLike',
+        recipientId: 'owner',
+        actorId: 'reader',
+        actorName: 'Reader',
+        targetId: 'post',
+        postTitle: 'Lunch',
+      },
+    ],
+    [
+      {
+        type: 'postComment',
+        commentText: 'Looks great',
+        recipientId: 'owner',
+        actorId: 'reader',
+        actorName: 'Reader',
+        targetId: 'post',
+        postTitle: 'Lunch',
+      },
+    ],
+  ]);
 });
