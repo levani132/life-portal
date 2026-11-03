@@ -197,7 +197,15 @@ are useful without it.
 
 - **FR-027**: The feature MUST sit behind a new `push` feature flag managed with the existing developer cohort controls. It defaults on for internal and developer accounts and off in production.
 - **FR-028**: Notification signing keys MUST come only from environment configuration and be documented in `.env.example`. Without them, the API MUST boot and the feature MUST be hidden.
-- **FR-029**: The design MUST allow chat messages and challenge events to be added later as new notification types, without changing how existing types work.
+- **FR-029**: Notifications MUST be one shared system that any module can send through, so chat messages and challenge events can be added later as new types without changing existing types, preferences, devices, delivery or opening. Each type declares only:
+  - who receives it and the access check that must still pass when sending;
+  - its text, under the same privacy rules as FR-016–FR-018;
+  - the screen it opens;
+  - what it collapses on (a post for likes; later, a conversation for messages);
+  - whether it counts toward the unread badge.
+- **FR-030**: The shared system MUST support two behaviours that messaging will need, even though no current type uses them:
+  - skip a notification when the recipient is already looking at the screen it would open (for example, the open conversation);
+  - let a module supply its own unread count to the badge (for example, unread messages), added to the Activity count.
 
 ### Key Entities
 
@@ -227,5 +235,5 @@ are useful without it.
 - The 15-minute like window and 2-minute comment window are starting values and can be tuned without changing the spec's intent.
 - Mute already means "less of this person in my Wall", so it reasonably also means "no notifications from this person".
 - Notifications are sent while the request that caused them is handled, with a short time limit, so no separate worker service is needed (constitution: free-tier deployable).
-- Chat and challenge notifications are out of scope until those features exist. FR-029 only requires that they can be added.
+- Chat and challenge notifications are out of scope until those features exist. FR-029 and FR-030 require that adding them is only a matter of registering new types.
 - Quiet hours, email notifications and notification sounds are out of scope for this version.
