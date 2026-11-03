@@ -21,3 +21,4 @@ export * from './lib/social';
 export * from './lib/posts';
 export * from './lib/activity';
 export * from './lib/notifications';
+export * from './lib/messages';

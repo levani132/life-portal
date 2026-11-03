@@ -8,6 +8,7 @@ export const NOTIFICATION_TYPES = [
   'friendAccepted',
   'postComment',
   'postLike',
+  'message',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -26,6 +27,9 @@ export interface NotificationEvent {
   postTitle?: string;
   /** Shown only when the recipient enabled comment previews. */
   commentText?: string;
+  /** For `message`: what was sent, and its text (shown only with message previews on). */
+  messageKind?: 'text' | 'post';
+  messageText?: string;
 }
 
 /** The encrypted push message body. Only the service worker reads it. */
@@ -70,6 +74,7 @@ export interface NotificationPreferences {
   /** Always complete in responses. A key the member never touched reads as on. */
   types: Record<NotificationType, boolean>;
   showCommentPreviews: boolean;
+  showMessagePreviews: boolean;
   /** Set when the in-app offer is hidden; the offer may show again after this time. */
   offerHiddenUntil?: string;
 }

@@ -124,12 +124,15 @@ export class NotificationsService {
       enabled?: boolean;
       types?: Partial<Record<NotificationType, boolean>>;
       showCommentPreviews?: boolean;
+      showMessagePreviews?: boolean;
     },
   ): Promise<NotificationPreferences> {
     const set: Record<string, unknown> = {};
     if (dto.enabled !== undefined) set['enabled'] = dto.enabled;
     if (dto.showCommentPreviews !== undefined)
       set['showCommentPreviews'] = dto.showCommentPreviews;
+    if (dto.showMessagePreviews !== undefined)
+      set['showMessagePreviews'] = dto.showMessagePreviews;
     for (const [type, value] of Object.entries(dto.types ?? {}))
       if (value !== undefined) set[`types.${type}`] = value;
     // Only userId is seeded on insert, so no field appears in both operators (CLAUDE.md).
@@ -166,6 +169,7 @@ export class NotificationsService {
         NOTIFICATION_TYPES.map((type) => [type, typeEnabled(row ?? undefined, type)]),
       ) as Record<NotificationType, boolean>,
       showCommentPreviews: row?.showCommentPreviews === true,
+      showMessagePreviews: row?.showMessagePreviews === true,
       ...(hiddenUntil && hiddenUntil > this.now()
         ? { offerHiddenUntil: hiddenUntil.toISOString() }
         : {}),
@@ -284,6 +288,7 @@ export class NotificationsService {
     if (others === null) return;
     const text = notificationText(event, {
       showCommentPreviews: prefs?.showCommentPreviews === true,
+      showMessagePreviews: prefs?.showMessagePreviews === true,
       others,
     });
     const payload = {

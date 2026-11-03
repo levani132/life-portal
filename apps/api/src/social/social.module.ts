@@ -166,6 +166,22 @@ export class SocialService implements OnModuleInit {
       },
     });
   }
+  /** Public identity for several members at once (Messages). Missing members are left out. */
+  async authors(
+    userIds: string[],
+  ): Promise<Map<string, { userId: string; displayName: string; username: string }>> {
+    if (!userIds.length) return new Map();
+    const rows = await this.profiles
+      .find({ userId: { $in: [...new Set(userIds)] } })
+      .select('userId displayName username')
+      .lean();
+    return new Map(
+      rows.map((row) => [
+        row.userId,
+        { userId: row.userId, displayName: row.displayName, username: row.username },
+      ]),
+    );
+  }
   /** Display names for Activity and notification text. */
   async displayNames(userIds: string[]): Promise<Map<string, string>> {
     if (!userIds.length) return new Map();

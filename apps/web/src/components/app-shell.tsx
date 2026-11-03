@@ -10,6 +10,7 @@ import type { PortalState } from '@life-portal/shared-types';
 import { moduleForPath } from '@life-portal/shared-domain';
 import { useAuth } from '../lib/auth-context';
 import { useApi } from '../lib/hooks';
+import { MessagesIcon } from './messages';
 import { ActivityBell, NotificationsBridge } from './notifications';
 import { PortalLoader } from './portal-loader';
 import { PullToRefresh } from './pull-to-refresh';
@@ -59,11 +60,38 @@ export function AppShell({ children }: { children: ReactNode }) {
     (!module || portal.data.access[module]) &&
     (!(pathname.startsWith('/posts') || pathname.startsWith('/wall')) ||
       canPost);
+  // A conversation owns the whole screen: no tabs, and no pull-to-refresh fighting its scroll.
+  const inChat = /^\/messages\/[^/]+/.test(pathname);
   const inMenu =
     pathname === '/menu' ||
     pathname.startsWith('/settings') ||
     pathname === '/setup' ||
     pathname === '/profile';
+  const page = (
+    <main
+      className={clsx(
+        'mx-auto max-w-7xl px-4',
+        inChat ? 'pb-0' : 'pb-[calc(6rem+env(safe-area-inset-bottom))]',
+        pathname === '/' ? 'pt-2' : inChat ? 'pt-0' : 'pt-6',
+      )}
+    >
+      {allowed ? (
+        children
+      ) : (
+        <div className="card mx-auto max-w-lg p-6">
+          <h1 className="text-xl font-semibold">
+            This module isn’t available yet
+          </h1>
+          <p className="mt-2 text-sm text-ink-muted">
+            You can manage your available modules in Menu.
+          </p>
+          <Link className="btn mt-4" href="/">
+            Go Home
+          </Link>
+        </div>
+      )}
+    </main>
+  );
   return (
     <div className="min-h-screen">
       <ScrollHeader hidden={chromeHidden} onReveal={revealChrome}>
@@ -72,6 +100,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             Life<span className="text-accent">Portal</span>
           </Link>
           <div className="flex items-center gap-2">
+            <MessagesIcon access={portal.data.access} />
             <ActivityBell access={portal.data.access} />
             <Link href="/menu" className="text-sm text-ink-muted">
               {user.name}
@@ -80,32 +109,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </ScrollHeader>
       <HealthSyncBridge key={user.id} enabled={portal.data.access.nutrition} />
-      <NotificationsBridge key={`push-${user.id}`} access={portal.data.access} />
-      <PullToRefresh>
-        <main
-          className={clsx(
-            'mx-auto max-w-7xl px-4 pb-[calc(6rem+env(safe-area-inset-bottom))]',
-            pathname === '/' ? 'pt-2' : 'pt-6',
-          )}
-        >
-          {allowed ? (
-            children
-          ) : (
-            <div className="card mx-auto max-w-lg p-6">
-              <h1 className="text-xl font-semibold">
-                This module isn’t available yet
-              </h1>
-              <p className="mt-2 text-sm text-ink-muted">
-                You can manage your available modules in Menu.
-              </p>
-              <Link className="btn mt-4" href="/">
-                Go Home
-              </Link>
-            </div>
-          )}
-        </main>
-      </PullToRefresh>
+      <NotificationsBridge
+        key={`push-${user.id}`}
+        access={portal.data.access}
+      />
+      {inChat ? page : <PullToRefresh>{page}</PullToRefresh>}
       <nav
+        hidden={inChat}
         aria-label="Main navigation"
         onFocusCapture={revealChrome}
         className={clsx(

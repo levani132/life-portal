@@ -2,6 +2,17 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-03 — Messages
+
+You can now message your friends. Tap **Message** on a friend's profile, or use the new message
+icon in the header to open your inbox. Messages appear within a few seconds while the
+conversation is open, and your last message shows "Seen" once your friend has read it. You can
+unsend your own messages, mute a conversation, and share a food post into a chat with the new
+**Send** button. The post's audience still decides who can open it. New messages notify you
+when the conversation isn't open, one notification per conversation. Turn on **Show message
+previews** in Notifications to see the text. Messages are behind the `messages` feature flag
+(on for internal accounts).
+
 ## 2026-11-03 — Push notifications and Activity
 
 With notifications turned on, you hear about friend requests, accepted requests, and comments

@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { LockKeyhole, UserRound } from 'lucide-react';
 import type {
@@ -17,6 +18,7 @@ import { api } from '../lib/api';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { ErrorNote, Input, Select, Spinner } from './ui';
 import { requestNotificationOffer } from './notifications';
+import { messagingAvailable, openConversation } from './messages';
 
 export function SharedWidgets({
   widgets,
@@ -90,6 +92,14 @@ export function ConnectionActions({
   compact?: boolean;
 }) {
   const action = useAction();
+  const router = useRouter();
+  const portal = useApi<PortalState>('/portal');
+  async function message() {
+    await action.run(
+      async () => router.push(`/messages/${await openConversation(person.userId)}`),
+      { revalidate: false },
+    );
+  }
   async function act(value: ConnectionAction) {
     const success = await action.run(
       async () => {
@@ -162,6 +172,16 @@ export function ConnectionActions({
         )}
         {relationship === 'friends' && (
           <>
+            {messagingAvailable(portal.data?.access) && (
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={action.pending}
+                onClick={() => void message()}
+              >
+                Message
+              </button>
+            )}
             <span className="flex items-center px-1 text-sm text-emerald-400">
               Friends
             </span>

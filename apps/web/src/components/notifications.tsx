@@ -214,6 +214,7 @@ const TYPE_LABELS: { type: NotificationType; label: string; hint: string }[] = [
   { type: 'friendAccepted', label: 'Accepted requests', hint: 'Someone accepted your request' },
   { type: 'postComment', label: 'Comments', hint: 'On your posts' },
   { type: 'postLike', label: 'Likes', hint: 'On your posts, grouped so bursts stay quiet' },
+  { type: 'message', label: 'Messages', hint: 'From friends, unless you muted that conversation' },
 ];
 
 function Toggle({
@@ -248,6 +249,8 @@ function Toggle({
 
 export function NotificationSettings() {
   const config = useApi<NotificationsConfig>('/notifications/config');
+  const portal = useApi<PortalState>('/portal');
+  const messaging = !!portal.data?.access.messages;
   const available = !!config.data?.available;
   const prefs = useApi<NotificationPreferences>(available ? '/notifications/preferences' : null);
   const devices = useApi<PushDeviceSummary[]>(available ? '/notifications/devices' : null);
@@ -308,7 +311,7 @@ export function NotificationSettings() {
             checked={data.enabled}
             onChange={(enabled) => void update({ enabled })}
           />
-          {TYPE_LABELS.map(({ type, label, hint }) => (
+          {TYPE_LABELS.filter(({ type }) => type !== 'message' || messaging).map(({ type, label, hint }) => (
             <Toggle
               key={type}
               label={label}
@@ -327,6 +330,15 @@ export function NotificationSettings() {
             disabled={!data.enabled}
             onChange={(showCommentPreviews) => void update({ showCommentPreviews })}
           />
+          {messaging && (
+            <Toggle
+              label="Show message previews"
+              hint="Adds the start of a message to the notification. It can appear on your lock screen."
+              checked={data.showMessagePreviews}
+              disabled={!data.enabled}
+              onChange={(showMessagePreviews) => void update({ showMessagePreviews })}
+            />
+          )}
         </div>
       </Panel>
 
@@ -393,6 +405,8 @@ function activityText(item: ActivityItem): string {
       return `${who} commented on ${post}`;
     case 'postLike':
       return `${who} liked ${post}`;
+    case 'message':
+      return `${who} sent you a message`;
   }
 }
 

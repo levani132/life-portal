@@ -33,6 +33,7 @@ export class NotificationPreferencesRecord {
   @Prop() enabled?: boolean;
   @Prop({ type: Object }) types?: Partial<Record<NotificationType, boolean>>;
   @Prop() showCommentPreviews?: boolean;
+  @Prop() showMessagePreviews?: boolean;
   @Prop() activitySeenAt?: Date;
   @Prop() offerDismissedAt?: Date;
 }

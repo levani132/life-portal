@@ -34,7 +34,7 @@ holds only facts. Activity and unread counts are derived on read (principle III)
   - **The endpoint is a capability URL.** It is never returned in a response and never logged.
 - **`notification_preferences`**: per member.
   - Fields: `enabled` (main switch), `types` (a missing key means on), `showCommentPreviews`
-    (missing means off), `activitySeenAt`, `offerDismissedAt`.
+    and `showMessagePreviews` (missing means off), `activitySeenAt`, `offerDismissedAt`.
   - No Mongo defaults are used.
 - **`notification_deliveries`**: collapse state per (recipient, type, collapse key):
   `lastSentAt` and `suppressed`. It has a 1-day TTL, and losing it at worst sends one extra
@@ -87,7 +87,9 @@ steps 2–5):
 action, the recipient's own post title and (if previews are on) up to 80 characters of a
 comment. Food, nutrition, weight, activity and money never reach it.
 
-## Adding a type (for example chat messages)
+## Adding a type
+
+Messages ([messages](messages.md)) was added exactly this way and is the worked example.
 
 1. Add the type to `NOTIFICATION_TYPES` in `libs/shared/types/src/lib/notifications.ts`, and
    add a `notificationText` case with a test.
@@ -112,6 +114,7 @@ Current types:
 | `friendAccepted` | SocialService | none | actor | `/people/:actor` |
 | `postComment` | PostEngagementService | 2 min | post | `/posts/:id` |
 | `postLike` | PostEngagementService | 15 min | post | `/posts/:id` |
+| `message` | MessagesService | none (replaces per conversation) | conversation | `/messages/:id` |
 
 ## Web
 

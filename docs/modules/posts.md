@@ -50,7 +50,7 @@ Read authorization always checks audience, the current friendship, blocks in eit
 
 ## Screens
 
-Wall is the fourth bottom tab when all three features are enabled. Food offers entry/meal/day/food/database share actions plus the full composer; logging offers a dismissible share action afterward. Profiles open Posts, with About alongside for permitted live widgets. Posts can be reviewed, edited, deleted, imported, reported or hidden. Each post's footer has Like, Comment and Share. Share uses the system share sheet, falling back to copying the `/posts/:id` link. The link opens only for signed-in viewers the post's audience already allows. Developer Menu includes the report queue.
+Wall is the fourth bottom tab when all three features are enabled. Food offers entry/meal/day/food/database share actions plus the full composer; logging offers a dismissible share action afterward. Profiles open Posts, with About alongside for permitted live widgets. Posts can be reviewed, edited, deleted, imported, reported or hidden. Each post's footer has Like, Comment, Send (with the `messages` feature: sends the post to a friend as a reference, so its audience still applies; see [messages](messages.md)) and Share. Share uses the system share sheet, falling back to copying the `/posts/:id` link. The link opens only for signed-in viewers the post's audience already allows. Developer Menu includes the report queue.
 
 ## Verification and boundaries
 

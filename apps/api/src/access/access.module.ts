@@ -57,6 +57,7 @@ const FeaturePolicySchema = SchemaFactory.createForClass(FeaturePolicy);
 class FeatureOverridesDto {
   @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() foodPosts?: boolean;
   @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() push?: boolean;
+  @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() messages?: boolean;
   @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() social?: boolean;
   @ValidateIf((_, value: unknown) => value !== undefined)
   @IsBoolean()

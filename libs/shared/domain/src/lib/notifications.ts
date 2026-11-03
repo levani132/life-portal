@@ -12,6 +12,7 @@ export interface StoredNotificationPreferences {
   enabled?: boolean;
   types?: Partial<Record<NotificationType, boolean>>;
   showCommentPreviews?: boolean;
+  showMessagePreviews?: boolean;
 }
 
 export type SkipReason =
@@ -83,8 +84,11 @@ function postName(title: string | undefined): string {
  * (opted in) the comment, so no tracking data can reach it (spec FR-016–FR-018).
  */
 export function notificationText(
-  event: Pick<NotificationEvent, 'type' | 'actorName' | 'postTitle' | 'commentText'>,
-  options: { showCommentPreviews: boolean; others?: number },
+  event: Pick<
+    NotificationEvent,
+    'type' | 'actorName' | 'postTitle' | 'commentText' | 'messageKind' | 'messageText'
+  >,
+  options: { showCommentPreviews: boolean; showMessagePreviews?: boolean; others?: number },
 ): { title: string; body: string } {
   const title = clip(event.actorName, TITLE_LIMIT) || 'Someone';
   const others = options.others ?? 0;
@@ -100,6 +104,14 @@ export function notificationText(
           ? clip(event.commentText, PREVIEW_LIMIT)
           : '';
       return { title, body: preview ? `${base}: ${preview}` : base };
+    }
+    case 'message': {
+      const base = event.messageKind === 'post' ? 'shared a post' : 'sent you a message';
+      const preview =
+        options.showMessagePreviews && event.messageKind !== 'post' && event.messageText
+          ? clip(event.messageText, PREVIEW_LIMIT)
+          : '';
+      return { title, body: preview || base };
     }
     case 'postLike':
       return {

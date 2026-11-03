@@ -78,6 +78,7 @@ export class UpdateNotificationPreferencesDto {
   @IsOptional() @IsBoolean() enabled?: boolean;
   @IsOptional() @Validate(NotificationTypeMap) types?: Record<string, boolean>;
   @IsOptional() @IsBoolean() showCommentPreviews?: boolean;
+  @IsOptional() @IsBoolean() showMessagePreviews?: boolean;
 }
 
 export class ActivityQueryDto {

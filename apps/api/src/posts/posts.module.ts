@@ -174,5 +174,7 @@ class PostsController {
   ],
   controllers: [PostsController],
   providers: [PostsService, PostEngagementService],
+  // Messages renders shared posts through the same read authorization as opening one.
+  exports: [PostsService],
 })
 export class PostsModule {}

@@ -1007,3 +1007,27 @@ Posts. Chat and challenges will register their own types and badge sources witho
 
 The lockfile was updated by hand-merging the seven new entries. On this machine npm 11 also
 pruned the Linux optional builds (rolldown) that Render and Vercel need.
+
+## 2026-11-03 — Direct messages: friends only, polling as presence, references for posts
+
+- **Friends only.** Only accepted friends with no block can message. A private-by-default
+  health app should not let strangers send messages. Message requests can come later.
+  Unfriending or blocking keeps the history readable and stops new messages.
+- **Short polling instead of sockets.** A 3-second `sync` runs while a conversation is
+  visible, and nothing runs in the background. This needs no always-on service (constitution:
+  free tier). The same sync records `viewingAt`, which is the presence signal the `message`
+  notification's server-side `suppress` hook reads. That works across devices because it is
+  stored per member. A WebSocket gateway with Redis fan-out is the Tier 1 upgrade; the `sync`
+  payload stays the contract.
+- **Nothing derived is stored.** The inbox's last message and unread counts are computed on
+  read (principle III). The cost is one count per conversation (at most 50), acceptable at this
+  scale. A read model later needs a constitution amendment.
+- **Shared posts are `postId` references**, rendered through `PostsService.detail()` for each
+  viewer (principle IV). A recipient outside the post's audience sees "Post unavailable", and
+  deleting or narrowing a post updates every card.
+- **Unsend erases content** and keeps a tombstone, so ordering and "Seen" stay consistent.
+  Sync reports IDs unsent since the last poll, so older bubbles update too.
+- **The rate limit (30 a minute) is counted in Mongo**, so it holds across instances without
+  Redis.
+- **Message previews on the lock screen are opt-in** (`showMessagePreviews`), like comment
+  previews.

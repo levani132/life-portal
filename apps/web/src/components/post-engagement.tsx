@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Heart, MessageCircle, Send, Share2, Trash2 } from 'lucide-react';
 import type {
+  PortalState,
   FoodPost,
   PostComment,
   PostCommentsPage,
@@ -13,6 +14,7 @@ import { useApi } from '../lib/hooks';
 import { PostRelativeTime } from './post-header-controls';
 import { ErrorNote, Modal } from './ui';
 import { requestNotificationOffer } from './notifications';
+import { messagingAvailable, SendPostDialog } from './messages';
 
 export function PostEngagement({ post }: { post: FoodPost }) {
   const stats = useApi<Engagement>(`/posts/${post.id}/engagement`, {
@@ -27,6 +29,9 @@ export function PostEngagement({ post }: { post: FoodPost }) {
   const [notice, setNotice] = useState('');
   const [linkOpen, setLinkOpen] = useState(false);
   const linkInput = useRef<HTMLInputElement>(null);
+  const [sendOpen, setSendOpen] = useState(false);
+  const portal = useApi<PortalState>('/portal');
+  const canSend = messagingAvailable(portal.data?.access);
   const value = optimistic ?? stats.data;
   const postUrl = () =>
     new URL(`/posts/${post.id}`, window.location.origin).href;
@@ -106,7 +111,7 @@ export function PostEngagement({ post }: { post: FoodPost }) {
         </div>
       ) : null}
       <div
-        className={`grid grid-cols-3 border-t border-border py-1 ${commentsOpen ? 'border-b' : ''}`}
+        className={`grid ${canSend ? 'grid-cols-4' : 'grid-cols-3'} border-t border-border py-1 ${commentsOpen ? 'border-b' : ''}`}
       >
         <button
           type="button"
@@ -128,6 +133,16 @@ export function PostEngagement({ post }: { post: FoodPost }) {
           <MessageCircle size={18} />
           Comment
         </button>
+        {canSend && (
+          <button
+            type="button"
+            onClick={() => setSendOpen(true)}
+            className="flex min-h-11 items-center justify-center gap-2 rounded-lg text-sm text-ink-muted transition hover:bg-violet-500/10 active:scale-95"
+          >
+            <Send size={18} className="-rotate-12" />
+            Send
+          </button>
+        )}
         <button
           type="button"
           onClick={() => void share()}
@@ -152,6 +167,9 @@ export function PostEngagement({ post }: { post: FoodPost }) {
             void stats.mutate().catch(() => undefined);
           }}
         />
+      )}
+      {sendOpen && (
+        <SendPostDialog postId={post.id} onClose={() => setSendOpen(false)} />
       )}
       {linkOpen && (
         <Modal open title="Share post" onClose={() => setLinkOpen(false)}>

@@ -232,3 +232,27 @@ describe('isPushServiceEndpoint', () => {
       expect(isPushServiceEndpoint(url)).toBe(false);
   });
 });
+
+describe('notificationText for messages', () => {
+  const message = { type: 'message' as const, actorName: 'Ana', messageText: 'Lunch at 1?' };
+  it('hides the text unless message previews are on', () => {
+    expect(notificationText({ ...message, messageKind: 'text' }, { showCommentPreviews: true })).toEqual({
+      title: 'Ana',
+      body: 'sent you a message',
+    });
+    expect(
+      notificationText(
+        { ...message, messageKind: 'text' },
+        { showCommentPreviews: false, showMessagePreviews: true },
+      ).body,
+    ).toBe('Lunch at 1?');
+  });
+  it('says a post was shared, never its content', () => {
+    expect(
+      notificationText(
+        { ...message, messageKind: 'post' },
+        { showCommentPreviews: false, showMessagePreviews: true },
+      ).body,
+    ).toBe('shared a post');
+  });
+});

@@ -44,6 +44,7 @@ export function moduleForPath(path: string): FeatureId | undefined {
       wall: 'foodPosts',
       posts: 'foodPosts',
       activity: 'push',
+      messages: 'messages',
       search: 'social',
       friends: 'social',
       people: 'social',

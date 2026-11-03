@@ -109,8 +109,9 @@ self.addEventListener('push', (event) => {
         {
           body: typeof payload.body === 'string' ? payload.body : 'You have new activity',
           tag,
-          // A newer comment on the same post replaces the older one, but still alerts.
-          renotify: !!tag && tag.startsWith('postComment'),
+          // A newer comment on a post, or message in a conversation, replaces the older
+          // notification but still alerts.
+          renotify: !!tag && (tag.startsWith('postComment') || tag.startsWith('message:')),
           icon: '/icon-192.png',
           badge: '/icon-192.png',
           data: { url: appPath(payload.url) ?? '/activity' },

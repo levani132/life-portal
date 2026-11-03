@@ -32,6 +32,9 @@ The global SocialGraphModule owns graph reads/writes, including block lookups us
 SocialModule orchestrates profiles and explicit shared responses; it never queries another
 module's tracking collections directly.
 
+A friend's profile shows **Message** with the `messages` feature ([messages](messages.md)).
+`SocialService.authors()` gives Messages public identities in one query.
+
 SocialService registers the `friendRequest` and `friendAccepted` notification types and the
 Activity source for incoming requests and accepted requests
 ([notifications](notifications.md)). It sends after a state-changing `request` or `accept`.

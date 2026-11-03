@@ -149,6 +149,11 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   server (`NotificationTypeDef.suppress`). `notify()` is never awaited by the action that caused
   it, and it never throws. A new notification type is registered by its own module; see
   `docs/modules/notifications.md`.
+- **The messages `sync` call is also the presence signal.** It marks the conversation read and
+  sets `viewingAt`, which is what stops a notification while someone has the chat open. Don't
+  make polling call something else, and don't poll while the page is hidden. A shared post in a
+  chat is a `postId` re-checked with `PostsService.detail()` every time it is shown; never copy
+  post content into a message. See `docs/modules/messages.md`.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for
