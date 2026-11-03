@@ -4,11 +4,14 @@ Explicit publishing is separate from live widget sharing: a private Food widget 
 
 ## Ownership and schema
 
-`PostsModule` owns `food_posts` and `post_reports`; `NutritionModule` alone reads tracking records and creates imported foods/saved meals through `NutritionPublicationService`. These collections preserve explicit publication events and reports without exposing private tracking collections.
+`PostsModule` owns `food_posts`, `post_reports`, `post_likes` and `post_comments`; `NutritionModule` alone reads tracking records and creates imported foods/saved meals through `NutritionPublicationService`. These collections preserve explicit publication events and reports without exposing private tracking collections.
 
 - `food_posts`: owner `userId`, unique `(userId, requestId)` UUID for retry safety, SHA-256 `previewHash`, title (120), caption (1000), audience private/friends/public, version 1, timestamps, deletion tombstone. Index `(userId, createdAt desc, _id desc)` supports stable feeds.
 - `publication`: kind, label, optional day/slot, and 1–1000 server-created food snapshots. Item keys are local ordinals, not tracking IDs. Snapshots contain name/brand, unit, serving size/label, nutrition facts, optional eaten amount/slot, attribution. No source record IDs, notes, favourites, barcodes, targets or measurements.
 - `post_reports`: unique `(userId, postId)`, reason, timestamp and optional `resolvedAt`. The queue lists unresolved reports; moderation resolves all reports for the removed post. A report immediately hides that post from its reporter. Developer review returns report metadata; it grants no access to a private post's contents. A developer may remove a reported post by report ID.
+- `post_likes`: one row per `(postId, userId)` (unique index), so liking twice is a no-op and a duplicate-key race is tolerated. Unliking deletes the row.
+- `post_comments`: `postId`, author `userId`, client `requestId` UUID (unique per `(postId, userId, requestId)` for retry safety), text (1–1000, trimmed) and a `deleted` flag. Deleting clears the text and keeps the row. Index `(postId, deleted, _id desc)` serves the newest-first list.
+- Like and comment counts are never stored on the post; `PostEngagementService` counts rows on read (principle 3).
 - `foods.attribution`, `foods.postImportKey`: provenance and unique per-user publication/food-facts key (partial unique index). Existing documents require no backfill. `saved_meals.postImportKey` similarly makes repeat whole-meal imports idempotent. These are independent recipient-owned copies, never links into an author's tracking data.
 
 Deletion erases the stored food snapshot and caption while retaining an owner/request tombstone so a retried publish cannot resurrect it. Previously imported copies remain recipient-owned; the composer and import UI explain this.
@@ -21,7 +24,11 @@ Authenticated `/api/posts` routes require **social + nutrition + foodPosts**, ev
 - `POST / {source, previewHash, requestId, title, caption, audience}` rebuilds the source and rejects a changed fingerprint with 409. Matching UUID retries return the original post; mismatched reuse and deleted requests fail with 409.
 - `GET /?authorId=&cursor=&preview=normal|friend|stranger` lists 10 visible posts. Wall includes self and accepted, unmuted friends; other public posts are reached through profiles. A feed teaser contains at most three foods. Owner-only audience previews restrict their own results; another viewer cannot elevate their relationship using a query parameter.
 - `GET /:id` returns the complete permitted snapshot.
-- `PATCH /:id {title,caption,audience}` and `DELETE /:id` are owner-only; food facts stay immutable.
+- `PATCH /:id {title,caption,audience}` and `DELETE /:id` are owner-only; food facts stay immutable. `PATCH /:id/audience {audience}` is the header's quick audience switch, also owner-only.
+- `GET /:id/engagement` returns `{likeCount, commentCount, liked}`. `PUT /:id/like` and `DELETE /:id/like` set the viewer's like and return the new counts.
+- `GET /:id/comments?before=` lists 20 comments newest first, with `nextCursor` (a comment ID) when more exist. Comments by someone blocked in either direction are left out. Authors who have left show as "Former member".
+- `POST /:id/comments {text, requestId}` adds a comment; a retried `requestId` returns the original. `DELETE /:id/comments/:commentId` is allowed for the comment's author and the post's owner.
+- Every engagement route first runs the same read authorization as `GET /:id`, so a viewer who cannot read a post cannot like it, comment on it or see its counts.
 - `GET /:id/import` previews already-imported foods and matching names.
 - `POST /:id/import {itemKeys,duplicatePolicy:skip|copy,saveAsMeal,mealName?}` copies selected foods privately. `skip` is the default for matching name/brand/unit. Whole meals/combinations can additionally become saved meals; select every item and explicitly copy conflicting names. No import logs a meal.
 - `POST /:id/report {reason}` reports and hides a readable, non-owned post. Repeats are safe.
@@ -42,10 +49,10 @@ Read authorization always checks audience, the current friendship, blocks in eit
 
 ## Screens
 
-Wall is the fourth bottom tab when all three features are enabled. Food offers entry/meal/day/food/database share actions plus the full composer; logging offers a dismissible share action afterward. Profiles open Posts, with About alongside for permitted live widgets. Posts can be reviewed, edited, deleted, imported, reported or hidden. Developer Menu includes the report queue.
+Wall is the fourth bottom tab when all three features are enabled. Food offers entry/meal/day/food/database share actions plus the full composer; logging offers a dismissible share action afterward. Profiles open Posts, with About alongside for permitted live widgets. Posts can be reviewed, edited, deleted, imported, reported or hidden. Each post's footer has Like, Comment and Share. Share uses the system share sheet, falling back to copying the `/posts/:id` link. The link opens only for signed-in viewers the post's audience already allows. Developer Menu includes the report queue.
 
 ## Verification and boundaries
 
-Domain tests cover source selection, canonicalisation, duplicates, calorie calculation and the audience matrix. API tests cover owned allowlists, historical snapshots, invalid combinations and private/import retry behavior. Isolated API/browser checks exercise the complete publication/import flow with separate accounts. Comments, reactions, images, financial posts, automatic posting, public web links and collection updates are future work.
+Domain tests cover source selection, canonicalisation, duplicates, calorie calculation and the audience matrix. API tests cover owned allowlists, historical snapshots, invalid combinations and private/import retry behavior. Isolated API/browser checks exercise the complete publication/import flow with separate accounts. Engagement tests cover idempotent likes and comments, delete rights and blocked commenters. Reactions beyond a like, comment replies, notifications, images, financial posts, automatic posting, public web links and collection updates are future work.
 
 Related: [social](social.md), [nutrition](nutrition.md), [portal](portal.md), [007 specification](../../specs/007-food-posts/spec.md).

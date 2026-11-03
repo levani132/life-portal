@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-02 — Likes, comments and sharing on posts
+
+Food posts now have Like, Comment and Share in their footer. Comments can be deleted by
+whoever wrote them and by the post's owner. Comments from people you have blocked, or who
+blocked you, are hidden. Share opens the phone's share sheet, or copies the post's link; the
+post's audience still decides who can open it. The post header also has a quick audience
+switch.
+
 ## 2026-11-02 — Home widgets follow your finger
 
 Swiping between Home widgets now tracks the finger one-to-one instead of racing ahead of it.
