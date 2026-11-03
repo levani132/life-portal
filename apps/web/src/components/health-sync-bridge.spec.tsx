@@ -5,7 +5,8 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
-import { HealthSyncBridge } from './apple-health';
+import { HealthSyncBridge, HealthSyncButton } from './apple-health';
+import { useApi } from '../lib/hooks';
 import { api } from '../lib/api';
 import {
   healthShortcutInstallKey,
@@ -199,4 +200,38 @@ it('does not mark a canceled installation as installed and offers setup on manua
   ).toBeTruthy();
   expect(api.post).not.toHaveBeenCalled();
   view.unmount();
+});
+
+it('asks for manual renewal after 20 days even with a fresh automatic upload', () => {
+  jest.useFakeTimers();
+  const manual = Date.parse('2026-11-03T00:00:00Z');
+  const day = 24 * 60 * 60 * 1000;
+  jest.setSystemTime(manual + 20 * day - 60000);
+  (useApi as jest.Mock).mockReturnValue({
+    data: {
+      paired: true,
+      lastManualLaunch: new Date(manual).toISOString(),
+      tokenExpiresAt: new Date(manual + 30 * day).toISOString(),
+      lastSync: new Date(manual + 20 * day).toISOString(),
+    },
+  });
+  const manualSync = jest.fn();
+  window.addEventListener('lp-health-sync', manualSync);
+  try {
+    const view = render(<HealthSyncButton />);
+    expect(
+      screen.getByRole('button', { name: 'Sync Apple Health' }),
+    ).toBeTruthy();
+    act(() => {
+      jest.advanceTimersByTime(60000);
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: /Renew automatic Apple Health sync/ }),
+    );
+    expect(manualSync).toHaveBeenCalledTimes(1);
+    view.unmount();
+  } finally {
+    window.removeEventListener('lp-health-sync', manualSync);
+    jest.useRealTimers();
+  }
 });

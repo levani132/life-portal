@@ -17,6 +17,7 @@ import { revalidate, useApi } from '../lib/hooks';
 import { ErrorNote, Select, Spinner } from './ui';
 import { NutritionOnboarding } from './nutrition-onboarding';
 import { AppleHealthPanel } from './apple-health';
+import { useIsIOS } from '../lib/ios-device';
 
 export function PortalPreferencesPanel({
   mode,
@@ -24,9 +25,12 @@ export function PortalPreferencesPanel({
   mode: 'setup' | 'modules' | 'privacy';
 }) {
   const { data, error, isLoading } = useApi<PortalState>('/portal');
-  if (isLoading) return <Spinner />;
+  const ios = useIsIOS();
+  if (isLoading || ios === null) return <Spinner />;
   if (error) return <ErrorNote message={(error as Error).message} />;
-  return data ? <PreferencesEditor initial={data} mode={mode} /> : null;
+  return data ? (
+    <PreferencesEditor initial={data} mode={mode} ios={ios} />
+  ) : null;
 }
 const CARD_ID: Record<ModuleId, string> = {
   nutrition: 'nutrition',
@@ -49,9 +53,11 @@ const STEPS = [
 function PreferencesEditor({
   initial,
   mode,
+  ios,
 }: {
   initial: PortalState;
   mode: 'setup' | 'modules' | 'privacy';
+  ios: boolean;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState(initial.selectedModules);
@@ -66,14 +72,19 @@ function PreferencesEditor({
     };
     return available.sort((a, b) => rank(a) - rank(b));
   });
+  const relevantStep = (id: string) =>
+    (selected.includes('nutrition') ||
+      !['nutrition-profile-v2', 'apple-health-v1'].includes(id)) &&
+    (ios || id !== 'apple-health-v1');
+  const visibleSteps = SETUP_STEPS.map((id, index) => ({ id, index })).filter(
+    ({ id }) => relevantStep(id),
+  );
   const [step, setStep] = useState(
     Math.max(
       0,
       SETUP_STEPS.findIndex(
         (id) =>
-          !(initial.completedSetupSteps ?? []).includes(id) &&
-          (selected.includes('nutrition') ||
-            !['nutrition-profile-v2', 'apple-health-v1'].includes(id)),
+          !(initial.completedSetupSteps ?? []).includes(id) && relevantStep(id),
       ),
     ),
   );
@@ -122,13 +133,16 @@ function PreferencesEditor({
     }
   }
   function next() {
-    const done = [...new Set([...completed, SETUP_STEPS[step]])];
+    // Health setup is optional on unsupported devices; skipping it must not keep onboarding unfinished.
+    const done = [
+      ...new Set([
+        ...completed,
+        SETUP_STEPS[step],
+        ...(!ios ? ['apple-health-v1' as const] : []),
+      ]),
+    ];
     const nextStep = SETUP_STEPS.findIndex(
-      (id, i) =>
-        i > step &&
-        !done.includes(id) &&
-        (selected.includes('nutrition') ||
-          !['nutrition-profile-v2', 'apple-health-v1'].includes(id)),
+      (id, i) => i > step && !done.includes(id) && relevantStep(id),
     );
     void save(
       {
@@ -161,12 +175,12 @@ function PreferencesEditor({
           </p>
           <div
             className="mb-6 flex gap-2"
-            aria-label={`Step ${step + 1} of ${STEPS.length}`}
+            aria-label={`Step ${visibleSteps.findIndex(({ index }) => index === step) + 1} of ${visibleSteps.length}`}
           >
-            {STEPS.map((label, i) => (
+            {visibleSteps.map(({ id, index }) => (
               <span
-                key={label}
-                className={`h-1 flex-1 rounded-full ${i <= step ? 'bg-sky-400' : 'bg-surface-raised'}`}
+                key={id}
+                className={`h-1 flex-1 rounded-full ${index <= step ? 'bg-sky-400' : 'bg-surface-raised'}`}
               />
             ))}
           </div>
@@ -317,7 +331,7 @@ function PreferencesEditor({
           </>
         )}
         {active === 3 && <NutritionOnboarding onSaved={next} />}
-        {active === 4 && <AppleHealthPanel />}
+        {active === 4 && ios && <AppleHealthPanel setupGuide />}
         {active === 5 && (
           <div className="card p-6">
             <Check className="mb-4 text-emerald-400" size={28} />
@@ -336,7 +350,13 @@ function PreferencesEditor({
             <button
               className="btn"
               type="button"
-              onClick={() => void save({ setupStep: step - 1 })}
+              onClick={() =>
+                void save({
+                  setupStep:
+                    visibleSteps.filter(({ index }) => index < step).at(-1)
+                      ?.index ?? 0,
+                })
+              }
             >
               Back
             </button>

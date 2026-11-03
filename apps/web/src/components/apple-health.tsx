@@ -5,7 +5,8 @@ import type { ActivityAdjustment } from '@life-portal/shared-types';
 import { api, API_URL } from '../lib/api';
 import { revalidate, useApi } from '../lib/hooks';
 import { useAuth } from '../lib/auth-context';
-import { healthShortcutUrl, healthSyncDue } from '../lib/health-sync';
+import { useIsIOS } from '../lib/ios-device';
+import { healthShortcutUrl, healthTokenState } from '../lib/health-sync';
 import { ErrorNote, Panel } from './ui';
 import { HealthActivityChart } from './health-activity-chart';
 import { HealthShortcutDialog } from './health-shortcut-dialog';
@@ -24,6 +25,8 @@ import {
 interface HealthStatus {
   paired: boolean;
   lastSync?: string;
+  lastManualLaunch?: string;
+  tokenExpiresAt?: string;
   installationUrl?: string;
   lastUploadAt?: string;
   lastReceivedCount?: number;
@@ -31,6 +34,10 @@ interface HealthStatus {
 }
 /** This bridge never launches on mount, resume, focus or a timer. Only a user action can launch. */
 export function HealthSyncBridge({ enabled }: { enabled: boolean }) {
+  const ios = useIsIOS();
+  return ios && enabled ? <IOSHealthSyncBridge enabled /> : null;
+}
+function IOSHealthSyncBridge({ enabled }: { enabled: boolean }) {
   const { user } = useAuth();
   const [message, setMessage] = useState('');
   const [shortcutPrompt, setShortcutPrompt] = useState<{
@@ -323,6 +330,10 @@ export function HealthSyncBridge({ enabled }: { enabled: boolean }) {
 }
 
 export function HealthSyncButton() {
+  const ios = useIsIOS();
+  return ios ? <IOSHealthSyncButton /> : null;
+}
+function IOSHealthSyncButton() {
   const status = useApi<HealthStatus>('/nutrition/health', {
     revalidateOnFocus: true,
     refreshInterval: 60000,
@@ -332,31 +343,68 @@ export function HealthSyncButton() {
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(timer);
   }, []);
-  const due = status.data?.paired && healthSyncDue(status.data.lastSync, now);
+  const due =
+    status.data?.paired &&
+    healthTokenState(
+      status.data.lastManualLaunch,
+      status.data.tokenExpiresAt,
+      now,
+    ) !== 'active';
   return (
     <button
       type="button"
       className={`flex h-10 items-center gap-1 rounded-lg px-2 text-xs font-medium hover:bg-violet-500/10 ${due ? 'text-amber-400' : 'text-violet-400'}`}
       aria-label={
         due
-          ? 'Sync Apple Health — last sync missing or more than six hours ago'
+          ? 'Renew automatic Apple Health sync — run manually every 20 days'
           : 'Sync Apple Health'
       }
       title={
         due
-          ? 'Sync recommended: six hours since the last successful sync, or no sync received yet'
+          ? 'Tap Sync to renew the 30-day automatic sync connection'
           : 'Sync Apple Health'
       }
       onClick={() => window.dispatchEvent(new Event('lp-health-sync'))}
     >
-      <RefreshCw size={15} /> {due ? 'Sync due' : 'Sync'}
+      <RefreshCw size={15} /> {due ? 'Renew sync' : 'Sync'}
     </button>
   );
 }
 export function AppleHealthPanel({
   activity,
+  setupGuide = false,
 }: {
   activity?: ActivityAdjustment;
+  setupGuide?: boolean;
+}) {
+  const ios = useIsIOS();
+  return ios ? (
+    <IOSAppleHealthPanel activity={activity} setupGuide={setupGuide} />
+  ) : null;
+}
+
+export function HealthConnectionSettings() {
+  const ios = useIsIOS();
+  if (ios === null) return null;
+  return ios ? (
+    <AppleHealthPanel setupGuide />
+  ) : (
+    <Panel title="Apple Health & Shortcuts">
+      <p className="text-sm text-ink-muted">
+        Health syncing works only on iOS. Open Life Portal on your iPhone or
+        iPad to install the Shortcut, connect Apple Health and set up scheduled
+        syncing. Desktop and Android cannot collect Apple Health samples.
+      </p>
+    </Panel>
+  );
+}
+
+function IOSAppleHealthPanel({
+  activity,
+  setupGuide,
+}: {
+  activity?: ActivityAdjustment;
+  setupGuide: boolean;
 }) {
   const status = useApi<HealthStatus>('/nutrition/health', {
     revalidateOnFocus: true,
@@ -432,6 +480,31 @@ export function AppleHealthPanel({
   return (
     <Panel title="Apple Health">
       <div className="space-y-4 text-sm">
+        {setupGuide && (
+          <div className="space-y-2 text-xs text-ink-muted">
+            <p className="font-medium text-ink">Set up Health syncing</p>
+            <ol className="list-decimal space-y-1 pl-4">
+              <li>Install Life Portal Health and keep its name unchanged.</li>
+              <li>
+                Tap Sync here once to save your connection and allow Health
+                access.
+              </li>
+              <li>
+                For automatic syncing, open the Shortcut in Shortcuts and enable
+                its scheduled runs. Allow running when locked if offered.
+              </li>
+            </ol>
+            <p>
+              Installing the Shortcut does not enable its schedule. You can
+              always sync manually.
+            </p>
+            <p>
+              Scheduled runs reuse your saved connection for 30 days. Tap Sync
+              manually every 20 days to renew it. The latest 50 samples per type
+              may not cover the whole day.
+            </p>
+          </div>
+        )}
         <button
           type="button"
           disabled={!status.data?.installationUrl}
@@ -517,6 +590,26 @@ export function AppleHealthPanel({
             {busy ? 'Connecting…' : 'Sync'}
           </button>
         </div>
+        {status.data?.paired && (
+          <div className="space-y-1 text-xs text-ink-muted">
+            {!setupGuide && (
+              <p>
+                With Shortcut automations enabled, Health sync runs on your
+                schedule. Tap Sync manually every 20 days to renew its 30-day
+                connection.
+              </p>
+            )}
+            {healthTokenState(
+              status.data.lastManualLaunch,
+              status.data.tokenExpiresAt,
+              Date.now(),
+            ) !== 'active' && (
+              <p role="status" className="text-amber-400">
+                Tap Sync now to renew automatic syncing.
+              </p>
+            )}
+          </div>
+        )}
         <details className="rounded-xl border border-border p-3">
           <summary className="cursor-pointer text-xs text-ink-muted">
             Details & connection
@@ -532,6 +625,12 @@ export function AppleHealthPanel({
                 Starting target {activity.startingTargetKcal} kcal → current
                 target {activity.currentTargetKcal} kcal. The adjustment is
                 already included.
+              </p>
+            )}
+            {status.data?.tokenExpiresAt && (
+              <p>
+                Automatic sync authorized until{' '}
+                {new Date(status.data.tokenExpiresAt).toLocaleString()}.
               </p>
             )}
             {status.data?.lastUploadAt && (

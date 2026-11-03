@@ -72,6 +72,7 @@ class SampleDto implements HealthSample {
   @Type(() => Number) @IsNumber() @Min(0) @Max(1000000) value!: number;
 }
 export const HEALTH_RECENT_LIMIT = 50;
+export const HEALTH_TOKEN_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 export class HealthUploadDto {
   @Transform(
     ({ value }: { value: unknown }) => {
@@ -102,6 +103,8 @@ export class HealthService {
     return {
       paired: row?.paired ?? false,
       lastSync: row?.lastSync,
+      lastManualLaunch: row?.lastLaunch,
+      tokenExpiresAt: row?.ticketHash ? row.expiresAt : undefined,
       installationUrl,
       mode: 'recent' as const,
       limitPerKind: HEALTH_RECENT_LIMIT,
@@ -166,7 +169,7 @@ export class HealthService {
         $set: {
           lastLaunch: new Date(now).toISOString(),
           ticketHash: hash(token),
-          expiresAt: new Date(now + 15 * 60000).toISOString(),
+          expiresAt: new Date(now + HEALTH_TOKEN_LIFETIME_MS).toISOString(),
         },
         // Retire only obsolete protocol metadata. Uploaded samples are kept.
         $unset: {
@@ -201,7 +204,7 @@ export class HealthService {
       .lean();
     if (!row)
       throw new UnauthorizedException(
-        'Expired, used or revoked Health upload ticket.',
+        'Health sync authorization expired or was revoked. Open Life Portal and tap Sync to renew it.',
       );
     await this.access.require(row.userId, 'nutrition');
     return {
@@ -288,7 +291,7 @@ export class HealthService {
     );
     if (!acquired)
       throw new UnauthorizedException(
-        'Upload ticket already used, processing or revoked.',
+        'Health sync is processing, expired or revoked. Retry shortly, or tap Sync in Life Portal to renew it.',
       );
     try {
       await this.storeSamples(owner, unique);
@@ -302,8 +305,6 @@ export class HealthService {
             ...(unique.length ? { lastSync: receivedAt } : {}),
           },
           $unset: {
-            ticketHash: 1,
-            expiresAt: 1,
             uploadingUntil: 1,
             uploadWriteId: 1,
           },
@@ -319,7 +320,7 @@ export class HealthService {
       );
       return { received: unique.length, limitPerKind: HEALTH_RECENT_LIMIT };
     } finally {
-      // Keep the ticket available after a failed write; repeated samples merge by identity.
+      // Keep the 30-day ticket reusable; only release this upload’s lock. Samples merge by identity.
       await this.model.updateOne(
         {
           _id: owner.connectionId,

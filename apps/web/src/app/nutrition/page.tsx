@@ -1,6 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
+import { useIsIOS } from '../../lib/ios-device';
 import Link from 'next/link';
 import { BookmarkPlus, Bot, Info, Plus, Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -397,11 +398,13 @@ function MacroTiles({
   targets: NutritionTargets;
 }) {
   const [healthOpen, setHealthOpen] = useState(false);
+  const ios = useIsIOS();
   useEffect(() => {
+    if (!ios) return;
     const setup = () => setHealthOpen(true);
     window.addEventListener('lp-health-setup', setup);
     return () => window.removeEventListener('lp-health-setup', setup);
-  }, []);
+  }, [ios]);
   const tiles = [
     {
       label: 'Calories',
@@ -458,33 +461,37 @@ function MacroTiles({
           </div>
         ))}
       </div>
-      <div className="card flex items-center justify-between gap-2 border-violet-400/30 bg-violet-500/10 px-3 py-2">
-        <span className="text-sm">⚡ Activity adjustment</span>
-        <div className="flex items-center gap-2">
-          <strong className="whitespace-nowrap text-sm">
-            {(targets.activity?.adjustmentKcal ?? 0) >= 0 ? '+' : ''}
-            {targets.activity?.adjustmentKcal ?? 0} kcal
-          </strong>
-          <HealthSyncButton />
-          <button
-            type="button"
-            className="flex h-10 w-10 items-center justify-center rounded-full text-violet-400 hover:bg-violet-500/10"
-            aria-label="Activity adjustment and Apple Health details"
-            title="Activity and Apple Health details"
-            onClick={() => setHealthOpen(true)}
+      {ios && (
+        <>
+          <div className="card flex items-center justify-between gap-2 border-violet-400/30 bg-violet-500/10 px-3 py-2">
+            <span className="text-sm">⚡ Activity adjustment</span>
+            <div className="flex items-center gap-2">
+              <strong className="whitespace-nowrap text-sm">
+                {(targets.activity?.adjustmentKcal ?? 0) >= 0 ? '+' : ''}
+                {targets.activity?.adjustmentKcal ?? 0} kcal
+              </strong>
+              <HealthSyncButton />
+              <button
+                type="button"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-violet-400 hover:bg-violet-500/10"
+                aria-label="Activity adjustment and Apple Health details"
+                title="Activity and Apple Health details"
+                onClick={() => setHealthOpen(true)}
+              >
+                <Info size={19} />
+              </button>
+            </div>
+          </div>
+          <Modal
+            open={healthOpen}
+            onClose={() => setHealthOpen(false)}
+            title="Activity & Apple Health"
+            wide
           >
-            <Info size={19} />
-          </button>
-        </div>
-      </div>
-      <Modal
-        open={healthOpen}
-        onClose={() => setHealthOpen(false)}
-        title="Activity & Apple Health"
-        wide
-      >
-        {healthOpen && <AppleHealthPanel activity={targets.activity} />}
-      </Modal>
+            {healthOpen && <AppleHealthPanel activity={targets.activity} />}
+          </Modal>
+        </>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { HealthConnectionSettings } from '../../components/apple-health';
 import { HealthShortcutAdminSetting } from '../../components/health-shortcut-admin-setting';
 import { ThemePreferenceControl } from '../../components/theme-preference';
 import type {
@@ -72,6 +73,11 @@ function Settings() {
           <ThemePreferenceControl />
         </div>
         {portal.data.cohort === 'developer' && <HealthShortcutAdminSetting />}
+        {portal.data.access.nutrition && (
+          <div className="mb-4">
+            <HealthConnectionSettings />
+          </div>
+        )}
         <div className="card divide-y divide-border">
           {[
             { href: '/settings/modules', label: 'Manage modules' },
@@ -119,6 +125,7 @@ function Settings() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <ThemePreferenceControl />
+        {portal.data.access.nutrition && <HealthConnectionSettings />}
         {portal.data.cohort === 'developer' && <HealthShortcutAdminSetting />}
         <Panel
           title="Display currency"

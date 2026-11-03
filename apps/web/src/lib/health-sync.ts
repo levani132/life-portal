@@ -17,3 +17,19 @@ export interface HealthShortcutInput {
 export function healthShortcutUrl(input: HealthShortcutInput): string {
   return `shortcuts://run-shortcut?name=Life Portal Health&input=text&text=${encodeURIComponent(JSON.stringify(input))}`;
 }
+
+const HEALTH_MANUAL_RENEWAL_MS = 20 * 24 * 60 * 60 * 1000;
+export function healthTokenState(
+  lastManualLaunch: string | undefined,
+  tokenExpiresAt: string | undefined,
+  now: number,
+): 'active' | 'renew' | 'expired' {
+  const expires = tokenExpiresAt ? Date.parse(tokenExpiresAt) : NaN;
+  if (!Number.isFinite(expires) || now >= expires) return 'expired';
+  const manual = lastManualLaunch ? Date.parse(lastManualLaunch) : NaN;
+  return !Number.isFinite(manual) ||
+    now - manual >= HEALTH_MANUAL_RENEWAL_MS ||
+    expires - now <= 10 * 24 * 60 * 60 * 1000
+    ? 'renew'
+    : 'active';
+}

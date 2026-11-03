@@ -1,6 +1,7 @@
 import {
   healthShortcutUrl,
   healthSyncDue,
+  healthTokenState,
   HEALTH_SYNC_INTERVAL_MS,
 } from './health-sync';
 it('reminds at six hours after receipt, including missing/invalid receipts', () => {
@@ -31,4 +32,18 @@ it('opens Shortcuts with input but never supplies a browser return callback', ()
   );
   for (const key of ['x-success', 'x-error', 'x-cancel'])
     expect(url.searchParams.has(key)).toBe(false);
+});
+
+it('requests renewal at day 20 even when scheduled uploads keep arriving', () => {
+  const manual = '2026-11-03T00:00:00Z';
+  const start = Date.parse(manual);
+  const day = 24 * 60 * 60 * 1000;
+  const expires = new Date(start + 30 * day).toISOString();
+  expect(healthTokenState(manual, expires, start + 20 * day - 1)).toBe(
+    'active',
+  );
+  expect(healthTokenState(manual, expires, start + 20 * day)).toBe('renew');
+  expect(healthTokenState(manual, expires, start + 30 * day)).toBe('expired');
+  expect(healthTokenState(manual, undefined, start)).toBe('expired');
+  expect(healthTokenState(undefined, expires, start)).toBe('renew');
 });

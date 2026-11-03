@@ -1,6 +1,12 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ActivityAdjustment } from '@life-portal/shared-types';
-import { AppleHealthPanel } from './apple-health';
+import {
+  AppleHealthPanel,
+  HealthConnectionSettings,
+  HealthSyncBridge,
+  HealthSyncButton,
+} from './apple-health';
+import { useApi } from '../lib/hooks';
 import { HealthActivityChart } from './health-activity-chart';
 import { writeHealthShortcutInstall } from '../lib/health-shortcut-install';
 const user = { id: 'person' };
@@ -11,7 +17,7 @@ const status = {
 };
 jest.mock('../lib/auth-context', () => ({ useAuth: () => ({ user }) }));
 jest.mock('../lib/hooks', () => ({
-  useApi: () => status,
+  useApi: jest.fn(() => status),
   revalidate: jest.fn(),
 }));
 jest.mock('../lib/api', () => ({
@@ -45,6 +51,19 @@ const activity: ActivityAdjustment = {
   ],
 };
 beforeEach(() => {
+  jest.clearAllMocks();
+  Object.defineProperty(navigator, 'userAgent', {
+    configurable: true,
+    value: 'iPhone',
+  });
+  Object.defineProperty(navigator, 'platform', {
+    configurable: true,
+    value: 'iPhone',
+  });
+  Object.defineProperty(navigator, 'maxTouchPoints', {
+    configurable: true,
+    value: 1,
+  });
   localStorage.clear();
 });
 it('updates the installation indicator immediately and distinguishes an older confirmed URL', () => {
@@ -74,4 +93,40 @@ it('switches between recorded energy and steps without presenting missing hours 
   expect(screen.getByRole('img', { name: /Steps by local hour/ })).toBeTruthy();
   expect(screen.getByText('05:00 — No imported samples')).toBeTruthy();
   view.unmount();
+});
+
+it.each([
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+  'Mozilla/5.0 (Linux; Android 16)',
+])('shows only the settings compatibility note on %s', (userAgent) => {
+  Object.defineProperty(navigator, 'userAgent', {
+    configurable: true,
+    value: userAgent,
+  });
+  Object.defineProperty(navigator, 'platform', {
+    configurable: true,
+    value: 'unsupported',
+  });
+  render(
+    <>
+      <AppleHealthPanel />
+      <HealthSyncButton />
+      <HealthSyncBridge enabled />
+      <HealthConnectionSettings />
+    </>,
+  );
+  expect(screen.getByText(/Health syncing works only on iOS/)).toBeTruthy();
+  expect(screen.queryByRole('button', { name: /Sync/ })).toBeNull();
+  expect(
+    screen.queryByRole('button', { name: /Life Portal Health/ }),
+  ).toBeNull();
+  expect(useApi).not.toHaveBeenCalled();
+});
+it('explains manual schedule setup without claiming installation enables it', () => {
+  render(<HealthConnectionSettings />);
+  expect(
+    screen.getByText(/Installing the Shortcut does not enable its schedule/),
+  ).toBeTruthy();
+  expect(screen.getByText(/enable its scheduled runs/)).toBeTruthy();
+  expect(screen.getByText(/every 20 days/)).toBeTruthy();
 });

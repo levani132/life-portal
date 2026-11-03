@@ -7,6 +7,7 @@ import {
   HealthUploadGuard,
   HealthService,
   HealthUploadDto,
+  HEALTH_TOKEN_LIFETIME_MS,
 } from './health.service';
 import { IS_TOKEN_AUTH } from '../auth/current-user.decorator';
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
@@ -40,7 +41,8 @@ function fixture() {
     findOne: jest.fn((filter: Record<string, unknown>) => ({
       lean: async () =>
         row.paired &&
-        (!filter.ticketHash || filter.ticketHash === row.ticketHash)
+        (!filter.ticketHash || filter.ticketHash === row.ticketHash) &&
+        (!filter.expiresAt || Date.parse(String(row.expiresAt)) > Date.now())
           ? { ...row }
           : null,
     })),
@@ -55,7 +57,13 @@ function fixture() {
         if (
           !row.paired ||
           (filter.ticketHash && filter.ticketHash !== row.ticketHash) ||
-          (filter.uploadWriteId && filter.uploadWriteId !== row.uploadWriteId)
+          (filter.uploadWriteId &&
+            filter.uploadWriteId !== row.uploadWriteId) ||
+          (filter.expiresAt &&
+            Date.parse(String(row.expiresAt)) <= Date.now()) ||
+          (filter.$or &&
+            row.uploadingUntil &&
+            Date.parse(String(row.uploadingUntil)) >= Date.now())
         )
           return null;
         const before = { ...row };
@@ -125,7 +133,7 @@ it('launches a recent-only sync with a token and limit and retires queue metadat
   });
   expect(days.deleteMany).not.toHaveBeenCalled();
 });
-it('scopes ownership to a verified ticket, normalizes kJ, deduplicates and consumes the ticket only after storing', async () => {
+it('scopes ownership, normalizes and deduplicates while retaining the reusable ticket', async () => {
   const { service, model, days, access, row } = fixture();
   const owner = await service.verify('scoped-ticket');
   expect(owner).toEqual({
@@ -169,16 +177,20 @@ it('scopes ownership to a verified ticket, normalizes kJ, deduplicates and consu
       },
     ],
   });
-  expect(row.ticketHash).toBeUndefined();
+  expect(row.ticketHash).toBe(hash('scoped-ticket'));
+  expect(row.expiresAt).toBe('2099-01-01T00:00:00Z');
   expect(row.lastReceivedCount).toBe(1);
   expect(model.findOneAndUpdate.mock.calls[0][0]).toMatchObject({
     userId: 'accountA',
     _id: 'connectionA',
     ticketHash: hash('scoped-ticket'),
   });
-  await expect(service.upload(owner, { samples })).rejects.toThrow(
-    'already used',
-  );
+  await expect(service.upload(owner, { samples })).resolves.toMatchObject({
+    received: 1,
+  });
+  await expect(service.verify('scoped-ticket')).resolves.toMatchObject({
+    userId: 'accountA',
+  });
 });
 it('accepts older recent samples without a date window and groups offset dates into their UTC storage day', async () => {
   const { service, days } = fixture();
@@ -271,7 +283,7 @@ it('rejects expired or revoked credentials', async () => {
   const { service, model } = fixture();
   model.findOne.mockReturnValue({ lean: async () => null });
   await expect(service.verify('revoked')).rejects.toThrow(
-    'Expired, used or revoked',
+    'expired or was revoked',
   );
 });
 it('lets uploads use the scoped Health guard without an account JWT', () => {
@@ -313,4 +325,53 @@ it('validates JSON-text samples with the same nested rules as native arrays', as
       ).length,
     ).toBeGreaterThan(0);
   }
+});
+
+it('issues a 30-day token, exposes renewal dates without secrets, and invalidates the previous token', async () => {
+  const { service, row } = fixture();
+  const before = Date.now();
+  const launch = await service.launch('accountA');
+  const expiry = Date.parse(String(row.expiresAt));
+  expect(expiry).toBeGreaterThanOrEqual(before + HEALTH_TOKEN_LIFETIME_MS);
+  expect(expiry).toBeLessThanOrEqual(Date.now() + HEALTH_TOKEN_LIFETIME_MS);
+  const status = await service.status('accountA');
+  expect(status.lastManualLaunch).toBe(row.lastLaunch);
+  expect(status.tokenExpiresAt).toBe(row.expiresAt);
+  expect(status).not.toHaveProperty('ticketHash');
+  expect(status).not.toHaveProperty('token');
+  await expect(service.verify('scoped-ticket')).rejects.toThrow('revoked');
+  await expect(service.verify(launch.token)).resolves.toMatchObject({
+    userId: 'accountA',
+  });
+});
+it('does not extend expiry or the manual renewal date when a scheduled upload succeeds', async () => {
+  const { service, row } = fixture();
+  row.lastLaunch = '2026-10-15T00:00:00Z';
+  const expiry = row.expiresAt;
+  const owner = await service.verify('scoped-ticket');
+  await service.upload(owner, { samples });
+  expect(row.lastLaunch).toBe('2026-10-15T00:00:00Z');
+  expect(row.expiresAt).toBe(expiry);
+});
+it('rejects credentials at expiry and revoked credentials before writing', async () => {
+  const { service, row, days } = fixture();
+  const owner = await service.verify('scoped-ticket');
+  row.expiresAt = new Date(Date.now() - 1).toISOString();
+  await expect(service.verify('scoped-ticket')).rejects.toThrow('expired');
+  await expect(service.upload(owner, { samples })).rejects.toThrow('expired');
+  row.expiresAt = '2099-01-01T00:00:00Z';
+  row.paired = false;
+  await expect(service.verify('scoped-ticket')).rejects.toThrow('revoked');
+  expect(days.updateOne).not.toHaveBeenCalled();
+});
+it('keeps concurrent uploads from sharing a live write lock', async () => {
+  const { service, row, days } = fixture();
+  const owner = await service.verify('scoped-ticket');
+  row.uploadingUntil = new Date(Date.now() + 60000).toISOString();
+  row.uploadWriteId = 'other-upload';
+  await expect(service.upload(owner, { samples })).rejects.toThrow(
+    'processing',
+  );
+  expect(row.uploadWriteId).toBe('other-upload');
+  expect(days.updateOne).not.toHaveBeenCalled();
 });
