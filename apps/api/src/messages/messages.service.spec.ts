@@ -50,7 +50,10 @@ function fixture() {
       id: 'p'.repeat(24),
       title: 'Lunch',
       author: { displayName: 'Ana' },
+      kind: 'meal',
       totalKcal: 640,
+      caption: '',
+      media: [],
     })),
   };
   const defs: NotificationTypeDef[] = [];

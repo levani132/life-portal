@@ -18,7 +18,7 @@ function PostDetail() {
   const result = useApi<FoodPost>(`/posts/${id}`, SOCIAL_REFRESH);
   return (
     <div className="mx-auto max-w-2xl">
-      <PageHeader title="Food post" />
+      <PageHeader title="Post" />
       {result.error ? (
         <ErrorNote message="This post is unavailable or its audience has changed." />
       ) : !result.data ? (

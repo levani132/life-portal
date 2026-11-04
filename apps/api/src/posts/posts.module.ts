@@ -26,6 +26,7 @@ import { SocialModule, SocialNoStore } from '../social/social.module';
 import {
   CreatePostDto,
   AddPostCommentDto,
+  MediaUploadDto,
   UpdatePostAudienceDto,
   ImportPostDto,
   PostListDto,
@@ -33,9 +34,12 @@ import {
   ReportPostDto,
   UpdatePostDto,
 } from './posts.dto';
+import { PostMediaService } from './post-media.service';
 import {
   FoodPostRecord,
   FoodPostSchema,
+  PostMediaRecord,
+  PostMediaSchema,
   PostReportRecord,
   PostReportSchema,
 } from './posts.schemas';
@@ -47,7 +51,17 @@ class PostsController {
   constructor(
     private readonly posts: PostsService,
     private readonly engagement: PostEngagementService,
+    private readonly media: PostMediaService,
   ) {}
+  @Get('media/config') mediaConfig(@CurrentUser('userId') userId: string) {
+    return this.media.mediaConfig(userId);
+  }
+  @Post('media') mediaUpload(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: MediaUploadDto,
+  ) {
+    return this.media.ticket(userId, dto);
+  }
   @Post('preview') preview(
     @CurrentUser('userId') userId: string,
     @Body() dto: PreviewPostDto,
@@ -170,10 +184,11 @@ class PostsController {
       { name: PostLikeRecord.name, schema: PostLikeSchema },
       { name: PostCommentRecord.name, schema: PostCommentSchema },
       { name: PostReportRecord.name, schema: PostReportSchema },
+      { name: PostMediaRecord.name, schema: PostMediaSchema },
     ]),
   ],
   controllers: [PostsController],
-  providers: [PostsService, PostEngagementService],
+  providers: [PostsService, PostEngagementService, PostMediaService],
   // Messages renders shared posts through the same read authorization as opening one.
   exports: [PostsService],
 })

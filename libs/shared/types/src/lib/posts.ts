@@ -66,7 +66,8 @@ export interface FoodPost {
   title: string;
   caption: string;
   audience: Audience;
-  kind: FoodPostKind;
+  /** Absent for a post without food (text and/or media only). */
+  kind?: FoodPostKind;
   day?: string;
   slot?: MealSlot;
   createdAt: string;
@@ -78,6 +79,8 @@ export interface FoodPost {
   totalKcal?: number;
   totalMacros?: PublishedMacros;
   targets?: Partial<PublishedMacros>;
+  /** Photos and videos, in order. Links are signed per read and expire within 2 hours. */
+  media: PostMedia[];
   isOwner: boolean;
 }
 export interface PostPage {
@@ -130,4 +133,56 @@ export interface PostComment {
 export interface PostCommentsPage {
   comments: PostComment[];
   nextCursor?: string;
+}
+
+// ------------------------------------------------------------------ media (spec 014)
+
+export const MEDIA_KINDS = ['image', 'video'] as const;
+export type MediaKind = (typeof MEDIA_KINDS)[number];
+export const MAX_POST_MEDIA = 10;
+export const MAX_VIDEO_SECONDS = 30;
+/** Accepted types and sizes, checked when an upload is requested and again on attach. */
+export const MEDIA_LIMITS = {
+  image: { maxBytes: 15 * 1024 * 1024, types: ['image/jpeg'] },
+  video: {
+    maxBytes: 60 * 1024 * 1024,
+    types: ['video/mp4', 'video/webm', 'video/quicktime'],
+  },
+  poster: { maxBytes: 2 * 1024 * 1024, types: ['image/jpeg'] },
+} as const;
+/** The longest edge a photo is resized to on the device. */
+export const MAX_IMAGE_EDGE = 2048;
+
+export interface PostMedia {
+  id: string;
+  kind: MediaKind;
+  width: number;
+  height: number;
+  durationMs?: number;
+  url: string;
+  /** A still for a video, shown before it loads. */
+  posterUrl?: string;
+}
+export interface MediaConfig {
+  available: boolean;
+  maxItems: number;
+  maxVideoSeconds: number;
+}
+export interface MediaUploadRequest {
+  kind: MediaKind;
+  contentType: string;
+  bytes: number;
+  width: number;
+  height: number;
+  durationMs?: number;
+  poster?: { bytes: number };
+}
+export interface SignedUpload {
+  url: string;
+  headers: Record<string, string>;
+}
+export interface MediaUploadTicket {
+  id: string;
+  upload: SignedUpload;
+  poster?: SignedUpload;
 }

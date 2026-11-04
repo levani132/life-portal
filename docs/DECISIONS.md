@@ -1080,3 +1080,33 @@ is the header's own flat colour, so blurring it changes nothing visible. The cos
 app header and 24px of chat header, only on iPhone/iPad Home Screen apps. If a future iOS changes the depth,
 this is the one value to tune.
 
+
+## 2026-11-04 — Post media: signed links straight to R2, re-encoded on the phone, video only from the camera
+
+Spec 014 adds photos and video to posts on the free tier. The choices, and why:
+
+- **The browser uploads straight to a private R2 bucket with a signed PUT**; the API never
+  handles the bytes (Render's free instance has little memory and bandwidth). R2 because egress
+  is free and 10 GB is free. The type *and exact size* are signed into the link (`aws4fetch`
+  with `allHeaders`), so R2 itself answers 403 to a different file; the size is checked again
+  with a `HEAD` when a post claims the upload. `aws4fetch` (zero dependencies) instead of the AWS
+  SDK, which is several MB of packages for four calls.
+- **Reads are signed links, never a public bucket.** Friends-only photos must stop working for
+  someone who leaves the audience. Each read signs after the post's audience check; the
+  signature uses the time floored to the hour and lasts two hours, so the same URL repeats for
+  an hour (the browser cache keeps working across feed refreshes) and any link dies within two.
+- **An upload ledger (`post_media`) with a reservation by `requestId`.** A publish first claims
+  its uploads for its own request id, then checks the files, then inserts the post. Two posts can
+  never take the same upload, a retried publish finds its own reservation, and anything never
+  claimed is deleted after a day. The post keeps a copy of each file's facts (dimensions, kind,
+  keys): these describe immutable files, not derived values, so principle 3 is not bent.
+- **Photos are re-encoded on the device** (canvas, 2048 px, JPEG 0.85). It strips EXIF/GPS,
+  which nothing on the server could do without receiving the file, and keeps uploads around
+  300–600 KB. The cost: no HEIC/PNG originals, no transparency.
+- **Video only from the in-app camera, 30 s.** No transcoding exists (free tier), so the app
+  only accepts video it recorded itself: known length, a codec the recording browser can play
+  (MP4 on Safari, WebM on Chrome). A WebM recorded on Chrome may not play on an older iPhone;
+  accepted until Tier 1 adds a video service (Mux or Cloudflare Stream, see the roadmap).
+  The duration comes from the recorder's clock because a MediaRecorder WebM reports `Infinity`.
+- **Moderation relies on reports for now.** Public images need automated scanning before a
+  public launch; it is listed as a gap in the roadmap.

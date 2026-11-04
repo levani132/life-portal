@@ -200,10 +200,13 @@ export class MessagesService implements OnModuleInit {
       const post = await this.posts.detail(viewerId, postId);
       return {
         id: post.id,
-        title: post.title || post.contentLabel || 'Food post',
+        title: post.title || post.contentLabel || clipCaption(post.caption) || 'Post',
         authorName: post.author.displayName,
-        ...(post.totalKcal !== undefined && post.totalKcal !== null
+        ...(post.kind && post.totalKcal !== undefined && post.totalKcal !== null
           ? { totalKcal: post.totalKcal }
+          : {}),
+        ...(post.media[0]
+          ? { thumbnailUrl: post.media[0].posterUrl ?? post.media[0].url }
           : {}),
       };
     } catch {
@@ -428,4 +431,10 @@ export class MessagesService implements OnModuleInit {
     );
     return flags.filter(Boolean).length;
   }
+}
+
+/** A text-only post's card title: its first line, cut short. */
+function clipCaption(caption: string): string {
+  const line = caption.trim().split('\n')[0] ?? '';
+  return line.length > 60 ? `${line.slice(0, 59)}…` : line;
 }

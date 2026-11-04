@@ -9,6 +9,7 @@ import {
   Home,
   Menu,
   MessageCircle,
+  Plus,
   Search,
   Users,
   type LucideIcon,
@@ -24,6 +25,7 @@ import { Inbox, messagingAvailable, useUnreadMessages } from './messages';
 import { ActivityBell, NotificationsBridge } from './notifications';
 import { PeopleSearch } from './people-search';
 import { PortalLoader } from './portal-loader';
+import { PostComposer } from './post-composer';
 import { PullToRefresh } from './pull-to-refresh';
 import { TabHost, type HostTab } from './tab-host';
 import { ErrorNote } from './ui';
@@ -66,6 +68,7 @@ function Portal({ children }: { children: ReactNode }) {
   }, [loading, user, needsSetup, pathname, router]);
   const [chromeHidden, revealChrome] = useScrollHidden(pathname === '/');
   const unreadMessages = useUnreadMessages(portal.data?.access ?? NO_ACCESS);
+  const [composing, setComposing] = useState(false);
   if (loading || !user || portal.isLoading)
     return <PortalLoader label="Opening your portal…" />;
   if (portal.error)
@@ -105,19 +108,31 @@ function Portal({ children }: { children: ReactNode }) {
       {/* A conversation has its own header (back, the person, mute), and only that. */}
       {!inChat && (
         <ScrollHeader hidden={chromeHidden} onReveal={revealChrome}>
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
+          {/* New post · name · Activity. Your account lives in the Menu tab. */}
+          <div className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-2 py-2">
+            <div className="flex">
+              {canPost && (
+                <button
+                  type="button"
+                  aria-label="New post"
+                  title="New post"
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-ink hover:bg-ink/5"
+                  onClick={() => setComposing(true)}
+                >
+                  <Plus size={24} />
+                </button>
+              )}
+            </div>
             <Link href="/" className="font-semibold tracking-tight">
               Life<span className="text-accent">Portal</span>
             </Link>
-            <div className="flex items-center gap-2">
+            <div className="flex justify-end pr-2">
               <ActivityBell access={portal.data.access} />
-              <Link href="/menu" className="text-sm text-ink-muted">
-                {user.name}
-              </Link>
             </div>
           </div>
         </ScrollHeader>
       )}
+      {composing && <PostComposer onClose={() => setComposing(false)} />}
       <HealthSyncBridge key={user.id} enabled={portal.data.access.nutrition} />
       <NotificationsBridge
         key={`push-${user.id}`}

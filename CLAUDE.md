@@ -167,6 +167,14 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   make polling call something else, and don't poll while the page is hidden. A shared post in a
   chat is a `postId` re-checked with `PostsService.detail()` every time it is shown; never copy
   post content into a message. See `docs/modules/messages.md`.
+- **Post media never passes through the API, and a bucket is never public.** The browser PUTs
+  to R2 with a link whose type and size are signed; reads are signed after the audience check,
+  per read. Never return a storage `key`, never make the bucket or a URL permanent, and never
+  accept a media id that `PostMediaService.reserve()` has not checked. A photo is re-encoded in
+  the browser (that is what strips GPS), so don't add a path that uploads the original file. See
+  `docs/modules/posts.md`.
+- **A post may have no food.** `publication`, `previewHash` and `kind` are optional; check
+  `post.kind` (web) or `row.publication` (API) before touching food fields.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for

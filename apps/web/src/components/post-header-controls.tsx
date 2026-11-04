@@ -124,7 +124,8 @@ export function PostOptions({
   busy: boolean;
   onEdit: () => void;
   onDelete: () => void;
-  onImport: () => void;
+  /** Absent for a post without food: there is nothing to import. */
+  onImport?: () => void;
   onReport: () => void;
 }) {
   const ref = useRef<HTMLDetailsElement>(null);
@@ -181,13 +182,15 @@ export function PostOptions({
           </>
         ) : (
           <>
-            <button
-              type="button"
-              className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-violet-500/10"
-              onClick={() => choose(onImport)}
-            >
-              Import foods
-            </button>
+            {onImport && (
+              <button
+                type="button"
+                className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-violet-500/10"
+                onClick={() => choose(onImport)}
+              >
+                Import foods
+              </button>
+            )}
             <button
               type="button"
               className="w-full rounded-lg px-3 py-2 text-left text-sm text-rose-400 hover:bg-rose-500/10"

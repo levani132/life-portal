@@ -25,6 +25,7 @@ import type {
 import {
   canReadFoodPost,
   canonicalPublication,
+  postHasContent,
   publicationCalories,
   publicationMacros,
 } from '@life-portal/shared-domain';
@@ -32,6 +33,7 @@ import { AccessService } from '../access/access.module';
 import { NutritionPublicationService } from '../nutrition/nutrition-publication.service';
 import { SocialService } from '../social/social.module';
 import { SocialGraphService } from '../social-graph/social-graph.module';
+import { PostMediaService } from './post-media.service';
 import { FoodPostRecord, PostReportRecord } from './posts.schemas';
 import type {
   CreatePostDto,
@@ -53,6 +55,7 @@ export class PostsService {
     private readonly nutrition: NutritionPublicationService,
     private readonly social: SocialService,
     private readonly graph: SocialGraphService,
+    private readonly media: PostMediaService,
     @Inject(CONFIG) private readonly config: AppConfig,
   ) {}
   private id(id: string) {
@@ -86,47 +89,74 @@ export class PostsService {
         .digest('hex'),
     };
   }
-  private dto(
+  /** Only ever called after the viewer has passed `readable()`: it signs the media links. */
+  private async dto(
     row: FoodPostRecord & { _id: Types.ObjectId },
     author: PostAuthor,
     viewerId: string,
     teaser: boolean,
-  ): FoodPost {
+  ): Promise<FoodPost> {
     const p = row.publication;
-    return {
+    const base = {
       id: String(row._id),
       author,
       title: row.title,
-      contentLabel: p.label,
       caption: row.caption,
       audience: row.audience,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      version: 1 as const,
+      media: await this.media.sign(row.media),
+      isOwner: row.userId === viewerId,
+    };
+    // A post without food: text and/or photos only.
+    if (!p) return { ...base, itemCount: 0, items: [] };
+    return {
+      ...base,
+      contentLabel: p.label,
       kind: p.kind,
       ...(p.day ? { day: p.day } : {}),
       ...(p.slot ? { slot: p.slot } : {}),
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
-      version: 1,
       itemCount: p.items.length,
       items: teaser ? p.items.slice(0, 3) : p.items,
       totalKcal: publicationCalories(p.items),
       totalMacros: publicationMacros(p.items),
       ...(p.kind === 'day' && p.targets ? { targets: p.targets } : {}),
-      isOwner: row.userId === viewerId,
     };
+  }
+  /** Whether a stored post is what this create request asked for (an idempotent retry). */
+  private sameRequest(
+    row: FoodPostRecord,
+    dto: CreatePostDto,
+  ): boolean {
+    return (
+      !row.deleted &&
+      row.previewHash === dto.previewHash &&
+      row.title === dto.title.trim() &&
+      row.caption === dto.caption.trim() &&
+      row.audience === dto.audience &&
+      (row.media ?? []).map((m) => m.id).join() === (dto.mediaIds ?? []).join()
+    );
   }
   async create(userId: string, dto: CreatePostDto): Promise<FoodPost> {
     await this.requireEnabled(userId);
+    const mediaIds = dto.mediaIds ?? [];
+    if (
+      !postHasContent({
+        title: dto.title,
+        caption: dto.caption,
+        mediaCount: mediaIds.length,
+        hasFood: !!dto.source,
+      })
+    )
+      throw new BadRequestException('Write something, or add a photo or food.');
+    if (!dto.source && dto.previewHash)
+      throw new BadRequestException('A preview needs the food it previews.');
     const existing = await this.posts
       .findOne({ userId, requestId: dto.requestId })
       .lean();
     if (existing) {
-      if (
-        existing.deleted ||
-        existing.previewHash !== dto.previewHash ||
-        existing.title !== dto.title.trim() ||
-        existing.caption !== dto.caption.trim() ||
-        existing.audience !== dto.audience
-      )
+      if (!this.sameRequest(existing, dto))
         throw new ConflictException('This publish request was already used.');
       return this.dto(
         existing,
@@ -135,11 +165,15 @@ export class PostsService {
         false,
       );
     }
-    const preview = await this.preview(userId, dto);
-    if (preview.previewHash !== dto.previewHash)
-      throw new ConflictException(
-        'Your selection changed. Preview it again before posting.',
-      );
+    let preview: PostPreview | undefined;
+    if (dto.source) {
+      preview = await this.preview(userId, { source: dto.source });
+      if (preview.previewHash !== dto.previewHash)
+        throw new ConflictException(
+          'Your selection changed. Preview it again before posting.',
+        );
+    }
+    const media = await this.media.reserve(userId, dto.requestId, mediaIds);
     await this.social.own(userId);
     try {
       await this.posts.updateOne(
@@ -148,8 +182,10 @@ export class PostsService {
           $setOnInsert: {
             userId,
             requestId: dto.requestId,
-            previewHash: dto.previewHash,
-            publication: preview.publication,
+            ...(preview
+              ? { previewHash: preview.previewHash, publication: preview.publication }
+              : {}),
+            ...(media.length ? { media } : {}),
             title: dto.title.trim(),
             caption: dto.caption.trim(),
             audience: dto.audience,
@@ -164,14 +200,10 @@ export class PostsService {
     const row = (await this.posts
       .findOne({ userId, requestId: dto.requestId })
       .lean())!;
-    if (
-      row.deleted ||
-      row.previewHash !== dto.previewHash ||
-      row.title !== dto.title.trim() ||
-      row.caption !== dto.caption.trim() ||
-      row.audience !== dto.audience
-    )
+    if (!this.sameRequest(row, dto))
       throw new ConflictException('This publish request was already used.');
+    if (media.length)
+      await this.media.claim(userId, dto.requestId, String(row._id));
     return this.dto(
       row,
       (await this.social.postAuthor(userId))!,
@@ -325,7 +357,7 @@ export class PostsService {
         if (!author) continue;
         if (visible.length === 10)
           return { posts: visible, nextCursor: this.encode(visibleCursor!) };
-        visible.push(this.dto(row, author, userId, true));
+        visible.push(await this.dto(row, author, userId, true));
         visibleCursor = row;
       }
       if (rows.length < 25) return { posts: visible };
@@ -353,6 +385,14 @@ export class PostsService {
   async update(userId: string, id: string, dto: UpdatePostDto) {
     await this.requireEnabled(userId);
     this.id(id);
+    if (!dto.title.trim() && !dto.caption.trim()) {
+      const row = await this.posts
+        .findOne({ _id: id, userId, deleted: { $ne: true } })
+        .select('publication media')
+        .lean();
+      if (row && !row.publication && !row.media?.length)
+        throw new BadRequestException('A post without food or photos needs some text.');
+    }
     const changed = await this.posts.updateOne(
       { _id: id, userId, deleted: { $ne: true } },
       {
@@ -375,24 +415,29 @@ export class PostsService {
           { _id: id, userId },
           {
             $set: { deleted: true, title: 'Removed post', caption: '' },
-            $unset: { publication: '' },
+            $unset: { publication: '', media: '' },
           },
         )
       ).matchedCount
     )
       throw new NotFoundException('Post not found.');
+    void this.media.removeForPost(id);
     return { success: true };
   }
   async importPreview(userId: string, id: string) {
     const { row } = await this.read(userId, id);
     if (row.userId === userId)
       throw new BadRequestException('These foods are already yours.');
+    if (!row.publication)
+      throw new BadRequestException('This post has no foods to save.');
     return this.nutrition.importPreview(userId, id, row.publication);
   }
   async import(userId: string, id: string, dto: ImportPostDto) {
     const { row, author } = await this.read(userId, id);
     if (row.userId === userId)
       throw new BadRequestException('These foods are already yours.');
+    if (!row.publication)
+      throw new BadRequestException('This post has no foods to save.');
     return this.nutrition.import(
       userId,
       id,
@@ -458,9 +503,10 @@ export class PostsService {
       { _id: report.postId },
       {
         $set: { deleted: true, title: 'Removed post', caption: '' },
-        $unset: { publication: '' },
+        $unset: { publication: '', media: '' },
       },
     );
+    void this.media.removeForPost(report.postId);
     await this.reports.updateMany(
       { postId: report.postId },
       { $set: { resolvedAt: new Date() } },

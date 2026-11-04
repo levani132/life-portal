@@ -5,7 +5,17 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
 }));
 jest.mock('../lib/api', () => ({ api: { post: jest.fn() } }));
-jest.mock('../lib/hooks', () => ({ revalidate: jest.fn() }));
+jest.mock('../lib/hooks', () => ({
+  revalidate: jest.fn(),
+  useApi: (path: string | null) => ({
+    data:
+      path === '/posts/media/config'
+        ? { available: true, maxItems: 10, maxVideoSeconds: 30 }
+        : path === '/nutrition/profile'
+          ? { profile: { defaultFoodVisibility: 'public' } }
+          : undefined,
+  }),
+}));
 const source = { kind: 'food' as const, foodId: 'food' };
 const preview = {
   previewHash: 'a'.repeat(64),
@@ -66,7 +76,7 @@ it('publishes long text as caption-only while keeping the specific shared source
     target: { value: text },
   });
   expect(screen.queryByLabelText('Post title')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'Publish post' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Share' }));
   await waitFor(() =>
     expect(api.post).toHaveBeenCalledWith(
       '/posts',
@@ -78,5 +88,42 @@ it('publishes long text as caption-only while keeping the specific shared source
       }),
     ),
   );
+  view.unmount();
+});
+
+it('publishes a text-only post from an empty composer, with the profile audience', async () => {
+  const view = render(<PostComposer onClose={jest.fn()} />);
+  const share = screen.getByRole('button', { name: 'Share' });
+  expect(share).toHaveProperty('disabled', true);
+  expect(screen.getByLabelText('Add from Food')).toBeTruthy();
+  expect(screen.getByLabelText('Add photos')).toBeTruthy();
+  expect(screen.getByLabelText('Camera')).toBeTruthy();
+  expect(
+    (screen.getByLabelText('Post audience') as HTMLSelectElement).value,
+  ).toBe('public');
+  fireEvent.change(screen.getByLabelText('Post title'), {
+    target: { value: 'Back from the gym' },
+  });
+  expect(share).toHaveProperty('disabled', false);
+  fireEvent.click(share);
+  await waitFor(() =>
+    expect(api.post).toHaveBeenCalledWith('/posts', {
+      title: 'Back from the gym',
+      caption: '',
+      audience: 'public',
+      requestId: expect.any(String),
+    }),
+  );
+  expect(api.post).not.toHaveBeenCalledWith('/posts/preview', expect.anything());
+  view.unmount();
+});
+it('drops the food attachment when removed, leaving a text post', async () => {
+  const view = render(
+    <PostComposer initialSource={source} defaultAudience="friends" onClose={jest.fn()} />,
+  );
+  await screen.findByText('Oats', { selector: 'h3' });
+  fireEvent.click(screen.getByLabelText('Remove food'));
+  expect(screen.queryByText('Oats', { selector: 'h3' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Share' })).toHaveProperty('disabled', true);
   view.unmount();
 });

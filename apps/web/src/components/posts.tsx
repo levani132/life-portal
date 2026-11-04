@@ -30,6 +30,7 @@ import {
   PostOptions,
 } from './post-header-controls';
 import { PostEngagement } from './post-engagement';
+import { PostMediaCarousel } from './post-media';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { SOCIAL_REFRESH } from '../lib/social-hooks';
 import {
@@ -177,7 +178,8 @@ export function PostCard({
       icon: Library,
       tint: 'bg-emerald-500/10 text-emerald-400',
     },
-  }[post.kind];
+  }[post.kind ?? 'food'];
+  const hasFood = !!post.kind;
   const PreviewIcon = presentation.icon;
   return (
     <article
@@ -200,13 +202,17 @@ export function PostCard({
           </Link>
           <div className="mt-0.5 flex items-center gap-1 text-[11px] text-ink-faint">
             <PostDateLink id={post.id} date={post.createdAt} />
-            <span aria-hidden="true">·</span>
-            <span
-              title={`Shared ${presentation.label.toLowerCase()}`}
-              aria-label={`Shared ${presentation.label.toLowerCase()}`}
-            >
-              <PreviewIcon size={13} aria-hidden="true" />
-            </span>
+            {hasFood && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span
+                  title={`Shared ${presentation.label.toLowerCase()}`}
+                  aria-label={`Shared ${presentation.label.toLowerCase()}`}
+                >
+                  <PreviewIcon size={13} aria-hidden="true" />
+                </span>
+              </>
+            )}
             <PostAudienceControl
               id={post.id}
               audience={post.audience}
@@ -219,7 +225,7 @@ export function PostCard({
           busy={action.pending}
           onEdit={() => setEditing(true)}
           onDelete={() => void remove()}
-          onImport={() => setImporting(true)}
+          onImport={hasFood ? () => setImporting(true) : undefined}
           onReport={() => setReporting(true)}
         />
       </div>
@@ -229,10 +235,18 @@ export function PostCard({
         </h2>
       )}
       {post.caption && (
-        <p className="my-4 whitespace-pre-wrap break-words text-sm leading-relaxed">
+        <p
+          className={`my-4 whitespace-pre-wrap break-words leading-relaxed ${!hasFood && !post.media.length && post.caption.length < 140 ? 'text-lg' : 'text-sm'}`}
+        >
           {post.caption}
         </p>
       )}
+      {post.media.length > 0 && (
+        <div className="-mx-4 mt-4 sm:mx-0">
+          <PostMediaCarousel media={post.media} />
+        </div>
+      )}
+      {hasFood && (
       <div
         className="mt-4 rounded-xl border border-border/60 bg-surface p-3 sm:p-4"
         data-post-kind={post.kind}
@@ -323,6 +337,7 @@ export function PostCard({
           </Link>
         )}
       </div>
+      )}
       <PostEngagement post={post} />
       {action.error && <ErrorNote message={action.error} />}
       {editing && <EditPost post={post} onClose={() => setEditing(false)} />}

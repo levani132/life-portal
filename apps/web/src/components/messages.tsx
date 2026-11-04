@@ -637,21 +637,31 @@ function PostCard({ post, mine }: { post: SharedPostCard; mine: boolean }) {
     <Link
       href={`/posts/${post.id}`}
       className={clsx(
-        'block w-64 max-w-full rounded-2xl border px-3.5 py-3',
+        'block w-64 max-w-full overflow-hidden rounded-2xl border',
         mine
           ? 'border-sky-500/40 bg-sky-500/10'
           : 'border-border bg-surface-raised',
       )}
     >
-      <span className="block text-xs text-ink-faint">
-        {post.authorName} · Food post
-      </span>
-      <span className="mt-1 block font-medium">{post.title}</span>
-      {post.totalKcal !== undefined && (
-        <span className="mt-1 block text-sm text-ink-muted">
-          {post.totalKcal.toLocaleString()} kcal
-        </span>
+      {post.thumbnailUrl && (
+        <img
+          src={post.thumbnailUrl}
+          alt=""
+          loading="lazy"
+          className="aspect-[4/3] w-full object-cover"
+        />
       )}
+      <span className="block px-3.5 pb-3 pt-2.5">
+        <span className="block text-xs text-ink-faint">
+          {post.authorName} · {post.totalKcal !== undefined ? 'Food post' : 'Post'}
+        </span>
+        <span className="mt-1 block font-medium">{post.title}</span>
+        {post.totalKcal !== undefined && (
+          <span className="mt-1 block text-sm text-ink-muted">
+            {post.totalKcal.toLocaleString()} kcal
+          </span>
+        )}
+      </span>
     </Link>
   );
 }

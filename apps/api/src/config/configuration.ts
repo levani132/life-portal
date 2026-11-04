@@ -45,6 +45,11 @@ export interface AppConfig {
    * hidden (graceful degradation); a partial set is a misconfiguration and refuses to boot.
    */
   push?: { publicKey: string; privateKey: string; subject: string };
+  /**
+   * S3-compatible object storage (Cloudflare R2) for post photos and videos. All four or none:
+   * absent hides media in posts; a partial set refuses to boot.
+   */
+  storage?: { endpoint: string; bucket: string; accessKeyId: string; secretAccessKey: string };
 }
 
 function positiveInt(name: string, value: string | undefined, fallback: number): number {
@@ -113,6 +118,34 @@ export function pushConfig(env: NodeJS.ProcessEnv): AppConfig['push'] {
   };
 }
 
+/** See `AppConfig.storage`. Exported for its unit test. */
+export function storageConfig(env: NodeJS.ProcessEnv): AppConfig['storage'] {
+  const values = {
+    R2_ENDPOINT: env['R2_ENDPOINT']?.trim() || '',
+    R2_BUCKET: env['R2_BUCKET']?.trim() || '',
+    R2_ACCESS_KEY_ID: env['R2_ACCESS_KEY_ID']?.trim() || '',
+    R2_SECRET_ACCESS_KEY: env['R2_SECRET_ACCESS_KEY']?.trim() || '',
+  };
+  const missing = Object.entries(values).filter(([, value]) => !value).map(([name]) => name);
+  if (missing.length === 4) return undefined;
+  if (missing.length) {
+    throw new Error(`Media storage needs all four R2 variables; missing ${missing.join(', ')}.`);
+  }
+  const url = new URL(values.R2_ENDPOINT);
+  if (url.protocol !== 'https:' || url.pathname !== '/' || url.search) {
+    throw new Error('R2_ENDPOINT must be an HTTPS origin such as https://<account>.r2.cloudflarestorage.com.');
+  }
+  if (!/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(values.R2_BUCKET)) {
+    throw new Error('R2_BUCKET must be a bucket name: lowercase letters, digits and hyphens.');
+  }
+  return {
+    endpoint: url.origin,
+    bucket: values.R2_BUCKET,
+    accessKeyId: values.R2_ACCESS_KEY_ID,
+    secretAccessKey: values.R2_SECRET_ACCESS_KEY,
+  };
+}
+
 export function loadConfig(): AppConfig {
   const jwtSecret = required('JWT_SECRET', process.env['JWT_SECRET']);
   if (jwtSecret.length < 32) {
@@ -136,6 +169,7 @@ export function loadConfig(): AppConfig {
     offUserAgent: openFoodFactsUserAgent(),
     disableSchedules: process.env['DISABLE_SCHEDULES'] === 'true',
     push: pushConfig(process.env),
+    storage: storageConfig(process.env),
   };
 }
 

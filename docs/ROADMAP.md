@@ -15,7 +15,7 @@ the same day. The core stays free; AI is the paid part.
 | **Money** | Loans with payoff scenarios, free-money cash flow, items to sell, shares and the ESPP plan, spending from bank messages (Shortcut ingest), multi-currency with daily FX history | 002 |
 | **Work and life** | EPAM boards, side projects, personal plans | — |
 | **Food** | Nutrition tracking, food profile and activity targets, Apple Health sync with resumable batches, AI assistant connectors (MCP with OAuth: ChatGPT, Claude) | 001, 004, 010, 011 |
-| **Social** | Friends, shared widgets, shared daily diary, food posts with likes, comments and Share, Home feed | 006–009 |
+| **Social** | Friends, shared widgets, shared daily diary, posts (text, photos, 30 s camera video, food) with likes, comments and Share, Home feed | 006–009, 014 |
 | **Platform** | Onboarding and setup, feature flags per cohort and user, installable PWA, push notifications with Activity and icon badge, direct messages, tabs that stay alive with swipe navigation | 003, 005, 012, 013 |
 
 **Infrastructure is Tier 0** (about $0/month): Vercel Hobby, Render free (kept awake by a cron
@@ -27,13 +27,13 @@ job), MongoDB Atlas M0.
   doc lists what deletion must remove.
 - **Real-device checks** of push, messages and swiping on an iPhone.
 - **Tier 0 limits:** Atlas M0 has 512 MB; Vercel Hobby does not allow commercial use.
-- **No object storage yet**, so no images.
+- **Image moderation** (automated scanning) before public photos reach strangers at scale.
+- **Camera video plays only where the recording browser's codec does** (no transcoding yet).
 
 ## Where we want to be (next, in order)
 
-1. **Photos in food posts.** Upload straight from the browser to Cloudflare R2 with pre-signed
-   URLs (never through the API, never in Mongo). Strip EXIF/GPS. Friends-only photos are served
-   through short-lived signed URLs after the post's audience check, never public links.
+1. ~~**Photos in posts.**~~ Done in 014: R2 with signed links, EXIF stripped on the phone,
+   plus 30-second camera video and text-only posts.
 2. **AI meal guess from a photo**, behind a feature flag that stays off until there are API
    keys. One provider interface, so adding the key is the only step left. Every guess is stored
    as a labelled estimate with its basis until the person confirms it (principle 6). Paid
@@ -48,8 +48,9 @@ job), MongoDB Atlas M0.
    Personal records, distance and ranks are computed on read. Leaderboards are opt-in and
    friends- or group-only by default. Imported workouts count as "verified", manual ones as
    "self-reported".
-6. **Video in posts.** Clips of 60 seconds or less through a service (Mux or Cloudflare Stream),
-   no in-house transcoding. No reels scroller until people make video on their own.
+6. **Video through a service.** 014 records 30-second clips in the app and stores them as-is.
+   Next: transcoding through Mux or Cloudflare Stream so every clip plays everywhere, library
+   videos and 60 seconds. No reels scroller until people make video on their own.
 7. **Native apps.** Wrap the web app with Capacitor and add HealthKit and background location.
    Background GPS (skiing, rides) is the one thing a PWA cannot do.
 

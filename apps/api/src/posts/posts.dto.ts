@@ -20,6 +20,10 @@ import {
 import {
   AUDIENCES,
   MAX_POST_ITEMS,
+  MAX_POST_MEDIA,
+  MEDIA_KINDS,
+  type MediaKind,
+  type MediaUploadRequest,
   MEAL_SLOTS,
   POST_KINDS,
   REPORT_REASONS,
@@ -57,8 +61,21 @@ export class PostSelectionDto implements PostSelection {
 export class PreviewPostDto {
   @ValidateNested() @Type(() => PostSelectionDto) source!: PostSelectionDto;
 }
-export class CreatePostDto extends PreviewPostDto {
-  @Matches(/^[a-f0-9]{64}$/) previewHash!: string;
+export class CreatePostDto {
+  /** Absent for a post without food. */
+  @ValidateIf((_, v: unknown) => v !== undefined)
+  @ValidateNested()
+  @Type(() => PostSelectionDto)
+  source?: PostSelectionDto;
+  @ValidateIf((o: CreatePostDto) => o.source !== undefined)
+  @Matches(/^[a-f0-9]{64}$/)
+  previewHash?: string;
+  @ValidateIf((_, v: unknown) => v !== undefined)
+  @IsArray()
+  @ArrayMaxSize(MAX_POST_MEDIA)
+  @ArrayUnique()
+  @IsMongoId({ each: true })
+  mediaIds?: string[];
   @IsUUID() requestId!: string;
   @IsString() @MaxLength(120) title!: string;
   @IsString() @MaxLength(1000) caption!: string;
@@ -115,4 +132,21 @@ export class AddPostCommentDto {
   @MaxLength(1000)
   text!: string;
   @IsUUID() requestId!: string;
+}
+
+class PosterDto {
+  @IsInt() @Min(1) @Max(50 * 1024 * 1024) bytes!: number;
+}
+/** Limits by kind are checked by `mediaLimitError`, shared with the browser. */
+export class MediaUploadDto implements MediaUploadRequest {
+  @IsIn(MEDIA_KINDS) kind!: MediaKind;
+  @IsString() @MaxLength(64) contentType!: string;
+  @IsInt() @Min(1) @Max(200 * 1024 * 1024) bytes!: number;
+  @IsInt() @Min(1) @Max(8192) width!: number;
+  @IsInt() @Min(1) @Max(8192) height!: number;
+  @ValidateIf((_, v: unknown) => v !== undefined) @IsInt() @Min(1) durationMs?: number;
+  @ValidateIf((_, v: unknown) => v !== undefined)
+  @ValidateNested()
+  @Type(() => PosterDto)
+  poster?: PosterDto;
 }

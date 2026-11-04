@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Types } from 'mongoose';
 import { PostsService } from './posts.service';
 import type { FoodPublication } from '@life-portal/shared-types';
@@ -62,16 +66,24 @@ function fixture() {
   const graph = {
     between: jest.fn().mockResolvedValue({ state: 'none', blockedBy: [] }),
   };
+  const media = {
+    sign: jest.fn().mockResolvedValue([]),
+    reserve: jest.fn().mockResolvedValue([]),
+    claim: jest.fn(),
+    removeForPost: jest.fn(),
+  };
+  const nutrition = { snapshot: jest.fn().mockResolvedValue(publication) };
   const service = new PostsService(
     posts as never,
     reports as never,
     access as never,
-    {} as never,
-    social as never,
+    nutrition as never,
+    { ...social, own: jest.fn() } as never,
     graph as never,
+    media as never,
     { jwtSecret: 'isolated-test-key' } as never,
   );
-  return { row, posts, reports, access, social, graph, service };
+  return { row, posts, reports, access, social, graph, media, nutrition, service };
 }
 describe('post read authorization and publish retries', () => {
   it('allows the owner without looking up other accounts or inventing catalogue calories', async () => {
@@ -130,6 +142,7 @@ describe('post read authorization and publish retries', () => {
     f.row.deleted = true;
     await expect(
       f.service.create('owner', {
+        source: { kind: 'food', foodId: String(new Types.ObjectId()) },
         requestId: 'request',
         previewHash: 'hash',
         title: 'Oats',
@@ -165,9 +178,10 @@ describe('post read authorization and publish retries', () => {
       { _id: String(f.row._id) },
       {
         $set: { deleted: true, title: 'Removed post', caption: '' },
-        $unset: { publication: '' },
+        $unset: { publication: '', media: '' },
       },
     );
+    expect(f.media.removeForPost).toHaveBeenCalledWith(String(f.row._id));
     expect(f.reports.updateMany).toHaveBeenCalledWith(
       { postId: String(f.row._id) },
       { $set: { resolvedAt: expect.any(Date) } },
@@ -188,4 +202,82 @@ it('updates only the audience and only for the post owner', async () => {
   await expect(
     f.service.updateAudience('stranger', id, 'public'),
   ).rejects.toThrow(NotFoundException);
+});
+
+describe('posts without food (spec 014)', () => {
+  const textOnly = {
+    requestId: 'text-request',
+    title: '',
+    caption: 'Back from the gym',
+    audience: 'friends',
+  } as CreatePostDto;
+  function textFixture() {
+    const f = fixture();
+    const stored: Record<string, unknown> = {
+      ...f.row,
+      requestId: 'text-request',
+      previewHash: undefined,
+      publication: undefined,
+      title: '',
+      caption: 'Back from the gym',
+      audience: 'friends',
+    };
+    f.posts.findOne
+      .mockReturnValueOnce({ lean: jest.fn().mockResolvedValue(null) })
+      .mockReturnValue({ lean: jest.fn().mockResolvedValue(stored) });
+    return { ...f, stored };
+  }
+  it('publishes a text-only post without touching the food module', async () => {
+    const f = textFixture();
+    const post = await f.service.create('owner', textOnly);
+    expect(f.nutrition.snapshot).not.toHaveBeenCalled();
+    const insert = f.posts.updateOne.mock.calls[0][1].$setOnInsert;
+    expect(insert).not.toHaveProperty('publication');
+    expect(insert).not.toHaveProperty('media');
+    expect(post).toMatchObject({ caption: 'Back from the gym', itemCount: 0, items: [], media: [] });
+    expect(post.kind).toBeUndefined();
+    expect(f.media.claim).not.toHaveBeenCalled();
+  });
+  it('refuses a post with no text, media or food', async () => {
+    const f = textFixture();
+    await expect(
+      f.service.create('owner', { ...textOnly, caption: '  ' }),
+    ).rejects.toThrow(BadRequestException);
+    expect(f.posts.updateOne).not.toHaveBeenCalled();
+  });
+  it('stores reserved media and claims it for the created post', async () => {
+    const f = textFixture();
+    const id = String(new Types.ObjectId());
+    const attached = {
+      id,
+      kind: 'image',
+      key: `media/owner/${id}.jpg`,
+      contentType: 'image/jpeg',
+      width: 1080,
+      height: 1350,
+    };
+    f.media.reserve.mockResolvedValue([attached]);
+    f.stored['media'] = [attached];
+    await f.service.create('owner', { ...textOnly, mediaIds: [id] });
+    expect(f.media.reserve).toHaveBeenCalledWith('owner', 'text-request', [id]);
+    expect(f.posts.updateOne.mock.calls[0][1].$setOnInsert.media).toEqual([attached]);
+    expect(f.media.claim).toHaveBeenCalledWith('owner', 'text-request', String(f.row._id));
+  });
+  it('treats a retry with different media as a different request', async () => {
+    const f = fixture();
+    f.posts.findOne.mockReturnValue({
+      lean: jest.fn().mockResolvedValue({ ...f.row, previewHash: undefined, publication: undefined, caption: 'Hi', title: '', media: [] }),
+    });
+    await expect(
+      f.service.create('owner', { ...textOnly, requestId: 'request', caption: 'Hi', audience: 'private', mediaIds: [String(new Types.ObjectId())] }),
+    ).rejects.toThrow(ConflictException);
+  });
+  it('refuses to import from a post that has no foods', async () => {
+    const f = fixture();
+    f.row.audience = 'public';
+    (f.row as { publication?: unknown }).publication = undefined;
+    await expect(f.service.importPreview('reader', String(f.row._id))).rejects.toThrow(
+      BadRequestException,
+    );
+  });
 });

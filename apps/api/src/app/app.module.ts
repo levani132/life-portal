@@ -25,6 +25,7 @@ import { PersonalModule } from '../personal/personal.module';
 import { SettingsModule } from '../settings/settings.module';
 import { SpendingModule } from '../spending/spending.module';
 import { StocksModule } from '../stocks/stocks.module';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { StocksModule } from '../stocks/stocks.module';
       }),
     }),
     ScheduleModule.forRoot(),
+    StorageModule,
     AuthModule,
     AccessModule,
     SocialGraphModule,

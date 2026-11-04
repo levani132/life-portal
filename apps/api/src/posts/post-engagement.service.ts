@@ -132,7 +132,7 @@ export class PostEngagementService implements OnModuleInit {
       actorId: userId,
       actorName,
       targetId: post.id,
-      postTitle: post.title,
+      postTitle: post.title || post.contentLabel,
     });
   }
   private async counts(

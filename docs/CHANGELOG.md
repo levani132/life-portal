@@ -2,6 +2,22 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-04 — One way to post, with photos and video
+
+The header has a **+** on the left that opens a new post from anywhere. LifePortal sits in the
+middle; your name is gone from the header (your account is in the Menu tab).
+
+A post no longer has to be about food. Write something on its own, add up to ten photos from your
+library, or open the camera: tap the shutter for a photo, or hold it to record a video of up to
+30 seconds while a ring fills around the button. Photos upload while you write, with a ring
+showing progress, and are cleaned of location details before they leave your phone. The **+** in
+the composer adds something from Food: a logged food, a meal, a whole day, a food, a saved meal or
+your whole database, previewed exactly as it will be shared. The share buttons in Food open the
+same composer with that item already attached.
+
+Photos and videos appear in a carousel you swipe through; videos play silently while on screen,
+and a tap turns the sound on. A post shared into a chat shows its first photo.
+
 ## 2026-11-04 — Sharp header in the iPhone app
 
 In the installed app on iOS 26 and later, the header's logo and buttons sat under a blur that iOS
