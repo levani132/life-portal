@@ -202,3 +202,20 @@ export interface MediaUploadTicket {
   upload: SignedUpload;
   poster?: SignedUpload;
 }
+
+/**
+ * What an unauthenticated link preview may show about a post (spec 017): only for a live, public
+ * post whose author still posts. Everything else answers 404 with no reason.
+ */
+export interface PublicPostPreview {
+  id: string;
+  title: string;
+  /** At most 200 characters of the caption. */
+  caption: string;
+  authorName: string;
+  /** "Food", "Meal"…; absent for a post without food. */
+  label?: string;
+  macros?: PublishedMacros;
+  /** A signed link to the first photo (or a video's still), valid for under two hours. */
+  photoUrl?: string;
+}

@@ -366,7 +366,10 @@ export function PostCard({
         </div>
       </div>
       )}
-      <PostEngagement post={post} />
+      <PostEngagement
+        post={post}
+        onSaveFoods={hasFood && !post.isOwner ? () => setImporting(true) : undefined}
+      />
       {action.error && <ErrorNote message={action.error} />}
       {editing && <EditPost post={post} onClose={() => setEditing(false)} />}
       {reporting && (

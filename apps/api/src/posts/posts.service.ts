@@ -18,6 +18,7 @@ import { isValidObjectId, Model, Types } from 'mongoose';
 import type {
   FoodPost,
   PostAuthor,
+  PublicPostPreview,
   PostPage,
   PostPreview,
   PostReport,
@@ -260,6 +261,34 @@ export class PostsService {
   async detail(userId: string, id: string) {
     const { row, author } = await this.read(userId, id);
     return this.dto(row, author, userId, false);
+  }
+  /**
+   * The link preview for anyone, signed in or not (spec 017). The same live checks a stranger
+   * would get from `readable()`: public audience, not deleted, not a repost, author access on.
+   * Any failure is the same 404, so a preview never tells a private post from a missing one.
+   */
+  async publicPreview(id: string): Promise<PublicPostPreview> {
+    const missing = () => new NotFoundException('Post not found.');
+    if (!isValidObjectId(id)) throw missing();
+    const row = await this.posts
+      .findOne({ _id: id, audience: 'public', deleted: { $ne: true }, ...ORIGINAL })
+      .lean();
+    if (!row || !(await this.enabled(row.userId))) throw missing();
+    const author = await this.social.postAuthor(row.userId);
+    if (!author) throw missing();
+    const p = row.publication;
+    const macros = p ? publicationMacros(p.items) : undefined;
+    const [first] = await this.media.sign(row.media?.slice(0, 1));
+    const photoUrl = first ? (first.kind === 'video' ? first.posterUrl : first.url) : undefined;
+    return {
+      id: String(row._id),
+      title: row.title || p?.label || '',
+      caption: row.caption.slice(0, 200),
+      authorName: author.displayName,
+      ...(p ? { label: p.label } : {}),
+      ...(macros ? { macros } : {}),
+      ...(photoUrl ? { photoUrl } : {}),
+    };
   }
   /** The owner's live posts, newest first, as id → title. Used for their Activity. */
   async ownTitles(userId: string, limit = 500): Promise<Map<string, string>> {

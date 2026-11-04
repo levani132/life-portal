@@ -173,6 +173,11 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   accept a media id that `PostMediaService.reserve()` has not checked. A photo is re-encoded in
   the browser (that is what strips GPS), so don't add a path that uploads the original file. See
   `docs/modules/posts.md`.
+- **`GET /api/public/posts/:id/preview` is the only `@Public()` posts route**, for link-preview
+  crawlers. It answers for public, live, original posts only and returns a narrow projection;
+  don't widen it or add a sibling. Share images are only for own or public posts
+  (`canShareImage()`), and the canvas must load the photo with `fetch` (CORS, no-store), never
+  an `<img>`, or the cached copy taints it. See `docs/modules/posts.md`.
 - **A post may have no food.** `publication`, `previewHash` and `kind` are optional; check
   `post.kind` (web) or `row.publication` (API) before touching food fields.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so

@@ -1163,3 +1163,22 @@ friends-only post that means friends of both. One-tap reposts copy the original'
 rather than asking; a private post cannot be reposted at all. The `requestId` `repost:<id>`
 reuses the existing unique index for idempotency, and a repost id is never addressable, so likes,
 comments, reports and imports can only ever reach the original.
+
+## 2026-11-05: sharing outside the app shows only what a stranger may see (017)
+
+A Story image or a link preview leaves the app for good, so both follow the strictest audience.
+The image is offered only for your own posts (you choose to show your own) and public ones
+(`canShareImage()`); a friend's friends-only post never becomes a picture someone can repost
+anywhere. It is drawn in the browser from what the viewer already has, so nothing new is stored.
+
+Link previews need an unauthenticated read, because crawlers have no session. That is the
+`@Public()` route `GET /public/posts/:id/preview`, deliberately narrow: public, live, original
+posts only, a 404 that does not distinguish "hidden" from "missing", and a projection of title,
+short caption, author name, totals and one signed photo. Everything else gets a generic preview.
+Keep it the only public posts route, and keep the web page itself behind sign-in.
+
+The canvas loads the photo with `fetch` and `createImageBitmap`, not an `<img>`: the post's own
+`<img>` fetched the same URL without CORS, and reusing that cached copy taints the canvas so it
+cannot be exported. The image is rendered when the sheet opens, because iOS only lets
+`navigator.share` run within the tap that started it.
+

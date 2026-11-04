@@ -380,3 +380,39 @@ describe('reposts (spec 016)', () => {
     expect(page.posts.map((post) => post.id)).toEqual([String(original._id)]);
   });
 });
+
+describe('public link previews (spec 017)', () => {
+  it('asks only for a live public original, and returns the small fixed shape', async () => {
+    const f = fixture();
+    f.row.audience = 'public';
+    const preview = await f.service.publicPreview(String(f.row._id));
+    expect(f.posts.findOne).toHaveBeenCalledWith({
+      _id: String(f.row._id),
+      audience: 'public',
+      deleted: { $ne: true },
+      repostOf: { $exists: false },
+    });
+    expect(Object.keys(preview).sort()).toEqual(['authorName', 'caption', 'id', 'label', 'title']);
+    expect(preview).toMatchObject({ title: 'Oats', authorName: 'Owner', label: 'Oats' });
+  });
+  it('answers the same 404 for a missing post, a bad id and an author whose posting is off', async () => {
+    const f = fixture();
+    await expect(f.service.publicPreview('not-an-id')).rejects.toThrow(NotFoundException);
+    f.posts.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+    await expect(f.service.publicPreview(String(f.row._id))).rejects.toThrow(NotFoundException);
+    f.posts.findOne.mockReturnValue({
+      lean: jest.fn().mockResolvedValue({ ...f.row, audience: 'public' }),
+    });
+    f.access.forUser.mockResolvedValue({
+      access: { social: true, nutrition: true, foodPosts: false },
+    });
+    await expect(f.service.publicPreview(String(f.row._id))).rejects.toThrow(NotFoundException);
+  });
+  it('links the first photo, or a video’s still', async () => {
+    const f = fixture();
+    f.media.sign.mockResolvedValue([
+      { id: 'm', kind: 'video', url: 'https://r2/video', posterUrl: 'https://r2/still', width: 1, height: 1 },
+    ]);
+    expect((await f.service.publicPreview(String(f.row._id))).photoUrl).toBe('https://r2/still');
+  });
+});

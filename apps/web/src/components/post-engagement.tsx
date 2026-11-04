@@ -18,7 +18,14 @@ import { requestNotificationOffer } from './notifications';
 import { messagingAvailable } from './messages';
 import { PostShareSheet } from './post-share-sheet';
 
-export function PostEngagement({ post }: { post: FoodPost }) {
+export function PostEngagement({
+  post,
+  onSaveFoods,
+}: {
+  post: FoodPost;
+  /** Opens the card's import dialog; absent for your own posts and posts without food. */
+  onSaveFoods?: () => void;
+}) {
   const stats = useApi<Engagement>(`/posts/${post.id}/engagement`, {
     refreshInterval: 30000,
     revalidateOnFocus: true,
@@ -154,9 +161,9 @@ export function PostEngagement({ post }: { post: FoodPost }) {
       )}
       {shareOpen && (
         <PostShareSheet
-          postId={post.id}
-          title={post.title || post.contentLabel || 'Life Portal post'}
+          post={post}
           canMessage={canSend}
+          onSaveFoods={onSaveFoods}
           repost={
             canRepost({ own: post.isOwner, audience: post.audience })
               ? {

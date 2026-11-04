@@ -1,8 +1,23 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { Check, Link2, Loader2, Repeat2, Share, X } from 'lucide-react';
-import type { InboxEntry, SocialPerson } from '@life-portal/shared-types';
+import {
+  Camera,
+  Check,
+  Download,
+  Link2,
+  Loader2,
+  MessageCircle,
+  Music2,
+  Phone,
+  Repeat2,
+  Share,
+  UtensilsCrossed,
+  X,
+} from 'lucide-react';
+import type { FoodPost, InboxEntry, SocialPerson } from '@life-portal/shared-types';
+import { canShareImage, shareTargetUrl, type ShareTarget } from '@life-portal/shared-domain';
+import { renderShareImage, shareImageFile } from '../lib/share-image';
 import { api } from '../lib/api';
 import { useApi } from '../lib/hooks';
 import { useSocialApi } from '../lib/social-hooks';
@@ -37,19 +52,40 @@ export function shareHeads(inbox: InboxEntry[] = [], friends: SocialPerson[] = [
  * for people the post is shared with.
  */
 export function PostShareSheet({
-  postId,
-  title,
+  post,
   canMessage,
   repost,
+  onSaveFoods,
   onClose,
 }: {
-  postId: string;
-  title: string;
+  post: FoodPost;
   canMessage: boolean;
   /** Absent when this post cannot be reposted (your own, or private). */
   repost?: { reposted: boolean; count: number; disabled: boolean; onToggle: () => void };
+  /** Opens the import dialog. Absent for your own posts and posts without food. */
+  onSaveFoods?: () => void;
   onClose: () => void;
 }) {
+  const postId = post.id;
+  const title = post.title || post.contentLabel || 'Life Portal post';
+  const imageAllowed = canShareImage({ own: post.isOwner, audience: post.audience });
+  // Drawn as soon as the sheet opens, so the share call runs inside the tap: iOS refuses a share
+  // sheet that opens after slow work.
+  const [image, setImage] = useState<File | null>(null);
+  const [imageFailed, setImageFailed] = useState(false);
+  useEffect(() => {
+    if (!imageAllowed) return;
+    let cancelled = false;
+    void renderShareImage(post)
+      .then((file) => !cancelled && setImage(file))
+      .catch(() => !cancelled && setImageFailed(true));
+    return () => {
+      cancelled = true;
+    };
+    // The post is fixed while the sheet is open.
+  }, [imageAllowed]);
+  const touch =
+    typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
   const inbox = useApi<InboxEntry[]>(canMessage ? '/messages/conversations' : null);
   const friends = useSocialApi<{ people: SocialPerson[] }>(canMessage ? FRIENDS_KEY : null);
   const [sent, setSent] = useState<Record<string, string>>({});
@@ -109,7 +145,22 @@ export function PostShareSheet({
     }
   }
 
+  async function shareImage(app?: string) {
+    if (!image) return;
+    setError('');
+    const result = await shareImageFile(image, title);
+    if (result === 'saved')
+      setNotice(
+        app ? `Image saved. Open ${app} and add it to your Story or a post.` : 'Image saved.',
+      );
+    if (result === 'shared') onClose();
+  }
+  function openTarget(target: ShareTarget) {
+    window.open(shareTargetUrl(target, url(), title), '_blank', 'noopener,noreferrer');
+  }
+
   const sentTo = Object.entries(sent);
+  const imageState = { disabled: !image, busy: !image && !imageFailed };
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" data-no-tab-swipe>
       <div className="absolute inset-0 bg-black/60" onClick={onClose} aria-hidden />
@@ -188,6 +239,17 @@ export function PostShareSheet({
               <Repeat2 size={21} />
             </SheetAction>
           )}
+          {onSaveFoods && (
+            <SheetAction
+              label="Save foods"
+              onClick={() => {
+                onClose();
+                onSaveFoods();
+              }}
+            >
+              <UtensilsCrossed size={20} />
+            </SheetAction>
+          )}
           <SheetAction label="Copy link" onClick={() => void copyLink()}>
             <Link2 size={21} />
           </SheetAction>
@@ -195,6 +257,60 @@ export function PostShareSheet({
             <SheetAction label="More…" onClick={() => void nativeShare()}>
               <Share size={20} />
             </SheetAction>
+          )}
+        </div>
+
+        <p className="px-4 pt-4 text-[11px] font-medium uppercase tracking-wide text-ink-faint">
+          Share to
+        </p>
+        <div className="flex gap-4 overflow-x-auto px-4 pt-2 [scrollbar-width:none]">
+          {imageAllowed && !imageFailed && (
+            <>
+              <AppAction
+                label="Instagram"
+                className="bg-gradient-to-tr from-amber-400 via-rose-500 to-fuchsia-600"
+                {...imageState}
+                onClick={() => void shareImage('Instagram')}
+              >
+                <Camera size={22} />
+              </AppAction>
+              <AppAction
+                label="TikTok"
+                className="bg-black ring-1 ring-white/20"
+                {...imageState}
+                onClick={() => void shareImage('TikTok')}
+              >
+                <Music2 size={21} />
+              </AppAction>
+            </>
+          )}
+          <AppAction label="WhatsApp" className="bg-[#25D366]" onClick={() => openTarget('whatsapp')}>
+            <Phone size={20} />
+          </AppAction>
+          {touch && (
+            <AppAction
+              label="Messenger"
+              className="bg-gradient-to-tr from-sky-500 via-violet-500 to-pink-500"
+              onClick={() => openTarget('messenger')}
+            >
+              <MessageCircle size={21} />
+            </AppAction>
+          )}
+          <AppAction label="Facebook" className="bg-[#1877F2]" onClick={() => openTarget('facebook')}>
+            <span className="text-2xl font-bold leading-none">f</span>
+          </AppAction>
+          <AppAction label="X" className="bg-black ring-1 ring-white/20" onClick={() => openTarget('x')}>
+            <span className="text-xl font-bold leading-none">𝕏</span>
+          </AppAction>
+          {imageAllowed && !imageFailed && (
+            <AppAction
+              label="Save image"
+              className="bg-ink/10 !text-ink"
+              {...imageState}
+              onClick={() => void shareImage()}
+            >
+              <Download size={20} />
+            </AppAction>
           )}
         </div>
 
@@ -227,7 +343,10 @@ export function PostShareSheet({
             </Link>
           )}
           <p className="text-[11px] text-ink-faint">
-            Only people this post is shared with can open it.
+            Links open only for people this post is shared with.
+            {imageAllowed
+              ? ' An image can be shared anywhere.'
+              : ' Images are for your own and public posts, so this one stays with its audience.'}
           </p>
         </div>
       </div>
@@ -260,6 +379,39 @@ function SheetAction({
         className={`flex h-14 w-14 items-center justify-center rounded-full ${pressed ? 'bg-emerald-500/15 text-emerald-400' : 'bg-ink/5 text-ink'}`}
       >
         {children}
+      </span>
+      <span className="text-[11px]">{label}</span>
+    </button>
+  );
+}
+
+function AppAction({
+  label,
+  className,
+  onClick,
+  disabled,
+  busy,
+  children,
+}: {
+  label: string;
+  className: string;
+  onClick: () => void;
+  disabled?: boolean;
+  busy?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={busy ? `${label} (preparing image)` : label}
+      className="flex w-16 shrink-0 flex-col items-center gap-1.5 disabled:opacity-60"
+    >
+      <span
+        className={`flex h-14 w-14 items-center justify-center rounded-2xl text-white ${className}`}
+      >
+        {busy ? <Loader2 size={20} className="animate-spin" /> : children}
       </span>
       <span className="text-[11px]">{label}</span>
     </button>

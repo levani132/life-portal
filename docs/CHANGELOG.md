@@ -2,6 +2,17 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-05: Share to Instagram, TikTok, WhatsApp and more
+
+The Share sheet has a **Share to** row. Instagram and TikTok get a Story-sized image of the post:
+the photo, the title and the macro rings. WhatsApp, Messenger, Facebook and X share the link, and
+**Save image** keeps the picture. Images are offered for your own posts and for public ones.
+
+A link to a public post now shows a preview card in chats and social apps, with the photo, title
+and macros. Links to friends-only or private posts show only "A post on Life Portal".
+
+On a friend's post with food, **Save foods** in the Share sheet copies its foods into yours.
+
 ## 2026-11-05: Reposts
 
 Share → **Repost** puts a friend's post on your wall and in your friends' Home feeds, with

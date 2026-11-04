@@ -20,7 +20,7 @@ import {
 } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { RequireModule } from '../access/access.module';
-import { CurrentUser } from '../auth/current-user.decorator';
+import { CurrentUser, Public } from '../auth/current-user.decorator';
 import { NutritionModule } from '../nutrition/nutrition.module';
 import { SocialModule, SocialNoStore } from '../social/social.module';
 import {
@@ -173,6 +173,20 @@ class PostsController {
     return this.posts.report(userId, id, dto);
   }
 }
+/**
+ * The one unauthenticated posts route: link previews for public posts (spec 017). No module
+ * guard (there is no user), and a fixed small shape from `PostsService.publicPreview()`.
+ */
+@UseInterceptors(SocialNoStore)
+@Controller('public/posts')
+class PublicPostsController {
+  constructor(private readonly posts: PostsService) {}
+  @Public()
+  @Get(':id/preview')
+  preview(@Param('id') id: string) {
+    return this.posts.publicPreview(id);
+  }
+}
 @Module({
   imports: [
     NutritionModule,
@@ -184,7 +198,7 @@ class PostsController {
       { name: PostReportRecord.name, schema: PostReportSchema },
     ]),
   ],
-  controllers: [PostsController],
+  controllers: [PostsController, PublicPostsController],
   providers: [PostsService, PostEngagementService],
   // Messages renders shared posts through the same read authorization as opening one.
   exports: [PostsService],

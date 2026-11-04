@@ -23,3 +23,4 @@ export * from './lib/activity';
 export * from './lib/notifications';
 export * from './lib/messages';
 export * from './lib/post-media';
+export * from './lib/share-out';
