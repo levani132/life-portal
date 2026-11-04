@@ -86,3 +86,38 @@ export function fitWithin(
     height: Math.max(1, Math.round(height * scale)),
   };
 }
+
+/**
+ * Each macro's share of a food's calories (protein and carbs 4 kcal/g, fat 9). The shares add
+ * up to 1 (or are all 0 when there are no macros), so they can draw a split ring without any
+ * daily target.
+ */
+export function macroShares(macros: {
+  proteinMg: number;
+  carbMg: number;
+  fatMg: number;
+}): { protein: number; carbs: number; fat: number } {
+  const protein = Math.max(0, macros.proteinMg) * 0.004;
+  const carbs = Math.max(0, macros.carbMg) * 0.004;
+  const fat = Math.max(0, macros.fatMg) * 0.009;
+  const total = protein + carbs + fat;
+  if (!(total > 0)) return { protein: 0, carbs: 0, fat: 0 };
+  return { protein: protein / total, carbs: carbs / total, fat: fat / total };
+}
+
+/**
+ * What the new-food buttons say and do. Logging needs a saved food, so it is ignored (and its
+ * checkbox disabled) while saving is off.
+ */
+export function newFoodActions(options: { save: boolean; log: boolean }): {
+  canLog: boolean;
+  log: boolean;
+  /** Saves (and logs) without posting. Absent when nothing would be kept. */
+  keep?: string;
+  post: string;
+} {
+  if (!options.save) return { canLog: false, log: false, post: 'Post' };
+  return options.log
+    ? { canLog: true, log: true, keep: 'Save and log food', post: 'Save, Log and Post' }
+    : { canLog: true, log: false, keep: 'Save food', post: 'Save and Post' };
+}

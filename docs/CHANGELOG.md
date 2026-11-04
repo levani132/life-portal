@@ -2,6 +2,19 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-04 — New post page with the camera, and new foods from a photo
+
+The tab bar is now Home, Messages, **+**, Search and Menu; Friends is in the Menu. The **+** opens
+the new post page: what you write is on top and the camera is live underneath. Drag the camera up
+to fill the screen or down to put it away. Photos and videos you take go straight into the post.
+
+**New food** lets you type a food right there: name, portion, calories and macros, shown as rings
+under the photo. Choose whether to save it to your foods and whether to log it as the current meal,
+then save it, post it, or both. You can do this with or without a photo.
+
+Foods can have a photo of their own, added in the Food form. It shows in your list, in the food
+picker, and on the food when you post it. In posts, a photo and its food are now one card.
+
 ## 2026-11-04 — One way to post, with photos and video
 
 The header has a **+** on the left that opens a new post from anywhere. LifePortal sits in the

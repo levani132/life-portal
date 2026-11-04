@@ -13,6 +13,7 @@ import { factsFromInput, factsToInput, macroEnergyMismatch, mgToG } from '@life-
 import { api } from '../lib/api';
 import { useAction } from '../lib/hooks';
 import { Field, Input, Modal, Select, Spinner } from './ui';
+import { FoodPhotoField, foodPhotoPayload, type FoodPhotoChange } from './food-photo-field';
 
 /** Long enough that typing "chicken" is one search, not seven. The API allows ten a minute. */
 const SEARCH_DEBOUNCE_MS = 400;
@@ -78,11 +79,13 @@ export function FoodForm({
   const [favourite, setFavourite] = useState(false);
   const [visibility, setVisibility] = useState<FoodVisibility>('private');
   const [numbers, setNumbers] = useState<NumberFields>(EMPTY);
+  const [photo, setPhoto] = useState<FoodPhotoChange>({ kind: 'keep' });
 
   useEffect(() => {
     if (!open) return;
     clearError();
     setTab('manual');
+    setPhoto({ kind: 'keep' });
     if (food) {
       const typed = factsToInput(food, food.entryMode, food.servingSize);
       setName(food.name);
@@ -153,8 +156,9 @@ export function FoodForm({
 
   const submit = () =>
     void run(async () => {
-      if (editing) await api.patch(`/nutrition/foods/${food.id}`, payload);
-      else await api.post('/nutrition/foods', payload);
+      const body = { ...payload, ...foodPhotoPayload(photo) };
+      if (editing) await api.patch(`/nutrition/foods/${food.id}`, body);
+      else await api.post('/nutrition/foods', body);
     }).then((ok) => {
       if (ok) {
         onSaved?.();
@@ -171,7 +175,7 @@ export function FoodForm({
       title={editing ? `Edit ${food.name}` : 'Add a food'}
       onSubmit={submit}
       submitLabel={editing ? 'Save food' : 'Add food'}
-      pending={pending}
+      pending={pending || photo.kind === 'uploading'}
       error={error}
       wide
     >
@@ -223,6 +227,7 @@ export function FoodForm({
         />
       ) : (
         <>
+          {open && <FoodPhotoField key={food?.id ?? 'new'} image={food?.image} onChange={setPhoto} />}
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Name">
               <Input value={name} onChange={(event) => setName(event.target.value)} required />

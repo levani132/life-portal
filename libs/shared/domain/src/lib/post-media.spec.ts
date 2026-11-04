@@ -1,6 +1,8 @@
 import {
   clampAspect,
   fitWithin,
+  macroShares,
+  newFoodActions,
   mediaLimitError,
   mediaListError,
   postHasContent,
@@ -66,5 +68,28 @@ describe('clampAspect and fitWithin', () => {
   it('shrinks to the long edge and never enlarges', () => {
     expect(fitWithin(4032, 3024, 2048)).toEqual({ width: 2048, height: 1536 });
     expect(fitWithin(800, 600, 2048)).toEqual({ width: 800, height: 600 });
+  });
+});
+
+describe('macroShares', () => {
+  it('splits calories by 4/4/9 and adds up to one', () => {
+    const shares = macroShares({ proteinMg: 30_000, carbMg: 50_000, fatMg: 20_000 });
+    // 120 + 200 + 180 = 500 kcal from macros
+    expect(shares.protein).toBeCloseTo(0.24);
+    expect(shares.carbs).toBeCloseTo(0.4);
+    expect(shares.fat).toBeCloseTo(0.36);
+  });
+  it('is all zero without macros', () => {
+    expect(macroShares({ proteinMg: 0, carbMg: 0, fatMg: 0 })).toEqual({ protein: 0, carbs: 0, fat: 0 });
+  });
+});
+
+describe('newFoodActions', () => {
+  it('follows the save and log checkboxes', () => {
+    expect(newFoodActions({ save: true, log: false })).toEqual({ canLog: true, log: false, keep: 'Save food', post: 'Save and Post' });
+    expect(newFoodActions({ save: true, log: true })).toEqual({ canLog: true, log: true, keep: 'Save and log food', post: 'Save, Log and Post' });
+  });
+  it('never logs without saving', () => {
+    expect(newFoodActions({ save: false, log: true })).toEqual({ canLog: false, log: false, post: 'Post' });
   });
 });

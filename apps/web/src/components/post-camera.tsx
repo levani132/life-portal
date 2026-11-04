@@ -1,6 +1,6 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
-import { RefreshCw, X } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Images, RefreshCw } from 'lucide-react';
 import { MAX_VIDEO_SECONDS } from '@life-portal/shared-types';
 import {
   captureFrame,
@@ -15,21 +15,32 @@ const HOLD_MS = 300;
 const RING = 2 * Math.PI * 38;
 
 /**
- * The in-app camera. Tap the shutter for a photo, hold it to record (up to 30 seconds, with a
- * ring filling around the button), release to stop. Video only comes from here: a recording
- * made in the app is short and known, a library video is neither.
+ * The live camera, sized by its parent (the bottom of the new post page). Tap the shutter for a
+ * photo, hold it to record (up to 30 seconds, with a ring filling around the button), release
+ * to stop. The camera runs only while `active`, and the microphone is asked for only when a
+ * recording starts, so taking photos never prompts for it.
  */
-export function PostCamera({
+export function CameraView({
+  active,
   onCapture,
-  onClose,
+  onLibrary,
+  top,
+  disabled,
 }: {
+  active: boolean;
   onCapture: (media: PreparedMedia) => void;
-  onClose: () => void;
+  /** Opens the photo library. */
+  onLibrary?: () => void;
+  /** Controls drawn over the top of the preview (the drag handle, close…). */
+  top?: ReactNode;
+  disabled?: boolean;
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
+  const microphone = useRef<MediaStreamTrack | null>(null);
   const recorder = useRef<MediaRecorder | null>(null);
   const holdTimer = useRef<number>(0);
+  const holding = useRef(false);
   const startedAt = useRef(0);
   const [facing, setFacing] = useState<'environment' | 'user'>('environment');
   const [failed, setFailed] = useState<string | null>(null);
@@ -40,22 +51,18 @@ export function PostCamera({
   const canRecord = !!recorderType();
 
   useEffect(() => {
+    if (!active) return;
     let cancelled = false;
     if (!navigator.mediaDevices?.getUserMedia) {
       setFailed('This browser cannot open the camera here.');
       return;
     }
-    const open = async () => {
-      try {
-        const media = await navigator.mediaDevices
-          .getUserMedia({
-            video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } },
-            audio: canRecord,
-          })
-          // A camera without a microphone still takes photos and silent clips.
-          .catch(() =>
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: false }),
-          );
+    void navigator.mediaDevices
+      .getUserMedia({
+        video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: false,
+      })
+      .then(async (media) => {
         if (cancelled) {
           media.getTracks().forEach((track) => track.stop());
           return;
@@ -66,17 +73,19 @@ export function PostCamera({
           await video.current.play().catch(() => undefined);
         }
         setFailed(null);
-      } catch {
+      })
+      .catch(() => {
         if (!cancelled) setFailed('Camera access was not allowed.');
-      }
-    };
-    void open();
+      });
     return () => {
       cancelled = true;
+      recorder.current?.stop();
       stream.current?.getTracks().forEach((track) => track.stop());
       stream.current = null;
+      microphone.current?.stop();
+      microphone.current = null;
     };
-  }, [facing, canRecord]);
+  }, [active, facing]);
 
   // The ring and the 30-second stop.
   useEffect(() => {
@@ -97,17 +106,29 @@ export function PostCamera({
     setBusy(true);
     try {
       onCapture(await captureFrame(video.current, facing === 'user'));
-      onClose();
     } finally {
       setBusy(false);
     }
   }
 
-  function startRecording() {
+  async function startRecording() {
     const type = recorderType();
     if (!stream.current || !type) return;
+    if (!microphone.current) {
+      // Asked for once, on the first recording. A clip without sound beats no clip.
+      microphone.current = await navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then((media) => media.getAudioTracks()[0] ?? null)
+        .catch(() => null);
+    }
+    // The finger may have lifted while the microphone prompt was up.
+    if (!holding.current || !stream.current) return;
+    const tracks = [
+      ...stream.current.getVideoTracks(),
+      ...(microphone.current ? [microphone.current] : []),
+    ];
     const chunks: Blob[] = [];
-    const next = new MediaRecorder(stream.current, {
+    const next = new MediaRecorder(new MediaStream(tracks), {
       mimeType: type,
       videoBitsPerSecond: 2_500_000,
     });
@@ -124,10 +145,7 @@ export function PostCamera({
       if (duration < 500 || !chunks.length) return;
       setBusy(true);
       void prepareVideo(new Blob(chunks, { type: next.mimeType || type }), duration)
-        .then((media) => {
-          onCapture(media);
-          onClose();
-        })
+        .then(onCapture)
         .catch(() => setFailed('Could not save the video.'))
         .finally(() => setBusy(false));
     };
@@ -141,17 +159,27 @@ export function PostCamera({
 
   function pressStart(event: React.PointerEvent) {
     event.preventDefault();
-    if (busy) return;
+    event.stopPropagation();
+    if (busy || disabled) return;
+    holding.current = true;
     (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
     window.clearTimeout(holdTimer.current);
-    holdTimer.current = canRecord ? window.setTimeout(startRecording, HOLD_MS) : 0;
+    holdTimer.current = canRecord
+      ? window.setTimeout(() => {
+          holdTimer.current = 0;
+          void startRecording();
+        }, HOLD_MS)
+      : 0;
   }
-  function pressEnd() {
+  function pressEnd(event: React.PointerEvent) {
+    event.stopPropagation();
+    const wasHolding = holding.current;
+    holding.current = false;
     if (recorder.current) {
       recorder.current.stop();
       return;
     }
-    if (holdTimer.current || !canRecord) {
+    if (wasHolding && (holdTimer.current || !canRecord)) {
       window.clearTimeout(holdTimer.current);
       holdTimer.current = 0;
       void takePhoto();
@@ -160,75 +188,60 @@ export function PostCamera({
 
   const progress = Math.min(1, elapsed / (MAX_VIDEO_SECONDS * 1000));
   return (
-    <div
-      className="fixed inset-0 z-[70] flex flex-col bg-black text-white"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Camera"
-      data-no-tab-swipe
-    >
-      <div className="flex items-center justify-between px-4 pb-2 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
+    <div className="relative h-full w-full overflow-hidden bg-black text-white" data-no-tab-swipe>
+      <video
+        ref={video}
+        playsInline
+        muted
+        autoPlay
+        className={`absolute inset-0 h-full w-full object-cover ${facing === 'user' ? '-scale-x-100' : ''}`}
+      />
+      {top}
+      {recording && (
+        <span className="absolute left-1/2 top-10 -translate-x-1/2 rounded-full bg-rose-500 px-3 py-1 text-xs font-semibold tabular-nums">
+          0:{String(Math.floor(elapsed / 1000)).padStart(2, '0')}
+        </span>
+      )}
+      {failed && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+          <p className="text-sm text-white/80">{failed}</p>
+          <button
+            type="button"
+            className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black"
+            onClick={() => fallback.current?.click()}
+          >
+            Take a photo instead
+          </button>
+          {/* The system camera, for photos only: a system video's length is unknown. */}
+          <input
+            ref={fallback}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (file) void prepareImage(file).then(onCapture);
+            }}
+          />
+        </div>
+      )}
+      <div className="absolute inset-x-0 bottom-0 flex items-center justify-around px-6 pb-4 pt-6">
         <button
           type="button"
-          aria-label="Close camera"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10"
-          onClick={() => {
-            recorder.current?.stop();
-            onClose();
-          }}
+          aria-label="Add photos from library"
+          disabled={!onLibrary || recording}
+          onClick={onLibrary}
+          onPointerDown={(event) => event.stopPropagation()}
+          className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15 backdrop-blur disabled:opacity-30"
         >
-          <X size={22} />
+          <Images size={21} />
         </button>
-        {recording && (
-          <span className="rounded-full bg-rose-500 px-3 py-1 text-xs font-semibold tabular-nums">
-            0:{String(Math.floor(elapsed / 1000)).padStart(2, '0')}
-          </span>
-        )}
-        <span className="h-10 w-10" />
-      </div>
-      <div className="relative min-h-0 flex-1 overflow-hidden">
-        <video
-          ref={video}
-          playsInline
-          muted
-          autoPlay
-          className={`h-full w-full object-cover ${facing === 'user' ? '-scale-x-100' : ''}`}
-        />
-        {failed && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center">
-            <p className="text-sm text-white/80">{failed}</p>
-            <button
-              type="button"
-              className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black"
-              onClick={() => fallback.current?.click()}
-            >
-              Take a photo instead
-            </button>
-            {/* The system camera, for photos only: a library or system video is not allowed. */}
-            <input
-              ref={fallback}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (!file) return;
-                void prepareImage(file).then((media) => {
-                  onCapture(media);
-                  onClose();
-                });
-              }}
-            />
-          </div>
-        )}
-      </div>
-      <div className="flex items-center justify-around px-6 pb-3 pt-5">
-        <span className="h-12 w-12" />
         <button
           type="button"
           aria-label={canRecord ? 'Shutter: tap for a photo, hold to record' : 'Take photo'}
-          disabled={!!failed || busy}
+          disabled={!!failed || busy || disabled}
           onPointerDown={pressStart}
           onPointerUp={pressEnd}
           onPointerCancel={pressEnd}
@@ -239,10 +252,10 @@ export function PostCamera({
               void takePhoto();
             }
           }}
-          className="relative flex h-[84px] w-[84px] touch-none select-none items-center justify-center disabled:opacity-40"
+          className="relative flex h-[76px] w-[76px] touch-none select-none items-center justify-center disabled:opacity-40"
         >
           <svg viewBox="0 0 84 84" className="absolute inset-0 -rotate-90" aria-hidden>
-            <circle cx="42" cy="42" r="38" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="5" />
+            <circle cx="42" cy="42" r="38" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="5" />
             {recording && (
               <circle
                 cx="42"
@@ -258,22 +271,20 @@ export function PostCamera({
             )}
           </svg>
           <span
-            className={`block rounded-full transition-all duration-200 ${recording ? 'h-8 w-8 rounded-lg bg-rose-500' : 'h-[66px] w-[66px] bg-white'}`}
+            className={`block rounded-full transition-all duration-200 ${recording ? 'h-7 w-7 rounded-lg bg-rose-500' : 'h-[60px] w-[60px] bg-white'}`}
           />
         </button>
         <button
           type="button"
           aria-label="Switch camera"
           disabled={recording}
-          className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 disabled:opacity-30"
+          onPointerDown={(event) => event.stopPropagation()}
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 backdrop-blur disabled:opacity-30"
           onClick={() => setFacing((f) => (f === 'user' ? 'environment' : 'user'))}
         >
-          <RefreshCw size={22} />
+          <RefreshCw size={20} />
         </button>
       </div>
-      <p className="pb-[calc(env(safe-area-inset-bottom)+0.5rem)] text-center text-[11px] text-white/60">
-        {canRecord ? `Tap for a photo · hold to record up to ${MAX_VIDEO_SECONDS}s` : 'Tap for a photo'}
-      </p>
     </div>
   );
 }

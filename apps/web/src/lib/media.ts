@@ -192,7 +192,7 @@ export async function uploadMedia(
     ...(item.durationMs !== undefined ? { durationMs: item.durationMs } : {}),
     ...(item.poster ? { poster: { bytes: item.poster.size } } : {}),
   };
-  const ticket = await api.post<MediaUploadTicket>('/posts/media', request);
+  const ticket = await api.post<MediaUploadTicket>('/media', request);
   const total = item.blob.size + (item.poster?.size ?? 0);
   let posterDone = 0;
   if (item.poster && ticket.poster) {

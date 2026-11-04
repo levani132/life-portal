@@ -3,6 +3,7 @@
 import clsx from 'clsx';
 import { useIsIOS } from '../../lib/ios-device';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { BookmarkPlus, Bot, Info, Plus, Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type {
@@ -32,7 +33,6 @@ import { AppShell } from '../../components/app-shell';
 import { CheatQueue } from '../../components/cheat-queue';
 import { FoodForm } from '../../components/food-form';
 import { FoodPicker } from '../../components/food-picker';
-import { PostComposer } from '../../components/post-composer';
 import { LogFoodModal } from '../../components/log-food-modal';
 import { NutritionRing } from '../../components/home-widget';
 import {
@@ -58,6 +58,7 @@ import { WeightTrend } from '../../components/weight-trend';
 import { api } from '../../lib/api';
 import { useAction, useApi } from '../../lib/hooks';
 import { mealContextNow } from '../../lib/local-day';
+import { newPostHref } from '../../lib/new-post';
 
 const SLOT_LABELS: Record<MealSlot, string> = {
   breakfast: 'Breakfast',
@@ -96,7 +97,9 @@ function Nutrition() {
     portal.data?.access.foodPosts &&
     portal.data.access.social &&
     portal.data.access.nutrition;
-  const [sharing, setSharing] = useState<PostSelection | null>(null);
+  const router = useRouter();
+  // Sharing opens the new post page with the selection attached.
+  const setSharing = (source: PostSelection) => router.push(newPostHref(source));
   const [recentEntry, setRecentEntry] = useState<MealEntry | null>(null);
   const [logging, setLogging] = useState<{
     slot: MealSlot;
@@ -296,13 +299,6 @@ function Nutrition() {
         </div>
       )}
 
-      {sharing && (
-        <PostComposer
-          initialSource={sharing}
-          defaultAudience={data.profile.defaultFoodVisibility}
-          onClose={() => setSharing(null)}
-        />
-      )}
       {logging && (
         <LogFoodModal
           open
@@ -1145,6 +1141,13 @@ function FoodsTab({
                     >
                       ★
                     </button>
+                    {food.image && (
+                      <img
+                        src={food.image.url}
+                        alt=""
+                        className="mr-2 inline-block h-7 w-7 rounded-md object-cover align-middle"
+                      />
+                    )}
                     {food.name}
                     {food.brand && (
                       <span className="ml-1 text-xs text-ink-faint">

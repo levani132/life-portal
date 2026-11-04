@@ -9,6 +9,7 @@ import {
   Plug,
   Flag,
   UserRound,
+  Users,
   Bell,
 } from 'lucide-react';
 import { MODULES, type PortalState } from '@life-portal/shared-types';
@@ -18,9 +19,22 @@ import { useApi } from '../lib/hooks';
 export function MenuContent() {
   const { user, logout } = useAuth();
   const { data } = useApi<PortalState>('/portal');
-  const links = [
+  const requests = useApi<{ count: number; more: boolean }>(
+    data?.access.social ? '/social/requests/count' : null,
+  );
+  const links: { href: string; label: string; icon: typeof Users; badge?: string }[] = [
     ...(data?.access.social
-      ? [{ href: '/profile', label: 'My profile', icon: UserRound }]
+      ? [
+          {
+            href: '/friends',
+            label: 'Friends',
+            icon: Users,
+            ...(requests.data?.count
+              ? { badge: `${requests.data.count}${requests.data.more ? '+' : ''}` }
+              : {}),
+          },
+          { href: '/profile', label: 'My profile', icon: UserRound },
+        ]
       : []),
     ...(data?.access.push && data.access.social
       ? [{ href: '/settings/notifications', label: 'Notifications', icon: Bell }]
@@ -61,7 +75,7 @@ export function MenuContent() {
     <div className="mx-auto max-w-2xl">
       <PageHeader title="Menu" subtitle={user?.name} />
       <div className="card divide-y divide-border">
-        {links.map(({ href, label, icon: Icon }) => (
+        {links.map(({ href, label, icon: Icon, badge }) => (
           <Link
             key={href}
             href={href}
@@ -69,6 +83,14 @@ export function MenuContent() {
           >
             <Icon size={20} className="text-accent" />
             <span className="flex-1">{label}</span>
+            {badge && (
+              <span
+                className="rounded-full bg-sky-500 px-2 py-0.5 text-[11px] font-semibold text-white"
+                aria-label={`${badge} pending friend requests`}
+              >
+                {badge}
+              </span>
+            )}
             <ChevronRight size={18} className="text-ink-faint" />
           </Link>
         ))}

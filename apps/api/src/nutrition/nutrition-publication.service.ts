@@ -158,8 +158,9 @@ export class NutritionPublicationService {
       const rows = await this.foods
         .find({
           userId,
-          archived: false,
-          ...(source.kind === 'food' ? { _id: source.foodId } : {}),
+          // One named food may be archived: a food posted from the composer without saving it
+          // is created archived, so it never appears in the owner's database (spec 015).
+          ...(source.kind === 'food' ? { _id: source.foodId } : { archived: false }),
         })
         .sort({ name: 1, _id: 1 })
         .limit(MAX_POST_ITEMS + 1)

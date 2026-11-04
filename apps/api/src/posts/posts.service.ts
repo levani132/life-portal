@@ -33,7 +33,7 @@ import { AccessService } from '../access/access.module';
 import { NutritionPublicationService } from '../nutrition/nutrition-publication.service';
 import { SocialService } from '../social/social.module';
 import { SocialGraphService } from '../social-graph/social-graph.module';
-import { PostMediaService } from './post-media.service';
+import { MediaService } from '../media/media.service';
 import { FoodPostRecord, PostReportRecord } from './posts.schemas';
 import type {
   CreatePostDto,
@@ -55,7 +55,7 @@ export class PostsService {
     private readonly nutrition: NutritionPublicationService,
     private readonly social: SocialService,
     private readonly graph: SocialGraphService,
-    private readonly media: PostMediaService,
+    private readonly media: MediaService,
     @Inject(CONFIG) private readonly config: AppConfig,
   ) {}
   private id(id: string) {

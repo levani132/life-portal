@@ -108,6 +108,14 @@ export interface Food extends NutritionFacts, Timestamped {
   notes?: string;
   /** Whether this food is visible to other users. */
   visibility: FoodVisibility;
+  /** The food's picture, for its owner only. A signed link, valid for an hour or more. */
+  image?: FoodImage;
+}
+
+export interface FoodImage {
+  url: string;
+  width: number;
+  height: number;
 }
 
 /** What one serving works out to. Derived, so the UI never does the arithmetic twice. */

@@ -31,6 +31,7 @@ import {
 } from './post-header-controls';
 import { PostEngagement } from './post-engagement';
 import { PostMediaCarousel } from './post-media';
+import { MacroRings } from './macro-rings';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { SOCIAL_REFRESH } from '../lib/social-hooks';
 import {
@@ -241,16 +242,19 @@ export function PostCard({
           {post.caption}
         </p>
       )}
-      {post.media.length > 0 && (
+      {post.media.length > 0 && !hasFood && (
         <div className="-mx-4 mt-4 sm:mx-0">
           <PostMediaCarousel media={post.media} />
         </div>
       )}
       {hasFood && (
+      // Photos and the food are one card: no gap, rounded only on the outside.
       <div
-        className="mt-4 rounded-xl border border-border/60 bg-surface p-3 sm:p-4"
+        className="mt-4 overflow-hidden rounded-xl border border-border/60 bg-surface"
         data-post-kind={post.kind}
       >
+        {post.media.length > 0 && <PostMediaCarousel media={post.media} className="" />}
+        <div className="p-3 sm:p-4">
         <div className="flex items-center gap-3">
           <span
             className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${presentation.tint}`}
@@ -284,11 +288,21 @@ export function PostCard({
             </p>
           </div>
         </div>
-        <PublishedNutritionSummary
-          totals={post.totalMacros}
-          targets={post.targets}
-          diary={post.kind === 'day'}
-        />
+        {post.kind !== 'day' && post.totalMacros ? (
+          <MacroRings
+            className="mt-3"
+            kcal={post.totalMacros.energyKcal}
+            proteinMg={post.totalMacros.proteinG * 1000}
+            carbMg={post.totalMacros.carbG * 1000}
+            fatMg={post.totalMacros.fatG * 1000}
+          />
+        ) : (
+          <PublishedNutritionSummary
+            totals={post.totalMacros}
+            targets={post.targets}
+            diary={post.kind === 'day'}
+          />
+        )}
         <ul
           className={`mt-3 divide-y divide-border/70 ${detail ? 'max-h-[32rem] overflow-y-auto' : ''}`}
         >
@@ -336,6 +350,7 @@ export function PostCard({
             View all {post.itemCount} foods →
           </Link>
         )}
+        </div>
       </div>
       )}
       <PostEngagement post={post} />

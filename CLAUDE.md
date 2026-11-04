@@ -199,3 +199,8 @@ that a figure you expect to be non-zero actually is.
   social + nutrition + foodPosts, current graph/audience checks and no-store responses.
   NutritionPublicationService alone projects owned nutrition facts and creates attributed
   private imports. Preserve idempotency keys and deletion tombstones; never log meals on import.
+- **`/new` (the new post page) is not a tab.** It is a normal route the shell renders without
+  header or nav, like a chat. Don't add it to the tab roots or it would stay mounted with a live
+  camera. A food posted without "Save to my foods" is created `archived`; never list archived
+  foods in the picker, and don't drop the archived exception from the single-food publication.
+  A food's `image.key` never leaves the API: responses carry a signed `url` instead.

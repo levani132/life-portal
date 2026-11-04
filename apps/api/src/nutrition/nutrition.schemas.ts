@@ -90,6 +90,11 @@ export class Food {
   @Prop({ required: true, enum: FOOD_VISIBILITY, default: 'private' })
   visibility!: string;
   @Prop({ default: 1 }) privacyVersion!: number;
+  /**
+   * The owner's picture of the food, a file of its own in storage. The key never leaves the API:
+   * responses carry a signed link instead (see `NutritionService.withImage`).
+   */
+  @Prop({ type: Object }) image?: { key: string; width: number; height: number };
 }
 
 export const FoodSchema = SchemaFactory.createForClass(Food);

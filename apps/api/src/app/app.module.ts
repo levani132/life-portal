@@ -26,6 +26,7 @@ import { SettingsModule } from '../settings/settings.module';
 import { SpendingModule } from '../spending/spending.module';
 import { StocksModule } from '../stocks/stocks.module';
 import { StorageModule } from '../storage/storage.module';
+import { MediaModule } from '../media/media.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { StorageModule } from '../storage/storage.module';
     }),
     ScheduleModule.forRoot(),
     StorageModule,
+    MediaModule,
     AuthModule,
     AccessModule,
     SocialGraphModule,

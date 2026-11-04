@@ -6,7 +6,8 @@ function fixture(flags: {
   shareWeight?: boolean;
 }) {
   const service = new NutritionService(
-    ...(Array(10).fill({}) as [
+    ...(Array(11).fill({}) as [
+      never,
       never,
       never,
       never,

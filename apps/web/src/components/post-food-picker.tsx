@@ -228,6 +228,7 @@ export function PostFoodPicker({
                     key={food.id}
                     icon={Apple}
                     title={food.name}
+                    image={food.image?.url}
                     detail={[food.brand, `${food.perServing.energyKcal} kcal per serving`]
                       .filter(Boolean)
                       .join(' · ')}
@@ -279,12 +280,15 @@ function Option({
   detail,
   onClick,
   small,
+  image,
 }: {
   icon: typeof Apple;
   title: string;
   detail: string;
   onClick: () => void;
   small?: boolean;
+  /** A food's own photo, shown in place of the icon. */
+  image?: string;
 }) {
   return (
     <li>
@@ -299,7 +303,11 @@ function Option({
             small ? 'h-8 w-8' : 'h-10 w-10',
           )}
         >
-          <Icon size={small ? 15 : 19} aria-hidden />
+          {image ? (
+            <img src={image} alt="" className="h-full w-full rounded-xl object-cover" />
+          ) : (
+            <Icon size={small ? 15 : 19} aria-hidden />
+          )}
         </span>
         <span className="min-w-0 flex-1">
           <span className={clsx('block truncate font-medium', small ? 'text-sm' : 'text-[15px]')}>

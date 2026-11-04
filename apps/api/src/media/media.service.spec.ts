@@ -1,6 +1,6 @@
 import { BadRequestException, HttpException } from '@nestjs/common';
 import { Types } from 'mongoose';
-import { PostMediaService } from './post-media.service';
+import { MediaService } from './media.service';
 
 function fixture() {
   const id = String(new Types.ObjectId());
@@ -23,6 +23,7 @@ function fixture() {
     create: jest.fn(),
     updateMany: jest.fn(),
     find: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([row]) }),
+    findOne: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(row) }),
   };
   const access = { require: jest.fn(), forUser: jest.fn() };
   const objects: Record<string, { bytes: number; contentType: string }> = {
@@ -35,8 +36,9 @@ function fixture() {
     presignPut: jest.fn(async (key: string) => ({ url: `https://r2/${key}`, headers: {} })),
     presignGet: jest.fn(async (key: string) => `https://r2/${key}?signed`),
     delete: jest.fn().mockResolvedValue(true),
+    copy: jest.fn(),
   };
-  const service = new PostMediaService(
+  const service = new MediaService(
     media as never,
     access as never,
     storage as never,
@@ -45,7 +47,7 @@ function fixture() {
   return { id, row, media, access, storage, objects, service };
 }
 
-describe('PostMediaService', () => {
+describe('MediaService', () => {
   it('reserves by request before checking, then checks both files', async () => {
     const f = fixture();
     const attached = await f.service.reserve('owner', 'request', [f.id]);
@@ -110,5 +112,20 @@ describe('PostMediaService', () => {
       url: `https://r2/${f.row.key}?signed`,
       posterUrl: `https://r2/${f.row.posterKey}?signed`,
     });
+  });
+});
+
+describe('copyForFood', () => {
+  it("copies a video's still to the food's own key and keeps the upload pending", async () => {
+    const f = fixture();
+    const image = await f.service.copyForFood('owner', f.id, 'food1');
+    expect(f.storage.copy).toHaveBeenCalledWith(f.row.posterKey, expect.stringMatching(/^foods\/owner\/food1-\w+\.jpg$/));
+    expect(image).toEqual({ key: expect.stringMatching(/^foods\/owner\//), width: 608, height: 1080 });
+    expect(f.media.updateMany).not.toHaveBeenCalled();
+  });
+  it('refuses a file that has not arrived', async () => {
+    const f = fixture();
+    delete f.objects[f.row.posterKey];
+    await expect(f.service.copyForFood('owner', f.id, 'food1')).rejects.toThrow(/Upload not finished/);
   });
 });

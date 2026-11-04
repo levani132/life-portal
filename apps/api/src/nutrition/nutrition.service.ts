@@ -62,6 +62,7 @@ import {
   WeighIn,
 } from './nutrition.schemas';
 import { User } from '../auth/schemas/user.schema';
+import { MediaService } from '../media/media.service';
 import type {
   CreateCheatMealDto,
   CreateEntryDto,
@@ -120,7 +121,15 @@ export class NutritionService {
     @InjectModel(CheatMeal.name) private readonly cheatMeals: Model<CheatMeal>,
     @InjectModel(User.name) private readonly users: Model<User>,
     private readonly lookup: OpenFoodFactsProvider,
+    private readonly media: MediaService,
   ) {}
+
+  /** The owner's view of a food: its picture as a signed link. Only for the owner's own foods. */
+  private async withImage<T extends FoodDto>(food: T, image?: StoredImage): Promise<T> {
+    if (!image) return food;
+    const url = await this.media.signKey(image.key);
+    return url ? { ...food, image: { url, width: image.width, height: image.height } } : food;
+  }
 
   // ---------------------------------------------------------------- foods
 
@@ -154,9 +163,12 @@ export class NutritionService {
       this.usageByFood(userId),
     ]);
 
+    const signed = await Promise.all(
+      rows.map((row) => this.withImage(foodJson(row), row.image)),
+    );
     return rows
-      .map((row) => {
-        const food = row.toJSON() as unknown as FoodDto;
+      .map((row, index) => {
+        const food = signed[index];
         const used = usage.get(food.id);
         const withUsage: FoodWithUsage = {
           ...food,
@@ -231,7 +243,18 @@ export class NutritionService {
       visibility,
       ...facts,
     } as never);
-    return created.toJSON() as unknown as FoodDto;
+    if (dto.imageMediaId) {
+      try {
+        const image = await this.media.copyForFood(userId, dto.imageMediaId, String(created._id));
+        await this.foods.updateOne({ _id: created._id }, { $set: { image } });
+        return this.withImage(foodJson(created), image);
+      } catch (error) {
+        // A food without its picture is still a food; only a bad request is worth undoing it for.
+        await this.foods.deleteOne({ _id: created._id });
+        throw error;
+      }
+    }
+    return foodJson(created);
   }
 
   async updateFood(
@@ -286,13 +309,18 @@ export class NutritionService {
       Object.assign(patch, facts);
     }
 
+    const oldImage = (await this.foods.findOne({ userId, _id: id }).select('image').lean())?.image;
+    let unset: Record<string, ''> | undefined;
+    if (dto.imageMediaId) patch['image'] = await this.media.copyForFood(userId, dto.imageMediaId, id);
+    else if (dto.removeImage) unset = { image: '' };
     const updated = await this.foods.findOneAndUpdate(
       { userId, _id: id },
-      { $set: patch },
+      { $set: patch, ...(unset ? { $unset: unset } : {}) },
       { new: true, runValidators: true },
     );
     if (!updated) throw new NotFoundException(`Food ${id} not found`);
-    return updated.toJSON() as unknown as FoodDto;
+    if (oldImage && (dto.imageMediaId || dto.removeImage)) void this.media.deleteKey(oldImage.key);
+    return this.withImage(foodJson(updated), updated.image);
   }
 
   /**
@@ -311,7 +339,8 @@ export class NutritionService {
       this.savedMeals.countDocuments({ userId, 'components.foodId': id }),
     ]);
     if (entryCount + cheatCount + savedCount === 0) {
-      await this.foods.findOneAndDelete({ userId, _id: id });
+      const deleted = await this.foods.findOneAndDelete({ userId, _id: id });
+      void this.media.deleteKey(deleted?.image?.key);
       return { id, deleted: true };
     }
     await this.foods.findOneAndUpdate(
@@ -339,7 +368,7 @@ export class NutritionService {
       throw new NotFoundException(`Food ${id} not found`);
     const found = await this.foods.findOne({ userId, _id: id });
     if (!found) throw new NotFoundException(`Food ${id} not found`);
-    return found.toJSON() as unknown as FoodDto;
+    return foodJson(found);
   }
 
   // ---------------------------------------------------------------- lookup
@@ -396,7 +425,7 @@ export class NutritionService {
       satFatMgPer100: result.satFatMgPer100,
       sodiumMgPer100: result.sodiumMgPer100,
     } as never);
-    return created.toJSON() as unknown as FoodDto;
+    return foodJson(created);
   }
 
   /** Explicit one-time private baseline, with a per-row marker safe across concurrent requests. */
@@ -456,7 +485,7 @@ export class NutritionService {
     const userMap = new Map(users.map((u) => [String(u._id), u.name]));
 
     const foods: PublicFood[] = rows.map((row) => {
-      const food = row.toJSON() as unknown as FoodDto;
+      const food = foodJson(row);
       const { userId: foodUserId, ...rest } = food;
       return {
         ...rest,
@@ -535,7 +564,7 @@ export class NutritionService {
       sodiumMgPer100: source.sodiumMgPer100,
       notes: source.notes,
     } as never);
-    return created.toJSON() as unknown as FoodDto;
+    return foodJson(created);
   }
 
   // ---------------------------------------------------------------- profile and weigh-ins
@@ -827,7 +856,7 @@ export class NutritionService {
       _id: { $in: sources.map((row) => row.foodId).filter(isValidObjectId) },
     });
     const byId = new Map(
-      foods.map((row) => [String(row._id), row.toJSON() as unknown as FoodDto]),
+      foods.map((row) => [String(row._id), foodJson(row)]),
     );
 
     const created = await this.entries.insertMany(
@@ -993,7 +1022,7 @@ export class NutritionService {
       },
     });
     const byId = new Map(
-      foods.map((row) => [String(row._id), row.toJSON() as unknown as FoodDto]),
+      foods.map((row) => [String(row._id), foodJson(row)]),
     );
 
     const created = await this.entries.insertMany(
@@ -1387,4 +1416,17 @@ export class NutritionService {
         : undefined,
     });
   }
+}
+
+interface StoredImage {
+  key: string;
+  width: number;
+  height: number;
+}
+
+/** A food row as JSON, without its storage key. A picture is added back only as a signed link. */
+function foodJson(row: { toJSON(): unknown }): FoodDto {
+  const json = row.toJSON() as FoodDto & { image?: unknown };
+  delete json.image;
+  return json;
 }

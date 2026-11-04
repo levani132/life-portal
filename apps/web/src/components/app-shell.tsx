@@ -11,21 +11,18 @@ import {
   MessageCircle,
   Plus,
   Search,
-  Users,
   type LucideIcon,
 } from 'lucide-react';
 import type { PortalState } from '@life-portal/shared-types';
 import { moduleForPath } from '@life-portal/shared-domain';
 import { useAuth } from '../lib/auth-context';
 import { useApi } from '../lib/hooks';
-import { Friends } from './friends-list';
 import { Dashboard } from './home-dashboard';
 import { MenuContent } from './menu-content';
 import { Inbox, messagingAvailable, useUnreadMessages } from './messages';
 import { ActivityBell, NotificationsBridge } from './notifications';
 import { PeopleSearch } from './people-search';
 import { PortalLoader } from './portal-loader';
-import { PostComposer } from './post-composer';
 import { PullToRefresh } from './pull-to-refresh';
 import { TabHost, type HostTab } from './tab-host';
 import { ErrorNote } from './ui';
@@ -68,7 +65,6 @@ function Portal({ children }: { children: ReactNode }) {
   }, [loading, user, needsSetup, pathname, router]);
   const [chromeHidden, revealChrome] = useScrollHidden(pathname === '/');
   const unreadMessages = useUnreadMessages(portal.data?.access ?? NO_ACCESS);
-  const [composing, setComposing] = useState(false);
   if (loading || !user || portal.isLoading)
     return <PortalLoader label="Opening your portal…" />;
   if (portal.error)
@@ -92,15 +88,22 @@ function Portal({ children }: { children: ReactNode }) {
     portal.data.access.nutrition;
   const allowed =
     (!module || portal.data.access[module]) &&
-    (!(pathname.startsWith('/posts') || pathname.startsWith('/wall')) ||
+    (!(
+      pathname.startsWith('/posts') ||
+      pathname.startsWith('/wall') ||
+      pathname === '/new'
+    ) ||
       canPost);
-  // A conversation owns the whole screen: no tabs, and no pull-to-refresh fighting its scroll.
-  const inChat = /^\/messages\/[^/]+/.test(pathname);
+  // A conversation and the new post page own the whole screen: no header, no tabs, and no
+  // pull-to-refresh fighting their own gestures.
+  const inChat = /^\/messages\/[^/]+/.test(pathname) || pathname === '/new';
   const inMenu =
     pathname === '/menu' ||
     pathname.startsWith('/settings') ||
     pathname === '/setup' ||
-    pathname === '/profile';
+    pathname === '/profile' ||
+    pathname === '/friends' ||
+    pathname.startsWith('/people/');
   const tabs = tabsFor(portal.data.access, pathname, inMenu);
   const current = tabs.findIndex((tab) => tab.href === pathname);
   return (
@@ -108,21 +111,9 @@ function Portal({ children }: { children: ReactNode }) {
       {/* A conversation has its own header (back, the person, mute), and only that. */}
       {!inChat && (
         <ScrollHeader hidden={chromeHidden} onReveal={revealChrome}>
-          {/* New post · name · Activity. Your account lives in the Menu tab. */}
+          {/* Name in the middle, Activity on the right. New posts start from the tab bar. */}
           <div className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-2 py-2">
-            <div className="flex">
-              {canPost && (
-                <button
-                  type="button"
-                  aria-label="New post"
-                  title="New post"
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-ink hover:bg-ink/5"
-                  onClick={() => setComposing(true)}
-                >
-                  <Plus size={24} />
-                </button>
-              )}
-            </div>
+            <span className="h-10" />
             <Link href="/" className="font-semibold tracking-tight">
               Life<span className="text-accent">Portal</span>
             </Link>
@@ -132,7 +123,6 @@ function Portal({ children }: { children: ReactNode }) {
           </div>
         </ScrollHeader>
       )}
-      {composing && <PostComposer onClose={() => setComposing(false)} />}
       <HealthSyncBridge key={user.id} enabled={portal.data.access.nutrition} />
       <NotificationsBridge
         key={`push-${user.id}`}
@@ -179,26 +169,22 @@ function Portal({ children }: { children: ReactNode }) {
         )}
       >
         <div className="mx-auto flex max-w-xl">
-          {tabs.map(({ href, label, icon: Icon, active }) => (
-            <Link
-              key={href}
-              href={href}
-              // Each tab keeps its own scroll position; tapping the open tab goes to its top.
-              scroll={false}
-              onClick={() => {
-                if (href === pathname)
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              aria-current={active ? 'page' : undefined}
-              className={clsx(
-                'flex min-h-16 flex-1 flex-col items-center justify-center gap-1 text-xs',
-                active ? 'text-accent' : 'text-ink-muted',
-              )}
-            >
-              <Icon size={21} aria-hidden />
-              <span>
-                {label}
-                {label === 'Messages' && unreadMessages > 0 && (
+          {withNewPost(tabs, canPost).map((tab) =>
+            tab === NEW_POST ? (
+              <Link
+                key="new"
+                href="/new"
+                scroll={false}
+                aria-label="New post"
+                className="flex min-h-16 flex-1 items-center justify-center"
+              >
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-ink text-surface shadow-sm active:scale-95">
+                  <Plus size={24} strokeWidth={2.5} aria-hidden />
+                </span>
+              </Link>
+            ) : (
+            <TabLink key={tab.href} tab={tab} pathname={pathname}>
+                {tab.label === 'Messages' && unreadMessages > 0 && (
                   <span
                     className="ml-1 rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] text-white"
                     aria-label={`${unreadMessages} unread conversations`}
@@ -206,7 +192,7 @@ function Portal({ children }: { children: ReactNode }) {
                     {unreadMessages > 99 ? '99+' : unreadMessages}
                   </span>
                 )}
-                {label === 'Friends' && !!requests.data?.count && (
+                {tab.label === 'Menu' && !!requests.data?.count && (
                   <span
                     className="ml-1 rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] text-white"
                     aria-label={`${requests.data.count} pending friend requests`}
@@ -215,9 +201,9 @@ function Portal({ children }: { children: ReactNode }) {
                     {requests.data.more ? '+' : ''}
                   </span>
                 )}
-              </span>
-            </Link>
-          ))}
+              </TabLink>
+            ),
+          )}
         </div>
       </nav>
     </div>
@@ -292,11 +278,52 @@ const NO_ACCESS = {} as PortalState['access'];
 
 /** The page padding for a route. The tab pager's previews use it too, so they line up exactly. */
 function mainClassFor(pathname: string): string {
-  const chat = /^\/messages\/[^/]+/.test(pathname);
+  const chat = /^\/messages\/[^/]+/.test(pathname) || pathname === '/new';
   return clsx(
     'mx-auto max-w-7xl px-4',
     chat ? 'pb-0' : 'pb-[calc(6rem+env(safe-area-inset-bottom))]',
     pathname === '/' ? 'pt-2' : chat ? 'pt-0' : 'pt-6',
+  );
+}
+
+const NEW_POST = 'new-post' as const;
+
+/** The tabs with the New post button in the middle. It is a link, not a tab: swiping skips it. */
+function withNewPost(tabs: Tab[], canPost: boolean): (Tab | typeof NEW_POST)[] {
+  if (!canPost) return tabs;
+  const middle = Math.ceil(tabs.length / 2);
+  return [...tabs.slice(0, middle), NEW_POST, ...tabs.slice(middle)];
+}
+
+function TabLink({
+  tab: { href, label, icon: Icon, active },
+  pathname,
+  children,
+}: {
+  tab: Tab;
+  pathname: string;
+  children?: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      // Each tab keeps its own scroll position; tapping the open tab goes to its top.
+      scroll={false}
+      onClick={() => {
+        if (href === pathname) window.scrollTo({ top: 0, behavior: 'smooth' });
+      }}
+      aria-current={active ? 'page' : undefined}
+      className={clsx(
+        'flex min-h-16 flex-1 flex-col items-center justify-center gap-1 text-xs',
+        active ? 'text-accent' : 'text-ink-muted',
+      )}
+    >
+      <Icon size={21} aria-hidden />
+      <span>
+        {label}
+        {children}
+      </span>
+    </Link>
   );
 }
 
@@ -330,6 +357,7 @@ function tabsFor(
     '/search',
     '/friends',
     '/people',
+    '/new',
     '/wall',
     '/posts',
     '/messages',
@@ -361,13 +389,6 @@ function tabsFor(
             Search,
             PeopleSearch,
             pathname === '/search',
-          ),
-          tab(
-            '/friends',
-            'Friends',
-            Users,
-            Friends,
-            pathname === '/friends' || pathname.startsWith('/people/'),
           ),
         ]
       : []),

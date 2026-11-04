@@ -32,7 +32,7 @@ for oil and +40% for syrup. A food is measured in one unit and stays in it.
 
 | Collection | Purpose |
 | --- | --- |
-| `foods` | The catalogue. Facts per 100 base units, plus `servingSize`, `entryMode`, `favourite`, `archived`. |
+| `foods` | The catalogue. Facts per 100 base units, plus `servingSize`, `entryMode`, `favourite`, `archived`, and optional `image: {key, width, height}` (015). |
 | `meal_entries` | **The event row.** One food, one day, one slot, an amount, and a frozen `facts` snapshot. Everything the widget shows derives from these. |
 | `saved_meals` | Named groups of foods and amounts ("my oatmeal bowl"), logged in one action. Components *reference* foods. |
 | `nutrition_profiles` | Intent: sex, height, birth date, activity, goal, cheat days, day-start hour, optional measured basal rate, optional manual target overrides. One row per user, upserted on first read. |
@@ -69,8 +69,8 @@ All under `/api/nutrition`, all JWT-guarded and user-scoped.
 | --- | --- | --- |
 | `GET` | `/` | Everything the page renders, `suggestions` included. `?today=` from the browser's clock; `?day=` the day being viewed. |
 | `GET` | `/summary` | The dashboard card's figures. Consumed by `DashboardService`. |
-| `GET`/`POST` | `/foods` | List (picker order) / create. |
-| `PATCH`/`DELETE` | `/foods/:id` | Update / delete-or-archive. |
+| `GET`/`POST` | `/foods` | List (picker order) / create. Create accepts `imageMediaId`: a finished upload of the caller's from `POST /api/media`. |
+| `PATCH`/`DELETE` | `/foods/:id` | Update / delete-or-archive. Update accepts `imageMediaId` (replace) or `removeImage: true`. |
 | `GET` | `/foods/lookup?q=` | Open Food Facts search. Declared before `/foods/:id` so the literal path wins. |
 | `GET` | `/foods/lookup/barcode/:code` | Barcode lookup. |
 | `POST` | `/foods/import` | `{ code }` → an owned food row. |
@@ -317,3 +317,21 @@ unimported periods stay missing rather than becoming measured zero.
 The configured developer alone can GET/PUT `/settings/health-shortcut`. Its validated
 iCloud URL lives in the singleton `health_shortcut_settings` document; the old environment
 variable is ignored. Publishing a different URL triggers existing per-device update prompts.
+
+## Food photos (015)
+
+A food may have one photo. It is a **copy** of an upload: `MediaService.copyForFood()` copies the
+upload's JPEG (a video's still, for a video) inside the bucket to `foods/{userId}/{foodId}-{oid}.jpg`
+and the food stores `image: {key, width, height}`. Copying, not referencing, keeps the upload free
+for a post and lets either be deleted without the other. The upload stays in the ledger and is
+cleaned up after a day if no post claims it.
+
+Responses never carry `key`: `image` is returned as `{url, width, height}` with a signed read link
+(same hour-aligned signing as posts). A replaced or removed photo's file is deleted after the
+update; a hard delete of the food deletes it too. If copying fails while creating, the food is
+deleted and the error returned, so a food never half-exists. Publications and imports do not copy
+food photos yet.
+
+`NutritionPublicationService` publishes a single food (`kind: 'food'`) even when it is archived,
+because the new post page creates an archived food for a post that is not saved to the list. The
+database kind still publishes only live foods.

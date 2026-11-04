@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   HttpException,
   HttpStatus,
   Inject,
@@ -23,8 +22,9 @@ import { mediaLimitError, mediaListError } from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
 import { CONFIG, type AppConfig } from '../config/configuration';
 import { StorageService } from '../storage/storage.module';
-import type { MediaUploadDto } from './posts.dto';
-import { PostMediaRecord, type AttachedMedia } from './posts.schemas';
+import type { AttachedMedia } from '../posts/posts.schemas';
+import type { MediaUploadDto } from './media.dto';
+import { MediaUploadRecord } from './media.schemas';
 
 /** Upload links per person per hour. Ten full posts' worth, with room for retries. */
 const UPLOADS_PER_HOUR = 60;
@@ -39,17 +39,17 @@ const EXTENSIONS: Record<string, string> = {
 };
 
 /**
- * Photos and videos on posts. The browser uploads straight to storage with a signed link; this
- * service decides who may upload what, checks the file really arrived before a post can use
- * it, signs short-lived read links after the post's own audience check, and deletes files with
- * their post.
+ * Photos and videos, for posts and for foods' pictures. The browser uploads straight to storage
+ * with a signed link; this service decides who may upload what, checks the file really arrived
+ * before a post or food can use it, signs short-lived read links (only after the caller's own
+ * authorization) and deletes files with whatever owned them.
  */
 @Injectable()
-export class PostMediaService {
-  private readonly log = new Logger(PostMediaService.name);
+export class MediaService {
+  private readonly log = new Logger(MediaService.name);
   constructor(
-    @InjectModel(PostMediaRecord.name)
-    private readonly media: Model<PostMediaRecord>,
+    @InjectModel(MediaUploadRecord.name)
+    private readonly media: Model<MediaUploadRecord>,
     private readonly access: AccessService,
     private readonly storage: StorageService,
     @Inject(CONFIG) private readonly config: AppConfig,
@@ -194,7 +194,7 @@ export class PostMediaService {
     }
   }
 
-  private async purge(rows: PostMediaRecord[]) {
+  private async purge(rows: MediaUploadRecord[]) {
     if (!this.storage.configured) return;
     for (const row of rows) {
       const removed = await Promise.all([
@@ -203,8 +203,46 @@ export class PostMediaService {
       ]);
       // A row is only dropped once its files are gone, so a failed delete is retried next hour.
       if (removed.every(Boolean))
-        await this.media.deleteOne({ _id: (row as PostMediaRecord & { _id: unknown })._id });
+        await this.media.deleteOne({ _id: (row as MediaUploadRecord & { _id: unknown })._id });
     }
+  }
+
+  /**
+   * A food's picture: a copy of an upload (a video's still, for a video), so the food and any post
+   * using the same capture never share a file. The upload itself stays pending, free for a post.
+   */
+  async copyForFood(
+    userId: string,
+    mediaId: string,
+    foodId: string,
+  ): Promise<{ key: string; width: number; height: number }> {
+    await this.requireAvailable(userId);
+    if (!Types.ObjectId.isValid(mediaId)) throw new BadRequestException('That photo can no longer be used.');
+    const row = await this.media.findOne({ _id: mediaId, userId }).lean();
+    if (!row) throw new BadRequestException('That photo can no longer be used.');
+    const source = row.kind === 'video' ? row.posterKey : row.key;
+    const object = source ? await this.storage.head(source) : null;
+    if (!source || !object || object.contentType !== 'image/jpeg')
+      throw new BadRequestException('Upload not finished. Wait for it, then save again.');
+    const key = `foods/${userId}/${foodId}-${String(new Types.ObjectId())}.jpg`;
+    await this.storage.copy(source, key);
+    const scale =
+      row.kind === 'video' ? 1080 / Math.max(row.width, row.height, 1080) : 1;
+    return {
+      key,
+      width: Math.max(1, Math.round(row.width * scale)),
+      height: Math.max(1, Math.round(row.height * scale)),
+    };
+  }
+
+  /** Signs one stored image the caller is already allowed to see. */
+  async signKey(key: string): Promise<string | undefined> {
+    return this.storage.configured ? this.storage.presignGet(key) : undefined;
+  }
+
+  /** Deletes a file that belonged to something removed. Never throws. */
+  async deleteKey(key: string | undefined) {
+    if (key && this.storage.configured) await this.storage.delete(key);
   }
 
   /** Uploads no post claimed within a day: abandoned drafts. */

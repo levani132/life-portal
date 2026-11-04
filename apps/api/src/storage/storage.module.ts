@@ -88,6 +88,17 @@ export class StorageService {
       contentType: response.headers.get('content-type') ?? '',
     };
   }
+  /** Copies an object inside the bucket (S3 CopyObject); nothing passes through the API. */
+  async copy(from: string, to: string): Promise<void> {
+    const { bucket } = this.config.storage!;
+    const response = await this.require().fetch(this.url(to), {
+      method: 'PUT',
+      headers: {
+        'x-amz-copy-source': `/${bucket}/${from.split('/').map(encodeURIComponent).join('/')}`,
+      },
+    });
+    if (!response.ok) throw new Error(`Storage copy failed with ${response.status}.`);
+  }
   /** Deletes an object. A missing one counts as deleted. Never throws. */
   async delete(key: string): Promise<boolean> {
     try {

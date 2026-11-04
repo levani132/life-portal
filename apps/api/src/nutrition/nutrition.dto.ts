@@ -54,10 +54,14 @@ export class CreateFoodDto {
   @IsOptional() @IsBoolean() archived?: boolean;
   @IsOptional() @IsString() @MaxLength(500) notes?: string;
   @IsOptional() @IsIn(FOOD_VISIBILITY) visibility?: string;
+  /** An upload (from `POST /media`) to copy in as the food's picture. */
+  @IsOptional() @IsMongoId() imageMediaId?: string;
 }
 
 /** PATCH variant: every field optional. */
 export class UpdateFoodDto extends CreateFoodDto {
+  /** Removes the food's picture. */
+  @IsOptional() @IsBoolean() removeImage?: boolean;
   @IsOptional() @IsString() @MaxLength(160) override name!: string;
   @IsOptional() @IsInt() @Min(1) @Max(5000) override servingSize!: number;
   @IsOptional() @IsInt() @Min(0) @Max(9000) override energyKcal!: number;

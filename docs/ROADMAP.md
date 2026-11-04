@@ -15,7 +15,7 @@ the same day. The core stays free; AI is the paid part.
 | **Money** | Loans with payoff scenarios, free-money cash flow, items to sell, shares and the ESPP plan, spending from bank messages (Shortcut ingest), multi-currency with daily FX history | 002 |
 | **Work and life** | EPAM boards, side projects, personal plans | — |
 | **Food** | Nutrition tracking, food profile and activity targets, Apple Health sync with resumable batches, AI assistant connectors (MCP with OAuth: ChatGPT, Claude) | 001, 004, 010, 011 |
-| **Social** | Friends, shared widgets, shared daily diary, posts (text, photos, 30 s camera video, food) with likes, comments and Share, Home feed | 006–009, 014 |
+| **Social** | Friends, shared widgets, shared daily diary, posts (text, photos, 30 s camera video, food) with likes, comments and Share, a camera-first new post page that can create and log a food, Home feed | 006–009, 014, 015 |
 | **Platform** | Onboarding and setup, feature flags per cohort and user, installable PWA, push notifications with Activity and icon badge, direct messages, tabs that stay alive with swipe navigation | 003, 005, 012, 013 |
 
 **Infrastructure is Tier 0** (about $0/month): Vercel Hobby, Render free (kept awake by a cron
@@ -34,7 +34,7 @@ job), MongoDB Atlas M0.
 
 1. ~~**Photos in posts.**~~ Done in 014: R2 with signed links, EXIF stripped on the phone,
    plus 30-second camera video and text-only posts.
-2. **AI meal guess from a photo**, behind a feature flag that stays off until there are API
+2. **AI meal guess from a photo** (next: a button on the new post page's New food card), behind a feature flag that stays off until there are API
    keys. One provider interface, so adding the key is the only step left. Every guess is stored
    as a labelled estimate with its basis until the person confirms it (principle 6). Paid
    feature; the MCP connectors remain the free alternative.

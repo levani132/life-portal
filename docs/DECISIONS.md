@@ -1110,3 +1110,23 @@ Spec 014 adds photos and video to posts on the free tier. The choices, and why:
   The duration comes from the recorder's clock because a MediaRecorder WebM reports `Infinity`.
 - **Moderation relies on reports for now.** Public images need automated scanning before a
   public launch; it is listed as a gap in the roadmap.
+
+## 2026-11-04: the new post page (015)
+
+- **`/new` is a route, outside the tabs.** The tab bar's middle **+** navigates there; it is not
+  one of the four tab roots, so it does not take part in swiping and never stays mounted. The
+  shell hides its header and nav there, the way it does in a chat.
+- **The camera is half the page and lazy.** Its stream runs only while it is visible, and the
+  microphone is asked for on the first video, not when the page opens, so photo-only use never
+  sees a microphone prompt. Typing puts the camera away, because the keyboard and a half-screen
+  camera do not fit on a phone together. iOS may ask for camera permission again on a later visit;
+  that is the browser's choice.
+- **An unsaved new food is an archived food.** A post must snapshot server-side facts, and the
+  publication service only builds from owned records. Creating the food archived keeps it out of
+  the list and the picker without a second publication path. The single-food publication now
+  accepts archived foods; the database kind does not.
+- **Food photos are copies of uploads.** See [nutrition](modules/nutrition.md#food-photos-015).
+- **Macro rings show shares of calories, not targets.** A post's viewers have different targets;
+  shares mean the same to everyone and need no private data.
+- **The media ledger moved to its own global `MediaModule`.** Foods and posts both use uploads;
+  the collection name `post_media` is unchanged, so no migration.

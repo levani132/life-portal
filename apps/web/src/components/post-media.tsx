@@ -9,7 +9,14 @@ import { clampAspect } from '@life-portal/shared-domain';
  * 1.91:1, like Instagram) and the rest fit inside it. Videos play muted while on screen; a tap
  * turns the sound on. The carousel owns horizontal swipes, so it never changes tabs.
  */
-export function PostMediaCarousel({ media }: { media: PostMedia[] }) {
+export function PostMediaCarousel({
+  media,
+  className = 'sm:rounded-xl',
+}: {
+  media: PostMedia[];
+  /** Rounding: none when the carousel is the top of a merged food card. */
+  className?: string;
+}) {
   const track = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   const [muted, setMuted] = useState(true);
@@ -32,7 +39,7 @@ export function PostMediaCarousel({ media }: { media: PostMedia[] }) {
     };
   }, []);
   return (
-    <div className="relative overflow-hidden bg-black sm:rounded-xl" data-no-tab-swipe>
+    <div className={`relative overflow-hidden bg-black ${className}`} data-no-tab-swipe>
       <div
         ref={track}
         className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain"
