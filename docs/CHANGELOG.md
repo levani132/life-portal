@@ -2,6 +2,11 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-05: The camera stops asking every time
+
+The camera on the new post page asks for permission once per session instead of every time it
+opens, and the **+** in the tab bar is wider.
+
 ## 2026-11-04 — New post page with the camera, and new foods from a photo
 
 The tab bar is now Home, Messages, **+**, Search and Menu; Friends is in the Menu. The **+** opens

@@ -9,6 +9,12 @@ import {
   recorderType,
   type PreparedMedia,
 } from '../lib/media';
+import {
+  acquireCamera,
+  acquireMicrophone,
+  muteMicrophone,
+  releaseCamera,
+} from '../lib/camera-stream';
 
 /** Holding the shutter this long starts a video instead of taking a photo. */
 const HOLD_MS = 300;
@@ -17,7 +23,7 @@ const RING = 2 * Math.PI * 38;
 /**
  * The live camera, sized by its parent (the bottom of the new post page). Tap the shutter for a
  * photo, hold it to record (up to 30 seconds, with a ring filling around the button), release
- * to stop. The camera runs only while `active`, and the microphone is asked for only when a
+ * to stop. The camera runs only while `active` (one stream per session, see `camera-stream.ts`), and the microphone is asked for only when a
  * recording starts, so taking photos never prompts for it.
  */
 export function CameraView({
@@ -57,16 +63,9 @@ export function CameraView({
       setFailed('This browser cannot open the camera here.');
       return;
     }
-    void navigator.mediaDevices
-      .getUserMedia({
-        video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: false,
-      })
+    void acquireCamera(facing)
       .then(async (media) => {
-        if (cancelled) {
-          media.getTracks().forEach((track) => track.stop());
-          return;
-        }
+        if (cancelled) return;
         stream.current = media;
         if (video.current) {
           video.current.srcObject = media;
@@ -80,10 +79,9 @@ export function CameraView({
     return () => {
       cancelled = true;
       recorder.current?.stop();
-      stream.current?.getTracks().forEach((track) => track.stop());
       stream.current = null;
-      microphone.current?.stop();
-      microphone.current = null;
+      // Paused, not stopped: a fresh request would make iOS ask for permission again.
+      releaseCamera();
     };
   }, [active, facing]);
 
@@ -114,13 +112,8 @@ export function CameraView({
   async function startRecording() {
     const type = recorderType();
     if (!stream.current || !type) return;
-    if (!microphone.current) {
-      // Asked for once, on the first recording. A clip without sound beats no clip.
-      microphone.current = await navigator.mediaDevices
-        .getUserMedia({ audio: true })
-        .then((media) => media.getAudioTracks()[0] ?? null)
-        .catch(() => null);
-    }
+    // Asked for once per session, on the first recording. A clip without sound beats no clip.
+    microphone.current = await acquireMicrophone();
     // The finger may have lifted while the microphone prompt was up.
     if (!holding.current || !stream.current) return;
     const tracks = [
@@ -142,6 +135,7 @@ export function CameraView({
       );
       setRecording(false);
       recorder.current = null;
+      muteMicrophone();
       if (duration < 500 || !chunks.length) return;
       setBusy(true);
       void prepareVideo(new Blob(chunks, { type: next.mimeType || type }), duration)

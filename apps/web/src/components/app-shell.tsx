@@ -178,7 +178,7 @@ function Portal({ children }: { children: ReactNode }) {
                 aria-label="New post"
                 className="flex min-h-16 flex-1 items-center justify-center"
               >
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-ink text-surface shadow-sm active:scale-95">
+                <span className="flex h-11 w-16 items-center justify-center rounded-2xl bg-ink text-surface shadow-sm active:scale-95">
                   <Plus size={24} strokeWidth={2.5} aria-hidden />
                 </span>
               </Link>

@@ -1130,3 +1130,12 @@ Spec 014 adds photos and video to posts on the free tier. The choices, and why:
   shares mean the same to everyone and need no private data.
 - **The media ledger moved to its own global `MediaModule`.** Foods and posts both use uploads;
   the collection name `post_media` is unchanged, so no migration.
+
+## 2026-11-05: one camera stream per session
+
+The installed iOS app asked for camera permission every time the new post page opened, the
+camera panel came back or the camera flipped, because each did a fresh `getUserMedia` after the
+previous tracks were stopped. `lib/camera-stream.ts` now keeps one stream: putting the camera away
+*disables* its tracks (iOS turns the camera and its indicator off) and only ten idle minutes stop
+it. Flipping asks for the new camera before stopping the old one. The microphone works the same
+way between recordings. Don't go back to stopping tracks on unmount; that brings the prompts back.
