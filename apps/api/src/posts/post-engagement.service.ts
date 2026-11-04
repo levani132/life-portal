@@ -72,11 +72,12 @@ export class PostEngagementService implements OnModuleInit {
       windowMs: COMMENT_WINDOW_MS,
       ...common,
     });
+    this.notifications.register({ type: 'postRepost', windowMs: LIKE_WINDOW_MS, ...common });
     this.notifications.registerActivitySource({
       rows: (userId, since, before, limit) => this.activity(userId, since, before, limit),
     });
   }
-  /** Likes and live comments by others on the owner's posts. Blocks are filtered by the caller. */
+  /** Likes, live comments and reposts by others on the owner's posts. Blocks are filtered by the caller. */
   async activity(
     userId: string,
     since: Date,
@@ -90,20 +91,22 @@ export class PostEngagementService implements OnModuleInit {
       userId: { $ne: userId },
       createdAt: { $gte: since, ...(before ? { $lt: before } : {}) },
     };
-    const [likes, comments] = await Promise.all([
+    const [likes, comments, reposts] = await Promise.all([
       this.likes.find(filter).sort({ createdAt: -1 }).limit(limit).lean(),
       this.comments
         .find({ ...filter, deleted: false })
         .sort({ createdAt: -1 })
         .limit(limit)
         .lean(),
+      this.posts.repostRows([...titles.keys()], userId, since, before, limit),
     ]);
     const names = await this.social.displayNames([
       ...likes.map((row) => row.userId),
       ...comments.map((row) => row.userId),
+      ...reposts.map((row) => row.userId),
     ]);
     const row = (
-      type: 'postLike' | 'postComment',
+      type: 'postLike' | 'postComment' | 'postRepost',
       r: { postId: string; userId: string; createdAt: Date },
     ): ActivityRow => ({
       type,
@@ -117,6 +120,9 @@ export class PostEngagementService implements OnModuleInit {
     return [
       ...likes.map((r) => row('postLike', r)),
       ...comments.map((r) => row('postComment', r)),
+      ...reposts.map((r) =>
+        row('postRepost', { postId: r.repostOf!, userId: r.userId, createdAt: r.createdAt }),
+      ),
     ];
   }
   /** Tells the post's owner. Not awaited by callers, and never throws. */
@@ -124,7 +130,10 @@ export class PostEngagementService implements OnModuleInit {
     post: FoodPost,
     userId: string,
     actorName: string,
-    extra: { type: 'postLike' } | { type: 'postComment'; commentText: string },
+    extra:
+      | { type: 'postLike' }
+      | { type: 'postRepost' }
+      | { type: 'postComment'; commentText: string },
   ) {
     void this.notifications.notify({
       ...extra,
@@ -139,12 +148,13 @@ export class PostEngagementService implements OnModuleInit {
     userId: string,
     postId: string,
   ): Promise<PostEngagement> {
-    const [likeCount, commentCount, liked] = await Promise.all([
+    const [likeCount, commentCount, liked, reposts] = await Promise.all([
       this.likes.countDocuments({ postId }),
       this.comments.countDocuments({ postId, deleted: false }),
       this.likes.exists({ postId, userId }),
+      this.posts.repostState(userId, postId),
     ]);
-    return { likeCount, commentCount, liked: !!liked };
+    return { likeCount, commentCount, liked: !!liked, ...reposts };
   }
   async stats(userId: string, postId: string) {
     await this.posts.detail(userId, postId);
@@ -168,6 +178,18 @@ export class PostEngagementService implements OnModuleInit {
         if ((error as { code?: number }).code !== 11000) throw error;
       }
     } else await this.likes.deleteOne({ postId, userId });
+    return this.counts(userId, postId);
+  }
+  async setRepost(userId: string, postId: string, reposted: boolean) {
+    if (reposted) {
+      const { post, created } = await this.posts.repost(userId, postId);
+      if (created) {
+        const actor = await this.social.postAuthor(userId);
+        if (actor) this.notifyOwner(post, userId, actor.displayName, { type: 'postRepost' });
+      }
+    } else {
+      await this.posts.unrepost(userId, postId);
+    }
     return this.counts(userId, postId);
   }
   private async commentDto(

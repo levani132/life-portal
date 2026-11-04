@@ -269,6 +269,7 @@ describe('NotificationsService preferences and activity', () => {
       friendAccepted: true,
       postComment: true,
       postLike: false,
+      postRepost: true,
       message: true,
     });
     expect(prefs.showCommentPreviews).toBe(false);

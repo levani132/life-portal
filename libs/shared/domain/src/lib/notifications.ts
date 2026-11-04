@@ -113,6 +113,8 @@ export function notificationText(
           : '';
       return { title, body: preview || base };
     }
+    case 'postRepost':
+      return { title, body: `reposted ${postName(event.postTitle)}` };
     case 'postLike':
       return {
         title,

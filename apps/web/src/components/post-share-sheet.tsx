@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { Check, Link2, Loader2, Share, X } from 'lucide-react';
+import { Check, Link2, Loader2, Repeat2, Share, X } from 'lucide-react';
 import type { InboxEntry, SocialPerson } from '@life-portal/shared-types';
 import { api } from '../lib/api';
 import { useApi } from '../lib/hooks';
@@ -40,11 +40,14 @@ export function PostShareSheet({
   postId,
   title,
   canMessage,
+  repost,
   onClose,
 }: {
   postId: string;
   title: string;
   canMessage: boolean;
+  /** Absent when this post cannot be reposted (your own, or private). */
+  repost?: { reposted: boolean; count: number; disabled: boolean; onToggle: () => void };
   onClose: () => void;
 }) {
   const inbox = useApi<InboxEntry[]>(canMessage ? '/messages/conversations' : null);
@@ -175,6 +178,16 @@ export function PostShareSheet({
         )}
 
         <div className="flex gap-6 px-4 pt-3">
+          {repost && (
+            <SheetAction
+              label={repost.reposted ? 'Reposted' : 'Repost'}
+              pressed={repost.reposted}
+              disabled={repost.disabled}
+              onClick={repost.onToggle}
+            >
+              <Repeat2 size={21} />
+            </SheetAction>
+          )}
           <SheetAction label="Copy link" onClick={() => void copyLink()}>
             <Link2 size={21} />
           </SheetAction>
@@ -202,6 +215,12 @@ export function PostShareSheet({
               {notice}
             </p>
           )}
+          {repost?.reposted && (
+            <p role="status" className="text-xs text-ink-muted">
+              On your wall
+              {repost.count > 1 ? ` · reposted by ${repost.count.toLocaleString()} people` : ''}.
+            </p>
+          )}
           {sentTo.length === 1 && (
             <Link href={`/messages/${sentTo[0][1]}`} className="block text-xs text-accent hover:underline">
               Open the conversation
@@ -219,15 +238,27 @@ export function PostShareSheet({
 function SheetAction({
   label,
   onClick,
+  pressed,
+  disabled,
   children,
 }: {
   label: string;
   onClick: () => void;
+  pressed?: boolean;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <button type="button" onClick={onClick} className="flex w-16 flex-col items-center gap-1.5">
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-ink/5 text-ink">
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={pressed}
+      className="flex w-16 flex-col items-center gap-1.5 disabled:opacity-50"
+    >
+      <span
+        className={`flex h-14 w-14 items-center justify-center rounded-full ${pressed ? 'bg-emerald-500/15 text-emerald-400' : 'bg-ink/5 text-ink'}`}
+      >
         {children}
       </span>
       <span className="text-[11px]">{label}</span>

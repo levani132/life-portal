@@ -82,6 +82,19 @@ export interface FoodPost {
   /** Photos and videos, in order. Links are signed per read and expire within 2 hours. */
   media: PostMedia[];
   isOwner: boolean;
+  /**
+   * Set when this card is someone's repost: the post itself is always the original (its id,
+   * author and content), so likes, comments and shares go to the original.
+   */
+  repost?: PostRepost;
+}
+export interface PostRepost {
+  /** The repost row's id. Unique per card in a feed; never addressable as a post. */
+  id: string;
+  by: PostAuthor;
+  /** The viewer is the one who reposted. */
+  isMine: boolean;
+  createdAt: string;
 }
 export interface PostPage {
   posts: FoodPost[];
@@ -122,6 +135,9 @@ export interface PostEngagement {
   liked: boolean;
   likeCount: number;
   commentCount: number;
+  /** Whether the viewer has reposted this post, and how many members have. */
+  reposted: boolean;
+  repostCount: number;
 }
 export interface PostComment {
   id: string;

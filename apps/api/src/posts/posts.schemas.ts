@@ -33,12 +33,18 @@ export class FoodPostRecord {
   audience!: Audience;
   @Prop({ default: 1 }) version!: number;
   @Prop({ default: false, index: true }) deleted!: boolean;
+  /**
+   * Set on a repost: the original post's id, and nothing else of its own (no title, caption,
+   * food or media). Its `requestId` is `repost:<original id>`, so one member reposts a post once.
+   */
+  @Prop() repostOf?: string;
   createdAt!: Date;
   updatedAt!: Date;
 }
 export const FoodPostSchema = SchemaFactory.createForClass(FoodPostRecord);
 FoodPostSchema.index({ userId: 1, requestId: 1 }, { unique: true });
 FoodPostSchema.index({ userId: 1, createdAt: -1, _id: -1 });
+FoodPostSchema.index({ repostOf: 1, createdAt: -1 }, { sparse: true });
 @Schema({ ...baseSchemaOptions, collection: 'post_reports' })
 export class PostReportRecord {
   @Prop({ required: true, index: true }) userId!: string;

@@ -9,8 +9,9 @@ import type {
   PostCommentsPage,
   PostEngagement as Engagement,
 } from '@life-portal/shared-types';
+import { canRepost } from '@life-portal/shared-domain';
 import { api } from '../lib/api';
-import { useApi } from '../lib/hooks';
+import { revalidate, useApi } from '../lib/hooks';
 import { PostRelativeTime } from './post-header-controls';
 import { ErrorNote } from './ui';
 import { requestNotificationOffer } from './notifications';
@@ -28,6 +29,7 @@ export function PostEngagement({ post }: { post: FoodPost }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [error, setError] = useState('');
   const [shareOpen, setShareOpen] = useState(false);
+  const feedStale = useRef(false);
   const portal = useApi<PortalState>('/portal');
   const canSend = messagingAvailable(portal.data?.access);
   const value = optimistic ?? stats.data;
@@ -53,6 +55,31 @@ export function PostEngagement({ post }: { post: FoodPost }) {
       setOptimistic(null);
       locked.current = false;
       setBusy(false);
+    }
+  }
+  async function toggleRepost() {
+    if (!value || locked.current) return;
+    locked.current = true;
+    setError('');
+    const reposted = !value.reposted;
+    setOptimistic({
+      ...value,
+      reposted,
+      repostCount: Math.max(0, value.repostCount + (reposted ? 1 : -1)),
+    });
+    try {
+      const result = reposted
+        ? await api.put<Engagement>(`/posts/${post.id}/repost`, {})
+        : await api.delete<Engagement>(`/posts/${post.id}/repost`);
+      await stats.mutate(result, false);
+      // The feed is refreshed when the sheet closes: a repost card replaces this one (it is keyed
+      // by the repost), which would unmount the open sheet under the finger.
+      feedStale.current = true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not update your repost.');
+    } finally {
+      setOptimistic(null);
+      locked.current = false;
     }
   }
   return (
@@ -130,7 +157,23 @@ export function PostEngagement({ post }: { post: FoodPost }) {
           postId={post.id}
           title={post.title || post.contentLabel || 'Life Portal post'}
           canMessage={canSend}
-          onClose={() => setShareOpen(false)}
+          repost={
+            canRepost({ own: post.isOwner, audience: post.audience })
+              ? {
+                  reposted: value?.reposted ?? false,
+                  count: value?.repostCount ?? 0,
+                  disabled: !value,
+                  onToggle: () => void toggleRepost(),
+                }
+              : undefined
+          }
+          onClose={() => {
+            setShareOpen(false);
+            if (feedStale.current) {
+              feedStale.current = false;
+              void revalidate('/posts?');
+            }
+          }}
         />
       )}
     </div>

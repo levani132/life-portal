@@ -1152,3 +1152,14 @@ then Copy link and More… (the system share sheet, shown only where `navigator.
 sheet is the place to grow: reposting to your own wall and app-specific targets (Instagram,
 TikTok, Messenger) belong in its second row. Every route still carries only a reference or a
 `/posts/:id` link, so the post's audience applies wherever it lands.
+
+## 2026-11-05: a repost is a reference row, and the original's audience always wins (016)
+
+A repost is a `food_posts` row holding only `repostOf`, never a copy of the post: copying would
+let content outlive its author's deletion or audience change. Every feed read checks the
+repost's own audience (so a friends-only repost reaches the reposter's friends) and then the
+original's, loaded fresh (so it reaches only those who could read the original anyway). For a
+friends-only post that means friends of both. One-tap reposts copy the original's audience
+rather than asking; a private post cannot be reposted at all. The `requestId` `repost:<id>`
+reuses the existing unique index for idempotency, and a repost id is never addressable, so likes,
+comments, reports and imports can only ever reach the original.

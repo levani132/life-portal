@@ -114,6 +114,7 @@ Current types:
 | `friendAccepted` | SocialService | none | actor | `/people/:actor` |
 | `postComment` | PostEngagementService | 2 min | post | `/posts/:id` |
 | `postLike` | PostEngagementService | 15 min | post | `/posts/:id` |
+| `postRepost` | PostEngagementService | 15 min | post | `/posts/:id` |
 | `message` | MessagesService | none (replaces per conversation) | conversation | `/messages/:id` |
 
 ## Web

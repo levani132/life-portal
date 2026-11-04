@@ -1,6 +1,6 @@
 # Roadmap
 
-Where Life Portal is, where it is going, and in what order. Updated 2026-11-04. Product
+Where Life Portal is, where it is going, and in what order. Updated 2026-11-05. Product
 direction comes from the owner; the order and the architecture tiers are recommendations agreed
 in conversation, not commitments. Costs are rough late-2026 list prices, order of magnitude only.
 
@@ -15,7 +15,7 @@ the same day. The core stays free; AI is the paid part.
 | **Money** | Loans with payoff scenarios, free-money cash flow, items to sell, shares and the ESPP plan, spending from bank messages (Shortcut ingest), multi-currency with daily FX history | 002 |
 | **Work and life** | EPAM boards, side projects, personal plans | — |
 | **Food** | Nutrition tracking, food profile and activity targets, Apple Health sync with resumable batches, AI assistant connectors (MCP with OAuth: ChatGPT, Claude) | 001, 004, 010, 011 |
-| **Social** | Friends, shared widgets, shared daily diary, posts (text, photos, 30 s camera video, food) with likes, comments and Share, a camera-first new post page that can create and log a food, Home feed | 006–009, 014, 015 |
+| **Social** | Friends, shared widgets, shared daily diary, posts (text, photos, 30 s camera video, food) with likes, comments and Share, a camera-first new post page that can create and log a food, a Share sheet with chats and reposts, Home feed | 006–009, 014–016 |
 | **Platform** | Onboarding and setup, feature flags per cohort and user, installable PWA, push notifications with Activity and icon badge, direct messages, tabs that stay alive with swipe navigation | 003, 005, 012, 013 |
 
 **Infrastructure is Tier 0** (about $0/month): Vercel Hobby, Render free (kept awake by a cron
@@ -54,7 +54,7 @@ job), MongoDB Atlas M0.
 7. **Native apps.** Wrap the web app with Capacitor and add HealthKit and background location.
    Background GPS (skiing, rides) is the one thing a PWA cannot do.
 
-Also wanted, unscheduled: recipes (steps and time on combination posts), message requests from
+Also wanted, unscheduled: quote reposts (a repost with your own text), share images for Instagram and TikTok Stories (a rendered card with the photo and macro rings), public link previews, recipes (steps and time on combination posts), message requests from
 non-friends, reactions, typing indicators, stories (the inbox's friend row is ready for rings).
 
 ## Architecture by tier

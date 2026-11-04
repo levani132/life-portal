@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-05: Reposts
+
+Share → **Repost** puts a friend's post on your wall and in your friends' Home feeds, with
+"↻ you reposted" above it. Tap **Reposted** to take it back. The post keeps its author's audience:
+someone who can't see the original never sees your repost, and if the author deletes it or makes
+it private, reposts disappear too. Authors get a "reposted your post" notification, with its own
+toggle in notification settings.
+
 ## 2026-11-05: The camera stops asking every time
 
 The camera on the new post page asks for permission once per session instead of every time it

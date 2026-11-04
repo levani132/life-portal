@@ -93,6 +93,18 @@ class PostsController {
   ) {
     return this.engagement.setLike(userId, id, false);
   }
+  @Put(':id/repost') repost(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.engagement.setRepost(userId, id, true);
+  }
+  @Delete(':id/repost') unrepost(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.engagement.setRepost(userId, id, false);
+  }
   @Get(':id/comments') comments(
     @CurrentUser('userId') userId: string,
     @Param('id') id: string,

@@ -5,6 +5,7 @@ import type {
 } from '@life-portal/shared-types';
 import {
   canReadFoodPost,
+  canRepost,
   canonicalPublication,
   publicationCalories,
   publicationMacros,
@@ -126,5 +127,14 @@ describe('food publication contracts', () => {
                     (audience === 'friends' && friends)),
               );
             }
+  });
+});
+
+describe('canRepost', () => {
+  it('allows another member’s public or friends post, never your own or a private one', () => {
+    expect(canRepost({ own: false, audience: 'public' })).toBe(true);
+    expect(canRepost({ own: false, audience: 'friends' })).toBe(true);
+    expect(canRepost({ own: false, audience: 'private' })).toBe(false);
+    expect(canRepost({ own: true, audience: 'public' })).toBe(false);
   });
 });

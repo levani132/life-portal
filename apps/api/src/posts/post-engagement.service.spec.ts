@@ -34,7 +34,10 @@ function fixture() {
     findOne: jest.fn(() => ({ lean: async () => row })),
     find: jest.fn(() => chain),
   };
-  const posts = { detail: jest.fn(async () => ({ isOwner: false })) };
+  const posts = {
+    detail: jest.fn(async () => ({ isOwner: false })),
+    repostState: jest.fn(async () => ({ reposted: false, repostCount: 0 })),
+  };
   const social = {
     own: jest.fn(),
     postAuthor: jest.fn(async () => ({

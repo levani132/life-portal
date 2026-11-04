@@ -195,7 +195,7 @@ it('updates only the audience and only for the post owner', async () => {
   f.posts.updateOne.mockResolvedValue({ matchedCount: 1 });
   await f.service.updateAudience('owner', id, 'friends');
   expect(f.posts.updateOne).toHaveBeenCalledWith(
-    { _id: id, userId: 'owner', deleted: { $ne: true } },
+    { _id: id, userId: 'owner', deleted: { $ne: true }, repostOf: { $exists: false } },
     { $set: { audience: 'friends' } },
   );
   f.posts.updateOne.mockResolvedValue({ matchedCount: 0 });
@@ -279,5 +279,104 @@ describe('posts without food (spec 014)', () => {
     await expect(f.service.importPreview('reader', String(f.row._id))).rejects.toThrow(
       BadRequestException,
     );
+  });
+});
+
+describe('reposts (spec 016)', () => {
+  it('refuses your own or a private post, and keeps the original’s audience', async () => {
+    const f = fixture();
+    const id = String(f.row._id);
+    await expect(f.service.repost('owner', id)).rejects.toThrow(BadRequestException);
+    f.row.audience = 'friends';
+    f.graph.between.mockResolvedValue({ state: 'accepted', blockedBy: [] });
+    f.posts.updateOne.mockResolvedValue({ upsertedCount: 1 });
+    await expect(f.service.repost('reader', id)).resolves.toMatchObject({ created: true });
+    expect(f.posts.updateOne).toHaveBeenCalledWith(
+      { userId: 'reader', requestId: `repost:${id}` },
+      {
+        $setOnInsert: expect.objectContaining({
+          repostOf: id,
+          audience: 'friends',
+          title: '',
+          caption: '',
+        }),
+      },
+      { upsert: true },
+    );
+    // A repeat finds the same row: no second repost, no second notification.
+    f.posts.updateOne.mockResolvedValue({ upsertedCount: 0 });
+    await expect(f.service.repost('reader', id)).resolves.toMatchObject({ created: false });
+  });
+
+  it('never opens a repost row by its own id', async () => {
+    const f = fixture();
+    await f.service.detail('owner', String(f.row._id));
+    expect(f.posts.findOne).toHaveBeenCalledWith(
+      expect.objectContaining({ repostOf: { $exists: false } }),
+    );
+  });
+
+  function feed(f: ReturnType<typeof fixture>, rows: object[]) {
+    (f.posts as { find?: jest.Mock }).find = jest.fn().mockReturnValue({
+      sort: () => ({ limit: () => ({ lean: jest.fn().mockResolvedValue(rows) }) }),
+    });
+    (f.graph as { wallAuthorIds?: jest.Mock }).wallAuthorIds = jest
+      .fn()
+      .mockResolvedValue(['ben']);
+  }
+
+  it('shows a repost only to viewers who can read both the repost and the original', async () => {
+    const f = fixture();
+    const original = { ...f.row, audience: 'friends' as const };
+    f.posts.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(original) });
+    const repost = {
+      _id: new Types.ObjectId(),
+      userId: 'ben',
+      requestId: `repost:${original._id}`,
+      repostOf: String(original._id),
+      title: '',
+      caption: '',
+      audience: 'friends',
+      deleted: false,
+      createdAt: new Date('2026-11-05T10:00:00Z'),
+      updatedAt: new Date('2026-11-05T10:00:00Z'),
+    };
+    feed(f, [repost]);
+    f.social.postAuthor.mockImplementation(async (userId: string) => ({
+      userId,
+      displayName: userId,
+      username: userId,
+    }));
+    // Cat is Ben's friend but not the owner's: the original's audience wins.
+    f.graph.between.mockImplementation(async (_viewer: string, author: string) => ({
+      state: author === 'ben' ? 'accepted' : 'none',
+      blockedBy: [],
+    }));
+    expect((await f.service.list('cat', {} as never)).posts).toEqual([]);
+    // A friend of both sees the original, marked as Ben's repost.
+    f.graph.between.mockResolvedValue({ state: 'accepted', blockedBy: [] });
+    const page = await f.service.list('dan', {} as never);
+    expect(page.posts).toHaveLength(1);
+    expect(page.posts[0]).toMatchObject({
+      id: String(original._id),
+      author: { userId: 'owner' },
+      repost: { id: String(repost._id), by: { userId: 'ben' }, isMine: false },
+    });
+  });
+
+  it('shows a post once per page when it appears as itself and as a repost', async () => {
+    const f = fixture();
+    const original = { ...f.row, audience: 'public' as const };
+    f.posts.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(original) });
+    const repost = {
+      ...original,
+      _id: new Types.ObjectId(),
+      userId: 'ben',
+      repostOf: String(original._id),
+      publication: undefined,
+    };
+    feed(f, [repost, original]);
+    const page = await f.service.list('dan', {} as never);
+    expect(page.posts.map((post) => post.id)).toEqual([String(original._id)]);
   });
 });

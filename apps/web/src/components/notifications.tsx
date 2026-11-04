@@ -214,6 +214,7 @@ const TYPE_LABELS: { type: NotificationType; label: string; hint: string }[] = [
   { type: 'friendAccepted', label: 'Accepted requests', hint: 'Someone accepted your request' },
   { type: 'postComment', label: 'Comments', hint: 'On your posts' },
   { type: 'postLike', label: 'Likes', hint: 'On your posts, grouped so bursts stay quiet' },
+  { type: 'postRepost', label: 'Reposts', hint: 'Someone put your post on their wall' },
   { type: 'message', label: 'Messages', hint: 'From friends, unless you muted that conversation' },
 ];
 
@@ -405,6 +406,8 @@ function activityText(item: ActivityItem): string {
       return `${who} commented on ${post}`;
     case 'postLike':
       return `${who} liked ${post}`;
+    case 'postRepost':
+      return `${who} reposted ${post}`;
     case 'message':
       return `${who} sent you a message`;
   }

@@ -24,6 +24,7 @@ import type {
 } from '@life-portal/shared-types';
 import {
   canReadFoodPost,
+  canRepost,
   canonicalPublication,
   postHasContent,
   publicationCalories,
@@ -43,6 +44,11 @@ import type {
   ReportPostDto,
   UpdatePostDto,
 } from './posts.dto';
+
+/** Matches posts, not reposts. A repost row is never addressable by its own id. */
+const ORIGINAL = { repostOf: { $exists: false } };
+const repostRequest = (postId: string) => `repost:${postId}`;
+type PostRow = FoodPostRecord & { _id: Types.ObjectId };
 
 @Injectable()
 export class PostsService {
@@ -245,7 +251,7 @@ export class PostsService {
     await this.requireEnabled(viewerId);
     this.id(id);
     const row = await this.posts
-      .findOne({ _id: id, deleted: { $ne: true } })
+      .findOne({ _id: id, deleted: { $ne: true }, ...ORIGINAL })
       .lean();
     const author = row ? await this.readable(viewerId, row) : null;
     if (!row || !author) throw new NotFoundException('Post not found.');
@@ -258,7 +264,7 @@ export class PostsService {
   /** The owner's live posts, newest first, as id → title. Used for their Activity. */
   async ownTitles(userId: string, limit = 500): Promise<Map<string, string>> {
     const rows = await this.posts
-      .find({ userId, deleted: { $ne: true } })
+      .find({ userId, deleted: { $ne: true }, ...ORIGINAL })
       .sort({ createdAt: -1 })
       .limit(limit)
       .select('title')
@@ -322,6 +328,8 @@ export class PostsService {
     let cursor = this.cursor(query.cursor);
     let scanned = 0;
     const visible: FoodPost[] = [];
+    // A post and a repost of it can both be in range; a page shows it once.
+    const shown = new Set<string>();
     let last: (FoodPostRecord & { _id: Types.ObjectId }) | undefined;
     let visibleCursor: (FoodPostRecord & { _id: Types.ObjectId }) | undefined;
     while (scanned < 100) {
@@ -353,11 +361,12 @@ export class PostsService {
           )
         )
           continue;
-        const author = await this.readable(userId, row);
-        if (!author) continue;
+        const card = await this.card(userId, row, shown);
+        if (!card) continue;
         if (visible.length === 10)
           return { posts: visible, nextCursor: this.encode(visibleCursor!) };
-        visible.push(await this.dto(row, author, userId, true));
+        visible.push(card);
+        shown.add(card.id);
         visibleCursor = row;
       }
       if (rows.length < 25) return { posts: visible };
@@ -368,6 +377,108 @@ export class PostsService {
       ...(last ? { nextCursor: this.encode(last) } : {}),
     };
   }
+  /**
+   * One feed card. A repost must pass the audience check for its reposter *and* the original for
+   * its author, both now: the original's audience, blocks and deletion always win.
+   */
+  private async card(
+    viewerId: string,
+    row: PostRow,
+    shown: Set<string>,
+  ): Promise<FoodPost | null> {
+    if (!row.repostOf) {
+      if (shown.has(String(row._id))) return null;
+      const author = await this.readable(viewerId, row);
+      return author ? this.dto(row, author, viewerId, true) : null;
+    }
+    if (shown.has(row.repostOf)) return null;
+    const by = await this.readable(viewerId, row);
+    if (!by) return null;
+    const original = isValidObjectId(row.repostOf)
+      ? await this.posts
+          .findOne({ _id: row.repostOf, deleted: { $ne: true }, ...ORIGINAL })
+          .lean()
+      : null;
+    const author = original ? await this.readable(viewerId, original) : null;
+    if (!original || !author) return null;
+    return {
+      ...(await this.dto(original, author, viewerId, true)),
+      repost: {
+        id: String(row._id),
+        by,
+        isMine: row.userId === viewerId,
+        createdAt: row.createdAt.toISOString(),
+      },
+    };
+  }
+  /**
+   * Reposts a post the member can read. Returns the original, and whether this call created the
+   * repost (a repeat is a no-op, so only the first one notifies).
+   */
+  async repost(userId: string, id: string): Promise<{ post: FoodPost; created: boolean }> {
+    const { row, author } = await this.read(userId, id);
+    if (!canRepost({ own: row.userId === userId, audience: row.audience }))
+      throw new BadRequestException(
+        row.userId === userId
+          ? 'You can’t repost your own post.'
+          : 'Private posts can’t be reposted.',
+      );
+    await this.social.own(userId);
+    let created = false;
+    try {
+      const result = await this.posts.updateOne(
+        { userId, requestId: repostRequest(id) },
+        {
+          $setOnInsert: {
+            userId,
+            requestId: repostRequest(id),
+            repostOf: id,
+            title: '',
+            caption: '',
+            audience: row.audience,
+            version: 1,
+          },
+        },
+        { upsert: true },
+      );
+      created = !!result.upsertedCount;
+    } catch (error) {
+      if ((error as { code?: number }).code !== 11000) throw error;
+    }
+    return { post: await this.dto(row, author, userId, false), created };
+  }
+  /** Takes a repost back. A repost holds no content, likes or comments, so it is deleted. */
+  async unrepost(userId: string, id: string) {
+    await this.requireEnabled(userId);
+    this.id(id);
+    await this.posts.deleteOne({ userId, requestId: repostRequest(id) });
+  }
+  async repostState(userId: string, id: string) {
+    const [repostCount, reposted] = await Promise.all([
+      this.posts.countDocuments({ repostOf: id }),
+      this.posts.exists({ userId, requestId: repostRequest(id) }),
+    ]);
+    return { repostCount, reposted: !!reposted };
+  }
+  /** Others' reposts of these posts, newest first, for their author's Activity. */
+  async repostRows(
+    postIds: string[],
+    ownerId: string,
+    since: Date,
+    before: Date | undefined,
+    limit: number,
+  ) {
+    return this.posts
+      .find({
+        repostOf: { $in: postIds },
+        userId: { $ne: ownerId },
+        createdAt: { $gte: since, ...(before ? { $lt: before } : {}) },
+      })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .select('userId repostOf createdAt')
+      .lean();
+  }
   async updateAudience(
     userId: string,
     id: string,
@@ -376,7 +487,7 @@ export class PostsService {
     await this.requireEnabled(userId);
     this.id(id);
     const result = await this.posts.updateOne(
-      { _id: id, userId, deleted: { $ne: true } },
+      { _id: id, userId, deleted: { $ne: true }, ...ORIGINAL },
       { $set: { audience } },
     );
     if (!result.matchedCount) throw new NotFoundException('Post not found.');
@@ -387,14 +498,14 @@ export class PostsService {
     this.id(id);
     if (!dto.title.trim() && !dto.caption.trim()) {
       const row = await this.posts
-        .findOne({ _id: id, userId, deleted: { $ne: true } })
+        .findOne({ _id: id, userId, deleted: { $ne: true }, ...ORIGINAL })
         .select('publication media')
         .lean();
       if (row && !row.publication && !row.media?.length)
         throw new BadRequestException('A post without food or photos needs some text.');
     }
     const changed = await this.posts.updateOne(
-      { _id: id, userId, deleted: { $ne: true } },
+      { _id: id, userId, deleted: { $ne: true }, ...ORIGINAL },
       {
         $set: {
           title: dto.title.trim(),
@@ -412,7 +523,7 @@ export class PostsService {
     if (
       !(
         await this.posts.updateOne(
-          { _id: id, userId },
+          { _id: id, userId, ...ORIGINAL },
           {
             $set: { deleted: true, title: 'Removed post', caption: '' },
             $unset: { publication: '', media: '' },

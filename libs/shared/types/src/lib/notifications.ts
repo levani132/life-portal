@@ -8,6 +8,7 @@ export const NOTIFICATION_TYPES = [
   'friendAccepted',
   'postComment',
   'postLike',
+  'postRepost',
   'message',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];

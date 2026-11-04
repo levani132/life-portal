@@ -8,6 +8,7 @@ import {
   CookingPot,
   Layers,
   Library,
+  Repeat2,
   Utensils,
 } from 'lucide-react';
 import {
@@ -28,6 +29,7 @@ import {
   PostAudienceControl,
   PostDateLink,
   PostOptions,
+  PostRelativeTime,
 } from './post-header-controls';
 import { PostEngagement } from './post-engagement';
 import { PostMediaCarousel } from './post-media';
@@ -73,7 +75,7 @@ export function PostsList({
     <div className="space-y-5">
       <div className="-mx-4 space-y-0.5 sm:mx-0 sm:space-y-5">
         {result.data.posts.map((post) => (
-          <PostCard key={post.id} post={post} />
+          <PostCard key={post.repost?.id ?? post.id} post={post} />
         ))}
       </div>
       {result.data.posts.length === 0 && (
@@ -186,6 +188,17 @@ export function PostCard({
     <article
       className={`card overflow-hidden p-4 sm:p-5 ${detail ? 'rounded-2xl' : 'rounded-none border-0 sm:rounded-2xl sm:border'}`}
     >
+      {post.repost && (
+        <p className="-mt-1 mb-3 flex items-center gap-1.5 text-xs text-ink-muted">
+          <Repeat2 size={14} aria-hidden="true" />
+          <Link href={`/people/${post.repost.by.userId}`} className="font-medium hover:text-ink">
+            {post.repost.isMine ? 'You' : post.repost.by.displayName}
+          </Link>
+          reposted
+          <span aria-hidden="true">·</span>
+          <PostRelativeTime date={post.repost.createdAt} />
+        </p>
+      )}
       <div className="flex items-start gap-3">
         <Link
           href={`/people/${post.author.userId}`}

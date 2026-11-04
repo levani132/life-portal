@@ -86,6 +86,13 @@ export function canReadFoodPost(input: {
       (input.audience === 'friends' && input.friends))
   );
 }
+/**
+ * Whether a member may repost a post they can already read: never their own, never a private
+ * one. The repost keeps the original's audience, and every read re-checks the original.
+ */
+export function canRepost(input: { own: boolean; audience: Audience }): boolean {
+  return !input.own && input.audience !== 'private';
+}
 export function publicationCalories(
   items: PublishedFood[],
 ): number | undefined {
