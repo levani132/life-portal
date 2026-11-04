@@ -23,8 +23,9 @@ const RING = 2 * Math.PI * 38;
 /**
  * The live camera, sized by its parent (the bottom of the new post page). Tap the shutter for a
  * photo, hold it to record (up to 30 seconds, with a ring filling around the button), release
- * to stop. The camera runs only while `active` (one stream per session, see `camera-stream.ts`), and the microphone is asked for only when a
- * recording starts, so taking photos never prompts for it.
+ * to stop. The camera runs only while `active` (one stream per session, see `camera-stream.ts`).
+ * The microphone is asked for right after the camera, so the first video starts when held
+ * instead of stopping for a permission prompt.
  */
 export function CameraView({
   active,
@@ -72,6 +73,13 @@ export function CameraView({
           await video.current.play().catch(() => undefined);
         }
         setFailed(null);
+        // Asked now, right after the camera, so the first hold of the shutter records instead of
+        // stopping for a prompt. Muted until a recording starts (that turns iOS's indicator off).
+        if (canRecord && !microphone.current) {
+          const track = await acquireMicrophone();
+          if (!recorder.current) muteMicrophone();
+          if (!cancelled) microphone.current = track;
+        }
       })
       .catch(() => {
         if (!cancelled) setFailed('Camera access was not allowed.');
@@ -112,7 +120,8 @@ export function CameraView({
   async function startRecording() {
     const type = recorderType();
     if (!stream.current || !type) return;
-    // Asked for once per session, on the first recording. A clip without sound beats no clip.
+    // Normally granted when the camera opened; asked here only if that has not finished yet.
+    // A clip without sound beats no clip.
     microphone.current = await acquireMicrophone();
     // The finger may have lifted while the microphone prompt was up.
     if (!holding.current || !stream.current) return;

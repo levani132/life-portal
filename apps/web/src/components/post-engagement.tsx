@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { Heart, MessageCircle, Send, Share2, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, Send, Trash2 } from 'lucide-react';
 import type {
   PortalState,
   FoodPost,
@@ -12,9 +12,10 @@ import type {
 import { api } from '../lib/api';
 import { useApi } from '../lib/hooks';
 import { PostRelativeTime } from './post-header-controls';
-import { ErrorNote, Modal } from './ui';
+import { ErrorNote } from './ui';
 import { requestNotificationOffer } from './notifications';
-import { messagingAvailable, SendPostDialog } from './messages';
+import { messagingAvailable } from './messages';
+import { PostShareSheet } from './post-share-sheet';
 
 export function PostEngagement({ post }: { post: FoodPost }) {
   const stats = useApi<Engagement>(`/posts/${post.id}/engagement`, {
@@ -26,15 +27,10 @@ export function PostEngagement({ post }: { post: FoodPost }) {
   const locked = useRef(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [linkOpen, setLinkOpen] = useState(false);
-  const linkInput = useRef<HTMLInputElement>(null);
-  const [sendOpen, setSendOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const portal = useApi<PortalState>('/portal');
   const canSend = messagingAvailable(portal.data?.access);
   const value = optimistic ?? stats.data;
-  const postUrl = () =>
-    new URL(`/posts/${post.id}`, window.location.origin).href;
   async function like() {
     if (!value || locked.current) return;
     locked.current = true;
@@ -59,34 +55,9 @@ export function PostEngagement({ post }: { post: FoodPost }) {
       setBusy(false);
     }
   }
-  async function share() {
-    setNotice('');
-    setError('');
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: post.title || post.contentLabel || 'Life Portal post',
-          url: postUrl(),
-        });
-        return;
-      } catch (e) {
-        if ((e as Error).name === 'AbortError') return;
-      }
-    }
-    try {
-      if (!navigator.clipboard) {
-        setLinkOpen(true);
-        return;
-      }
-      await navigator.clipboard.writeText(postUrl());
-      setNotice('Link copied. The post’s audience still applies.');
-    } catch {
-      setLinkOpen(true);
-    }
-  }
   return (
     <div
-      className={`mt-3 ${commentsOpen || error || stats.error || notice ? '' : '-mb-4 sm:-mb-5'}`}
+      className={`mt-3 ${commentsOpen || error || stats.error ? '' : '-mb-4 sm:-mb-5'}`}
     >
       {value?.likeCount || value?.commentCount ? (
         <div
@@ -111,7 +82,7 @@ export function PostEngagement({ post }: { post: FoodPost }) {
         </div>
       ) : null}
       <div
-        className={`grid ${canSend ? 'grid-cols-4' : 'grid-cols-3'} border-t border-border py-1 ${commentsOpen ? 'border-b' : ''}`}
+        className={`grid grid-cols-3 border-t border-border py-1 ${commentsOpen ? 'border-b' : ''}`}
       >
         <button
           type="button"
@@ -133,32 +104,18 @@ export function PostEngagement({ post }: { post: FoodPost }) {
           <MessageCircle size={18} />
           Comment
         </button>
-        {canSend && (
-          <button
-            type="button"
-            onClick={() => setSendOpen(true)}
-            className="flex min-h-11 items-center justify-center gap-2 rounded-lg text-sm text-ink-muted transition hover:bg-violet-500/10 active:scale-95"
-          >
-            <Send size={18} className="-rotate-12" />
-            Send
-          </button>
-        )}
         <button
           type="button"
-          onClick={() => void share()}
+          aria-haspopup="dialog"
+          onClick={() => setShareOpen(true)}
           className="flex min-h-11 items-center justify-center gap-2 rounded-lg text-sm text-ink-muted transition hover:bg-violet-500/10 active:scale-95"
         >
-          <Share2 size={18} />
+          <Send size={18} className="-rotate-12" />
           Share
         </button>
       </div>
       {(error || stats.error) && (
         <ErrorNote message={error || (stats.error as Error).message} />
-      )}
-      {notice && (
-        <p role="status" className="mt-2 text-xs text-ink-muted">
-          {notice}
-        </p>
       )}
       {commentsOpen && (
         <PostComments
@@ -168,51 +125,13 @@ export function PostEngagement({ post }: { post: FoodPost }) {
           }}
         />
       )}
-      {sendOpen && (
-        <SendPostDialog postId={post.id} onClose={() => setSendOpen(false)} />
-      )}
-      {linkOpen && (
-        <Modal open title="Share post" onClose={() => setLinkOpen(false)}>
-          <p className="mb-3 text-sm text-ink-muted">
-            Only people in this post’s audience can open the link.
-          </p>
-          <input
-            autoFocus
-            ref={linkInput}
-            className="field"
-            aria-label="Post link"
-            readOnly
-            value={postUrl()}
-            onFocus={(event) => event.target.select()}
-          />
-          <button
-            type="button"
-            className="btn mt-3"
-            onClick={async () => {
-              try {
-                if (!navigator.clipboard) {
-                  linkInput.current?.focus();
-                  linkInput.current?.select();
-                  setNotice('Select the link above to copy it.');
-                  return;
-                }
-                await navigator.clipboard.writeText(postUrl());
-                setLinkOpen(false);
-                setNotice('Link copied.');
-              } catch {
-                linkInput.current?.select();
-                setNotice('Select the link above to copy it.');
-              }
-            }}
-          >
-            Copy link
-          </button>
-          {notice && (
-            <p role="status" className="mt-2 text-xs text-ink-muted">
-              {notice}
-            </p>
-          )}
-        </Modal>
+      {shareOpen && (
+        <PostShareSheet
+          postId={post.id}
+          title={post.title || post.contentLabel || 'Life Portal post'}
+          canMessage={canSend}
+          onClose={() => setShareOpen(false)}
+        />
       )}
     </div>
   );

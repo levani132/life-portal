@@ -46,7 +46,7 @@ export async function openConversation(userId: string): Promise<string> {
     .id;
 }
 
-function errorText(caught: unknown, fallback: string): string {
+export function errorText(caught: unknown, fallback: string): string {
   return caught instanceof ApiError ? caught.message : fallback;
 }
 
@@ -62,7 +62,7 @@ export function useUnreadMessages(access: PortalState['access']): number {
   return messagingAvailable(access) ? (unread.data?.count ?? 0) : 0;
 }
 
-function Avatar({ name, size = 44 }: { name: string; size?: number }) {
+export function Avatar({ name, size = 44 }: { name: string; size?: number }) {
   return (
     <span
       aria-hidden
@@ -76,7 +76,7 @@ function Avatar({ name, size = 44 }: { name: string; size?: number }) {
 
 // ------------------------------------------------------------------ Inbox
 
-const FRIENDS_KEY = '/social/connections?kind=friends&skip=0';
+export const FRIENDS_KEY = '/social/connections?kind=friends&skip=0';
 
 export function Inbox() {
   const inbox = useApi<InboxEntry[]>('/messages/conversations', {
@@ -786,91 +786,5 @@ function Composer({ onSend }: { onSend: (text: string) => void }) {
         <Send size={18} />
       </button>
     </form>
-  );
-}
-
-// ------------------------------------------------------------------ Send a post
-
-/** Friend picker for a post's Send button (spec US4). */
-export function SendPostDialog({
-  postId,
-  onClose,
-}: {
-  postId: string;
-  onClose: () => void;
-}) {
-  const router = useRouter();
-  const friends = useSocialApi<{ people: SocialPerson[] }>(FRIENDS_KEY);
-  const [sending, setSending] = useState<string | null>(null);
-  const [sent, setSent] = useState<{
-    name: string;
-    conversationId: string;
-  } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function sendTo(person: SocialPerson) {
-    setSending(person.userId);
-    setError(null);
-    try {
-      const conversationId = await openConversation(person.userId);
-      await api.post(`/messages/conversations/${conversationId}/messages`, {
-        requestId: crypto.randomUUID(),
-        postId,
-      });
-      setSent({ name: person.displayName, conversationId });
-    } catch (caught) {
-      setError(errorText(caught, 'Could not send the post.'));
-    } finally {
-      setSending(null);
-    }
-  }
-
-  return (
-    <Modal open title="Send to a friend" onClose={onClose}>
-      {error && <ErrorNote message={error} />}
-      {sent ? (
-        <div className="space-y-3 text-sm">
-          <p>
-            Sent to {sent.name}. They’ll see it only if the post’s audience
-            includes them.
-          </p>
-          <button
-            type="button"
-            className="btn-primary w-full justify-center"
-            onClick={() => router.push(`/messages/${sent.conversationId}`)}
-          >
-            Open conversation
-          </button>
-        </div>
-      ) : friends.isLoading || !friends.data ? (
-        <Spinner />
-      ) : !friends.data.people.length ? (
-        <p className="text-sm text-ink-muted">
-          Add friends to send them posts.
-        </p>
-      ) : (
-        <ul className="-mx-2 max-h-80 divide-y divide-border overflow-y-auto">
-          {friends.data.people.map((person) => (
-            <li
-              key={person.userId}
-              className="flex items-center gap-3 px-2 py-2.5"
-            >
-              <Avatar name={person.displayName} size={36} />
-              <span className="min-w-0 flex-1 truncate">
-                {person.displayName}
-              </span>
-              <button
-                type="button"
-                className="btn shrink-0"
-                disabled={!!sending}
-                onClick={() => void sendTo(person)}
-              >
-                {sending === person.userId ? 'Sending…' : 'Send'}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Modal>
   );
 }

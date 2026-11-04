@@ -5,7 +5,11 @@ User-visible changes. Newest first.
 ## 2026-11-05: The camera stops asking every time
 
 The camera on the new post page asks for permission once per session instead of every time it
-opens, and the **+** in the tab bar is wider.
+opens, and the **+** in the tab bar is wider. It also asks for the microphone right after the
+camera, so holding the shutter for your first video records straight away.
+
+A post has three buttons now: Like, Comment and Share. Share opens a sheet with your recent
+chats (tap one to send the post), Copy link, and More… for the phone's own share menu.
 
 ## 2026-11-04 — New post page with the camera, and new foods from a photo
 

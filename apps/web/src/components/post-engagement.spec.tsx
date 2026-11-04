@@ -3,6 +3,7 @@ import type { FoodPost } from '@life-portal/shared-types';
 import { PostEngagement } from './post-engagement';
 import { api } from '../lib/api';
 import { PostAudienceControl } from './post-header-controls';
+import { shareHeads } from './post-share-sheet';
 const stats = {
   data: { liked: false, likeCount: 0, commentCount: 0 },
   mutate: jest.fn(),
@@ -14,8 +15,12 @@ const comments = {
   isLoading: false,
 };
 jest.mock('../lib/hooks', () => ({
-  useApi: (url: string) => (url.endsWith('/engagement') ? stats : comments),
+  useApi: (url: string | null) =>
+    url === null ? { data: undefined } : url.endsWith('/engagement') ? stats : comments,
   revalidate: jest.fn(),
+}));
+jest.mock('../lib/social-hooks', () => ({
+  useSocialApi: () => ({ data: { people: [] }, isLoading: false }),
 }));
 jest.mock('../lib/api', () => ({
   api: { put: jest.fn(), delete: jest.fn(), post: jest.fn(), patch: jest.fn() },
@@ -93,7 +98,10 @@ it('copies a permission-preserving post link when native sharing is unavailable'
     value: { writeText },
   });
   const view = render(<PostEngagement post={post} />);
+  expect(screen.getAllByRole('button').length).toBe(3);
   fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+  expect(screen.queryByRole('button', { name: 'More…' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Copy link' }));
   await screen.findByText('Link copied. The post’s audience still applies.');
   expect(writeText).toHaveBeenCalledWith(
     new URL('/posts/post', window.location.origin).href,
@@ -115,4 +123,18 @@ it('changes only the audience without overwriting the caption', async () => {
     }),
   );
   view.unmount();
+});
+
+it('lists recent chats first, then friends without a conversation, once each', () => {
+  const person = (userId: string, displayName: string) =>
+    ({ userId, displayName, username: userId }) as never;
+  expect(
+    shareHeads(
+      [{ id: 'c1', other: person('b', 'Bea'), preview: '', lastMessageAt: '', unread: 0 }],
+      [person('a', 'Ana'), person('b', 'Bea')],
+    ),
+  ).toEqual([
+    { userId: 'b', displayName: 'Bea', conversationId: 'c1' },
+    { userId: 'a', displayName: 'Ana' },
+  ]);
 });

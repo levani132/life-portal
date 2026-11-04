@@ -1139,3 +1139,16 @@ previous tracks were stopped. `lib/camera-stream.ts` now keeps one stream: putti
 *disables* its tracks (iOS turns the camera and its indicator off) and only ten idle minutes stop
 it. Flipping asks for the new camera before stopping the old one. The microphone works the same
 way between recordings. Don't go back to stopping tracks on unmount; that brings the prompts back.
+
+The microphone is now asked for right after the camera opens, not on the first hold of the
+shutter: a prompt in the middle of a hold ended the gesture, so the first video never recorded.
+Its track stays muted until a recording starts.
+
+## 2026-11-05: one Share button with a sheet, not Send and Share
+
+A post's footer had four buttons (Like, Comment, Send, Share). Send and Share are now one Share
+button opening a bottom sheet: chat heads first (sending in a chat is the share people use most),
+then Copy link and More… (the system share sheet, shown only where `navigator.share` exists). The
+sheet is the place to grow: reposting to your own wall and app-specific targets (Instagram,
+TikTok, Messenger) belong in its second row. Every route still carries only a reference or a
+`/posts/:id` link, so the post's audience applies wherever it lands.
