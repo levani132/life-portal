@@ -264,7 +264,7 @@ function ScrollHeader({
     <header
       onFocusCapture={onReveal}
       className={clsx(
-        'portal-header sticky top-0 z-40 bg-surface/95 pt-[env(safe-area-inset-top)] backdrop-blur transition-transform duration-200',
+        'portal-header sticky top-0 z-40 bg-surface/95 pt-[var(--top-chrome)] backdrop-blur transition-transform duration-200',
         hidden && '-translate-y-full',
       )}
     >

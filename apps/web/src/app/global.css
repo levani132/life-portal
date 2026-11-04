@@ -441,3 +441,29 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/*
+ * Where top chrome (the app header, a conversation's header) starts its content.
+ *
+ * Since iOS 26, a Home Screen web app gets the system's "scroll edge effect": a progressive blur
+ * drawn over the top ~40pt of the page, below the status bar, that no meta tag or CSS can turn
+ * off (removing `black-translucent` does not remove it either). Anything placed there looks out
+ * of focus. So in the installed app on iOS the header grows by the depth of that ramp, the band
+ * is the header's own flat colour (a blurred flat colour looks the same), and the logo and
+ * buttons sit below it. Browser tabs and other platforms are unaffected.
+ * `-webkit-touch-callout` is only supported by iOS/iPadOS WebKit, which is what scopes this.
+ */
+:root {
+  --top-chrome: env(safe-area-inset-top);
+}
+@media (display-mode: standalone) {
+  @supports (-webkit-touch-callout: none) {
+    :root {
+      --top-chrome: calc(env(safe-area-inset-top) + 1.5rem);
+    }
+    .portal-header,
+    .chat-header {
+      background-color: rgb(var(--surface));
+    }
+  }
+}

@@ -1064,3 +1064,16 @@ pruned the Linux optional builds (rolldown) that Render and Vercel need.
   `friends-list`, `menu-content`), because a Next page file may only export the page itself and
   the pager needs to render the neighbour without its shell.
 
+## 2026-11-04 — iOS 26's top blur: move the header below it, don't fight it
+
+Since iOS 26, a Home Screen web app gets the system "scroll edge effect": a progressive blur over
+roughly the top 40pt of the page, below the status bar. Other projects tried removing
+`black-translucent`, adding an opaque strip and splitting the header's `backdrop-filter` into
+another layer, and none of those removed it on a device. The approach reported to work is
+keeping content out of that band. So `--top-chrome` (global.css) is the safe-area inset plus
+1.5rem in the installed app on iOS (`display-mode: standalone` with
+`@supports (-webkit-touch-callout: none)`), and both headers start their content there. The band
+is the header's own flat colour, so blurring it changes nothing visible. The cost is 24px of
+header height, and only on iPhone/iPad Home Screen apps. If a future iOS changes the depth,
+this is the one value to tune.
+

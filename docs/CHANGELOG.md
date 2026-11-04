@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-04 — Sharp header in the iPhone app
+
+In the installed app on iOS 26 and later, the header's logo and buttons sat under a blur that iOS
+draws across the top of Home Screen web apps. The header now leaves room for that blur, so its
+contents stay sharp. The same applies to a conversation's header. Browser tabs are unchanged.
+
 ## 2026-11-04 — Tabs stay where you left them
 
 Home, Messages, Search, Friends and Menu now stay open in the background. Scroll down Home, move
