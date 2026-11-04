@@ -5,15 +5,27 @@ import clsx from 'clsx';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Home, Menu, Search, Users } from 'lucide-react';
+import {
+  Home,
+  Menu,
+  MessageCircle,
+  Search,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 import type { PortalState } from '@life-portal/shared-types';
 import { moduleForPath } from '@life-portal/shared-domain';
 import { useAuth } from '../lib/auth-context';
 import { useApi } from '../lib/hooks';
-import { MessagesIcon } from './messages';
+import { Friends } from './friends-list';
+import { Dashboard } from './home-dashboard';
+import { MenuContent } from './menu-content';
+import { Inbox, messagingAvailable, useUnreadMessages } from './messages';
 import { ActivityBell, NotificationsBridge } from './notifications';
+import { PeopleSearch } from './people-search';
 import { PortalLoader } from './portal-loader';
 import { PullToRefresh } from './pull-to-refresh';
+import { TabPager, type PagerTab } from './tab-pager';
 import { ErrorNote } from './ui';
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -35,6 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     else if (needsSetup && pathname !== '/setup') router.replace('/setup');
   }, [loading, user, needsSetup, pathname, router]);
   const [chromeHidden, revealChrome] = useScrollHidden(pathname === '/');
+  const unreadMessages = useUnreadMessages(portal.data?.access ?? NO_ACCESS);
   if (loading || !user || portal.isLoading)
     return <PortalLoader label="Opening your portal…" />;
   if (portal.error)
@@ -67,14 +80,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     pathname.startsWith('/settings') ||
     pathname === '/setup' ||
     pathname === '/profile';
+  const tabs = tabsFor(portal.data.access, pathname, inMenu);
+  const current = tabs.findIndex((tab) => tab.href === pathname);
   const page = (
-    <main
-      className={clsx(
-        'mx-auto max-w-7xl px-4',
-        inChat ? 'pb-0' : 'pb-[calc(6rem+env(safe-area-inset-bottom))]',
-        pathname === '/' ? 'pt-2' : inChat ? 'pt-0' : 'pt-6',
-      )}
-    >
+    <main className={mainClassFor(pathname)}>
       {allowed ? (
         children
       ) : (
@@ -100,7 +109,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             Life<span className="text-accent">Portal</span>
           </Link>
           <div className="flex items-center gap-2">
-            <MessagesIcon access={portal.data.access} />
             <ActivityBell access={portal.data.access} />
             <Link href="/menu" className="text-sm text-ink-muted">
               {user.name}
@@ -113,7 +121,23 @@ export function AppShell({ children }: { children: ReactNode }) {
         key={`push-${user.id}`}
         access={portal.data.access}
       />
-      {inChat ? page : <PullToRefresh>{page}</PullToRefresh>}
+      {inChat ? (
+        page
+      ) : (
+        <PullToRefresh>
+          {current >= 0 && allowed ? (
+            <TabPager
+              prev={tabs[current - 1]}
+              next={tabs[current + 1]}
+              onSwipeStart={revealChrome}
+            >
+              {page}
+            </TabPager>
+          ) : (
+            page
+          )}
+        </PullToRefresh>
+      )}
       <nav
         hidden={inChat}
         aria-label="Main navigation"
@@ -124,39 +148,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
       >
         <div className="mx-auto flex max-w-xl">
-          {[
-            {
-              href: '/',
-              label: 'Home',
-              icon: Home,
-              active:
-                !inMenu &&
-                !pathname.startsWith('/search') &&
-                !pathname.startsWith('/friends') &&
-                !pathname.startsWith('/people') &&
-                !pathname.startsWith('/wall') &&
-                !pathname.startsWith('/posts'),
-            },
-            ...(portal.data.access.social
-              ? [
-                  {
-                    href: '/search',
-                    label: 'Search',
-                    icon: Search,
-                    active: pathname === '/search',
-                  },
-                  {
-                    href: '/friends',
-                    label: 'Friends',
-                    icon: Users,
-                    active:
-                      pathname === '/friends' ||
-                      pathname.startsWith('/people/'),
-                  },
-                ]
-              : []),
-            { href: '/menu', label: 'Menu', icon: Menu, active: inMenu },
-          ].map(({ href, label, icon: Icon, active }) => (
+          {tabs.map(({ href, label, icon: Icon, active }) => (
             <Link
               key={href}
               href={href}
@@ -169,6 +161,14 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Icon size={21} aria-hidden />
               <span>
                 {label}
+                {label === 'Messages' && unreadMessages > 0 && (
+                  <span
+                    className="ml-1 rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] text-white"
+                    aria-label={`${unreadMessages} unread conversations`}
+                  >
+                    {unreadMessages > 99 ? '99+' : unreadMessages}
+                  </span>
+                )}
                 {label === 'Friends' && !!requests.data?.count && (
                   <span
                     className="ml-1 rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] text-white"
@@ -251,25 +251,91 @@ function ScrollHeader({
   );
 }
 
-/** Page heading with an optional action area, used by every detail page. */
-export function PageHeader({
-  title,
-  subtitle,
-  actions,
-}: {
-  title: string;
-  subtitle?: string;
-  actions?: ReactNode;
-}) {
-  return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-      <div className="min-w-0">
-        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-ink-muted">{subtitle}</p>}
-      </div>
-      {actions && (
-        <div className="flex flex-wrap items-center gap-2">{actions}</div>
-      )}
-    </div>
+const NO_ACCESS = {} as PortalState['access'];
+
+/** The page padding for a route. The tab pager's previews use it too, so they line up exactly. */
+function mainClassFor(pathname: string): string {
+  const chat = /^\/messages\/[^/]+/.test(pathname);
+  return clsx(
+    'mx-auto max-w-7xl px-4',
+    chat ? 'pb-0' : 'pb-[calc(6rem+env(safe-area-inset-bottom))]',
+    pathname === '/' ? 'pt-2' : chat ? 'pt-0' : 'pt-6',
   );
 }
+
+interface Tab extends PagerTab {
+  label: string;
+  icon: LucideIcon;
+  active: boolean;
+}
+
+/** The bottom tabs, in order. Swiping moves between neighbours in this same order. */
+function tabsFor(
+  access: PortalState['access'],
+  pathname: string,
+  inMenu: boolean,
+): Tab[] {
+  const tab = (
+    href: string,
+    label: string,
+    icon: LucideIcon,
+    Content: Tab['Content'],
+    active: boolean,
+  ): Tab => ({
+    href,
+    label,
+    icon,
+    Content,
+    active,
+    mainClass: mainClassFor(href),
+  });
+  const elsewhere = [
+    '/search',
+    '/friends',
+    '/people',
+    '/wall',
+    '/posts',
+    '/messages',
+  ];
+  return [
+    tab(
+      '/',
+      'Home',
+      Home,
+      Dashboard,
+      !inMenu && !elsewhere.some((p) => pathname.startsWith(p)),
+    ),
+    ...(messagingAvailable(access)
+      ? [
+          tab(
+            '/messages',
+            'Messages',
+            MessageCircle,
+            Inbox,
+            pathname.startsWith('/messages'),
+          ),
+        ]
+      : []),
+    ...(access.social
+      ? [
+          tab(
+            '/search',
+            'Search',
+            Search,
+            PeopleSearch,
+            pathname === '/search',
+          ),
+          tab(
+            '/friends',
+            'Friends',
+            Users,
+            Friends,
+            pathname === '/friends' || pathname.startsWith('/people/'),
+          ),
+        ]
+      : []),
+    tab('/menu', 'Menu', Menu, MenuContent, inMenu),
+  ];
+}
+
+export { PageHeader } from './page-header';

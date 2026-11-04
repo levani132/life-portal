@@ -433,3 +433,11 @@
     transition: none !important;
   }
 }
+
+/* A sideways strip that scrolls by touch or trackpad without showing a scrollbar. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

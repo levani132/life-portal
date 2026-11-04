@@ -2,6 +2,17 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-04 — Messages tab and swiping between tabs
+
+Messages moved from the header to the bottom tabs, right after Home, with the unread count on
+the tab. The inbox no longer has a title or a box around it: your friends sit along the top as
+round avatars (tap one to start or open a conversation), and conversations follow as plain rows.
+
+On a phone, swipe left or right on Home, Messages, Search, Friends or Menu to move to the next
+or previous tab. The next tab slides in under your finger, already loaded. A swipe that starts
+on something that scrolls sideways, such as the widget carousel or the friends row, scrolls that
+instead, so flicking through widgets never changes the tab.
+
 ## 2026-11-03 — Messages
 
 You can now message your friends. Tap **Message** on a friend's profile, or use the new message

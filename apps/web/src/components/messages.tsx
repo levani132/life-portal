@@ -3,8 +3,14 @@
 import clsx from 'clsx';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowLeft, Bell, BellOff, MessageCircle, MoreHorizontal, Send } from 'lucide-react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
+import { ArrowLeft, Bell, BellOff, MoreHorizontal, Send } from 'lucide-react';
 import {
   MAX_MESSAGE_LENGTH,
   type ChatMessage,
@@ -28,41 +34,32 @@ const SYNC_MS = 3000;
 const INBOX_MS = 15000;
 const UNREAD_KEY = '/messages/unread';
 
-export function messagingAvailable(access: PortalState['access'] | undefined): boolean {
+export function messagingAvailable(
+  access: PortalState['access'] | undefined,
+): boolean {
   return !!access?.messages && !!access.social;
 }
 
 /** Opens (or finds) the one conversation with a friend and returns its id. */
 export async function openConversation(userId: string): Promise<string> {
-  return (await api.post<{ id: string }>('/messages/conversations', { userId })).id;
+  return (await api.post<{ id: string }>('/messages/conversations', { userId }))
+    .id;
 }
 
 function errorText(caught: unknown, fallback: string): string {
   return caught instanceof ApiError ? caught.message : fallback;
 }
 
-/** Header icon with the number of conversations that have unread messages. */
-export function MessagesIcon({ access }: { access: PortalState['access'] }) {
-  const unread = useApi<{ count: number }>(messagingAvailable(access) ? UNREAD_KEY : null, {
-    revalidateOnFocus: true,
-    refreshInterval: INBOX_MS,
-  });
-  if (!messagingAvailable(access)) return null;
-  const count = unread.data?.count ?? 0;
-  return (
-    <Link
-      href="/messages"
-      className="relative inline-flex h-9 w-9 items-center justify-center rounded-full text-ink-muted hover:text-ink"
-      aria-label={count ? `Messages, ${count} unread` : 'Messages'}
-    >
-      <MessageCircle size={20} aria-hidden />
-      {count > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-sky-500 px-1 text-center text-[10px] font-semibold leading-[18px] text-white">
-          {count > 99 ? '99+' : count}
-        </span>
-      )}
-    </Link>
+/** How many conversations have unread messages, for the Messages tab's badge. */
+export function useUnreadMessages(access: PortalState['access']): number {
+  const unread = useApi<{ count: number }>(
+    messagingAvailable(access) ? UNREAD_KEY : null,
+    {
+      revalidateOnFocus: true,
+      refreshInterval: INBOX_MS,
+    },
   );
+  return messagingAvailable(access) ? (unread.data?.count ?? 0) : 0;
 }
 
 function Avatar({ name, size = 44 }: { name: string; size?: number }) {
@@ -79,58 +76,153 @@ function Avatar({ name, size = 44 }: { name: string; size?: number }) {
 
 // ------------------------------------------------------------------ Inbox
 
+const FRIENDS_KEY = '/social/connections?kind=friends&skip=0';
+
 export function Inbox() {
   const inbox = useApi<InboxEntry[]>('/messages/conversations', {
     revalidateOnFocus: true,
     refreshInterval: INBOX_MS,
   });
-  if (inbox.isLoading) return <Spinner />;
-  if (inbox.error) return <ErrorNote message="Your messages could not be loaded." />;
-  if (!inbox.data?.length)
-    return (
-      <EmptyState
-        message="No messages yet. Open a friend’s profile and tap Message."
-        action={
-          <Link href="/friends" className="btn">
-            Your friends
-          </Link>
-        }
-      />
-    );
+  const friends = useSocialApi<{ people: SocialPerson[] }>(FRIENDS_KEY);
+  const hasFriends = !!friends.data?.people.length;
   return (
-    <ul className="card divide-y divide-border">
-      {inbox.data.map((entry) => (
-        <li key={entry.id}>
-          <Link
-            href={`/messages/${entry.id}`}
-            className="flex items-center gap-3 px-4 py-3 hover:bg-surface-raised"
-          >
-            <Avatar name={entry.other.displayName} />
-            <span className="min-w-0 flex-1">
-              <span className={clsx('block truncate', entry.unread ? 'font-semibold' : 'font-medium')}>
-                {entry.other.displayName}
-              </span>
-              <span
-                className={clsx(
-                  'block truncate text-sm',
-                  entry.unread ? 'text-ink' : 'text-ink-muted',
+    <div className="mx-auto max-w-2xl">
+      <h1 className="sr-only">Messages</h1>
+      <FriendBalloons
+        people={friends.data?.people}
+        loading={!friends.data && !friends.error}
+      />
+      {inbox.isLoading ? (
+        <Spinner />
+      ) : inbox.error ? (
+        <ErrorNote message="Your messages could not be loaded." />
+      ) : !inbox.data?.length ? (
+        hasFriends ? (
+          <p className="px-1 py-6 text-center text-sm text-ink-muted">
+            Tap a friend above to start a conversation.
+          </p>
+        ) : (
+          <EmptyState
+            message="No messages yet. Add a friend, then tap them here to start a conversation."
+            action={
+              <Link href="/search" className="btn">
+                Find people
+              </Link>
+            }
+          />
+        )
+      ) : (
+        <ul className="-mx-2" aria-label="Conversations">
+          {inbox.data.map((entry) => (
+            <li key={entry.id}>
+              <Link
+                href={`/messages/${entry.id}`}
+                className="flex items-center gap-3 rounded-xl px-2 py-2 active:bg-surface-raised hover:bg-surface-raised"
+              >
+                <Avatar name={entry.other.displayName} size={52} />
+                <span className="min-w-0 flex-1">
+                  <span
+                    className={clsx(
+                      'block truncate',
+                      entry.unread ? 'font-semibold' : 'font-medium',
+                    )}
+                  >
+                    {entry.other.displayName}
+                  </span>
+                  <span
+                    className={clsx(
+                      'block truncate text-sm',
+                      entry.unread ? 'text-ink' : 'text-ink-muted',
+                    )}
+                  >
+                    {entry.preview} · {postTimeLabel(entry.lastMessageAt)}
+                  </span>
+                </span>
+                {entry.unread > 0 && (
+                  <span
+                    className="min-w-[22px] rounded-full bg-sky-500 px-1.5 text-center text-xs font-semibold leading-[22px] text-white"
+                    aria-label={`${entry.unread} unread`}
+                  >
+                    {entry.unread >= 99 ? '99+' : entry.unread}
+                  </span>
                 )}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Friends as a row of round avatars, the way Instagram's inbox starts. Tapping one opens (or
+ * creates) the conversation. Each balloon is a fixed slot, so stories can later add a ring
+ * around it without changing the layout.
+ *
+ * The row scrolls sideways, so a swipe that starts on it belongs to it, not to the tab pager.
+ */
+function FriendBalloons({
+  people,
+  loading,
+}: {
+  people?: SocialPerson[];
+  loading: boolean;
+}) {
+  const router = useRouter();
+  const [opening, setOpening] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  if (!loading && !people?.length) return null;
+  const open = async (person: SocialPerson) => {
+    if (opening) return;
+    setOpening(person.userId);
+    setError(null);
+    try {
+      router.push(`/messages/${await openConversation(person.userId)}`);
+    } catch (caught) {
+      setError(errorText(caught, 'That conversation could not be opened.'));
+      setOpening(null);
+    }
+  };
+  return (
+    <div className="mb-2">
+      <ul
+        className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-3 pt-1"
+        aria-label="Friends"
+      >
+        {loading
+          ? [0, 1, 2, 3, 4].map((index) => (
+              <li
+                key={index}
+                className="flex w-16 shrink-0 flex-col items-center gap-1.5"
+                aria-hidden
               >
-                {entry.preview} · {postTimeLabel(entry.lastMessageAt)}
-              </span>
-            </span>
-            {entry.unread > 0 && (
-              <span
-                className="min-w-[22px] rounded-full bg-sky-500 px-1.5 text-center text-xs font-semibold leading-[22px] text-white"
-                aria-label={`${entry.unread} unread`}
-              >
-                {entry.unread >= 99 ? '99+' : entry.unread}
-              </span>
-            )}
-          </Link>
-        </li>
-      ))}
-    </ul>
+                <span className="h-16 w-16 animate-pulse rounded-full bg-surface-raised" />
+                <span className="h-2.5 w-10 animate-pulse rounded bg-surface-raised" />
+              </li>
+            ))
+          : people?.map((person) => (
+              <li key={person.userId} className="shrink-0">
+                <button
+                  type="button"
+                  className={clsx(
+                    'flex w-16 flex-col items-center gap-1.5',
+                    opening === person.userId && 'opacity-60',
+                  )}
+                  aria-label={`Message ${person.displayName}`}
+                  disabled={!!opening}
+                  onClick={() => void open(person)}
+                >
+                  <Avatar name={person.displayName} size={64} />
+                  <span className="w-full truncate text-center text-xs text-ink-muted">
+                    {person.displayName.split(/\s+/)[0]}
+                  </span>
+                </button>
+              </li>
+            ))}
+      </ul>
+      {error && <ErrorNote message={error} />}
+    </div>
   );
 }
 
@@ -148,7 +240,10 @@ interface Pending {
 function separatorLabel(at: string): string {
   const date = new Date(at);
   const today = new Date();
-  const time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  const time = date.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
   if (date.toDateString() === today.toDateString()) return time;
   const sameYear = date.getFullYear() === today.getFullYear();
   return `${date.toLocaleDateString(undefined, {
@@ -160,16 +255,24 @@ function separatorLabel(at: string): string {
 }
 
 function nearBottom(): boolean {
-  return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 120;
+  return (
+    window.innerHeight + window.scrollY >=
+    document.documentElement.scrollHeight - 120
+  );
 }
 function toBottom() {
   window.scrollTo({ top: document.documentElement.scrollHeight });
 }
 
-function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
+function mergeMessages(
+  current: ChatMessage[],
+  incoming: ChatMessage[],
+): ChatMessage[] {
   const byId = new Map(current.map((m) => [m.id, m]));
   for (const m of incoming) byId.set(m.id, m);
-  return [...byId.values()].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return [...byId.values()].sort((a, b) =>
+    a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+  );
 }
 
 export function Conversation({ id }: { id: string }) {
@@ -207,7 +310,11 @@ export function Conversation({ id }: { id: string }) {
         setMessages(page.messages);
         setNextBefore(page.nextBefore);
       })
-      .catch((caught) => !cancelled && setError(errorText(caught, 'Messages could not be loaded.')));
+      .catch(
+        (caught) =>
+          !cancelled &&
+          setError(errorText(caught, 'Messages could not be loaded.')),
+      );
     return () => {
       cancelled = true;
     };
@@ -220,10 +327,13 @@ export function Conversation({ id }: { id: string }) {
   const sync = useCallback(async () => {
     if (document.visibilityState !== 'visible') return;
     try {
-      const result = await api.post<SyncResult>(`/messages/conversations/${id}/sync`, {
-        ...(latest.current ? { after: latest.current } : {}),
-        ...(since.current ? { since: since.current } : {}),
-      });
+      const result = await api.post<SyncResult>(
+        `/messages/conversations/${id}/sync`,
+        {
+          ...(latest.current ? { after: latest.current } : {}),
+          ...(since.current ? { since: since.current } : {}),
+        },
+      );
       since.current = result.serverTime;
       stickToBottom.current = nearBottom();
       setOtherLastReadAt(result.otherLastReadAt);
@@ -233,16 +343,26 @@ export function Conversation({ id }: { id: string }) {
           const merged = mergeMessages(current ?? [], result.messages);
           const unsent = new Set(result.unsentIds);
           return merged.map((m) =>
-            unsent.has(m.id) ? { id: m.id, mine: m.mine, kind: 'unsent', createdAt: m.createdAt } : m,
+            unsent.has(m.id)
+              ? {
+                  id: m.id,
+                  mine: m.mine,
+                  kind: 'unsent',
+                  createdAt: m.createdAt,
+                }
+              : m,
           );
         });
       if (result.messages.some((m) => m.requestId))
         setPending((list) =>
-          list.filter((p) => !result.messages.some((m) => m.requestId === p.requestId)),
+          list.filter(
+            (p) => !result.messages.some((m) => m.requestId === p.requestId),
+          ),
         );
       // The header count changes only on the first sync (it marks the chat read) or when
       // something arrives, so it isn't refetched on every tick.
-      if (!synced.current || result.messages.length) void refreshUnread.current();
+      if (!synced.current || result.messages.length)
+        void refreshUnread.current();
       synced.current = true;
     } catch {
       // Polling failures are silent; the next tick tries again.
@@ -277,17 +397,26 @@ export function Conversation({ id }: { id: string }) {
         { ...item, status: 'sending', error: undefined },
       ]);
       try {
-        const stored = await api.post<ChatMessage>(`/messages/conversations/${id}/messages`, {
-          requestId: item.requestId,
-          ...item.body,
-        });
+        const stored = await api.post<ChatMessage>(
+          `/messages/conversations/${id}/messages`,
+          {
+            requestId: item.requestId,
+            ...item.body,
+          },
+        );
         setMessages((current) => mergeMessages(current ?? [], [stored]));
-        setPending((list) => list.filter((p) => p.requestId !== item.requestId));
+        setPending((list) =>
+          list.filter((p) => p.requestId !== item.requestId),
+        );
       } catch (caught) {
         setPending((list) =>
           list.map((p) =>
             p.requestId === item.requestId
-              ? { ...p, status: 'failed', error: errorText(caught, 'Not sent. Tap to retry.') }
+              ? {
+                  ...p,
+                  status: 'failed',
+                  error: errorText(caught, 'Not sent. Tap to retry.'),
+                }
               : p,
           ),
         );
@@ -308,7 +437,9 @@ export function Conversation({ id }: { id: string }) {
       setNextBefore(page.nextBefore);
       // Keep the message the member was reading where it was.
       requestAnimationFrame(() =>
-        window.scrollBy({ top: document.documentElement.scrollHeight - before }),
+        window.scrollBy({
+          top: document.documentElement.scrollHeight - before,
+        }),
       );
     } catch (caught) {
       setError(errorText(caught, 'Older messages could not be loaded.'));
@@ -318,7 +449,9 @@ export function Conversation({ id }: { id: string }) {
   async function toggleMute() {
     if (!view.data) return;
     try {
-      await api.put(`/messages/conversations/${id}/mute`, { muted: !view.data.muted });
+      await api.put(`/messages/conversations/${id}/mute`, {
+        muted: !view.data.muted,
+      });
       await view.mutate();
     } catch (caught) {
       setError(errorText(caught, 'Could not change notifications.'));
@@ -326,21 +459,33 @@ export function Conversation({ id }: { id: string }) {
   }
 
   if (view.error)
-    return <ErrorNote message={errorText(view.error, 'This conversation isn’t available.')} />;
-  if (!view.data || !messages) return error ? <ErrorNote message={error} /> : <Spinner />;
+    return (
+      <ErrorNote
+        message={errorText(view.error, 'This conversation isn’t available.')}
+      />
+    );
+  if (!view.data || !messages)
+    return error ? <ErrorNote message={error} /> : <Spinner />;
 
   const other = view.data.other;
   const stored = new Set(messages.map((m) => m.requestId).filter(Boolean));
   const shownPending = pending.filter((p) => !stored.has(p.requestId));
   const separators = new Set(timeSeparators(messages.map((m) => m.createdAt)));
   const lastMine = [...messages].reverse().find((m) => m.mine);
-  const lastIsMine = messages[messages.length - 1]?.mine && !shownPending.length;
-  const seen = lastIsMine ? seenLabel(lastMine?.createdAt, otherLastReadAt) : null;
+  const lastIsMine =
+    messages[messages.length - 1]?.mine && !shownPending.length;
+  const seen = lastIsMine
+    ? seenLabel(lastMine?.createdAt, otherLastReadAt)
+    : null;
 
   return (
     <div className="mx-auto flex min-h-[calc(100dvh-8rem)] max-w-2xl flex-col">
       <div className="sticky top-[calc(env(safe-area-inset-top)+4.25rem)] z-30 -mx-4 mb-2 flex items-center gap-3 border-b border-border bg-surface/95 px-4 py-2 backdrop-blur">
-        <Link href="/messages" className="btn-ghost -ml-2 px-2" aria-label="Back to messages">
+        <Link
+          href="/messages"
+          className="btn-ghost -ml-2 px-2"
+          aria-label="Back to messages"
+        >
           <ArrowLeft size={20} />
         </Link>
         <Avatar name={other.displayName} size={36} />
@@ -354,7 +499,9 @@ export function Conversation({ id }: { id: string }) {
           type="button"
           className="btn-ghost px-2"
           onClick={() => void toggleMute()}
-          aria-label={view.data.muted ? 'Unmute notifications' : 'Mute notifications'}
+          aria-label={
+            view.data.muted ? 'Unmute notifications' : 'Mute notifications'
+          }
           aria-pressed={view.data.muted}
         >
           {view.data.muted ? <BellOff size={18} /> : <Bell size={18} />}
@@ -364,14 +511,19 @@ export function Conversation({ id }: { id: string }) {
       <div className="flex-1 space-y-1 pb-3">
         {nextBefore && (
           <div className="flex justify-center py-2">
-            <button type="button" className="btn-ghost text-sm" onClick={() => void loadOlder()}>
+            <button
+              type="button"
+              className="btn-ghost text-sm"
+              onClick={() => void loadOlder()}
+            >
               Load earlier messages
             </button>
           </div>
         )}
         {!messages.length && !shownPending.length && (
           <p className="py-10 text-center text-sm text-ink-faint">
-            Say hi to {other.displayName}. Messages are only between the two of you.
+            Say hi to {other.displayName}. Messages are only between the two of
+            you.
           </p>
         )}
         {messages.map((message, index) => (
@@ -383,7 +535,11 @@ export function Conversation({ id }: { id: string }) {
             )}
             <Bubble
               message={message}
-              onUnsend={message.mine && message.kind !== 'unsent' ? () => setUnsendId(message.id) : undefined}
+              onUnsend={
+                message.mine && message.kind !== 'unsent'
+                  ? () => setUnsendId(message.id)
+                  : undefined
+              }
             />
           </div>
         ))}
@@ -407,7 +563,9 @@ export function Conversation({ id }: { id: string }) {
             </button>
           </div>
         ))}
-        {seen && <p className="pr-1 text-right text-[11px] text-ink-faint">{seen}</p>}
+        {seen && (
+          <p className="pr-1 text-right text-[11px] text-ink-faint">{seen}</p>
+        )}
       </div>
 
       {error && <ErrorNote message={error} />}
@@ -444,11 +602,20 @@ export function Conversation({ id }: { id: string }) {
             .then(() =>
               setMessages((current) =>
                 (current ?? []).map((m) =>
-                  m.id === target ? { id: m.id, mine: true, kind: 'unsent', createdAt: m.createdAt } : m,
+                  m.id === target
+                    ? {
+                        id: m.id,
+                        mine: true,
+                        kind: 'unsent',
+                        createdAt: m.createdAt,
+                      }
+                    : m,
                 ),
               ),
             )
-            .catch((caught) => setError(errorText(caught, 'Could not unsend.')));
+            .catch((caught) =>
+              setError(errorText(caught, 'Could not unsend.')),
+            );
         }}
       >
         <p className="text-sm text-ink-muted">
@@ -471,10 +638,14 @@ function PostCard({ post, mine }: { post: SharedPostCard; mine: boolean }) {
       href={`/posts/${post.id}`}
       className={clsx(
         'block w-64 max-w-full rounded-2xl border px-3.5 py-3',
-        mine ? 'border-sky-500/40 bg-sky-500/10' : 'border-border bg-surface-raised',
+        mine
+          ? 'border-sky-500/40 bg-sky-500/10'
+          : 'border-border bg-surface-raised',
       )}
     >
-      <span className="block text-xs text-ink-faint">{post.authorName} · Food post</span>
+      <span className="block text-xs text-ink-faint">
+        {post.authorName} · Food post
+      </span>
       <span className="mt-1 block font-medium">{post.title}</span>
       {post.totalKcal !== undefined && (
         <span className="mt-1 block text-sm text-ink-muted">
@@ -485,11 +656,22 @@ function PostCard({ post, mine }: { post: SharedPostCard; mine: boolean }) {
   );
 }
 
-function Bubble({ message, onUnsend }: { message: ChatMessage; onUnsend?: () => void }) {
+function Bubble({
+  message,
+  onUnsend,
+}: {
+  message: ChatMessage;
+  onUnsend?: () => void;
+}) {
   const [menu, setMenu] = useState(false);
   const mine = message.mine;
   return (
-    <div className={clsx('group flex items-center gap-1', mine ? 'justify-end' : 'justify-start')}>
+    <div
+      className={clsx(
+        'group flex items-center gap-1',
+        mine ? 'justify-end' : 'justify-start',
+      )}
+    >
       {onUnsend && (
         <span className="relative">
           <button
@@ -574,7 +756,12 @@ function Composer({ onSend }: { onSend: (text: string) => void }) {
         onChange={(event) => setText(event.target.value)}
         onKeyDown={(event) => {
           // Enter sends on a keyboard; Shift+Enter (and phones' return key) adds a line.
-          if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && window.matchMedia('(pointer: fine)').matches) {
+          if (
+            event.key === 'Enter' &&
+            !event.shiftKey &&
+            !event.nativeEvent.isComposing &&
+            window.matchMedia('(pointer: fine)').matches
+          ) {
             event.preventDefault();
             submit();
           }
@@ -595,11 +782,20 @@ function Composer({ onSend }: { onSend: (text: string) => void }) {
 // ------------------------------------------------------------------ Send a post
 
 /** Friend picker for a post's Send button (spec US4). */
-export function SendPostDialog({ postId, onClose }: { postId: string; onClose: () => void }) {
+export function SendPostDialog({
+  postId,
+  onClose,
+}: {
+  postId: string;
+  onClose: () => void;
+}) {
   const router = useRouter();
-  const friends = useSocialApi<{ people: SocialPerson[] }>('/social/connections?kind=friends&skip=0');
+  const friends = useSocialApi<{ people: SocialPerson[] }>(FRIENDS_KEY);
   const [sending, setSending] = useState<string | null>(null);
-  const [sent, setSent] = useState<{ name: string; conversationId: string } | null>(null);
+  const [sent, setSent] = useState<{
+    name: string;
+    conversationId: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function sendTo(person: SocialPerson) {
@@ -624,7 +820,10 @@ export function SendPostDialog({ postId, onClose }: { postId: string; onClose: (
       {error && <ErrorNote message={error} />}
       {sent ? (
         <div className="space-y-3 text-sm">
-          <p>Sent to {sent.name}. They’ll see it only if the post’s audience includes them.</p>
+          <p>
+            Sent to {sent.name}. They’ll see it only if the post’s audience
+            includes them.
+          </p>
           <button
             type="button"
             className="btn-primary w-full justify-center"
@@ -636,13 +835,20 @@ export function SendPostDialog({ postId, onClose }: { postId: string; onClose: (
       ) : friends.isLoading || !friends.data ? (
         <Spinner />
       ) : !friends.data.people.length ? (
-        <p className="text-sm text-ink-muted">Add friends to send them posts.</p>
+        <p className="text-sm text-ink-muted">
+          Add friends to send them posts.
+        </p>
       ) : (
         <ul className="-mx-2 max-h-80 divide-y divide-border overflow-y-auto">
           {friends.data.people.map((person) => (
-            <li key={person.userId} className="flex items-center gap-3 px-2 py-2.5">
+            <li
+              key={person.userId}
+              className="flex items-center gap-3 px-2 py-2.5"
+            >
               <Avatar name={person.displayName} size={36} />
-              <span className="min-w-0 flex-1 truncate">{person.displayName}</span>
+              <span className="min-w-0 flex-1 truncate">
+                {person.displayName}
+              </span>
               <button
                 type="button"
                 className="btn shrink-0"

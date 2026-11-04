@@ -126,6 +126,11 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   move with `pointercancel`), and a card stays an `<a>` in edit mode with its click cancelled —
   replacing the node the finger is touching cancels the touch. Either mistake gives the same
   symptom: the card lifts and the drag dies immediately. `npm run check` passed through both.
+- **Swiping between tabs (`components/tab-pager.tsx`) follows the pull-to-refresh rules**:
+  `touchmove` is registered non-passive at mount, and a gesture already `defaultPrevented` is
+  never a swipe. At rest the page must have *no* transform (not `translateX(0)`), because modals
+  are `position: fixed` inside the page. A swipe that starts in anything that scrolls sideways
+  belongs to that element; mark other sideways gestures with `data-no-tab-swipe`.
 - **A payment's `day` is stored, and the *server* applies `dayStartHour`** — both deliberate, both
   the opposite of how meals work. Deriving the day later would move historic payments when the
   setting changed; a Shortcut cannot read the profile, so only the server can apply the rule. See

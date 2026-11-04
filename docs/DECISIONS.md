@@ -1031,3 +1031,27 @@ pruned the Linux optional builds (rolldown) that Render and Vercel need.
   Redis.
 - **Message previews on the lock screen are opt-in** (`showMessagePreviews`), like comment
   previews.
+
+## 2026-11-04 — Swiping between tabs: who owns a sideways swipe, and preloaded neighbours
+
+- **Only the five tab roots swipe**, and only on touch screens. Swiping on a detail page (a
+  module, a profile, a chat) would fight its own gestures and has no obvious neighbour.
+- **A swipe that starts in anything that scrolls sideways belongs to that element for the whole
+  gesture, even at its end.** This is how iOS nests scroll views. Android instead hands the
+  gesture to the pager once the inner scroller can't move further, which is the behaviour that
+  makes people change tabs by accident while flicking past the last item. The same applies to
+  form controls, charts (`.recharts-wrapper`), fixed layers (modals, the editing toolbar) and
+  anything marked `data-no-tab-swipe`.
+- **The direction is decided once**, after 10px, and sideways must beat vertical by 1.2×. A
+  vertical start stays a scroll, and a sideways one never scrolls the page.
+- **The neighbours are mounted ahead of time**, hidden and inert, on idle after the current tab
+  renders, and their routes are prefetched. The first frame of a swipe already shows the real
+  neighbour with its data. After release the slide finishes, then the app navigates, and the
+  real page replaces the preview from the same cache. The price is that the neighbours' data
+  loads (and the inbox polls) while you're on an adjacent tab.
+- **At rest the page has no transform at all**, not `translateX(0)`. Modals render inside the
+  page with `position: fixed`, and any transform on an ancestor would pin them to the page.
+- The tab pages' contents moved into components (`home-dashboard`, `people-search`,
+  `friends-list`, `menu-content`), because a Next page file may only export the page itself and
+  the pager needs to render the neighbour without its shell.
+
