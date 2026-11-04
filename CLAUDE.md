@@ -9,6 +9,8 @@ sellable assets, share holdings, work obligations, side projects, personal plans
    are not aspirational; the code follows them and reviews enforce them.
 2. `docs/modules/<module>.md` — one doc per module: schema, endpoints, formulas, cross-links.
 3. `docs/DECISIONS.md` — why things are the way they are, including the non-obvious ones.
+4. `docs/ROADMAP.md` — what's built, what's next and in what order, the infrastructure tiers
+   and the business model.
 
 ## The six principles, in one line each
 
