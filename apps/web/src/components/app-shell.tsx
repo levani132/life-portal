@@ -25,10 +25,28 @@ import { ActivityBell, NotificationsBridge } from './notifications';
 import { PeopleSearch } from './people-search';
 import { PortalLoader } from './portal-loader';
 import { PullToRefresh } from './pull-to-refresh';
-import { TabPager, type PagerTab } from './tab-pager';
+import { TabHost, type HostTab } from './tab-host';
 import { ErrorNote } from './ui';
 
+/** Routes that render without the portal: signing in and creating an account. */
+const PUBLIC_PATHS = ['/login', '/register'];
+
+/**
+ * Pages still wrap themselves in `AppShell`, but the shell itself is mounted once, by the root
+ * layout (`PortalShell`), and survives every navigation. That is what keeps the tabs alive:
+ * leaving Home and coming back finds it exactly where it was.
+ */
 export function AppShell({ children }: { children: ReactNode }) {
+  return <>{children}</>;
+}
+
+export function PortalShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  if (PUBLIC_PATHS.includes(pathname)) return <>{children}</>;
+  return <Portal>{children}</Portal>;
+}
+
+function Portal({ children }: { children: ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -82,62 +100,60 @@ export function AppShell({ children }: { children: ReactNode }) {
     pathname === '/profile';
   const tabs = tabsFor(portal.data.access, pathname, inMenu);
   const current = tabs.findIndex((tab) => tab.href === pathname);
-  const page = (
-    <main className={mainClassFor(pathname)}>
-      {allowed ? (
-        children
-      ) : (
-        <div className="card mx-auto max-w-lg p-6">
-          <h1 className="text-xl font-semibold">
-            This module isn’t available yet
-          </h1>
-          <p className="mt-2 text-sm text-ink-muted">
-            You can manage your available modules in Menu.
-          </p>
-          <Link className="btn mt-4" href="/">
-            Go Home
-          </Link>
-        </div>
-      )}
-    </main>
-  );
   return (
     <div className="min-h-screen">
-      <ScrollHeader hidden={chromeHidden} onReveal={revealChrome}>
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
-          <Link href="/" className="font-semibold tracking-tight">
-            Life<span className="text-accent">Portal</span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <ActivityBell access={portal.data.access} />
-            <Link href="/menu" className="text-sm text-ink-muted">
-              {user.name}
+      {/* A conversation has its own header (back, the person, mute), and only that. */}
+      {!inChat && (
+        <ScrollHeader hidden={chromeHidden} onReveal={revealChrome}>
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
+            <Link href="/" className="font-semibold tracking-tight">
+              Life<span className="text-accent">Portal</span>
             </Link>
+            <div className="flex items-center gap-2">
+              <ActivityBell access={portal.data.access} />
+              <Link href="/menu" className="text-sm text-ink-muted">
+                {user.name}
+              </Link>
+            </div>
           </div>
-        </div>
-      </ScrollHeader>
+        </ScrollHeader>
+      )}
       <HealthSyncBridge key={user.id} enabled={portal.data.access.nutrition} />
       <NotificationsBridge
         key={`push-${user.id}`}
         access={portal.data.access}
       />
-      {inChat ? (
-        page
-      ) : (
-        <PullToRefresh>
-          {current >= 0 && allowed ? (
-            <TabPager
-              prev={tabs[current - 1]}
-              next={tabs[current + 1]}
-              onSwipeStart={revealChrome}
-            >
-              {page}
-            </TabPager>
-          ) : (
-            page
+      {/* One stable tree for every route, so moving between pages never remounts the tabs. A
+          conversation owns its scroll, so pull-to-refresh is off there. */}
+      <PullToRefresh enabled={!inChat}>
+        <main>
+          <TabHost
+            key={user.id}
+            tabs={tabs}
+            active={current >= 0 ? tabs[current].href : null}
+            onSwipeStart={revealChrome}
+          />
+          {current < 0 && (
+            <div className={mainClassFor(pathname)}>
+              {allowed ? (
+                children
+              ) : (
+                <div className="card mx-auto max-w-lg p-6">
+                  <h1 className="text-xl font-semibold">
+                    This module isn’t available yet
+                  </h1>
+                  <p className="mt-2 text-sm text-ink-muted">
+                    You can manage your available modules in Menu.
+                  </p>
+                  <Link className="btn mt-4" href="/">
+                    Go Home
+                  </Link>
+                </div>
+              )}
+            </div>
           )}
-        </PullToRefresh>
-      )}
+        </main>
+      </PullToRefresh>
       <nav
         hidden={inChat}
         aria-label="Main navigation"
@@ -152,6 +168,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link
               key={href}
               href={href}
+              // Each tab keeps its own scroll position; tapping the open tab goes to its top.
+              scroll={false}
+              onClick={() => {
+                if (href === pathname)
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               aria-current={active ? 'page' : undefined}
               className={clsx(
                 'flex min-h-16 flex-1 flex-col items-center justify-center gap-1 text-xs',
@@ -263,7 +285,7 @@ function mainClassFor(pathname: string): string {
   );
 }
 
-interface Tab extends PagerTab {
+interface Tab extends HostTab {
   label: string;
   icon: LucideIcon;
   active: boolean;

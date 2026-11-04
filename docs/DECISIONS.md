@@ -1044,13 +1044,22 @@ pruned the Linux optional builds (rolldown) that Render and Vercel need.
   anything marked `data-no-tab-swipe`.
 - **The direction is decided once**, after 10px, and sideways must beat vertical by 1.2×. A
   vertical start stays a scroll, and a sideways one never scrolls the page.
-- **The neighbours are mounted ahead of time**, hidden and inert, on idle after the current tab
-  renders, and their routes are prefetched. The first frame of a swipe already shows the real
-  neighbour with its data. After release the slide finishes, then the app navigates, and the
-  real page replaces the preview from the same cache. The price is that the neighbours' data
-  loads (and the inbox polls) while you're on an adjacent tab.
-- **At rest the page has no transform at all**, not `translateX(0)`. Modals render inside the
-  page with `position: fixed`, and any transform on an ancestor would pin them to the page.
+- **All tab roots stay mounted** (superseding the first version, which mounted read-only
+  previews of the neighbours and navigated to a fresh page). The shell (`PortalShell`) now lives
+  in the root layout, so it survives navigation, and `TabHost` keeps every tab mounted: the
+  open one in the normal page flow (the window scrolls it, so the hiding header,
+  pull-to-refresh and status-bar-tap-to-top keep working), the others as hidden, inert, fixed
+  layers. Each tab's scroll position is restored before the first paint after a switch. The
+  previews had two costs this removes: a page shown twice, and a jump on landing (the preview's
+  inline top padding replaced the page's own, so content shifted by that padding).
+- **The scroll position is recorded on every touch, click and back**, not only on scroll
+  events. A browser may not deliver the last scroll event before a switch (a background tab
+  delivers none), and after the switch commits the old position is gone.
+- Pages still wrap themselves in `AppShell`, which is now a pass-through, so the 28 pages did not
+  change. On a tab root the shell ignores the page's own render and shows the live tab.
+- The cost: the five tabs' data loads, and the inbox polls, while the portal is open.
+- **At rest no tab has a transform at all**, not `translateX(0)`. Modals render inside the
+  tab with `position: fixed`, and any transform on an ancestor would pin them to the tab.
 - The tab pages' contents moved into components (`home-dashboard`, `people-search`,
   `friends-list`, `menu-content`), because a Next page file may only export the page itself and
   the pager needs to render the neighbour without its shell.

@@ -107,7 +107,8 @@ updates every card (principle IV).
   - a mute toggle.
 - `SendPostDialog`: the friend picker for posts.
 
-`/messages/:id` hides the bottom tabs and pull-to-refresh.
+`/messages/:id` hides the app header, the bottom tabs and pull-to-refresh; the chat's own
+header (back, the person, mute) is the only header.
 
 ## Limits and open questions
 

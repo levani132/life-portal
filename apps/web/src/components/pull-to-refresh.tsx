@@ -30,7 +30,16 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * 9;
  * - A gesture already claimed by someone else (`defaultPrevented`, e.g. a card being dragged on
  *   the dashboard) is never also a pull.
  */
-export function PullToRefresh({ children }: { children: ReactNode }) {
+export function PullToRefresh({
+  children,
+  enabled = true,
+}: {
+  children: ReactNode;
+  /** Off where the page owns its own scroll (a conversation). The tree stays the same. */
+  enabled?: boolean;
+}) {
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const gesture = useRef({
@@ -62,6 +71,7 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
       g.armed = false;
       if (refreshingRef.current) return;
       setPull(0);
+      if (!enabledRef.current) return;
       if (window.scrollY > 0) return;
       if (event.touches.length !== 1) return;
       // A touch inside something with its own vertical scrollbar — a sheet, a modal list —

@@ -479,8 +479,8 @@ export function Conversation({ id }: { id: string }) {
     : null;
 
   return (
-    <div className="mx-auto flex min-h-[calc(100dvh-8rem)] max-w-2xl flex-col">
-      <div className="sticky top-[calc(env(safe-area-inset-top)+4.25rem)] z-30 -mx-4 mb-2 flex items-center gap-3 border-b border-border bg-surface/95 px-4 py-2 backdrop-blur">
+    <div className="mx-auto flex min-h-dvh max-w-2xl flex-col">
+      <div className="sticky top-0 z-30 -mx-4 mb-2 flex items-center gap-3 border-b border-border bg-surface/95 px-4 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur">
         <Link
           href="/messages"
           className="btn-ghost -ml-2 px-2"

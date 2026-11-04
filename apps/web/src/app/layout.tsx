@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { ThemeSync } from '../components/theme-preference';
 import { AuthProvider } from '../lib/auth-context';
+import { PortalShell } from '../components/app-shell';
 import { ServiceWorkerRegistration } from '../components/service-worker';
 
 export const metadata: Metadata = {
@@ -61,7 +62,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body>
         <ThemeSync />
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <PortalShell>{children}</PortalShell>
+        </AuthProvider>
         <ServiceWorkerRegistration />
       </body>
     </html>

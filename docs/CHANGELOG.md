@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-04 — Tabs stay where you left them
+
+Home, Messages, Search, Friends and Menu now stay open in the background. Scroll down Home, move
+to Messages or open a widget, and coming back finds Home exactly where you left it. Swiping
+between tabs no longer nudges the page down when it lands. Tapping the tab you're already on
+scrolls it to the top. Inside a conversation the app's header is gone; the chat's own header
+(back, the person, mute) is the only one.
+
 ## 2026-11-04 — Messages tab and swiping between tabs
 
 Messages moved from the header to the bottom tabs, right after Home, with the unread count on
