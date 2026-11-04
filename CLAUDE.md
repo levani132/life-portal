@@ -134,7 +134,7 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   gesture is never a swipe. At rest no tab may have a transform, because modals are
   `position: fixed` inside it. A swipe that starts in anything that scrolls sideways belongs to
   that element; mark other sideways gestures with `data-no-tab-swipe`.
-- **Top chrome starts at `var(--top-chrome)`, not `env(safe-area-inset-top)`.** In the installed
+- **Top chrome starts at `var(--top-chrome)` (or `var(--chat-top)`), not `env(safe-area-inset-top)`.** In the installed
   iOS app it adds room for the blur iOS 26 draws over the top of web apps; content placed in that
   band looks out of focus and nothing turns the blur off. See `docs/DECISIONS.md`.
 - **A payment's `day` is stored, and the *server* applies `dayStartHour`** — both deliberate, both

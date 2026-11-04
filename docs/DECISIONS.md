@@ -1070,10 +1070,13 @@ Since iOS 26, a Home Screen web app gets the system "scroll edge effect": a prog
 roughly the top 40pt of the page, below the status bar. Other projects tried removing
 `black-translucent`, adding an opaque strip and splitting the header's `backdrop-filter` into
 another layer, and none of those removed it on a device. The approach reported to work is
-keeping content out of that band. So `--top-chrome` (global.css) is the safe-area inset plus
-1.5rem in the installed app on iOS (`display-mode: standalone` with
-`@supports (-webkit-touch-callout: none)`), and both headers start their content there. The band
-is the header's own flat colour, so blurring it changes nothing visible. The cost is 24px of
-header height, and only on iPhone/iPad Home Screen apps. If a future iOS changes the depth,
+keeping content out of that band. In the installed app on iOS (`display-mode: standalone` with
+`@supports (-webkit-touch-callout: none)`), `--top-chrome` (the app header) is the safe-area
+inset plus 0.375rem, and `--chat-top` (a conversation's header) the inset plus 2rem. The app
+header already had 16px of its own padding and only its top few pixels were blurred; 1.5rem
+there, tried first, pushed it visibly too low on an iPhone. The chat header has 0.5rem of
+padding and needed the full clearance. The band
+is the header's own flat colour, so blurring it changes nothing visible. The cost is a few pixels of
+app header and 24px of chat header, only on iPhone/iPad Home Screen apps. If a future iOS changes the depth,
 this is the one value to tune.
 
