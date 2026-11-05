@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-05: The same macro colours everywhere
+
+Calories are green, protein purple, carbs blue and fat amber on the Home widget, the Food page,
+the week chart, posts, share images and link previews. Before, the widget and the Food page each
+had their own colours (fat was green on Home).
+
 ## 2026-11-05: Share to Instagram, TikTok, WhatsApp and more
 
 The Share sheet has a **Share to** row. Instagram and TikTok get a Story-sized image of the post:

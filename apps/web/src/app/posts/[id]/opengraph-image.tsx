@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og';
+import { MACRO_COLORS } from '../../../lib/macro-colors';
 import { macroShares, ringArcs } from '@life-portal/shared-domain';
 import type { PublicPostPreview } from '@life-portal/shared-types';
 import { fetchPublicPreview } from '../../../lib/public-preview';
@@ -11,7 +12,7 @@ const BG = '#0C0E14';
 const INK = '#F4F5F8';
 const MUTED = '#9AA3B2';
 const ACCENT = '#38BDF8';
-const COLORS = { protein: '#A78BFA', carbs: '#38BDF8', fat: '#FBBF24' };
+const COLORS = MACRO_COLORS;
 
 /**
  * A font that covers the text, subset by Google Fonts to just those characters. Titles are often
@@ -94,7 +95,7 @@ function Rings({ macros }: { macros: NonNullable<PublicPostPreview['macros']> })
           }}
         >
           <span style={{ fontSize: 38, color: INK }}>{Math.round(macros.energyKcal)}</span>
-          <span style={{ fontSize: 18, color: MUTED }}>kcal</span>
+          <span style={{ fontSize: 18, color: COLORS.kcal }}>kcal</span>
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

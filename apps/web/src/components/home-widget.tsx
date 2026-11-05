@@ -1,6 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
+import { MACRO_COLORS } from '../lib/macro-colors';
 import {
   useLayoutEffect,
   useRef,
@@ -171,7 +172,7 @@ export function HomeWidget({
       value: nutrition.eatenKcal,
       target: nutrition.targetKcal,
       unit: 'kcal',
-      color: '#dc9560',
+      color: MACRO_COLORS.kcal,
       basis: nutrition.targetBasis?.calories,
     },
     {
@@ -179,7 +180,7 @@ export function HomeWidget({
       value: nutrition.proteinEatenG,
       target: nutrition.proteinTargetG,
       unit: 'g',
-      color: '#9c87cf',
+      color: MACRO_COLORS.protein,
       basis: nutrition.targetBasis?.protein,
     },
     {
@@ -187,7 +188,7 @@ export function HomeWidget({
       value: nutrition.carbEatenG,
       target: nutrition.carbTargetG,
       unit: 'g',
-      color: '#70a9d0',
+      color: MACRO_COLORS.carbs,
       basis: nutrition.targetBasis?.carbs,
     },
     {
@@ -195,7 +196,7 @@ export function HomeWidget({
       value: nutrition.fatEatenG,
       target: nutrition.fatTargetG,
       unit: 'g',
-      color: '#72ae91',
+      color: MACRO_COLORS.fat,
       basis: nutrition.targetBasis?.fat,
     },
   ];

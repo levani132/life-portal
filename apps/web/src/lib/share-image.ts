@@ -1,5 +1,6 @@
 'use client';
 import { macroShares, ringArcs } from '@life-portal/shared-domain';
+import { MACRO_COLORS } from './macro-colors';
 import type { FoodPost } from '@life-portal/shared-types';
 
 /**
@@ -13,7 +14,7 @@ const SURFACE = '#151924';
 const INK = '#F4F5F8';
 const MUTED = '#9AA3B2';
 const ACCENT = '#38BDF8';
-const COLORS = { protein: '#A78BFA', carbs: '#38BDF8', fat: '#FBBF24' };
+const COLORS = MACRO_COLORS;
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Georgian", "Noto Sans", sans-serif';
 
 /**
@@ -146,7 +147,7 @@ function draw(post: FoodPost, photo: ImageBitmap | null): HTMLCanvasElement {
     ctx.fillStyle = INK;
     ctx.font = `700 64px ${FONT}`;
     ctx.fillText(Math.round(m.energyKcal).toLocaleString(), cx, cy + 14);
-    ctx.fillStyle = MUTED;
+    ctx.fillStyle = COLORS.kcal;
     ctx.font = `500 30px ${FONT}`;
     ctx.fillText('kcal', cx, cy + 56);
     ctx.textAlign = 'left';

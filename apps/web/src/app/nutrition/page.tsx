@@ -1,6 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
+import { MACRO_COLORS } from '../../lib/macro-colors';
 import { useIsIOS } from '../../lib/ios-device';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -432,7 +433,7 @@ function MacroTiles({
     },
   ];
 
-  const colors = ['#fb923c', '#38bdf8', '#a78bfa', '#fbbf24'];
+  const colors = [MACRO_COLORS.kcal, MACRO_COLORS.protein, MACRO_COLORS.carbs, MACRO_COLORS.fat];
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

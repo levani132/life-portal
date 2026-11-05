@@ -1,7 +1,8 @@
 import clsx from 'clsx';
+import { MACRO_COLORS, MACRO_TEXT } from '../lib/macro-colors';
 import { macroShares } from '@life-portal/shared-domain';
 
-const COLORS = { protein: '#a78bfa', carbs: '#38bdf8', fat: '#fbbf24' };
+const COLORS = MACRO_COLORS;
 const R = 15.5;
 const C = 2 * Math.PI * R;
 
@@ -56,7 +57,7 @@ export function MacroRings({
         </svg>
         <span className="absolute inset-0 flex flex-col items-center justify-center leading-tight">
           <strong className="text-sm font-semibold tabular-nums">{Math.round(kcal).toLocaleString()}</strong>
-          <span className="text-[9px] text-ink-muted">kcal</span>
+          <span className={clsx('text-[9px]', MACRO_TEXT.kcal)}>kcal</span>
         </span>
       </div>
       {parts.map((part) => (

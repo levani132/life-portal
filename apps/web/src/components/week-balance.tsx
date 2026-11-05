@@ -64,7 +64,7 @@ export function WeekBalancePanel({ week }: { week: WeekBalanceData }) {
                       ? 'bg-border'
                       : dayTarget != null && day.eatenKcal > dayTarget
                         ? 'bg-rose-500/70'
-                        : 'bg-lime-500/70',
+                        : 'bg-emerald-400/80',
                     day.isToday && 'ring-1 ring-ink-faint',
                   )}
                   style={{ height: `${Math.max(day.logged ? 4 : 2, height)}%` }}
@@ -82,7 +82,7 @@ export function WeekBalancePanel({ week }: { week: WeekBalanceData }) {
       </div>
 
       {week.bankedKcal > 0 && (
-        <p className="mt-3 rounded-lg border border-lime-500/30 bg-lime-500/5 px-3 py-2 text-xs text-lime-200">
+        <p className="mt-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-200">
           <span className="tabular font-semibold">{week.bankedKcal.toLocaleString()} kcal</span>{' '}
           banked from the days you logged under target. An allowance for your cheat day, not a
           rule — and days you did not log are not counted.

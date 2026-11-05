@@ -1182,3 +1182,10 @@ The canvas loads the photo with `fetch` and `createImageBitmap`, not an `<img>`:
 cannot be exported. The image is rendered when the sheet opens, because iOS only lets
 `navigator.share` run within the tap that started it.
 
+## 2026-11-05: one palette for calories and macros
+
+`apps/web/src/lib/macro-colors.ts` holds the colours (`MACRO_COLORS` hex for SVG and canvas,
+`MACRO_TEXT` classes for text): calories green because they are energy, protein purple, carbs
+blue, fat amber. The Home widget, Food page, rings, Story image and OG card had drifted into
+three different palettes. Use the constants; don't write a macro hex at a call site.
+

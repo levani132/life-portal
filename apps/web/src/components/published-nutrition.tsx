@@ -1,4 +1,5 @@
 import type { PublishedFood, PublishedMacros } from '@life-portal/shared-types';
+import { MACRO_TEXT } from '../lib/macro-colors';
 import { publicationMacros } from '@life-portal/shared-domain';
 
 const metrics = [
@@ -6,11 +7,11 @@ const metrics = [
     key: 'energyKcal',
     label: 'Energy',
     unit: 'kcal',
-    color: 'text-emerald-400',
+    color: MACRO_TEXT.kcal,
   },
-  { key: 'proteinG', label: 'Protein', unit: 'g', color: 'text-violet-400' },
-  { key: 'carbG', label: 'Carbs', unit: 'g', color: 'text-sky-400' },
-  { key: 'fatG', label: 'Fat', unit: 'g', color: 'text-amber-400' },
+  { key: 'proteinG', label: 'Protein', unit: 'g', color: MACRO_TEXT.protein },
+  { key: 'carbG', label: 'Carbs', unit: 'g', color: MACRO_TEXT.carbs },
+  { key: 'fatG', label: 'Fat', unit: 'g', color: MACRO_TEXT.fat },
 ] as const;
 const number = (value: number) => Math.round(value * 10) / 10;
 
@@ -101,12 +102,12 @@ export function PublishedFoodMacros({ food }: { food: PublishedFood }) {
   if (!totals) return null;
   return (
     <p className="mt-1 text-xs text-ink-muted">
-      {number(totals.energyKcal)} kcal ·{' '}
-      <span className="text-violet-400">P {number(totals.proteinG)}g</span>
+      <span className={MACRO_TEXT.kcal}>{number(totals.energyKcal)} kcal</span> ·{' '}
+      <span className={MACRO_TEXT.protein}>P {number(totals.proteinG)}g</span>
       {' · '}
-      <span className="text-sky-400">C {number(totals.carbG)}g</span>
+      <span className={MACRO_TEXT.carbs}>C {number(totals.carbG)}g</span>
       {' · '}
-      <span className="text-amber-400">F {number(totals.fatG)}g</span>
+      <span className={MACRO_TEXT.fat}>F {number(totals.fatG)}g</span>
       {food.amount === undefined && <span> · per 100 {food.unit}</span>}
     </p>
   );
