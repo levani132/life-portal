@@ -57,6 +57,7 @@ export function FoodForm({
   food,
   lookupAvailable,
   lookupReason,
+  initialName,
   onSaved,
 }: {
   open: boolean;
@@ -64,6 +65,8 @@ export function FoodForm({
   food?: Food;
   lookupAvailable: boolean;
   lookupReason?: string;
+  /** Pre-fills a new food's name, e.g. with what was typed into a search. */
+  initialName?: string;
   onSaved?: () => void;
 }) {
   const editing = food != null;
@@ -107,7 +110,7 @@ export function FoodForm({
         sodiumMg: typed.sodiumMg != null ? String(typed.sodiumMg) : '',
       });
     } else {
-      setName('');
+      setName(initialName ?? '');
       setBrand('');
       setUnit('g');
       setServingSize('100');
@@ -117,7 +120,7 @@ export function FoodForm({
       setVisibility('private');
       setNumbers(EMPTY);
     }
-  }, [open, food, clearError]);
+  }, [open, food, initialName, clearError]);
 
   const num = (value: string): number => {
     const parsed = Number(value);

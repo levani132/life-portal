@@ -254,10 +254,13 @@ export function Modal({
   pending,
   error,
   wide,
+  headerAction,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
+  /** A small control beside the title, e.g. the log modal's day picker. */
+  headerAction?: ReactNode;
   children: ReactNode;
   onSubmit?: (event: FormEvent) => void;
   submitLabel?: string;
@@ -292,8 +295,9 @@ export function Modal({
         aria-modal="true"
         aria-label={title}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold">{title}</h3>
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <h3 className="min-w-0 truncate text-sm font-semibold">{title}</h3>
+          {headerAction && <div className="ml-auto shrink-0">{headerAction}</div>}
           <button
             type="button"
             className="text-ink-faint hover:text-ink"

@@ -2,6 +2,16 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-07: A tidier Log food window
+
+The Log food window fits on one phone screen. The meal is a row of icons (sunrise, sun, moon,
+cookie), and the day sits beside the title: arrows step a day, the label opens the calendar, and
+anything but today is highlighted. Pressing the food box opens a list with each food's photo — or
+an icon guessed from its name, tinted by its main macro — plus its calories and macros, and the
+chosen food folds into a card. A food you cannot find can be added straight from the list, with
+the name already typed. Servings and amount share one line, servings has −/+ buttons in half
+steps, and a newly chosen food starts at one serving so the rings show it at once.
+
 ## 2026-11-07: See your day before you log a meal
 
 The Log food window now shows four rings — calories, protein, carbs and fat — for the day as it
