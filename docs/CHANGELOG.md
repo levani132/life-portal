@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-07: Your foods as cards
+
+The Foods tab shows your foods as a grid of cards instead of lines of text: a large photo (or, for
+a food without one, a big icon on a tint of its main macro), the calories per serving, a bar of
+where those calories come from, and protein, carbs and fat in their colours. Tap a card to edit
+it; the star, share, edit and delete buttons sit on the card. All, Favourites and Archived chips
+replace the "include archived" checkbox.
+
 ## 2026-11-07: A tidier Log food window
 
 The Log food window fits on one phone screen. The meal is a row of icons (sunrise, sun, moon,

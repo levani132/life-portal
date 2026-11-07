@@ -131,3 +131,45 @@ export function FoodThumb({
     </span>
   );
 }
+
+/**
+ * The same picture as `FoodThumb`, filling its container — for a food card. Without a photo it
+ * is a soft gradient in the main macro's colour with a large icon, so a grid of foods never
+ * looks like a wall of grey boxes.
+ */
+export function FoodArt({
+  name,
+  imageUrl,
+  macros,
+  className,
+}: {
+  name: string;
+  imageUrl?: string;
+  macros: { proteinMg: number; carbMg: number; fatMg: number };
+  className?: string;
+}) {
+  if (imageUrl) {
+    return (
+      <img
+        src={imageUrl}
+        alt=""
+        loading="lazy"
+        className={clsx('h-full w-full object-cover', className)}
+      />
+    );
+  }
+  const Icon = foodIcon(name);
+  const color = dominantMacroColor(macros);
+  return (
+    <span
+      aria-hidden
+      className={clsx('flex h-full w-full items-center justify-center', className)}
+      style={{
+        color,
+        backgroundImage: `radial-gradient(circle at 30% 25%, ${color}40, ${color}14 70%)`,
+      }}
+    >
+      <Icon className="h-2/5 w-2/5" strokeWidth={1.6} />
+    </span>
+  );
+}

@@ -5,7 +5,7 @@ import { MACRO_COLORS } from '../../lib/macro-colors';
 import { useIsIOS } from '../../lib/ios-device';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { BookmarkPlus, Bot, Info, Plus, Share2 } from 'lucide-react';
+import { BookmarkPlus, Bot, Info, Plus, Search, Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type {
   PortalState,
@@ -32,6 +32,7 @@ import {
 } from '@life-portal/shared-domain';
 import { AppShell } from '../../components/app-shell';
 import { CheatQueue } from '../../components/cheat-queue';
+import { FoodCard } from '../../components/food-card';
 import { FoodForm } from '../../components/food-form';
 import { FoodPicker } from '../../components/food-picker';
 import { LogFoodModal } from '../../components/log-food-modal';
@@ -1024,7 +1025,7 @@ function FoodsTab({
   onShare?: (source: PostSelection) => void;
 }) {
   const [query, setQuery] = useState('');
-  const [showArchived, setShowArchived] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'favourites' | 'archived'>('all');
   const [editing, setEditing] = useState<Food | null>(null);
   const [adding, setAdding] = useState(false);
   const { run, pending } = useAction();
@@ -1032,11 +1033,21 @@ function FoodsTab({
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return overview.foods.filter((food) => {
-      if (!showArchived && food.archived) return false;
+      if (filter === 'archived' ? !food.archived : food.archived) return false;
+      if (filter === 'favourites' && !food.favourite) return false;
       if (!needle) return true;
       return `${food.name} ${food.brand ?? ''}`.toLowerCase().includes(needle);
     });
-  }, [overview.foods, query, showArchived]);
+  }, [overview.foods, query, filter]);
+  const counts = useMemo(
+    () => ({
+      all: overview.foods.filter((food) => !food.archived).length,
+      favourites: overview.foods.filter((food) => food.favourite && !food.archived)
+        .length,
+      archived: overview.foods.filter((food) => food.archived).length,
+    }),
+    [overview.foods],
+  );
 
   const toggleFavourite = (food: Food) =>
     void run(async () =>
@@ -1056,48 +1067,80 @@ function FoodsTab({
     <div className="space-y-5">
       <Panel
         title="Your foods"
-        description={`${overview.foods.length} in your database, ordered by what you actually eat`}
+        description={`${counts.all} foods · most eaten first`}
         actions={
           <>
             {onShare && overview.foods.some((f) => !f.archived) && (
               <button
-                className="btn-ghost"
+                className="btn-ghost px-2.5"
                 onClick={() => onShare({ kind: 'database' })}
+                aria-label="Share database"
+                title="Share database"
               >
-                Share database
+                <Share2 size={15} />
+                <span className="hidden sm:inline">Share database</span>
               </button>
             )}
             <button
               type="button"
-              className="btn-primary"
+              className="btn-primary px-3"
               onClick={() => setAdding(true)}
             >
-              Add a food
+              <Plus size={15} /> Add<span className="hidden sm:inline"> a food</span>
             </button>
           </>
         }
       >
-        <div className="mb-3 flex flex-wrap items-center gap-3">
-          <Input
-            type="search"
-            placeholder="Search by name or brand…"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            className="max-w-xs"
-          />
-          <label className="flex items-center gap-2 text-xs text-ink-muted">
-            <input
-              type="checkbox"
-              checked={showArchived}
-              onChange={(event) => setShowArchived(event.target.checked)}
-              className="h-4 w-4 rounded border-border bg-surface"
+        <div className="mb-4 space-y-2">
+          <div className="relative">
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint"
+              aria-hidden
             />
-            include archived
-          </label>
+            <Input
+              type="search"
+              placeholder="Search by name or brand…"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <div
+            className="flex gap-1.5 overflow-x-auto"
+            role="group"
+            aria-label="Show"
+          >
+            {(
+              [
+                ['all', 'All'],
+                ['favourites', '★ Favourites'],
+                ['archived', 'Archived'],
+              ] as const
+            ).map(([value, label]) =>
+              value === 'archived' && counts.archived === 0 ? null : (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFilter(value)}
+                  aria-pressed={filter === value}
+                  className={clsx(
+                    'flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition',
+                    filter === value
+                      ? 'border-accent bg-accent/10 text-ink'
+                      : 'border-border text-ink-muted hover:text-ink',
+                  )}
+                >
+                  {label}
+                  <span className="tabular text-ink-faint">{counts[value]}</span>
+                </button>
+              ),
+            )}
+          </div>
           {!overview.foodLookup.available && (
-            <span className="text-xs text-amber-400">
+            <p className="text-xs text-amber-400">
               Open Food Facts is unavailable — manual entry works as normal
-            </span>
+            </p>
           )}
         </div>
 
@@ -1119,93 +1162,21 @@ function FoodsTab({
             }
           />
         ) : (
-          <ul className="divide-y divide-border">
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
             {shown.map((food) => (
-              <li
+              <FoodCard
                 key={food.id}
-                className="flex items-center justify-between gap-3 py-2 text-sm"
-              >
-                <div className="min-w-0">
-                  <p className="truncate">
-                    <button
-                      type="button"
-                      onClick={() => toggleFavourite(food)}
-                      className={clsx(
-                        'mr-1.5',
-                        food.favourite ? 'text-amber-400' : 'text-ink-faint',
-                      )}
-                      aria-label={
-                        food.favourite
-                          ? 'Remove from favourites'
-                          : 'Add to favourites'
-                      }
-                      disabled={pending}
-                    >
-                      ★
-                    </button>
-                    {food.image && (
-                      <img
-                        src={food.image.url}
-                        alt=""
-                        className="mr-2 inline-block h-7 w-7 rounded-md object-cover align-middle"
-                      />
-                    )}
-                    {food.name}
-                    {food.brand && (
-                      <span className="ml-1 text-xs text-ink-faint">
-                        {food.brand}
-                      </span>
-                    )}
-                    {food.archived && (
-                      <span className="ml-2 text-xs text-ink-faint">
-                        (archived)
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-xs text-ink-faint">
-                    {food.servingSize} {food.unit} serving ·{' '}
-                    {food.perServing.energyKcal} kcal · P{' '}
-                    {mgToG(food.perServing.proteinMg)}g C{' '}
-                    {mgToG(food.perServing.carbMg)}g F{' '}
-                    {mgToG(food.perServing.fatMg)}g
-                    {food.useCount > 0 && ` · eaten ${food.useCount}×`}
-                    {food.source === 'openfoodfacts' && ' · imported from OFF'}
-                    {food.source === 'imported' && ' · imported from user'}
-                    {food.visibility === 'public' && (
-                      <span className="ml-1 text-accent">· public</span>
-                    )}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  {onShare && !food.archived && (
-                    <button
-                      type="button"
-                      className="text-xs text-accent"
-                      aria-label={`Share ${food.name}`}
-                      onClick={() => onShare({ kind: 'food', foodId: food.id })}
-                    >
-                      Share
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="text-xs text-ink-faint hover:text-ink"
-                    onClick={() => setEditing(food)}
-                  >
-                    edit
-                  </button>
-                  <button
-                    type="button"
-                    className="p-1 text-xs text-ink-faint hover:text-rose-300"
-                    onClick={() => remove(food)}
-                    disabled={pending}
-                    aria-label={`Delete ${food.name}`}
-                    title="A food you have eaten is archived, so your history keeps its numbers"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </li>
+                food={food}
+                busy={pending}
+                onEdit={() => setEditing(food)}
+                onFavourite={() => toggleFavourite(food)}
+                onDelete={() => remove(food)}
+                onShare={
+                  onShare
+                    ? () => onShare({ kind: 'food', foodId: food.id })
+                    : undefined
+                }
+              />
             ))}
           </ul>
         )}
