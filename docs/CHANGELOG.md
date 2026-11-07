@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-07: See your day before you log a meal
+
+The Log food window now shows four rings — calories, protein, carbs and fat — for the day as it
+will be after the meal: solid for what you have already eaten, a softly pulsing extension for
+this meal, with the target, how much it adds and what is left. The meal's part turns red when it
+takes you over a target. Correcting a logged meal counts it once, not twice.
+
 ## 2026-11-05: The same macro colours everywhere
 
 Calories are green, protein purple, carbs blue and fat amber on the Home widget, the Food page,

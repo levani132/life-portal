@@ -34,8 +34,9 @@ export function Dashboard() {
   const { data, error, isLoading } = useApi<DashboardResponse>('/dashboard');
   const portal = useApi<PortalState>('/portal');
   const [logging, setLogging] = useState<MealSlot | null>(null);
+  // The same key the log modal reads its rings from, so opening it costs one request.
   const { data: food } = useApi<{ foods: FoodWithUsage[] }>(
-    logging ? '/nutrition' : null,
+    logging && data ? `/nutrition?today=${data.today}&day=${data.today}` : null,
   );
   const [editing, setEditing] = useState(false);
   const [menuCard, setMenuCard] = useState<WidgetCard | null>(null);

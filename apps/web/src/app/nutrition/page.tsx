@@ -306,6 +306,7 @@ function Nutrition() {
           onClose={() => setLogging(null)}
           foods={data.foods}
           day={day}
+          today={today}
           slot={logging.slot}
           entry={logging.entry}
           onLogged={(entry) => {

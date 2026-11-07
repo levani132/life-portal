@@ -2,22 +2,24 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type {
+  EntryTotals,
   FoodWithUsage,
   MealEntry,
   MealSlot,
+  NutritionOverview,
 } from '@life-portal/shared-types';
 import { MEAL_SLOTS } from '@life-portal/shared-types';
 import {
   amountToServings,
   entryTotals,
   formatDay,
-  mgToG,
   servingsToAmount,
 } from '@life-portal/shared-domain';
 import { api } from '../lib/api';
 import { FoodForm } from './food-form';
 import { FoodPicker } from './food-picker';
-import { useAction } from '../lib/hooks';
+import { useAction, useApi } from '../lib/hooks';
+import { MealImpact } from './meal-impact';
 import { Field, Input, Modal, Select } from './ui';
 
 const SLOT_LABELS: Record<MealSlot, string> = {
@@ -38,12 +40,16 @@ const SLOT_LABELS: Record<MealSlot, string> = {
  *    size cannot change what was eaten.
  * 2. **The preview uses `entryTotals`, the same domain function the API uses to store the row.**
  *    The number shown before saving and the number saved cannot disagree.
+ * 3. **The rings show the day after this meal.** They read the same `/nutrition` overview the
+ *    Food page reads (one request, shared by SWR), and when correcting an entry its old totals
+ *    are taken out first so it is not counted twice.
  */
 export function LogFoodModal({
   open,
   onClose,
   foods,
   day,
+  today = day,
   slot: initialSlot,
   entry,
   onLogged,
@@ -52,6 +58,8 @@ export function LogFoodModal({
   onClose: () => void;
   foods: FoodWithUsage[];
   day: string;
+  /** The eater's today, sent as `?today=` so the day's targets match the Food page. */
+  today?: string;
   slot: MealSlot;
   /** Present when correcting an already-logged entry. */
   entry?: MealEntry;
@@ -95,6 +103,16 @@ export function LogFoodModal({
   const validAmount = Number.isFinite(amount) && amount >= 1;
   const preview =
     facts && validAmount ? entryTotals(Math.round(amount), facts) : undefined;
+
+  const overview = useApi<NutritionOverview>(
+    open && entryDay ? `/nutrition?today=${today}&day=${entryDay}` : null,
+  );
+  const eaten = useMemo(() => {
+    const totals = overview.data?.dayTotals.totals;
+    if (!totals) return undefined;
+    // The day being viewed already contains the entry being corrected.
+    return entry && entry.day === entryDay ? subtract(totals, entry.totals) : totals;
+  }, [overview.data, entry, entryDay]);
 
   const setFromServings = (text: string) => {
     setServingsText(text);
@@ -240,33 +258,12 @@ export function LogFoodModal({
               </p>
             )}
 
-            <div className="rounded-lg border border-lime-500/30 bg-lime-500/5 p-3">
-              <p className="label mb-2">This will add</p>
-              {preview ? (
-                <dl className="grid grid-cols-4 gap-2 text-center">
-                  <PreviewFigure label="kcal" value={preview.energyKcal} />
-                  <PreviewFigure
-                    label="protein"
-                    value={mgToG(preview.proteinMg)}
-                    suffix="g"
-                  />
-                  <PreviewFigure
-                    label="carbs"
-                    value={mgToG(preview.carbMg)}
-                    suffix="g"
-                  />
-                  <PreviewFigure
-                    label="fat"
-                    value={mgToG(preview.fatMg)}
-                    suffix="g"
-                  />
-                </dl>
-              ) : (
-                <p className="text-sm text-ink-faint">
-                  Enter servings or an amount.
-                </p>
-              )}
-            </div>
+            <MealImpact
+              eaten={eaten}
+              added={preview}
+              targets={overview.data?.targets}
+              loading={overview.isLoading}
+            />
           </>
         )}
       </Modal>
@@ -282,26 +279,11 @@ export function LogFoodModal({
   );
 }
 
-function PreviewFigure({
-  label,
-  value,
-  suffix,
-}: {
-  label: string;
-  value: number;
-  suffix?: string;
-}) {
-  return (
-    <div>
-      <dd className="tabular text-lg font-semibold text-ink">
-        {value}
-        {suffix && (
-          <span className="ml-0.5 text-xs font-normal text-ink-faint">
-            {suffix}
-          </span>
-        )}
-      </dd>
-      <dt className="text-[11px] text-ink-faint">{label}</dt>
-    </div>
-  );
+function subtract(a: EntryTotals, b: EntryTotals): EntryTotals {
+  return {
+    energyKcal: Math.max(0, a.energyKcal - b.energyKcal),
+    proteinMg: Math.max(0, a.proteinMg - b.proteinMg),
+    carbMg: Math.max(0, a.carbMg - b.carbMg),
+    fatMg: Math.max(0, a.fatMg - b.fatMg),
+  };
 }
