@@ -79,6 +79,8 @@ non-friends, reactions, typing indicators, stories (the inbox's friend row is re
 
 ### Tier 0: now, under ~1k users, about $0/month
 
+Provider-by-provider costs, free tiers and the one-cloud-vs-mix question: `docs/hosting-cost-comparison.md`.
+
 Vercel Hobby, Render free, Atlas M0. Add Cloudflare R2's free tier (10 GB, free downloads) for
 photos. A soft-launch step costs about $40–70/month: Render Starter, Atlas Flex, Vercel Pro.
 
