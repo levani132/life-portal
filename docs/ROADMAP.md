@@ -1,6 +1,6 @@
 # Roadmap
 
-Where Life Portal is, where it is going, and in what order. Updated 2026-11-05. Product
+Where Life Portal is, where it is going, and in what order. Updated 2026-11-11. Product
 direction comes from the owner; the order and the architecture tiers are recommendations agreed
 in conversation, not commitments. Costs are rough late-2026 list prices, order of magnitude only.
 
@@ -23,35 +23,56 @@ job), MongoDB Atlas M0.
 
 ### Known gaps to close before a public launch
 
+These are step 2 below. Found in a review on 2026-11-11 by reading the code:
+
+- **No password reset and no email.** Auth has register, login, refresh, change-password and
+  logout only; a person who forgets their password is locked out for good.
+- **No rate limits** on login, register or anything else.
+- **No CI.** `npm run check` runs only when someone remembers to; `apps/api-e2e` is still the
+  generated "Hello API" test.
+- **No error monitoring** in production.
+- **Access checks are the least tested code.** The domain library has about 25 spec files; social,
+  posts and messages, which decide who can see what, have one or two each.
 - **Account deletion and data export.** Health data is a GDPR special category. Every module
   doc lists what deletion must remove.
 - **Real-device checks** of push, messages and swiping on an iPhone.
-- **Tier 0 limits:** Atlas M0 has 512 MB; Vercel Hobby does not allow commercial use.
+- **Tier 0 limits:** Atlas M0 has 512 MB; Vercel Hobby does not allow commercial use, and Render
+  free is kept awake by a cron job.
 - **Image moderation** (automated scanning) before public photos reach strangers at scale.
 - **Camera video plays only where the recording browser's codec does** (no transcoding yet).
+- **The money modules are built for one person** (the seeded loan, ESPP plan and EPAM boards).
+  Decide whether they stay owner-only behind a flag or become a product for everyone, before
+  strangers see them.
 
 ## Where we want to be (next, in order)
 
 1. ~~**Photos in posts.**~~ Done in 014: R2 with signed links, EXIF stripped on the phone,
    plus 30-second camera video and text-only posts.
-2. **AI meal guess from a photo** (next: a button on the new post page's New food card), behind a feature flag that stays off until there are API
+2. **Launch hardening**, before any new feature. Password reset with transactional email
+   (Resend or Postmark), rate limits on auth and writes, CI running `npm run check` on every
+   push, error monitoring, integration tests for social and post access, account deletion and
+   data export, an iPhone check of push, messages and swiping, and the soft-launch infrastructure
+   step (about $40–70/month). Also add domain events for social writes now (an outbox or
+   in-process emitter), so search, feeds and challenges have something to listen to; none exist
+   yet.
+3. **AI meal guess from a photo** (next: a button on the new post page's New food card), behind a feature flag that stays off until there are API
    keys. One provider interface, so adding the key is the only step left. Every guess is stored
    as a labelled estimate with its basis until the person confirms it (principle 6). Paid
    feature; the MCP connectors remain the free alternative.
-3. **Explore and search built around food.** Filter posts by macros ("600 kcal dinners, 40g+
+4. **Explore and search built around food.** Filter posts by macros ("600 kcal dinners, 40g+
    protein"). Diet tags (vegan, keto, high-protein) are computed from the facts, never stored
    by hand. Image moderation (CSAM scanning, nudity) must exist before public images.
-4. **Groups and challenges.** Streaks, protein-target days, logging streaks, staying within
+5. **Groups and challenges.** Streaks, protein-target days, logging streaks, staying within
    calories. A challenge sees only a computed score, never the diary. Group chat reuses the
    messages module (conversations already have a members shape).
-5. **Training and sports.** A module for sessions, sets and later GPS tracks, stored as events.
+6. **Training and sports.** A module for sessions, sets and later GPS tracks, stored as events.
    Personal records, distance and ranks are computed on read. Leaderboards are opt-in and
    friends- or group-only by default. Imported workouts count as "verified", manual ones as
    "self-reported".
-6. **Video through a service.** 014 records 30-second clips in the app and stores them as-is.
+7. **Video through a service.** 014 records 30-second clips in the app and stores them as-is.
    Next: transcoding through Mux or Cloudflare Stream so every clip plays everywhere, library
    videos and 60 seconds. No reels scroller until people make video on their own.
-7. **Native apps.** Wrap the web app with Capacitor and add HealthKit and background location.
+8. **Native apps.** Wrap the web app with Capacitor and add HealthKit and background location.
    Background GPS (skiing, rides) is the one thing a PWA cannot do.
 
 Also wanted, unscheduled: quote reposts (a repost with your own text), a public web page for public posts (017 gives link previews; opening one still needs sign-in), a native Instagram Stories sticker with a link back (needs the Capacitor app), recipes (steps and time on combination posts), message requests from
