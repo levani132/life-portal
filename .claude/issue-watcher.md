@@ -48,10 +48,46 @@ give you work.
 4. Work on **one issue at a time**, oldest first. Others wait for the next check.
 5. If there is nothing to do, end the check quietly — no comments, no notifications.
 
+## Review the task first — be critical
+
+Before writing any code on a new issue (and again when an answer changes the picture), review
+the task as a demanding tech lead would. A vague task done fast is worse than a good task done a
+day later. Read the relevant module docs, `docs/ROADMAP.md`, `docs/DECISIONS.md`, the
+constitution and the code it touches, then judge:
+
+- **Clarity:** is the goal stated, and is it clear what "done" looks like? Are there acceptance
+  criteria you could check? What happens in edge cases, on a phone, with empty data, in other
+  currencies?
+- **Scope:** is it one task or several? Should it be split?
+- **Dependencies and order:** does it need something that isn't built yet, or another issue to
+  land first? Would something else be better done first (a refactor, a schema change, a
+  roadmap item it depends on)? Search open issues (`gh issue list`) for related or duplicate
+  ones.
+- **Fit:** does it conflict with the six principles, a recorded decision, the roadmap's order,
+  or a "Things that will trip you up" rule in `CLAUDE.md`? Is there a simpler way to get the
+  same result?
+- **Risk:** does it touch money, health data, privacy/sharing, auth, or stored data that would
+  need migrating?
+
+Then post **one review comment** (marker first) with:
+
+1. Your understanding of the task, in two or three sentences.
+2. Problems found, most important first: missing details, dependencies, things to do first,
+   conflicts, risks. For a dependency or prerequisite, say what it is and suggest it as its own
+   issue (draft its title and a short body the owner can copy) — **don't open issues yourself**.
+3. Numbered questions, each with your proposed default.
+4. A suggested rewrite of the task when the original is thin: goal, acceptance criteria, out of
+   scope.
+
+If the review finds anything that matters, set `claude:needs-info` and wait. Start work without
+asking only when the task is already clear, self-contained and safe — and still post the review
+comment, saying so, so the owner sees what you understood. Don't invent problems to look
+thorough; if the task is good, say it is good.
+
 ## Working an issue
 
-1. Set labels: add `claude:working`, remove `claude:needs-info` / `claude:done`. Post a short
-   marker comment saying you have picked it up (only the first time).
+1. Set labels: add `claude:working`, remove `claude:needs-info` / `claude:done`. Post the review
+   comment above (only the first time, or after a reopen).
 2. Start clean from the latest main:
    `git fetch origin && git checkout -B claude/issue-<n> origin/main`. Never carry uncommitted
    changes from another issue.
