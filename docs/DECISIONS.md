@@ -1206,3 +1206,12 @@ CLAUDE.md's "Verifying a change" still applies; CI is the floor, not the check.
 `SocialService` (profiles, diaries, search, connection actions across blocks) and money widget
 sharing. They assert that a refused viewer never causes the owner's summary to be computed, not
 only that the response is empty, so a leak through a later field cannot hide behind a filter.
+
+## 2026-11-11: a Claude session works GitHub issues labelled `claude`
+
+A long-running Claude session on the owner's Mac checks issues every 15 minutes and follows
+`.claude/issue-watcher.md`. It runs as one session rather than a GitHub Action so it keeps
+context across questions and answers; the cost is that the Mac must stay awake. The repo is
+public, so it acts only on issues the owner labelled and comments the owner wrote, and marks its
+own comments (they post under the owner's account) with `🤖 **Claude watcher**`. Finished work
+goes straight to `main` because the project is a test environment; revisit both when it launches.
