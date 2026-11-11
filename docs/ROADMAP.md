@@ -29,11 +29,14 @@ day launch is scheduled, not the next step. Found in a review on 2026-11-11 by r
 - **No password reset and no email.** Auth has register, login, refresh, change-password and
   logout only; a person who forgets their password is locked out for good.
 - **No rate limits** on login, register or anything else.
-- **No CI.** `npm run check` runs only when someone remembers to; `apps/api-e2e` is still the
-  generated "Hello API" test.
 - **No error monitoring** in production.
-- **Access checks are the least tested code.** The domain library has about 25 spec files; social,
-  posts and messages, which decide who can see what, have one or two each.
+- **`apps/api-e2e` is still the generated "Hello API" test**, so nothing boots the real app
+  against a database automatically.
+
+Done since the review (2026-11-11): CI runs `npm run check` on every push to main
+(`.github/workflows/check.yml`), and the access module, friend profiles and diaries, people
+search, connection actions and money widget sharing have their own tests.
+
 - **Account deletion and data export.** Health data is a GDPR special category. Every module
   doc lists what deletion must remove.
 - **Real-device checks** of push, messages and swiping on an iPhone.

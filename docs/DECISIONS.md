@@ -1189,3 +1189,20 @@ cannot be exported. The image is rendered when the sheet opens, because iOS only
 blue, fat amber. The Home widget, Food page, rings, Story image and OG card had drifted into
 three different palettes. Use the constants; don't write a macro hex at a call site.
 
+
+## 2026-11-11: CI runs the quality gate on every push, with no services
+
+`.github/workflows/check.yml` runs `npm ci` and `npm run check` on every push to main and every
+pull request, on the Node version in `.node-version`. Nx Cloud is off (`NX_NO_CLOUD`).
+
+**Why now, before any launch:** the project commits straight to main, often many times a day,
+and `npm run check` only ran when someone remembered. Polishing touches shared code (posts,
+sharing, the shell) where a quiet regression is easy to miss on a phone.
+
+**What it does not cover:** it needs no MongoDB and no secrets, so it does not boot the app.
+CLAUDE.md's "Verifying a change" still applies; CI is the floor, not the check.
+
+**Access tests:** the same change added specs for `AccessService` and `ModuleAccessGuard`,
+`SocialService` (profiles, diaries, search, connection actions across blocks) and money widget
+sharing. They assert that a refused viewer never causes the owner's summary to be computed, not
+only that the response is empty, so a leak through a later field cannot hide behind a filter.

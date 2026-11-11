@@ -85,3 +85,85 @@ describe('daily diary audience and module checks', () => {
     ]);
   });
 });
+
+describe('money widgets on a profile', () => {
+  function moneyFixture(visibility: Partial<Record<string, Audience>>) {
+    const access = {
+      forUser: jest
+        .fn()
+        .mockResolvedValue({ access: resolveFeatureAccess('developer') }),
+    };
+    const settings = {
+      get: jest.fn().mockResolvedValue({
+        selectedModules: ['money', 'loans', 'epam', 'projects'],
+        widgetOrder: [],
+        moduleVisibility: visibility,
+      }),
+    };
+    const cashflow = {
+      summary: jest.fn().mockResolvedValue({
+        currentBalanceCents: 123_45,
+        freeTodayCents: 50_00,
+        currency: 'GEL',
+      }),
+    };
+    const loans = {
+      summary: jest.fn().mockResolvedValue({
+        totalRemainingCents: 1_000_00,
+        totalPaidCents: 0,
+        activeCount: 1,
+        currency: 'GEL',
+      }),
+    };
+    const boards = {
+      summaries: jest.fn().mockResolvedValue([
+        { key: 'epam', openTaskCount: 9, overdueTaskCount: 9 },
+        { key: 'side', openTaskCount: 1, overdueTaskCount: 0 },
+      ]),
+    };
+    const service = new SharedWidgetsService(
+      access as never,
+      settings as never,
+      {} as never,
+      cashflow as never,
+      {} as never,
+      loans as never,
+      {} as never,
+      {} as never,
+      boards as never,
+      {} as never,
+    );
+    const viewer = resolveFeatureAccess('internal');
+    return { service, viewer, cashflow, loans, boards };
+  }
+
+  it('never computes a private money summary, even for a friend', async () => {
+    const f = moneyFixture({ money: 'private', loans: 'private' });
+    expect(await f.service.forViewer('owner', f.viewer, true, '2026-11-11')).toEqual([]);
+    expect(f.cashflow.summary).not.toHaveBeenCalled();
+    expect(f.loans.summary).not.toHaveBeenCalled();
+  });
+
+  it('shows friends-only money to friends and nothing to strangers', async () => {
+    const f = moneyFixture({ money: 'friends', loans: 'public' });
+    const stranger = await f.service.forViewer('owner', f.viewer, false, '2026-11-11');
+    expect(stranger.map((w) => w.module)).toEqual(['loans']);
+    expect(f.cashflow.summary).not.toHaveBeenCalled();
+    const friend = await f.service.forViewer('owner', f.viewer, true, '2026-11-11');
+    expect(friend.map((w) => w.module).sort()).toEqual(['loans', 'money']);
+  });
+
+  it('never shares the EPAM board, even when marked public', async () => {
+    const f = moneyFixture({ epam: 'public', projects: 'public' });
+    const widgets = await f.service.forViewer('owner', f.viewer, true, '2026-11-11');
+    expect(widgets.map((w) => w.module)).toEqual(['projects']);
+    expect(widgets[0].stats.find((s) => s.label === 'Open tasks')?.value).toBe('1');
+  });
+
+  it('shows nothing to a viewer without social access', async () => {
+    const f = moneyFixture({ money: 'public' });
+    f.viewer.social = false;
+    expect(await f.service.forViewer('owner', f.viewer, true, '2026-11-11')).toEqual([]);
+    expect(f.cashflow.summary).not.toHaveBeenCalled();
+  });
+});
