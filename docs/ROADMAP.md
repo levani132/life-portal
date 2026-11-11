@@ -23,7 +23,8 @@ job), MongoDB Atlas M0.
 
 ### Known gaps to close before a public launch
 
-These are step 2 below. Found in a review on 2026-11-11 by reading the code:
+No public launch is planned soon; the focus until then is polish. These gaps are a gate for the
+day launch is scheduled, not the next step. Found in a review on 2026-11-11 by reading the code:
 
 - **No password reset and no email.** Auth has register, login, refresh, change-password and
   logout only; a person who forgets their password is locked out for good.
@@ -48,31 +49,24 @@ These are step 2 below. Found in a review on 2026-11-11 by reading the code:
 
 1. ~~**Photos in posts.**~~ Done in 014: R2 with signed links, EXIF stripped on the phone,
    plus 30-second camera video and text-only posts.
-2. **Launch hardening**, before any new feature. Password reset with transactional email
-   (Resend or Postmark), rate limits on auth and writes, CI running `npm run check` on every
-   push, error monitoring, integration tests for social and post access, account deletion and
-   data export, an iPhone check of push, messages and swiping, and the soft-launch infrastructure
-   step (about $40–70/month). Also add domain events for social writes now (an outbox or
-   in-process emitter), so search, feeds and challenges have something to listen to; none exist
-   yet.
-3. **AI meal guess from a photo** (next: a button on the new post page's New food card), behind a feature flag that stays off until there are API
+2. **AI meal guess from a photo** (next: a button on the new post page's New food card), behind a feature flag that stays off until there are API
    keys. One provider interface, so adding the key is the only step left. Every guess is stored
    as a labelled estimate with its basis until the person confirms it (principle 6). Paid
    feature; the MCP connectors remain the free alternative.
-4. **Explore and search built around food.** Filter posts by macros ("600 kcal dinners, 40g+
+3. **Explore and search built around food.** Filter posts by macros ("600 kcal dinners, 40g+
    protein"). Diet tags (vegan, keto, high-protein) are computed from the facts, never stored
    by hand. Image moderation (CSAM scanning, nudity) must exist before public images.
-5. **Groups and challenges.** Streaks, protein-target days, logging streaks, staying within
+4. **Groups and challenges.** Streaks, protein-target days, logging streaks, staying within
    calories. A challenge sees only a computed score, never the diary. Group chat reuses the
    messages module (conversations already have a members shape).
-6. **Training and sports.** A module for sessions, sets and later GPS tracks, stored as events.
+5. **Training and sports.** A module for sessions, sets and later GPS tracks, stored as events.
    Personal records, distance and ranks are computed on read. Leaderboards are opt-in and
    friends- or group-only by default. Imported workouts count as "verified", manual ones as
    "self-reported".
-7. **Video through a service.** 014 records 30-second clips in the app and stores them as-is.
+6. **Video through a service.** 014 records 30-second clips in the app and stores them as-is.
    Next: transcoding through Mux or Cloudflare Stream so every clip plays everywhere, library
    videos and 60 seconds. No reels scroller until people make video on their own.
-8. **Native apps.** Wrap the web app with Capacitor and add HealthKit and background location.
+7. **Native apps.** Wrap the web app with Capacitor and add HealthKit and background location.
    Background GPS (skiing, rides) is the one thing a PWA cannot do.
 
 Also wanted, unscheduled: quote reposts (a repost with your own text), a public web page for public posts (017 gives link previews; opening one still needs sign-in), a native Instagram Stories sticker with a link back (needs the Capacitor app), recipes (steps and time on combination posts), message requests from
