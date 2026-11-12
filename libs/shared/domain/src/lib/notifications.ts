@@ -5,7 +5,7 @@ import type {
   NotificationEvent,
   NotificationType,
 } from '@life-portal/shared-types';
-import { PUSH_SERVICE_HOSTS } from '@life-portal/shared-types';
+import { PUSH_SERVICE_HOSTS, badgeDefinition, badgeText } from '@life-portal/shared-types';
 
 /** The parts of stored preferences the send rules read. `undefined` = never turned on. */
 export interface StoredNotificationPreferences {
@@ -44,9 +44,11 @@ export function shouldNotify(input: {
   actorAccess: FeatureAccess;
   /** The pair's connection row, if any. */
   connection?: { blockedBy: string[]; mutedBy: string[] } | null;
+  /** Only a type about the recipient's own doing (a badge) may be sent to its own actor. */
+  selfAllowed?: boolean;
 }): SkipReason | null {
   const { event, prefs, requires, recipientAccess, actorAccess, connection } = input;
-  if (event.actorId === event.recipientId) return 'self';
+  if (event.actorId === event.recipientId && !input.selfAllowed) return 'self';
   if (!prefs?.enabled) return 'not-enabled';
   if (!typeEnabled(prefs, event.type)) return 'type-off';
   if (!recipientAccess.push || requires.some((id) => !recipientAccess[id]))
@@ -87,8 +89,13 @@ export function notificationText(
   event: Pick<
     NotificationEvent,
     'type' | 'actorName' | 'postTitle' | 'commentText' | 'messageKind' | 'messageText'
-  >,
-  options: { showCommentPreviews: boolean; showMessagePreviews?: boolean; others?: number },
+  > &
+    Partial<Pick<NotificationEvent, 'targetId' | 'badgeTier' | 'count'>>,
+  options: {
+    showCommentPreviews: boolean;
+    showMessagePreviews?: boolean;
+    others?: number;
+  },
 ): { title: string; body: string } {
   const title = clip(event.actorName, TITLE_LIMIT) || 'Someone';
   const others = options.others ?? 0;
@@ -115,6 +122,8 @@ export function notificationText(
     }
     case 'postRepost':
       return { title, body: `reposted ${postName(event.postTitle)}` };
+    case 'badgeEarned':
+      return badgeEarnedText(event.targetId ?? '', event.badgeTier, event.count);
     case 'postLike':
       return {
         title,
@@ -126,6 +135,18 @@ export function notificationText(
   }
 }
 
+/** "You earned the 30-day logging streak", or a count when several arrived together. */
+export function badgeEarnedText(
+  badgeId: string,
+  tier: number | undefined,
+  count = 1,
+): { title: string; body: string } {
+  if (count > 1) return { title: 'New badges', body: `You earned ${count} badges` };
+  const def = badgeDefinition(badgeId);
+  const name = def ? badgeText(def.name, tier ?? def.tiers[0]) : 'a badge';
+  return { title: 'New badge', body: `You earned ${name}` };
+}
+
 /** One underlying action, as an Activity source reports it. */
 export interface ActivityRow {
   type: NotificationType;
@@ -134,6 +155,8 @@ export interface ActivityRow {
   targetId: string;
   url: string;
   postTitle?: string;
+  badgeId?: string;
+  badgeTier?: number;
   createdAt: Date;
 }
 
@@ -168,6 +191,7 @@ export function groupActivity(rows: ActivityRow[], seenAt?: Date): ActivityItem[
       othersCount: Math.max(0, group.length - MAX_ACTORS),
       url: newest.url,
       ...(newest.postTitle ? { postTitle: newest.postTitle } : {}),
+      ...(newest.badgeId ? { badgeId: newest.badgeId, badgeTier: newest.badgeTier } : {}),
       createdAt: newest.createdAt.toISOString(),
       unseen: !seenAt || newest.createdAt > seenAt,
     };

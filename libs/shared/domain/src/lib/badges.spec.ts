@@ -6,6 +6,7 @@ import {
   onTargetDays,
   type BadgeInputs,
   type FoodDayFacts,
+  weeklyConsistency,
 } from './badges';
 import { addDays } from './dates';
 
@@ -163,5 +164,61 @@ describe('evaluateBadges', () => {
   it('clamps dates to the account lifetime', () => {
     const early = { ...base, postDays: ['2026-01-01'] };
     expect(find(early, 'firstPost')?.reached[0].reachedOn).toBe('2026-07-01');
+  });
+});
+
+describe('weeklyConsistency', () => {
+  // Weeks start on Monday: 2026-08-03, 08-10, 08-17, 08-24 (TODAY 08-30 is that week's Sunday).
+  it('counts weeks with two workouts and dates each by the second one', () => {
+    const result = weeklyConsistency(
+      ['2026-08-04', '2026-08-06', '2026-08-11', '2026-08-13', '2026-08-15'],
+      '2026-08-16',
+    );
+    expect(result.runs).toEqual([['2026-08-06', '2026-08-13']]);
+    expect(result.current).toBe(2);
+  });
+
+  it('a finished week with one workout breaks the run', () => {
+    const result = weeklyConsistency(
+      ['2026-08-04', '2026-08-06', '2026-08-12', '2026-08-18', '2026-08-20'],
+      '2026-08-23',
+    );
+    expect(result.runs.map((run) => run.length)).toEqual([1, 1]);
+  });
+
+  it('the current week neither breaks nor extends a run until it has two', () => {
+    const past = ['2026-08-11', '2026-08-13', '2026-08-18', '2026-08-20'];
+    expect(weeklyConsistency([...past, '2026-08-25'], TODAY).current).toBe(2);
+    expect(weeklyConsistency([...past, '2026-08-25', '2026-08-27'], TODAY).current).toBe(3);
+  });
+
+  it('a whole week without workouts breaks the run', () => {
+    expect(weeklyConsistency(['2026-08-04', '2026-08-06'], TODAY).current).toBe(0);
+  });
+});
+
+describe('evaluateBadges: training', () => {
+  const base: BadgeInputs = {
+    accountCreatedOn: '2026-07-01',
+    setupCompleted: false,
+    postDays: [],
+    friendAcceptedDays: [],
+  };
+  const find = (input: BadgeInputs, id: string) =>
+    evaluateBadges(input, TODAY).find((badge) => badge.badgeId === id);
+  // Two workouts on Tuesday and Thursday of each of the four weeks before TODAY's week.
+  const weeks = ['2026-08-03', '2026-08-10', '2026-08-17', '2026-08-24'];
+  const finishedDays = weeks.flatMap((monday) => [addDays(monday, 1), addDays(monday, 3)]);
+
+  it('awards first workout, counts, and four weeks of consistency', () => {
+    const input = { ...base, training: { finishedDays: [...finishedDays, '2026-08-29', '2026-08-30'] } };
+    expect(find(input, 'firstWorkout')?.reached).toEqual([{ tier: 1, reachedOn: '2026-08-04' }]);
+    expect(find(input, 'workouts')?.reached).toEqual([{ tier: 10, reachedOn: '2026-08-30' }]);
+    expect(find(input, 'consistency')?.reached).toEqual([{ tier: 4, reachedOn: '2026-08-27' }]);
+    expect(find(input, 'consistency')?.progress).toEqual({ current: 4, next: 12 });
+  });
+
+  it('leaves training out unless it was loaded', () => {
+    expect(find(base, 'firstWorkout')).toBeUndefined();
   });
 });

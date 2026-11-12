@@ -74,6 +74,18 @@ export class SessionsService {
   // ---------------------------------------------------------------- sessions
 
   /**
+   * The day of every finished workout, for profile badges (spec 022 US4). An open session does
+   * not count; a finished one always has at least one set (`finish` refuses an empty one).
+   */
+  async finishedDays(userId: string): Promise<string[]> {
+    const rows = await this.sessions
+      .find({ userId, status: 'finished' })
+      .select('day')
+      .lean<{ day: string }[]>();
+    return rows.map((row) => row.day);
+  }
+
+  /**
    * Starts a workout, empty or (spec 023) from a plan's workout. A plan start copies the
    * workout's exercises and targets onto the session (`planned`): suggestions are fixed here and
    * never follow later edits of the plan. An open session is resumed instead, with nothing added.

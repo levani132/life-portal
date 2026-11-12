@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import {
   Ban,
   BellOff,
@@ -42,7 +42,7 @@ import {
 } from './badges';
 import { checkBadges } from '../lib/badges';
 import { PostsList } from './posts';
-import type { PortalState } from '@life-portal/shared-types';
+import { badgeDefinition, type PortalState } from '@life-portal/shared-types';
 import { api } from '../lib/api';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { ErrorNote, Input, Spinner } from './ui';
@@ -359,11 +359,30 @@ function HeaderBadges({ userId, live }: { userId: string; live: boolean }) {
     </>
   );
 }
+/**
+ * `/profile?badge=<id>` (the "badge earned" notification and Activity): reports the badge once,
+ * then drops the parameter so a refresh or a later tab switch does not reopen it. Its own
+ * Suspense boundary, because `useSearchParams` needs one.
+ */
+function BadgeDeepLink({ onOpen }: { onOpen: (badgeId: BadgeId) => void }) {
+  const params = useSearchParams();
+  const router = useRouter();
+  const badge = params.get('badge');
+  useEffect(() => {
+    if (!badge) return;
+    if (badgeDefinition(badge)) onOpen(badge as BadgeId);
+    router.replace('/profile', { scroll: false });
+    // `onOpen` is recreated each render; the parameter is what matters.
+  }, [badge]);
+  return null;
+}
+
 export function ProfileView({ userId }: { userId?: string }) {
   const { user } = useAuth();
   const own = !userId || userId === user?.id;
   const [preview, setPreview] = useState<Preview>('normal');
   const [tab, setTab] = useState<'posts' | 'badges' | 'about'>('posts');
+  const [openBadge, setOpenBadge] = useState<BadgeId | null>(null);
   const portal = useApi<PortalState>('/portal');
   const path = own
     ? `/social/me?preview=${preview}`
@@ -481,12 +500,23 @@ export function ProfileView({ userId }: { userId?: string }) {
           ))}
         </div>
       )}
+      {own && (
+        <Suspense fallback={null}>
+          <BadgeDeepLink
+            onOpen={(badgeId) => {
+              setPreview('normal');
+              setTab('badges');
+              setOpenBadge(badgeId);
+            }}
+          />
+        </Suspense>
+      )}
       {shown === 'posts' ? (
         <div className="mt-4">
           <PostsList authorId={person.userId} preview={viewAs} />
         </div>
       ) : shown === 'badges' ? (
-        <BadgeCollection />
+        <BadgeCollection open={openBadge} onOpened={() => setOpenBadge(null)} />
       ) : (
         <>
           <div className="mb-4 mt-6 flex items-center justify-between gap-4">
@@ -817,7 +847,11 @@ function AvatarEditor({ person }: { person: SocialProfile }) {
           triggerClassName="inline-flex rounded-full"
           trigger={picture}
           items={[
-            { label: 'Choose a new photo', icon: <ImagePlus size={16} />, onSelect: pick },
+            {
+              label: 'Choose a new photo',
+              icon: <ImagePlus size={16} />,
+              onSelect: pick,
+            },
             {
               label: 'Remove photo',
               icon: <Trash2 size={16} />,

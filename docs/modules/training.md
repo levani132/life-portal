@@ -326,6 +326,9 @@ real instants set by the server, because durations need them.
 
 ## Cross-links
 
+- [badges](badges.md): `SessionsService.finishedDays(userId)` exports the `day` of each finished
+  workout for the training badges. Badges never read training collections directly.
+
 - **Food / Apple Health:** none in this phase, on purpose. Training produces **no burned-energy
   figure** and never changes Food's targets or activity adjustment, which Apple Health's Active
   Energy owns. Who owns burned energy when Health is not connected is a later decision.

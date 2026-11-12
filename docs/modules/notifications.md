@@ -72,7 +72,8 @@ The decision order (`shouldNotify` in `libs/shared/domain/src/lib/notifications.
 steps 2–5):
 
 1. A registered type exists, and keys are configured.
-2. The actor is not the recipient.
+2. The actor is not the recipient, unless the type is registered with `selfAllowed` (only
+   `badgeEarned`, which is about the recipient's own doing).
 3. The main switch is on and the type is not off.
 4. The recipient has `push` plus the type's `requires`, and the actor has `social`.
 5. The pair is not blocked in either direction, and the recipient has not muted the actor.
@@ -104,7 +105,7 @@ Messages ([messages](messages.md)) was added exactly this way and is the worked 
    `registerBadgeSource({unseen})` so it is added to the icon badge.
 5. Add an Activity source with `registerActivitySource({rows})` if the events belong in
    Activity. Rows come from the module's own collections. The service removes the member's own
-   actions and anyone blocked.
+   actions (except for a `selfAllowed` type) and anyone blocked.
 
 Current types:
 
@@ -116,6 +117,7 @@ Current types:
 | `postLike` | PostEngagementService | 15 min | post | `/posts/:id` |
 | `postRepost` | PostEngagementService | 15 min | post | `/posts/:id` |
 | `message` | MessagesService | none (replaces per conversation) | conversation | `/messages/:id` |
+| `badgeEarned` | BadgesService (`selfAllowed`) | none (one per evaluation) | recipient | `/profile?badge=:id` |
 
 ## Web
 

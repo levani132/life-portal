@@ -14,7 +14,12 @@ const TODAY = '2026-11-12';
 const day = (offset: number) =>
   new Date(Date.UTC(2026, 10, 12 + offset)).toISOString().slice(0, 10);
 
-type Award = { userId: string; badgeId: string; tier: number; earnedOn: string };
+type Award = {
+  userId: string;
+  badgeId: string;
+  tier: number;
+  earnedOn: string;
+};
 
 function fixture(
   options: {
@@ -27,6 +32,8 @@ function fixture(
     otherOff?: FeatureId[];
     blocked?: boolean;
     otherMissing?: boolean;
+    /** Days of finished workouts. */
+    workouts?: string[];
   } = {},
 ) {
   const store: Award[] = [];
@@ -99,11 +106,21 @@ function fixture(
       cheatDays: [],
     })),
   };
-  const posts = { originalPostDays: jest.fn().mockResolvedValue(options.postDays ?? []) };
+  const posts = {
+    originalPostDays: jest.fn().mockResolvedValue(options.postDays ?? []),
+  };
   const portal = { get: jest.fn().mockResolvedValue({ setupCompleted: true }) };
   const graph = {
     acceptedSince: jest.fn().mockResolvedValue(options.friends ?? []),
     isBlocked: jest.fn().mockResolvedValue(!!options.blocked),
+  };
+  const sessions = {
+    finishedDays: jest.fn().mockResolvedValue(options.workouts ?? []),
+  };
+  const notifications = {
+    notify: jest.fn().mockResolvedValue(undefined),
+    register: jest.fn(),
+    registerActivitySource: jest.fn(),
   };
   const service = new BadgesService(
     awards as never,
@@ -114,13 +131,28 @@ function fixture(
     posts as never,
     portal as never,
     graph as never,
+    sessions as never,
+    notifications as never,
   );
-  return { service, store, nutrition, posts, graph, portal, access };
+  return {
+    service,
+    store,
+    nutrition,
+    posts,
+    graph,
+    portal,
+    access,
+    sessions,
+    notifications,
+  };
 }
 
 describe('BadgesService.evaluate', () => {
   it('awards each reached tier once, even under two concurrent evaluations', async () => {
-    const { service, store } = fixture({ foodDays: 8, postDays: ['2026-08-05'] });
+    const { service, store } = fixture({
+      foodDays: 8,
+      postDays: ['2026-08-05'],
+    });
     const [a, b] = await Promise.all([
       service.evaluate(USER, TODAY),
       service.evaluate(USER, TODAY),
@@ -137,7 +169,10 @@ describe('BadgesService.evaluate', () => {
   });
 
   it('dates awards from history', async () => {
-    const { service, store } = fixture({ foodDays: 8, postDays: ['2026-08-05'] });
+    const { service, store } = fixture({
+      foodDays: 8,
+      postDays: ['2026-08-05'],
+    });
     await service.evaluate(USER, TODAY);
     expect(store.find((row) => row.badgeId === 'firstPost')?.earnedOn).toBe('2026-08-05');
     expect(store.find((row) => row.badgeId === 'loggingStreak')?.earnedOn).toBe(day(-2));
@@ -166,12 +201,101 @@ describe('BadgesService.evaluate', () => {
   });
 });
 
+describe('BadgesService.evaluate: training', () => {
+  it('awards training badges from finished workouts only', async () => {
+    const { service, store, sessions } = fixture({ workouts: ['2026-11-03'] });
+    await service.evaluate(USER, TODAY);
+    expect(sessions.finishedDays).toHaveBeenCalledWith(USER);
+    expect(store.find((row) => row.badgeId === 'firstWorkout')?.earnedOn).toBe('2026-11-03');
+    expect(store.some((row) => row.badgeId === 'workouts')).toBe(false);
+  });
+});
+
+describe('BadgesService: earned notification', () => {
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+  it('sends one notification per evaluation, with the count', async () => {
+    const { service, notifications } = fixture({
+      foodDays: 8,
+      postDays: ['2026-08-05'],
+    });
+    await service.evaluate(USER, TODAY);
+    await flush();
+    expect(notifications.notify).toHaveBeenCalledTimes(1);
+    expect(notifications.notify.mock.calls[0][0]).toMatchObject({
+      type: 'badgeEarned',
+      recipientId: USER,
+      actorId: USER,
+      count: 5,
+    });
+  });
+
+  it('sends nothing when nothing new was earned', async () => {
+    const { service, notifications } = fixture({ postDays: ['2026-08-05'] });
+    await service.evaluate(USER, TODAY);
+    await flush();
+    notifications.notify.mockClear();
+    await service.evaluate(USER, TODAY);
+    await flush();
+    expect(notifications.notify).not.toHaveBeenCalled();
+  });
+
+  it('does not announce a badge whose feature is off', async () => {
+    const { service, notifications } = fixture({
+      foodDays: 8,
+      off: ['nutrition'],
+    });
+    await service.evaluate(USER, TODAY);
+    await flush();
+    expect(notifications.notify.mock.calls[0][0].count).toBe(2); // setup and earlyMember; the food awards stay silent
+  });
+
+  it('names the badge in Activity and links to it', async () => {
+    const { service } = fixture();
+    const find = jest.fn().mockReturnValue({
+      sort: () => ({
+        limit: () => ({
+          select: () => ({
+            lean: async () => [
+              {
+                badgeId: 'loggingStreak',
+                tier: 7,
+                createdAt: new Date('2026-11-10T08:00:00Z'),
+              },
+              {
+                badgeId: 'retired',
+                tier: 1,
+                createdAt: new Date('2026-11-09T08:00:00Z'),
+              },
+            ],
+          }),
+        }),
+      }),
+    });
+    (service as unknown as { awards: { find: unknown } }).awards.find = find;
+    const rows = await service.activity(USER, new Date('2026-10-01'), undefined, 20);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        type: 'badgeEarned',
+        actorId: USER,
+        badgeId: 'loggingStreak',
+        badgeTier: 7,
+        url: '/profile?badge=loggingStreak',
+      }),
+    ]);
+  });
+});
+
 describe('BadgesService.mine', () => {
   it('shows earned badges, progress for locked tiers, and marks new ones', async () => {
     const { service } = fixture({ foodDays: 8 });
     const mine = await service.mine(USER, TODAY);
     const streak = mine.badges.find((badge) => badge.badgeId === 'loggingStreak');
-    expect(streak).toMatchObject({ tier: 7, isNew: true, progress: { current: 8, next: 30 } });
+    expect(streak).toMatchObject({
+      tier: 7,
+      isNew: true,
+      progress: { current: 8, next: 30 },
+    });
     const again = await service.mine(USER, TODAY);
     expect(again.badges.find((badge) => badge.badgeId === 'loggingStreak')?.isNew).toBeUndefined();
   });

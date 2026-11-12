@@ -5,6 +5,7 @@ import {
   type BadgeId,
 } from '@life-portal/shared-types';
 import { addDays, isAfter, isBefore, weekdayOf } from './dates';
+import { weekStart } from './nutrition';
 
 /**
  * Profile badges (spec 022). Pure: everything is computed from plain facts and an explicit
@@ -40,6 +41,8 @@ export interface BadgeInputs {
   friendAcceptedDays: (string | undefined)[];
   /** Absent when food was not loaded (every food tier already earned, or no data). */
   food?: { days: FoodDayFacts[]; cheatDays: number[] };
+  /** One day per finished workout. Absent when training was not loaded. */
+  training?: { finishedDays: string[] };
 }
 
 /** A run of consecutive counted days. Each element is the day that count was reached. */
@@ -135,6 +138,42 @@ export function onTargetDays(
   return { ...streak, totalDays };
 }
 
+/**
+ * Consecutive Monday-start weeks with at least `minPerWeek` finished workouts. Training has no
+ * daily streak on purpose: rest days are part of training. A run's element for a week is the day
+ * of the workout that made the week count. The week containing `today` extends a run once it
+ * counts and never breaks one before it ends.
+ */
+export function weeklyConsistency(
+  finishedDays: string[],
+  today: string,
+  minPerWeek = 2,
+): { current: number; runs: Run[] } {
+  const days = [...finishedDays].filter((day) => !isAfter(day, today)).sort();
+  if (!days.length) return { current: 0, runs: [] };
+  const byWeek = new Map<string, string[]>();
+  for (const day of days) {
+    const week = weekStart(day);
+    byWeek.set(week, [...(byWeek.get(week) ?? []), day]);
+  }
+  const thisWeek = weekStart(today);
+  const runs: Run[] = [];
+  let open: Run | null = null;
+  for (let week = weekStart(days[0]); !isAfter(week, thisWeek); week = addDays(week, 7)) {
+    const sessions = byWeek.get(week) ?? [];
+    if (sessions.length >= minPerWeek) {
+      if (!open) {
+        open = [];
+        runs.push(open);
+      }
+      open.push(sessions[minPerWeek - 1]);
+    } else if (week !== thisWeek) {
+      open = null;
+    }
+  }
+  return { runs, current: open ? open.length : 0 };
+}
+
 /** The day the n-th event happened, for each tier the events reach. */
 export function countMilestones(dates: string[], tiers: number[]): TierReached[] {
   const sorted = [...dates].sort();
@@ -173,7 +212,8 @@ function evaluation(
 }
 
 /**
- * Evaluates the standard badges, and the food badges when `input.food` is given. Every
+ * Evaluates the standard badges, the food badges when `input.food` is given, and the training
+ * badges when `input.training` is given. Every
  * `reachedOn` lies between the account's creation day and `today`.
  */
 export function evaluateBadges(input: BadgeInputs, today: string): BadgeEvaluation[] {
@@ -209,6 +249,15 @@ export function evaluateBadges(input: BadgeInputs, today: string): BadgeEvaluati
         target.totalDays.length,
         bounds,
       ),
+    );
+  }
+  if (input.training) {
+    const finished = input.training.finishedDays.filter((day) => !isAfter(day, today));
+    const weekly = weeklyConsistency(finished, today);
+    out.push(
+      evaluation(def('firstWorkout'), countMilestones(finished, [1]), undefined, bounds),
+      evaluation(def('workouts'), countMilestones(finished, def('workouts').tiers), finished.length, bounds),
+      evaluation(def('consistency'), fromRuns(weekly.runs, def('consistency').tiers), weekly.current, bounds),
     );
   }
   return out;

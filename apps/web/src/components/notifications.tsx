@@ -23,6 +23,7 @@ import {
   thisDeviceId,
   type PushSupport,
 } from '../lib/push';
+import { badgeEarnedText } from '@life-portal/shared-domain';
 import { postTimeLabel } from '../lib/post-time';
 import { EmptyState, ErrorNote, Modal, Panel, Spinner } from './ui';
 
@@ -44,7 +45,10 @@ function pushAccess(access: PortalState['access'] | undefined): boolean {
 
 /** Client-only: the browser's capabilities are unknown during server rendering. */
 function useSupport(): { support: PushSupport; granted: boolean } | null {
-  const [state, setState] = useState<{ support: PushSupport; granted: boolean } | null>(null);
+  const [state, setState] = useState<{
+    support: PushSupport;
+    granted: boolean;
+  } | null>(null);
   useEffect(() => {
     setState({ support: pushSupport(), granted: permission() === 'granted' });
   }, []);
@@ -210,12 +214,33 @@ export function ActivityBell({ access }: { access: PortalState['access'] }) {
 // ------------------------------------------------------------------ Settings
 
 const TYPE_LABELS: { type: NotificationType; label: string; hint: string }[] = [
-  { type: 'friendRequest', label: 'Friend requests', hint: 'Someone wants to connect' },
-  { type: 'friendAccepted', label: 'Accepted requests', hint: 'Someone accepted your request' },
+  {
+    type: 'friendRequest',
+    label: 'Friend requests',
+    hint: 'Someone wants to connect',
+  },
+  {
+    type: 'friendAccepted',
+    label: 'Accepted requests',
+    hint: 'Someone accepted your request',
+  },
   { type: 'postComment', label: 'Comments', hint: 'On your posts' },
-  { type: 'postLike', label: 'Likes', hint: 'On your posts, grouped so bursts stay quiet' },
-  { type: 'postRepost', label: 'Reposts', hint: 'Someone put your post on their wall' },
-  { type: 'message', label: 'Messages', hint: 'From friends, unless you muted that conversation' },
+  {
+    type: 'postLike',
+    label: 'Likes',
+    hint: 'On your posts, grouped so bursts stay quiet',
+  },
+  {
+    type: 'postRepost',
+    label: 'Reposts',
+    hint: 'Someone put your post on their wall',
+  },
+  {
+    type: 'message',
+    label: 'Messages',
+    hint: 'From friends, unless you muted that conversation',
+  },
+  { type: 'badgeEarned', label: 'Badges', hint: 'When you earn a new badge' },
 ];
 
 function Toggle({
@@ -410,6 +435,8 @@ function activityText(item: ActivityItem): string {
       return `${who} reposted ${post}`;
     case 'message':
       return `${who} sent you a message`;
+    case 'badgeEarned':
+      return badgeEarnedText(item.badgeId ?? '', item.badgeTier).body;
   }
 }
 

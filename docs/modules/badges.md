@@ -9,16 +9,13 @@ their own; the UI is a tab on your own profile.
 - **Catalogue and contracts:** `libs/shared/types/src/lib/badges.ts`
 - **Spec:** `specs/022-profile-badges/` (spec, plan, research R1–R10, data model, API contract)
 
-**Status (2026-11-12):** built:
+**Status (2026-11-12):** all five stories built:
 - **US1:** standard and food badges, earned from history and shown privately in the owner's
   collection.
 - **US2:** equipping up to three.
 - **US3:** other people's view.
-
-Still to come:
-- **US4:** training badges. The catalogue lists them, but they are hidden until their rules
-  exist.
-- **US5:** the earned notification.
+- **US4:** training badges.
+- **US5:** the "badge earned" notification and Activity row.
 
 ## Catalogue
 
@@ -35,7 +32,9 @@ request. It can only grow, and ids are never reused.
 | `loggingStreak` | food | 7 / 30 / 100 / 365 days | `nutrition` |
 | `onTargetStreak` | food | 7 / 30 days | `nutrition` |
 | `daysOnTarget` | food | 30 / 100 / 365 days | `nutrition` |
-| `firstWorkout`, `workouts`, `consistency` | training | see the spec | `training` (US4) |
+| `firstWorkout` | training | 1 | `training` |
+| `workouts` | training | 10 / 50 / 100 / 250 finished workouts | `training` |
+| `consistency` | training | 4 / 12 / 26 / 52 weeks | `training` |
 
 ## Collections
 
@@ -60,6 +59,7 @@ never queries another module's collections.
 | `PostsService.originalPostDays(userId)` | Posts | the UTC creation day of each live original post |
 | `SocialGraphService.acceptedSince(userId)` | SocialGraph | the `acceptedAt` day of each current friendship (`undefined` for old rows) |
 | `PortalService.get(userId).setupCompleted` | Portal | whether setup is complete |
+| `SessionsService.finishedDays(userId)` | Training | the `day` of each finished workout (open ones never count) |
 | `users.createdAt` | Auth | the day the account was created |
 
 - **What gets loaded.** A family whose every tier is already awarded is skipped. Setup and posts
@@ -105,6 +105,29 @@ account's creation day and today.
     on-target day, a cheat day included.
 - **Posts** use the UTC creation day, an approximation of the author's day that is fine for
   "first post".
+- **Workouts** count finished sessions only, by their stored `day`.
+- **Weekly consistency:** consecutive Monday-start weeks (the same `weekStart` as nutrition)
+  with at least **2** finished workouts. There is no daily training streak on purpose: rest days
+  are part of training. A tier is dated by the workout that completed its last week. The current
+  week extends a run as soon as it has two, and never breaks one before it is over.
+
+## Notification (US5)
+
+`BadgesService` registers the `badgeEarned` type and an Activity source in `onModuleInit`
+([notifications](notifications.md)).
+- **One per evaluation.** An evaluation that creates awards calls `notify()` once, without
+  awaiting: "You earned the 30-day logging streak" for one award (the highest new tier),
+  otherwise "You earned n badges". The first check after launch therefore sends one summary,
+  not one push per backfilled badge. Concurrent evaluations cannot both announce an award,
+  because only the upsert that inserted it counts.
+- **Only what the person can see.** Awards of a feature that is off are not counted in the push
+  or listed in Activity.
+- **The one self-notification.** Actor and recipient are the same person, so the type is
+  registered with `selfAllowed: true`; every other type still drops a person's own actions.
+- **Turning it off** (the Badges toggle in notification settings) stops the push only; badges
+  are still awarded.
+- **The link** is `/profile?badge=<id>`. The profile switches to the Badges tab, opens that
+  badge's sheet, and removes the parameter.
 
 ## API
 
@@ -153,4 +176,5 @@ is active, because the collection holds private progress.
 - [posts](posts.md) `originalPostDays`
 - [social](social.md) `acceptedSince`, and profiles
 - [portal](portal.md) setup
-- [notifications](notifications.md) (US5)
+- [training](training.md) `finishedDays`
+- [notifications](notifications.md) `badgeEarned`, `selfAllowed`

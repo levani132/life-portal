@@ -271,6 +271,7 @@ describe('NotificationsService preferences and activity', () => {
       postLike: false,
       postRepost: true,
       message: true,
+      badgeEarned: true,
     });
     expect(prefs.showCommentPreviews).toBe(false);
     expect(prefs.offerHiddenUntil).toBe('2026-11-15T12:00:00.000Z');

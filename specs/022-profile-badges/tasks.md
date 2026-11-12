@@ -283,7 +283,7 @@ profiles read `/badges/people/:id` and open a read-only `BadgeDetail`.
 **Independent test**: 10 finished workouts, with 2 or more in each of 4 consecutive weeks, earn
 "First workout", "10 workouts" and "4-week consistency". An open session does not count.
 
-- [ ] T029 [P] [US4] Add `weeklyConsistency` cases to `badges.spec.ts`:
+- [x] T029 [P] [US4] Add `weeklyConsistency` cases to `badges.spec.ts`:
   - weeks start on Monday (match `weekStart` in `nutrition.ts`);
   - a week with 1 session breaks the run;
   - the current week with fewer than 2 sessions neither breaks nor extends the run, and with 2
@@ -292,15 +292,17 @@ profiles read `/badges/people/:id` and open a read-only `BadgeDetail`.
   - tiers come from earlier runs.
 
   Add `evaluateBadges` training cases too.
-- [ ] T030 [US4] Implement `weeklyConsistency` and the training family in `evaluateBadges` in
+- [x] T030 [US4] Implement `weeklyConsistency` and the training family in `evaluateBadges` in
   `libs/shared/domain/src/lib/badges.ts`.
-- [ ] T031 [P] [US4] Add `finishedDays(userId): Promise<string[]>` to
+- [x] T031 [P] [US4] Add `finishedDays(userId): Promise<string[]>` to
   `apps/api/src/training/sessions.service.ts`, covering `status: 'finished'` only, projecting
   `day`.
-- [ ] T032 [US4] Load the training inputs in `BadgesService.evaluate` when the training family is
+- [x] T032 [US4] Load the training inputs in `BadgesService.evaluate` when the training family is
   not complete. Add a service-spec case where an open session is not counted.
-- [ ] T033 [US4] Call `checkBadges()` after a successful finish in
+- [x] T033 [US4] Call `checkBadges()` after a successful finish in
   `apps/web/src/components/training/workout-session.tsx`.
+  *As built:* no component change. `POST /training/sessions/:id/finish` is in `QUALIFYING`
+  (`lib/badges.ts`), so the API client's `onSuccessfulWrite` hook fires the check.
 
 **Checkpoint**: quickstart scenario 9 passes.
 
@@ -314,27 +316,32 @@ profiles read `/badges/people/:id` and open a read-only `BadgeDetail`.
 sends one "You earned n badges". Turning the type off sends nothing, but the badges are still
 awarded.
 
-- [ ] T034 [P] [US5] In `libs/shared/types/src/lib/notifications.ts`, add `'badgeEarned'` to
+- [x] T034 [P] [US5] In `libs/shared/types/src/lib/notifications.ts`, add `'badgeEarned'` to
   `NOTIFICATION_TYPES` and optional `count?: number` to `NotificationEvent`.
-- [ ] T035 [US5] In `libs/shared/domain/src/lib/notifications.ts`:
+- [x] T035 [US5] In `libs/shared/domain/src/lib/notifications.ts`:
   - **`shouldNotify`:** takes the type's `selfAllowed` (as an argument or as a set of types) and
     skips the `'self'` rule only for such types.
   - **`notificationText`:** for `badgeEarned`, "You earned <name>" when `count` is 1 (resolved
     from `BADGE_CATALOGUE` via `targetId`), otherwise "You earned <count> badges".
   - **Tests:** in that module's spec file, `'self'` is still blocked for every other type.
-- [ ] T036 [US5] In `apps/api/src/notifications/notifications.service.ts`, add
+- [x] T036 [US5] In `apps/api/src/notifications/notifications.service.ts`, add
   `selfAllowed?: true` to `NotificationTypeDef` and pass it into `shouldNotify`.
-- [ ] T037 [US5] In `BadgesService.onModuleInit`, register the type: `badgeEarned`, `requires:
+- [x] T037 [US5] In `BadgesService.onModuleInit`, register the type: `badgeEarned`, `requires:
   ['social']`, `windowMs: 0`, `selfAllowed: true`, collapse key on the recipient, and `url` set
   to `/profile?badge=<targetId>`. Also register an Activity source over `badge_awards` (by
   `createdAt`, newest first). After `evaluate` creates n > 0 awards, `void notify(...)` once with
   `count: n`. Add spec cases: one notify per evaluation, none when there are no new awards.
-- [ ] T038 [P] [US5] Add the `badgeEarned` label and icon to the activity label switch in
+- [x] T038 [P] [US5] Add the `badgeEarned` label and icon to the activity label switch in
   `apps/web/src/components/notifications.tsx`, and the toggle label wherever the per-type
   preferences are listed.
-- [ ] T039 [US5] In `apps/web/src/components/social.tsx`, read `?badge=` on `/profile`. Scroll to
+- [x] T039 [US5] In `apps/web/src/components/social.tsx`, read `?badge=` on `/profile`. Scroll to
   the collection, open that badge's `BadgeSheet` once, then clear the parameter with
   `router.replace`.
+  *As built:* `BadgeDeepLink` (its own Suspense boundary for `useSearchParams`) switches to the
+  Badges tab, `BadgeCollection` opens the sheet once loaded, and only for an earned, visible
+  badge. Activity rows come from `BadgesService.activity`; `NotificationsService` keeps a
+  `selfAllowed` type's own rows, which it otherwise drops. The push names the highest new tier
+  for one award, and awards of a feature that is off are left out of the count.
 
 **Checkpoint**: quickstart scenarios 1 (notification) and 2 pass.
 
@@ -342,13 +349,13 @@ awarded.
 
 ## Phase 8: Polish and cross-cutting
 
-- [ ] T040 [P] Write `docs/modules/badges.md`:
+- [x] T040 [P] Write `docs/modules/badges.md`:
   - purpose, catalogue, collections (with one sentence each on why they exist), API and access;
   - the evaluation triggers (R4);
   - the on-target basis (the starting target with the current goal, R6), labelled as the basis;
   - earned dates (R7) and `selfAllowed`;
   - cross-links to social, nutrition, training, posts and notifications.
-- [ ] T041 [P] Update the module docs for the new exported reads and behaviour:
+- [x] T041 [P] Update the module docs for the new exported reads and behaviour:
   - `docs/modules/nutrition.md`: `badgeInputs`.
   - `docs/modules/training.md`: `finishedDays`.
   - `docs/modules/posts.md`: `originalPostDays`.
@@ -356,18 +363,18 @@ awarded.
     separately.
   - `docs/modules/notifications.md`: the `badgeEarned` type, `selfAllowed`, and the first
     self-notification.
-- [ ] T042 Append to `docs/DECISIONS.md`:
+- [x] T042 Append to `docs/DECISIONS.md`:
   - "Badge awards are stored facts; progress is derived."
   - "Equipping a badge is consent to show it (training stays unshareable)."
   - "On-target uses the starting target."
   - "Badges are fetched separately from the profile (module cycle)."
 
   Append "Profile badges" to `docs/CHANGELOG.md`.
-- [ ] T043 Add a "things that will trip you up" line to `CLAUDE.md`. Awards are written with
+- [x] T043 Add a "things that will trip you up" line to `CLAUDE.md`. Awards are written with
   `$setOnInsert` only and never edited or deleted. Badges never query another module's
   collections, only the exported reads. `POST /badges/check` is fired by the browser, because
   there is no event bus.
-- [ ] T044 Run `npm run check` and fix anything it finds. Then run the quickstart manual
+- [x] T044 Run `npm run check` and fix anything it finds. Then run the quickstart manual
   scenarios on a local Mongo at 375 px, in light and dark mode. Expect non-zero streaks and
   dates from history, not today.
 

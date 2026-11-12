@@ -10,6 +10,7 @@ export const NOTIFICATION_TYPES = [
   'postLike',
   'postRepost',
   'message',
+  'badgeEarned',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -31,6 +32,9 @@ export interface NotificationEvent {
   /** For `message`: what was sent, and its text (shown only with message previews on). */
   messageKind?: 'text' | 'post';
   messageText?: string;
+  /** For `badgeEarned` (targetId is the badge id): its tier, and how many awards arrived together. */
+  badgeTier?: number;
+  count?: number;
 }
 
 /** The encrypted push message body. Only the service worker reads it. */
@@ -60,6 +64,9 @@ export interface ActivityItem {
   othersCount: number;
   url: string;
   postTitle?: string;
+  /** For `badgeEarned`: which badge, at which tier. */
+  badgeId?: string;
+  badgeTier?: number;
   /** ISO time of the newest underlying action. */
   createdAt: string;
   unseen: boolean;

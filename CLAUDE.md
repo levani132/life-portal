@@ -188,6 +188,12 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   an `<img>`, or the cached copy taints it. See `docs/modules/posts.md`.
 - **A post may have no food.** `publication`, `previewHash` and `kind` are optional; check
   `post.kind` (web) or `row.publication` (API) before touching food fields.
+- **Badge awards are written once and never edited or deleted** (`$setOnInsert`, unique per
+  user/badge/tier), so erasing history never revokes one; progress is always derived. Badges
+  read other modules only through their exported reads, and evaluation runs when the browser
+  calls `POST /badges/check` — there is no event bus. `badgeEarned` is the only `selfAllowed`
+  notification; don't use that flag to let any other type notify its own actor. See
+  `docs/modules/badges.md`.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for

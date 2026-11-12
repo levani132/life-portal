@@ -20,6 +20,15 @@ User-visible changes. Newest first.
   With no workout open, the Workout tab offers the next workout of each plan you used in the last
   four weeks, one tap to start.
 
+## 2026-11-12: Training badges and badge notifications
+
+- **Training badges.** A first workout; 10, 50, 100 and 250 finished workouts; and 4, 12, 26 and
+  52 weeks in a row with at least two workouts each. Rest days never break anything, and past
+  workouts count.
+- **Told when you earn one.** A notification says which badge you earned, or how many if several
+  arrived together, and opens it on your profile. It shows in Activity too. Turn it off under
+  Notifications → Badges; you still earn them.
+
 ## 2026-11-12: Badges on your profile
 
 - **A Badges tab on your own profile.** It lists what you've earned from what you already do:

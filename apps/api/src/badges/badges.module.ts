@@ -22,6 +22,7 @@ import { Today } from '../common/today';
 import { NutritionModule } from '../nutrition/nutrition.module';
 import { PortalModule } from '../portal/portal.module';
 import { PostsModule } from '../posts/posts.module';
+import { TrainingModule } from '../training/training.module';
 import {
   BadgeAward,
   BadgeAwardSchema,
@@ -82,6 +83,7 @@ export class BadgesController {
     NutritionModule,
     PortalModule,
     PostsModule,
+    TrainingModule,
   ],
   controllers: [BadgesController],
   providers: [BadgesService, BadgesNoStore],

@@ -1383,3 +1383,17 @@ evaluation" marker is needed.
   had only `@Prop`s and `SchemaFactory.createForClass`; Mongo then stored every workout as `{}`
   while every unit test (on the in-memory fake) passed. Found by running the app. A string-union
   field also needs an explicit `type: String`, or the API refuses to boot.
+
+## 2026-11-12: The badge notification is the one a person sends themself
+
+**Decision.** `badgeEarned` is registered with `selfAllowed: true`, and `shouldNotify` skips
+its `'self'` rule only for such a type. Activity keeps a `selfAllowed` type's own rows too.
+
+**Why.** The `'self'` rule exists so a person never hears about their own like or comment, and
+it is the safeguard that stops every other type from notifying the actor. A badge is the first
+event that is about the recipient's own doing, so actor and recipient are the same person. A
+per-type opt-in keeps the rule for everything else instead of weakening it globally.
+
+**Also decided.** One push per evaluation, not per award, so the first check after launch (which
+may backfill several badges) sends one "You earned n badges". Training consistency counts weeks
+with two workouts, not consecutive days, because rest days are part of training.

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  type OnModuleInit,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -17,19 +18,18 @@ import {
   type PersonBadges,
   type PublicBadge,
 } from '@life-portal/shared-types';
-import { evaluateBadges, type BadgeEvaluation } from '@life-portal/shared-domain';
+import { evaluateBadges, type ActivityRow, type BadgeEvaluation } from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
 import { User } from '../auth/schemas/user.schema';
+import { NotificationsService } from '../notifications/notifications.service';
 import { NutritionService } from '../nutrition/nutrition.service';
 import { PortalService } from '../portal/portal.module';
 import { PostsService } from '../posts/posts.service';
 import { SocialGraphService } from '../social-graph/social-graph.module';
+import { SessionsService } from '../training/sessions.service';
 import { BadgeAward, BadgeSelection } from './badges.schemas';
 
 type AwardRow = Pick<BadgeAward, 'badgeId' | 'tier' | 'earnedOn'>;
-
-/** Families with rules today. Training is listed in the catalogue but evaluated from US4 on. */
-const EVALUATED: BadgeFamily[] = ['standard', 'food'];
 
 export function accessible(def: BadgeDefinition, access: FeatureAccess): boolean {
   return def.requires.every((flag) => access[flag]);
@@ -41,7 +41,7 @@ export function accessible(def: BadgeDefinition, access: FeatureAccess): boolean
  * collections.
  */
 @Injectable()
-export class BadgesService {
+export class BadgesService implements OnModuleInit {
   constructor(
     @InjectModel(BadgeAward.name) private readonly awards: Model<BadgeAward>,
     @InjectModel(BadgeSelection.name)
@@ -52,7 +52,64 @@ export class BadgesService {
     private readonly posts: PostsService,
     private readonly portal: PortalService,
     private readonly graph: SocialGraphService,
+    private readonly sessions: SessionsService,
+    private readonly notifications: NotificationsService,
   ) {}
+
+  /**
+   * The "badge earned" notification (US5). It is about the recipient's own doing, so it is the
+   * one `selfAllowed` type. Window 0: evaluation already sends at most one per check.
+   */
+  onModuleInit() {
+    this.notifications.register({
+      type: 'badgeEarned',
+      requires: ['social'],
+      windowMs: 0,
+      selfAllowed: true,
+      collapseKey: (event) => event.recipientId,
+      url: (event) => `/profile?badge=${encodeURIComponent(event.targetId)}`,
+    });
+    this.notifications.registerActivitySource({
+      rows: (userId, since, before, limit) => this.activity(userId, since, before, limit),
+    });
+  }
+
+  /** One Activity row per award made in the window, for badges the person can still see. */
+  async activity(
+    userId: string,
+    since: Date,
+    before: Date | undefined,
+    limit: number,
+  ): Promise<ActivityRow[]> {
+    const [rows, { access }] = await Promise.all([
+      this.awards
+        .find({
+          userId,
+          createdAt: { $gte: since, ...(before ? { $lt: before } : {}) },
+        })
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .select('badgeId tier createdAt')
+        .lean<{ badgeId: string; tier: number; createdAt: Date }[]>(),
+      this.access.forUser(userId),
+    ]);
+    return rows.flatMap((row): ActivityRow[] => {
+      const def = BADGE_CATALOGUE.find((badge) => badge.id === row.badgeId);
+      if (!def || !accessible(def, access)) return [];
+      return [
+        {
+          type: 'badgeEarned',
+          actorId: userId,
+          actorName: 'You',
+          targetId: def.id,
+          url: `/profile?badge=${def.id}`,
+          badgeId: def.id,
+          badgeTier: row.tier,
+          createdAt: row.createdAt,
+        },
+      ];
+    });
+  }
 
   /**
    * Inserts an award if it does not exist. `true` only for the call that created it, so two
@@ -81,7 +138,11 @@ export class BadgesService {
   async evaluate(
     userId: string,
     today: string,
-  ): Promise<{ awards: AwardRow[]; created: AwardRow[]; evaluations: BadgeEvaluation[] }> {
+  ): Promise<{
+    awards: AwardRow[];
+    created: AwardRow[];
+    evaluations: BadgeEvaluation[];
+  }> {
     const [existing, user] = await Promise.all([
       this.awards.find({ userId }).select('badgeId tier earnedOn').lean<AwardRow[]>(),
       this.users.findById(userId).select('createdAt').lean<{ createdAt?: Date }>(),
@@ -96,15 +157,23 @@ export class BadgesService {
     const familyDone = (family: BadgeFamily) =>
       done(BADGE_CATALOGUE.filter((def) => def.family === family).map((def) => def.id));
 
-    const [setupCompleted, postDays, friendAcceptedDays, food] = await Promise.all([
+    const [setupCompleted, postDays, friendAcceptedDays, food, finishedDays] = await Promise.all([
       has('setup', 1) ? true : this.portal.get(userId).then((state) => state.setupCompleted),
       has('firstPost', 1) ? [] : this.posts.originalPostDays(userId),
       done(['firstFriend', 'connected']) ? [] : this.graph.acceptedSince(userId),
       familyDone('food') ? undefined : this.nutrition.badgeInputs(userId, today),
+      familyDone('training') ? undefined : this.sessions.finishedDays(userId),
     ]);
     const accountCreatedOn = (user.createdAt ?? new Date()).toISOString().slice(0, 10);
     const evaluations = evaluateBadges(
-      { accountCreatedOn, setupCompleted, postDays, friendAcceptedDays, food },
+      {
+        accountCreatedOn,
+        setupCompleted,
+        postDays,
+        friendAcceptedDays,
+        food,
+        ...(finishedDays ? { training: { finishedDays } } : {}),
+      },
       today,
     );
 
@@ -113,11 +182,45 @@ export class BadgesService {
       for (const { tier, reachedOn } of evaluation.reached) {
         if (has(evaluation.badgeId, tier)) continue;
         if (await this.award(userId, evaluation.badgeId, tier, reachedOn)) {
-          created.push({ badgeId: evaluation.badgeId, tier, earnedOn: reachedOn });
+          created.push({
+            badgeId: evaluation.badgeId,
+            tier,
+            earnedOn: reachedOn,
+          });
         }
       }
     }
+    this.announce(userId, created);
     return { awards: [...existing, ...created], created, evaluations };
+  }
+
+  /**
+   * One notification per evaluation, however many awards it made: the highest new tier is named
+   * when there is one award, otherwise a count. Never awaited, never throws (`notify` contract).
+   * Awards of a feature that is off are not announced; they appear once it is on.
+   */
+  private announce(userId: string, created: AwardRow[]) {
+    if (!created.length) return;
+    void this.access
+      .forUser(userId)
+      .then(({ access }) => {
+        const shown = created.filter((row) => {
+          const def = BADGE_CATALOGUE.find((badge) => badge.id === row.badgeId);
+          return def && accessible(def, access);
+        });
+        if (!shown.length) return;
+        const [first] = [...shown].sort((a, b) => b.tier - a.tier);
+        return this.notifications.notify({
+          type: 'badgeEarned',
+          recipientId: userId,
+          actorId: userId,
+          actorName: 'You',
+          targetId: first.badgeId,
+          badgeTier: first.tier,
+          count: shown.length,
+        });
+      })
+      .catch(() => undefined);
   }
 
   /** The owner's collection: evaluates, then shows only what the owner can access. */
@@ -128,26 +231,22 @@ export class BadgesService {
       this.access.forUser(userId),
       this.selections.findOne({ userId }).lean(),
     ]);
-    const badges = BADGE_CATALOGUE.filter(
-      (def) => EVALUATED.includes(def.family) && accessible(def, access),
-    ).map(
-      (def): BadgeView => {
-        const tiersEarned = awards
-          .filter((row) => row.badgeId === def.id)
-          .sort((a, b) => a.tier - b.tier)
-          .map(({ tier, earnedOn }) => ({ tier, earnedOn }));
-        const top = tiersEarned[tiersEarned.length - 1];
-        const progress = evaluations.find((row) => row.badgeId === def.id)?.progress;
-        const next = def.tiers.find((tier) => !tiersEarned.some((row) => row.tier === tier));
-        return {
-          badgeId: def.id,
-          ...(top ? { tier: top.tier, earnedOn: top.earnedOn } : {}),
-          tiersEarned,
-          ...(progress && next != null ? { progress: { current: progress.current, next } } : {}),
-          ...(created.some((row) => row.badgeId === def.id) ? { isNew: true } : {}),
-        };
-      },
-    );
+    const badges = BADGE_CATALOGUE.filter((def) => accessible(def, access)).map((def): BadgeView => {
+      const tiersEarned = awards
+        .filter((row) => row.badgeId === def.id)
+        .sort((a, b) => a.tier - b.tier)
+        .map(({ tier, earnedOn }) => ({ tier, earnedOn }));
+      const top = tiersEarned[tiersEarned.length - 1];
+      const progress = evaluations.find((row) => row.badgeId === def.id)?.progress;
+      const next = def.tiers.find((tier) => !tiersEarned.some((row) => row.tier === tier));
+      return {
+        badgeId: def.id,
+        ...(top ? { tier: top.tier, earnedOn: top.earnedOn } : {}),
+        tiersEarned,
+        ...(progress && next != null ? { progress: { current: progress.current, next } } : {}),
+        ...(created.some((row) => row.badgeId === def.id) ? { isNew: true } : {}),
+      };
+    });
     const shown = new Set(badges.filter((badge) => badge.tier != null).map((b) => b.badgeId));
     return {
       badges,
@@ -160,7 +259,9 @@ export class BadgesService {
   /** The trigger the web fires after qualifying actions. Awards even while a feature is off. */
   async check(userId: string, today: string): Promise<{ newBadgeIds: BadgeId[] }> {
     const { created } = await this.evaluate(userId, today);
-    return { newBadgeIds: [...new Set(created.map((row) => row.badgeId as BadgeId))] };
+    return {
+      newBadgeIds: [...new Set(created.map((row) => row.badgeId as BadgeId))],
+    };
   }
 
   /**

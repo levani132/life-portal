@@ -1,5 +1,6 @@
 import { FEATURE_IDS, type FeatureAccess } from '@life-portal/shared-types';
 import {
+  badgeEarnedText,
   collapseCutoff,
   groupActivity,
   isPushServiceEndpoint,
@@ -10,7 +11,11 @@ import {
 } from './notifications';
 
 const all = Object.fromEntries(FEATURE_IDS.map((id) => [id, true])) as FeatureAccess;
-const event = { type: 'postLike' as const, recipientId: 'owner', actorId: 'fan' };
+const event = {
+  type: 'postLike' as const,
+  recipientId: 'owner',
+  actorId: 'fan',
+};
 const base = {
   event,
   prefs: { enabled: true },
@@ -35,6 +40,27 @@ describe('shouldNotify', () => {
         event: { ...event, actorId: 'owner' },
       }),
     ).toBe('self');
+  });
+  it('lets a self-allowed type (a badge) through, and still applies its turn-off switch', () => {
+    const own = {
+      ...base,
+      requires: ['social' as const],
+      event: {
+        type: 'badgeEarned' as const,
+        recipientId: 'owner',
+        actorId: 'owner',
+      },
+      connection: null,
+    };
+    expect(shouldNotify({ ...own, selfAllowed: true })).toBeNull();
+    expect(shouldNotify(own)).toBe('self');
+    expect(
+      shouldNotify({
+        ...own,
+        selfAllowed: true,
+        prefs: { enabled: true, types: { badgeEarned: false } },
+      }),
+    ).not.toBeNull();
   });
   it('needs the main switch on and the type not turned off', () => {
     expect(shouldNotify({ ...base, requires: [], prefs: undefined })).toBe(
@@ -234,7 +260,11 @@ describe('isPushServiceEndpoint', () => {
 });
 
 describe('notificationText for messages', () => {
-  const message = { type: 'message' as const, actorName: 'Ana', messageText: 'Lunch at 1?' };
+  const message = {
+    type: 'message' as const,
+    actorName: 'Ana',
+    messageText: 'Lunch at 1?',
+  };
   it('hides the text unless message previews are on', () => {
     expect(notificationText({ ...message, messageKind: 'text' }, { showCommentPreviews: true })).toEqual({
       title: 'Ana',
@@ -254,5 +284,31 @@ describe('notificationText for messages', () => {
         { showCommentPreviews: false, showMessagePreviews: true },
       ).body,
     ).toBe('shared a post');
+  });
+});
+
+describe('badgeEarnedText', () => {
+  it('names one badge at its tier, and counts several', () => {
+    expect(badgeEarnedText('loggingStreak', 30).body).toMatch(/30/);
+    expect(badgeEarnedText('loggingStreak', 30, 3)).toEqual({
+      title: 'New badges',
+      body: 'You earned 3 badges',
+    });
+    expect(badgeEarnedText('retired', 1).body).toBe('You earned a badge');
+  });
+
+  it('is what notificationText returns for the type', () => {
+    expect(
+      notificationText(
+        {
+          type: 'badgeEarned',
+          actorName: 'You',
+          targetId: 'firstWorkout',
+          badgeTier: 1,
+          count: 1,
+        },
+        { showCommentPreviews: false, showMessagePreviews: false, others: 0 },
+      ),
+    ).toEqual(badgeEarnedText('firstWorkout', 1, 1));
   });
 });

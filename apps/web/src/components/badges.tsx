@@ -12,7 +12,7 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { mutate } from 'swr';
 import {
   badgeDefinition,
@@ -329,9 +329,23 @@ function BadgeRow({
 }
 
 /** The owner's collection: earned first (tap to show on the profile), then locked with progress. */
-export function BadgeCollection() {
+export function BadgeCollection({
+  open = null,
+  onOpened,
+}: {
+  /** A badge to open once the collection has loaded (`/profile?badge=`). */
+  open?: BadgeId | null;
+  onOpened?: () => void;
+} = {}) {
   const { data, error, isLoading } = useMyBadges();
   const [selected, setSelected] = useState<BadgeId | null>(null);
+  useEffect(() => {
+    if (!open || !data) return;
+    // Only an earned, visible badge has a sheet; anything else just lands on the collection.
+    if (data.badges.some((badge) => badge.badgeId === open && badge.tier != null))
+      setSelected(open);
+    onOpened?.();
+  }, [open, data]);
   if (error) return <ErrorNote message="Badges couldn’t be loaded." />;
   if (isLoading || !data) return <Spinner label="Checking badges…" />;
   const earned = data.badges.filter((badge) => badge.tier != null);
@@ -347,7 +361,8 @@ export function BadgeCollection() {
       {earned.length > 0 && (
         <>
           <p className="mb-3 text-xs text-ink-faint">
-            Tap a badge to show it on your profile (up to {MAX_EQUIPPED_BADGES}).
+            Tap a badge to show it on your profile (up to {MAX_EQUIPPED_BADGES}
+            ).
           </p>
           <ul className="grid gap-3 sm:grid-cols-2">
             {earned.map((badge) => (

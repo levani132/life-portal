@@ -55,6 +55,11 @@ export interface NotificationTypeDef {
    * the server: iOS forbids a push that shows nothing, so the service worker cannot drop one.
    */
   suppress?: (event: NotificationEvent) => Promise<boolean>;
+  /**
+   * The event is about the recipient's own doing (a badge they earned), so actor and recipient
+   * are the same person. Every other type keeps the `'self'` safeguard.
+   */
+  selfAllowed?: true;
 }
 
 /** Supplies Activity rows from data its module owns. Rows by blocked users are filtered here. */
@@ -277,6 +282,7 @@ export class NotificationsService {
       recipientAccess,
       actorAccess,
       connection,
+      selfAllowed: def.selfAllowed,
     });
     if (skip) return;
     if (def.canStillSee && !(await def.canStillSee(event))) return;
@@ -359,7 +365,10 @@ export class NotificationsService {
     return new Date(this.now().getTime() - ACTIVITY_DAYS * 24 * 60 * 60 * 1000);
   }
 
-  /** Rows from every source, without the member's own actions or anyone blocked. */
+  /**
+   * Rows from every source, without the member's own actions or anyone blocked. A type that is
+   * about the member's own doing (`selfAllowed`, e.g. a badge) is the exception.
+   */
   private async rows(userId: string, since: Date, before: Date | undefined, limit: number) {
     const [blocked, ...batches] = await Promise.all([
       this.graph.blockedUserIds(userId),
@@ -368,7 +377,13 @@ export class NotificationsService {
     const hidden = new Set(blocked);
     return {
       full: batches.some((batch) => batch.length >= limit),
-      rows: batches.flat().filter((row) => row.actorId !== userId && !hidden.has(row.actorId)),
+      rows: batches
+        .flat()
+        .filter(
+          (row) =>
+            (row.actorId !== userId || this.types.get(row.type)?.selfAllowed) &&
+            !hidden.has(row.actorId),
+        ),
     };
   }
 
