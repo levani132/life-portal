@@ -115,6 +115,14 @@ export class SocialGraphService {
       ),
     ];
   }
+  /** Accepted, unblocked friendships: the count on your own profile. */
+  async friendCount(userId: string): Promise<number> {
+    return this.connections.countDocuments({
+      $or: [{ lowId: userId }, { highId: userId }],
+      state: 'accepted',
+      'blockedBy.0': { $exists: false },
+    });
+  }
   async list(userId: string, kind: ConnectionList, skip: number) {
     const filter: Record<string, unknown> =
       kind === 'blocked'

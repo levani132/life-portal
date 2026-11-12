@@ -3,6 +3,7 @@ import {
   CallHandler,
   ConflictException,
   Controller,
+  Delete,
   ExecutionContext,
   Get,
   Injectable,
@@ -45,6 +46,7 @@ import {
   type ConnectionList,
   type PeoplePage,
   type SocialPerson,
+  type SocialAvatarUpdate,
   type SocialProfile as ProfileDto,
   type SocialProfileUpdate,
 } from '@life-portal/shared-types';
@@ -65,6 +67,7 @@ import { ItemsModule } from '../items/items.module';
 import { PersonalModule } from '../personal/personal.module';
 import { BoardsModule } from '../boards/boards.module';
 import { FxModule } from '../fx/fx.module';
+import { MediaService } from '../media/media.service';
 import { SharedWidgetsService } from './shared-widgets.service';
 
 @Schema({ ...baseSchemaOptions, collection: 'social_profiles' })
@@ -75,6 +78,8 @@ class SocialProfile {
   @Prop({ required: true, trim: true }) displayName!: string;
   @Prop({ default: '' }) bio!: string;
   @Prop({ default: false, index: true }) discoverable!: boolean;
+  /** The profile photo's storage key. Never leaves the API: responses carry a signed `avatarUrl`. */
+  @Prop() avatarKey?: string;
 }
 const ProfileSchema = SchemaFactory.createForClass(SocialProfile);
 export class ProfileUpdateDto implements SocialProfileUpdate {
@@ -85,6 +90,9 @@ export class ProfileUpdateDto implements SocialProfileUpdate {
   @IsString() @MinLength(1) @MaxLength(80) displayName!: string;
   @IsString() @MaxLength(300) bio!: string;
   @IsBoolean() discoverable!: boolean;
+}
+class AvatarDto implements SocialAvatarUpdate {
+  @IsString() @MaxLength(64) mediaId!: string;
 }
 class ConnectionDto {
   @IsIn(CONNECTION_ACTIONS) action!: ConnectionAction;
@@ -134,6 +142,7 @@ export class SocialService implements OnModuleInit {
     private readonly access: AccessService,
     private readonly shared: SharedWidgetsService,
     private readonly notifications: NotificationsService,
+    private readonly media: MediaService,
   ) {}
   /** Friend notifications and their Activity rows (docs/modules/notifications.md). */
   onModuleInit() {
@@ -169,18 +178,35 @@ export class SocialService implements OnModuleInit {
   /** Public identity for several members at once (Messages). Missing members are left out. */
   async authors(
     userIds: string[],
-  ): Promise<Map<string, { userId: string; displayName: string; username: string }>> {
+  ): Promise<
+    Map<string, { userId: string; displayName: string; username: string; avatarUrl?: string }>
+  > {
     if (!userIds.length) return new Map();
     const rows = await this.profiles
       .find({ userId: { $in: [...new Set(userIds)] } })
-      .select('userId displayName username')
+      .select('userId displayName username avatarKey')
       .lean();
     return new Map(
-      rows.map((row) => [
-        row.userId,
-        { userId: row.userId, displayName: row.displayName, username: row.username },
-      ]),
+      await Promise.all(
+        rows.map(async (row) => [row.userId, await this.identity(row)] as const),
+      ),
     );
+  }
+  /**
+   * Who someone is, for anything that names them: post authors, comments, chat headers. A profile
+   * photo is shown wherever the name is, so it is signed here, after the caller's own check.
+   */
+  private async identity(profile: SocialProfile) {
+    const avatarUrl = await this.avatarUrl(profile);
+    return {
+      userId: profile.userId,
+      displayName: profile.displayName,
+      username: profile.username,
+      ...(avatarUrl ? { avatarUrl } : {}),
+    };
+  }
+  private async avatarUrl(profile: SocialProfile) {
+    return profile.avatarKey ? this.media.signKey(profile.avatarKey) : undefined;
   }
   /** Display names for Activity and notification text. */
   async displayNames(userIds: string[]): Promise<Map<string, string>> {
@@ -238,27 +264,34 @@ export class SocialService implements OnModuleInit {
   }
   async postAuthor(userId: string) {
     const profile = await this.profiles.findOne({ userId }).lean();
-    return profile
-      ? {
-          userId: profile.userId,
-          displayName: profile.displayName,
-          username: profile.username,
-        }
-      : null;
+    return profile ? this.identity(profile) : null;
   }
-  private person(
+  private async person(
     profile: SocialProfile,
     relationship: SocialPerson['relationship'],
     muted = false,
-  ): SocialPerson {
+  ): Promise<SocialPerson> {
     return {
-      userId: profile.userId,
-      username: profile.username,
-      displayName: profile.displayName,
+      ...(await this.identity(profile)),
       bio: profile.bio,
       relationship,
       muted,
     };
+  }
+  /** Replaces the profile photo with a copy of an upload, then deletes the old file. */
+  async setAvatar(userId: string, dto: AvatarDto) {
+    const previous = (await this.own(userId)).avatarKey;
+    const { key } = await this.media.copyForAvatar(userId, dto.mediaId);
+    await this.profiles.updateOne({ userId }, { $set: { avatarKey: key } });
+    if (previous) await this.media.deleteKey(previous);
+    return { avatarUrl: await this.media.signKey(key) };
+  }
+  async removeAvatar(userId: string) {
+    const previous = (await this.own(userId)).avatarKey;
+    if (!previous) return { success: true };
+    await this.profiles.updateOne({ userId }, { $unset: { avatarKey: 1 } });
+    await this.media.deleteKey(previous);
+    return { success: true };
   }
   async update(userId: string, dto: ProfileUpdateDto) {
     if (
@@ -306,12 +339,17 @@ export class SocialService implements OnModuleInit {
     const viewer = await this.access.forUser(viewerId);
     const friends = self ? preview !== 'stranger' : row?.state === 'accepted';
     return {
-      ...this.person(
+      ...(await this.person(
         profile,
         self ? 'self' : relationshipFor(row, viewerId, targetId),
         row?.mutedBy.includes(viewerId),
-      ),
-      ...(self ? { discoverable: profile.discoverable } : {}),
+      )),
+      ...(self
+        ? {
+            discoverable: profile.discoverable,
+            friendCount: await this.graph.friendCount(viewerId),
+          }
+        : {}),
       widgets: await this.shared.forViewer(
         targetId,
         viewer.access,
@@ -373,7 +411,7 @@ export class SocialService implements OnModuleInit {
         if (!(await this.enabled(p.userId))) return null;
         const connection = await this.graph.between(userId, p.userId);
         if (connection?.blockedBy.length) return null;
-        return this.person(p, relationshipFor(connection, userId, p.userId));
+        return await this.person(p, relationshipFor(connection, userId, p.userId));
       }),
     );
     return {
@@ -401,11 +439,11 @@ export class SocialService implements OnModuleInit {
         )
           return null;
         return {
-          ...this.person(
+          ...(await this.person(
             profile,
             relationshipFor(row, userId, targetId),
             row.mutedBy.includes(userId),
-          ),
+          )),
           ...(query.kind === 'friends'
             ? {
                 widgets: await this.shared.forViewer(
@@ -473,6 +511,15 @@ export class SocialController {
     @Body() dto: ProfileUpdateDto,
   ) {
     return this.social.update(userId, dto);
+  }
+  @Put('me/avatar') setAvatar(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: AvatarDto,
+  ) {
+    return this.social.setAvatar(userId, dto);
+  }
+  @Delete('me/avatar') removeAvatar(@CurrentUser('userId') userId: string) {
+    return this.social.removeAvatar(userId);
   }
   @Get('search') search(
     @CurrentUser('userId') userId: string,

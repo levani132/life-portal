@@ -13,6 +13,14 @@ password/refresh-token hashes or other account fields entering social responses.
 use `user-<id>`; handles matching that pattern are reserved to their own account. A known profile
 link works even when search is off; audiences still apply. No anonymous/open-internet routes.
 
+`avatarKey` (optional) is the profile photo's storage key under `avatars/<userId>/`. It never
+leaves the API: every response that names a person (profiles, people lists, post and comment
+authors, chat headers) carries a signed `avatarUrl` instead, signed per read after that read's own
+check. A photo is identity, like the display name, so it is shown wherever the name is; there is
+no separate audience for it. The browser crops it to the centre square at 512 px and re-encodes
+it (`prepareAvatar`, which strips EXIF/GPS like every upload); the server copies the upload into
+the profile (`MediaService.copyForAvatar`, images only) and deletes the previous file.
+
 `social_connections` stores one unique canonical pair with pending/accepted/none state,
 request sender and directional blockedBy/mutedBy arrays. One row makes accept/block/cancel
 conditional atomic writes rather than conflicting mutations of mirrored friendship documents.
@@ -44,6 +52,10 @@ Activity source for incoming requests and accepted requests
 All under `/api/social`, with `Cache-Control: private, no-store`:
 - GET/PUT `/me`: own profile/create-on-first-read or validated identity update.
 - GET `/me?preview=friend|stranger`: owner-only audience preview.
+- PUT `/me/avatar` `{mediaId}` / DELETE `/me/avatar`: set or remove the profile photo. Needs
+  `postMedia` and configured storage, the same as any upload.
+- Your own profile (from `/me` or `/profiles/<your id>`) also carries `friendCount`. Other
+  people's counts are never returned.
 - GET `/profiles/:userId`: audience-checked profile. Preview parameters cannot elevate a viewer.
 - GET `/search?q=&skip=`: literal escaped name/username search, minimum two characters.
 - GET `/connections?kind=friends|incoming|outgoing|blocked&skip=`: private connection lists.
@@ -79,10 +91,18 @@ privacy changes cannot erase information already seen, but later reads return on
 
 ## UI
 
-Social-enabled accounts get Home/Search/Friends/Menu. Friends includes Requests (also badged in
-navigation), Sent and Blocked. Menu → My profile → Edit profile provides publishable identity
-and search visibility. Own profile has friend/stranger preview controls and a copyable direct profile link. Privacy settings link
-to that preview and to Food's existing meal/target/weight controls. Wall is not an empty tab.
+Social-enabled accounts get Home/Messages/Search/**Profile**: the last tab is your own profile,
+and its ☰ button opens Menu (Menu stays the last tab for accounts without social). Your own
+profile is one page however you reach it: `/people/<your id>` (your name on a post, a shared link)
+redirects to `/profile`, and `ProfileView` decides "own" from the signed-in user, never from the
+route. The friend-request badge sits on the Profile tab, the ☰ button and the friends count.
+
+The profile header carries its actions as icons on a gradient band (no cover photo): your own has
+View as (friend/stranger preview, with a banner while previewing), Share (the share sheet, or the
+link copied), Edit and Menu; someone else's has "…" with Mute, Unfriend, Cancel request and Block
+(the last two confirm first). Only the main action gets a button row: Add friend, Accept/Decline,
+Message, Unblock. Tapping your own photo changes or removes it. Friends includes Requests, Sent
+and Blocked. Privacy settings link to the preview and to Food's meal/target/weight controls.
 
 ## Wall and profile posts (007)
 

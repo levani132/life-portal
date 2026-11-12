@@ -11,6 +11,7 @@ import {
   MessageCircle,
   Plus,
   Search,
+  UserRound,
   type LucideIcon,
 } from 'lucide-react';
 import type { PortalState } from '@life-portal/shared-types';
@@ -24,6 +25,7 @@ import { ActivityBell, NotificationsBridge } from './notifications';
 import { PeopleSearch } from './people-search';
 import { PortalLoader } from './portal-loader';
 import { PullToRefresh } from './pull-to-refresh';
+import { ProfileView } from './social';
 import { TabHost, type HostTab } from './tab-host';
 import { ErrorNote } from './ui';
 
@@ -97,13 +99,15 @@ function Portal({ children }: { children: ReactNode }) {
   // A conversation and the new post page own the whole screen: no header, no tabs, and no
   // pull-to-refresh fighting their own gestures.
   const inChat = /^\/messages\/[^/]+/.test(pathname) || pathname === '/new';
+  // Pages reached from your profile (its menu, settings, your friends) keep the last tab lit.
+  // `/people/<you>` redirects to `/profile`; someone else's profile lights no tab.
   const inMenu =
     pathname === '/menu' ||
     pathname.startsWith('/settings') ||
     pathname === '/setup' ||
     pathname === '/profile' ||
     pathname === '/friends' ||
-    pathname.startsWith('/people/');
+    pathname === `/people/${user.id}`;
   const tabs = tabsFor(portal.data.access, pathname, inMenu);
   const current = tabs.findIndex((tab) => tab.href === pathname);
   return (
@@ -192,7 +196,7 @@ function Portal({ children }: { children: ReactNode }) {
                     {unreadMessages > 99 ? '99+' : unreadMessages}
                   </span>
                 )}
-                {tab.label === 'Menu' && !!requests.data?.count && (
+                {tab.href === LAST_TAB_HREF.profile && !!requests.data?.count && (
                   <span
                     className="ml-1 rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] text-white"
                     aria-label={`${requests.data.count} pending friend requests`}
@@ -287,6 +291,16 @@ function mainClassFor(pathname: string): string {
 }
 
 const NEW_POST = 'new-post' as const;
+
+/**
+ * The last tab is your profile when social is on (its menu button opens Menu), and Menu itself
+ * otherwise, so an account without social still reaches settings in one tap.
+ */
+const LAST_TAB_HREF = { profile: '/profile', menu: '/menu' } as const;
+
+function OwnProfile() {
+  return <ProfileView />;
+}
 
 /** The tabs with the New post button in the middle. It is a link, not a tab: swiping skips it. */
 function withNewPost(tabs: Tab[], canPost: boolean): (Tab | typeof NEW_POST)[] {
@@ -392,7 +406,9 @@ function tabsFor(
           ),
         ]
       : []),
-    tab('/menu', 'Menu', Menu, MenuContent, inMenu),
+    access.social
+      ? tab(LAST_TAB_HREF.profile, 'Profile', UserRound, OwnProfile, inMenu)
+      : tab(LAST_TAB_HREF.menu, 'Menu', Menu, MenuContent, inMenu),
   ];
 }
 

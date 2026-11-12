@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { isStandalone } from '../lib/push';
 
-/** A tab root: Home, Messages, Search, Friends or Menu. */
+/** A tab root: Home, Messages, Search, and Profile (or Menu, without social). */
 export interface HostTab {
   href: string;
   Content: ComponentType;

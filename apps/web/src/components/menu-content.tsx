@@ -8,7 +8,6 @@ import {
   Sparkles,
   Plug,
   Flag,
-  UserRound,
   Users,
   Bell,
 } from 'lucide-react';
@@ -33,7 +32,6 @@ export function MenuContent() {
               ? { badge: `${requests.data.count}${requests.data.more ? '+' : ''}` }
               : {}),
           },
-          { href: '/profile', label: 'My profile', icon: UserRound },
         ]
       : []),
     ...(data?.access.push && data.access.social

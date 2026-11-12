@@ -1,4 +1,5 @@
 'use client';
+import { Avatar } from './avatar';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Heart, MessageCircle, Send, Trash2 } from 'lucide-react';
@@ -295,6 +296,12 @@ function PostComments({
       <ul className="space-y-3">
         {comments.map((comment) => (
           <li key={comment.id} className="flex items-start gap-2">
+            <Avatar
+              name={comment.author.displayName}
+              url={comment.author.avatarUrl}
+              size={28}
+              className="mt-1"
+            />
             <div className="min-w-0 flex-1 rounded-xl bg-violet-500/5 px-3 py-2">
               {comment.author.userId ? (
                 <Link

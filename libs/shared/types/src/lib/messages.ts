@@ -9,6 +9,8 @@ export interface ChatPerson {
   userId: string;
   displayName: string;
   username: string;
+  /** A signed, short-lived link to their profile photo. */
+  avatarUrl?: string;
 }
 
 /** A shared post as the viewer may see it right now, or nothing at all. */

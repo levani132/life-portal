@@ -54,7 +54,7 @@ No finance/FX summary requests run for Food-only Home. Net position is omitted u
 contributing finance modules are selected, avoiding a partial number labelled as net position.
 Alerts are built only from the summaries that were loaded.
 
-Home/Menu remain the production default. Social-enabled users also get Search and Friends;
+Home/Menu remain the production default. Social-enabled users get Search, and Profile replaces Menu as the last tab (Menu opens from the profile; see social.md);
 The wall stays on Home and /wall redirects to /#wall. The floating rearrangement bar sits above navigation and safe-area space.
 
 The independent `social` feature is stored in the same cohort/user policies, defaults off for

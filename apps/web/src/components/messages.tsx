@@ -1,5 +1,6 @@
 'use client';
 
+import { Avatar } from './avatar';
 import clsx from 'clsx';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -62,17 +63,7 @@ export function useUnreadMessages(access: PortalState['access']): number {
   return messagingAvailable(access) ? (unread.data?.count ?? 0) : 0;
 }
 
-export function Avatar({ name, size = 44 }: { name: string; size?: number }) {
-  return (
-    <span
-      aria-hidden
-      className="flex shrink-0 items-center justify-center rounded-full bg-sky-500/15 font-semibold text-sky-300"
-      style={{ width: size, height: size, fontSize: size * 0.4 }}
-    >
-      {(name.trim()[0] ?? '?').toUpperCase()}
-    </span>
-  );
-}
+export { Avatar };
 
 // ------------------------------------------------------------------ Inbox
 
@@ -119,7 +110,7 @@ export function Inbox() {
                 href={`/messages/${entry.id}`}
                 className="flex items-center gap-3 rounded-xl px-2 py-2 active:bg-surface-raised hover:bg-surface-raised"
               >
-                <Avatar name={entry.other.displayName} size={52} />
+                <Avatar name={entry.other.displayName} url={entry.other.avatarUrl} size={52} />
                 <span className="min-w-0 flex-1">
                   <span
                     className={clsx(
@@ -213,7 +204,7 @@ function FriendBalloons({
                   disabled={!!opening}
                   onClick={() => void open(person)}
                 >
-                  <Avatar name={person.displayName} size={64} />
+                  <Avatar name={person.displayName} url={person.avatarUrl} size={64} />
                   <span className="w-full truncate text-center text-xs text-ink-muted">
                     {person.displayName.split(/\s+/)[0]}
                   </span>
@@ -488,7 +479,7 @@ export function Conversation({ id }: { id: string }) {
         >
           <ArrowLeft size={20} />
         </Link>
-        <Avatar name={other.displayName} size={36} />
+        <Avatar name={other.displayName} url={other.avatarUrl} size={36} />
         <Link
           href={other.userId ? `/people/${other.userId}` : '/messages'}
           className="min-w-0 flex-1 truncate font-semibold"

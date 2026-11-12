@@ -58,6 +58,8 @@ export interface PostAuthor {
   userId: string;
   displayName: string;
   username: string;
+  /** A signed, short-lived link to the author's profile photo. */
+  avatarUrl?: string;
 }
 export interface FoodPost {
   id: string;

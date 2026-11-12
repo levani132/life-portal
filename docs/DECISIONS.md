@@ -1251,3 +1251,20 @@ partial unique index, which is why `status` is stored next to `endedAt`. Sets ar
 so two devices never overwrite each other. Training produces no burned-energy figure: Apple
 Health's Active Energy already feeds Food, and counting a workout too would double it.
 
+## 2026-11-12: Profile replaces Menu as the last tab; own profile decided by who you are
+
+The feed links every author to `/people/:id`, and `ProfileView` chose "own" from whether the
+route had an id, so your own name opened your profile as a stranger. "Own" is now decided from
+the signed-in user, and `/people/<your id>` redirects to `/profile` so the Profile tab is lit and
+there is one URL for one page. Menu moved behind a ☰ on your profile: people visit their profile
+far more often than settings, and a fifth tab would crowd the New post button. Accounts without
+social keep Menu as the tab, because they have no profile.
+
+Profile photos reuse the food-photo path rather than a new upload type: an ordinary image upload,
+copied server-side to `avatars/<userId>/` so a post using the same capture never shares the file.
+The browser crops to a 512 px square because the photo is drawn beside every post in a feed; a
+2048 px original there would be wasted bandwidth. The photo is identity, so it has no audience of
+its own; it is signed wherever the name is shown, after that response's own check. Only your own
+profile carries a friend count: showing other people's counts would reveal the size of a private
+list. No cover photo: it would be a second upload flow for little, and the owner wanted the page
+to stay serious.

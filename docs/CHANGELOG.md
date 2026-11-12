@@ -2,6 +2,18 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-12: Your profile, one way, one tap away
+
+- **Your profile looks the same however you get there.** Tapping your own name on a post used to
+  show your profile as a stranger would see it; it now opens your real profile.
+- **Profile is the last tab.** It replaces Menu; the ☰ button at the top of your profile opens the
+  menu. The friend-request badge moved onto the Profile tab.
+- **Profile photos.** Tap the circle on your profile to add one; it shows on your posts, comments,
+  chats and in people lists. Photos are cropped square and stripped of location before upload.
+- **A tidier header.** View as, Share, Edit and Menu are icons on the header instead of a row of
+  buttons, and your friend count links to Friends. On other people's profiles, only Add friend or
+  Message is a button; Mute, Unfriend and Block are under "…", and Unfriend and Block ask first.
+
 ## 2026-11-12: Training, first version (behind a flag)
 
 A new **Training** module for logging gym workouts, on for the internal cohort only. Start a

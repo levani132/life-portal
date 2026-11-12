@@ -36,6 +36,8 @@ export interface SocialPerson {
   username: string;
   displayName: string;
   bio: string;
+  /** A signed, short-lived link to the profile photo. Absent when there is none. */
+  avatarUrl?: string;
   relationship: Relationship;
   muted: boolean;
   widgets?: SharedWidget[];
@@ -43,6 +45,12 @@ export interface SocialPerson {
 export interface SocialProfile extends SocialPerson {
   widgets: SharedWidget[];
   discoverable?: boolean;
+  /** Accepted friends. Only on your own profile: other people's counts are not shown. */
+  friendCount?: number;
+}
+/** Sets the profile photo from an upload (`POST /media`). */
+export interface SocialAvatarUpdate {
+  mediaId: string;
 }
 export interface PeoplePage {
   people: SocialPerson[];

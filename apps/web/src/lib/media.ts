@@ -84,6 +84,30 @@ export async function prepareImage(file: Blob): Promise<PreparedMedia> {
   return { kind: 'image', ...result, previewUrl: URL.createObjectURL(result.blob) };
 }
 
+/** A profile photo's edge. Small enough to sit beside every post in a feed. */
+const AVATAR_EDGE = 512;
+
+/**
+ * Re-encodes a profile photo: the centre square, at most 512 px. Re-drawing strips EXIF the same
+ * way `prepareImage` does, so the location never reaches storage.
+ */
+export async function prepareAvatar(file: Blob): Promise<PreparedMedia> {
+  const image = await decode(file);
+  const width = 'naturalWidth' in image ? image.naturalWidth : image.width;
+  const height = 'naturalHeight' in image ? image.naturalHeight : image.height;
+  const side = Math.min(width, height);
+  const edge = Math.max(1, Math.min(AVATAR_EDGE, side));
+  const canvas = document.createElement('canvas');
+  canvas.width = edge;
+  canvas.height = edge;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('This browser cannot prepare photos.');
+  context.drawImage(image, (width - side) / 2, (height - side) / 2, side, side, 0, 0, edge, edge);
+  if ('close' in image) image.close();
+  const blob = await toJpeg(canvas, 0.88);
+  return { kind: 'image', blob, width: edge, height: edge, previewUrl: URL.createObjectURL(blob) };
+}
+
 /** A photo taken from the live camera preview. The front camera is mirrored, like a mirror. */
 export async function captureFrame(video: HTMLVideoElement, mirror: boolean) {
   const result = await drawJpeg(

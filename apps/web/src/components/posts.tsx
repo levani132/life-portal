@@ -1,4 +1,5 @@
 'use client';
+import { Avatar } from './avatar';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
@@ -283,9 +284,9 @@ export function PostCard({
         <Link
           href={`/people/${post.author.userId}`}
           aria-label={`View ${post.author.displayName}'s profile`}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-sm font-semibold text-accent"
+          className="shrink-0"
         >
-          {post.author.displayName.trim().slice(0, 1).toUpperCase()}
+          <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={40} />
         </Link>
         <div className="min-w-0">
           <Link

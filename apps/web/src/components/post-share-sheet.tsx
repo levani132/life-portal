@@ -27,6 +27,7 @@ import { ErrorNote } from './ui';
 interface Head {
   userId: string;
   displayName: string;
+  avatarUrl?: string;
   /** Known when there is already a conversation. */
   conversationId?: string;
 }
@@ -36,12 +37,17 @@ export function shareHeads(inbox: InboxEntry[] = [], friends: SocialPerson[] = [
   const heads: Head[] = inbox.map((entry) => ({
     userId: entry.other.userId,
     displayName: entry.other.displayName,
+    ...(entry.other.avatarUrl ? { avatarUrl: entry.other.avatarUrl } : {}),
     conversationId: entry.id,
   }));
   const seen = new Set(heads.map((head) => head.userId));
   for (const friend of friends) {
     if (!seen.has(friend.userId))
-      heads.push({ userId: friend.userId, displayName: friend.displayName });
+      heads.push({
+        userId: friend.userId,
+        displayName: friend.displayName,
+        ...(friend.avatarUrl ? { avatarUrl: friend.avatarUrl } : {}),
+      });
   }
   return heads;
 }
@@ -205,7 +211,7 @@ export function PostShareSheet({
                         className="flex w-full flex-col items-center gap-1.5 disabled:opacity-50"
                       >
                         <span className="relative">
-                          <Avatar name={head.displayName} size={56} />
+                          <Avatar name={head.displayName} url={head.avatarUrl} size={56} />
                           {(done || sending === head.userId) && (
                             <span className="absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-surface-raised bg-accent text-white">
                               {done ? (

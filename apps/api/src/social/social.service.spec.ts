@@ -58,6 +58,7 @@ function fixture(
     blockedUserIds: jest.fn().mockResolvedValue(options.blocked ?? []),
     isBlocked: jest.fn().mockResolvedValue(!!options.row?.blockedBy.length),
     act: jest.fn().mockResolvedValue(true),
+    friendCount: jest.fn().mockResolvedValue(3),
   };
   const access = {
     forUser: jest.fn().mockImplementation(async (userId: string) => ({
@@ -69,6 +70,11 @@ function fixture(
     diaryForViewer: jest.fn().mockResolvedValue({ day: TODAY, slots: [] }),
   };
   const notifications = { notify: jest.fn(), register: jest.fn() };
+  const media = {
+    signKey: jest.fn(async (key: string) => `https://signed/${key}`),
+    copyForAvatar: jest.fn().mockResolvedValue({ key: 'avatars/new.jpg' }),
+    deleteKey: jest.fn(),
+  };
   const service = new SocialService(
     profiles as never,
     {} as never,
@@ -76,8 +82,9 @@ function fixture(
     access as never,
     shared as never,
     notifications as never,
+    media as never,
   );
-  return { profiles, graph, access, shared, notifications, service };
+  return { profiles, graph, access, shared, notifications, media, service };
 }
 
 describe('profile visibility', () => {
@@ -226,5 +233,52 @@ describe('connection actions', () => {
     await expect(
       f.service.act(VIEWER, TARGET, { action: 'unblock' } as never),
     ).resolves.toEqual({ success: true });
+  });
+});
+
+describe('profile photo and friend count', () => {
+  const withAvatar = (userId: string) => ({ ...profileOf(userId), avatarKey: `avatars/${userId}/a.jpg` });
+
+  it('signs the photo and never returns its storage key', async () => {
+    const f = fixture();
+    f.profiles.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(withAvatar(TARGET)) });
+    const profile = await f.service.profile(VIEWER, TARGET, TODAY);
+    expect(profile.avatarUrl).toBe(`https://signed/avatars/${TARGET}/a.jpg`);
+    expect(JSON.stringify(profile)).not.toContain('avatarKey');
+  });
+
+  it('leaves avatarUrl out when there is no photo', async () => {
+    const f = fixture();
+    const author = await f.service.postAuthor(TARGET);
+    expect(author).not.toHaveProperty('avatarUrl');
+    expect(f.media.signKey).not.toHaveBeenCalled();
+  });
+
+  it('counts friends only on your own profile', async () => {
+    const f = fixture({ row: pair() });
+    expect((await f.service.profile(VIEWER, TARGET, TODAY)).friendCount).toBeUndefined();
+    f.profiles.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(profileOf(VIEWER)) });
+    expect((await f.service.profile(VIEWER, VIEWER, TODAY)).friendCount).toBe(3);
+  });
+
+  it('replaces the photo, then deletes the old file', async () => {
+    const f = fixture();
+    f.profiles.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(withAvatar(VIEWER)) });
+    const result = await f.service.setAvatar(VIEWER, { mediaId: 'm1' } as never);
+    expect(f.media.copyForAvatar).toHaveBeenCalledWith(VIEWER, 'm1');
+    expect(f.profiles.updateOne).toHaveBeenCalledWith(
+      { userId: VIEWER },
+      { $set: { avatarKey: 'avatars/new.jpg' } },
+    );
+    expect(f.media.deleteKey).toHaveBeenCalledWith(`avatars/${VIEWER}/a.jpg`);
+    expect(result.avatarUrl).toBe('https://signed/avatars/new.jpg');
+  });
+
+  it('removing a photo unsets it and deletes the file', async () => {
+    const f = fixture();
+    f.profiles.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(withAvatar(VIEWER)) });
+    await f.service.removeAvatar(VIEWER);
+    expect(f.profiles.updateOne).toHaveBeenCalledWith({ userId: VIEWER }, { $unset: { avatarKey: 1 } });
+    expect(f.media.deleteKey).toHaveBeenCalledWith(`avatars/${VIEWER}/a.jpg`);
   });
 });

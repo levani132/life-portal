@@ -216,15 +216,34 @@ export class MediaService {
     mediaId: string,
     foodId: string,
   ): Promise<{ key: string; width: number; height: number }> {
+    return this.copyImage(userId, mediaId, `foods/${userId}/${foodId}-`);
+  }
+
+  /**
+   * A profile photo: a copy of an image upload, the same way as a food's. The browser has already
+   * cropped it square and small (`prepareAvatar`), so it is cheap beside every post in a feed.
+   */
+  async copyForAvatar(userId: string, mediaId: string): Promise<{ key: string }> {
+    const { key } = await this.copyImage(userId, mediaId, `avatars/${userId}/`, false);
+    return { key };
+  }
+
+  private async copyImage(
+    userId: string,
+    mediaId: string,
+    prefix: string,
+    allowVideo = true,
+  ): Promise<{ key: string; width: number; height: number }> {
     await this.requireAvailable(userId);
     if (!Types.ObjectId.isValid(mediaId)) throw new BadRequestException('That photo can no longer be used.');
     const row = await this.media.findOne({ _id: mediaId, userId }).lean();
-    if (!row) throw new BadRequestException('That photo can no longer be used.');
+    if (!row || (!allowVideo && row.kind !== 'image'))
+      throw new BadRequestException('That photo can no longer be used.');
     const source = row.kind === 'video' ? row.posterKey : row.key;
     const object = source ? await this.storage.head(source) : null;
     if (!source || !object || object.contentType !== 'image/jpeg')
       throw new BadRequestException('Upload not finished. Wait for it, then save again.');
-    const key = `foods/${userId}/${foodId}-${String(new Types.ObjectId())}.jpg`;
+    const key = `${prefix}${String(new Types.ObjectId())}.jpg`;
     await this.storage.copy(source, key);
     const scale =
       row.kind === 'video' ? 1080 / Math.max(row.width, row.height, 1080) : 1;

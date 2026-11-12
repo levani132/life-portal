@@ -129,3 +129,11 @@ describe('copyForFood', () => {
     await expect(f.service.copyForFood('owner', f.id, 'food1')).rejects.toThrow(/Upload not finished/);
   });
 });
+
+describe('copyForAvatar', () => {
+  it('refuses a video: a profile photo is a photo', async () => {
+    const f = fixture();
+    await expect(f.service.copyForAvatar('owner', f.id)).rejects.toThrow(/can no longer be used/);
+    expect(f.storage.copy).not.toHaveBeenCalled();
+  });
+});
