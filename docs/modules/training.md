@@ -351,6 +351,22 @@ two steps: the exercise (with "Create exercise" for what the catalogue lacks), t
 closing the app with writes still pending loses them. Weight fields use `Input` with
 `inputMode="decimal"`, so a comma from a Georgian keyboard works.
 
+**Colour system (spec 024, display only).** Training is colourful by derivation, never by stored
+data. `lib/training-colors.ts` maps each muscle to a group (push: chest, shoulders; pull: back,
+traps, neck; legs; core: abdominals; arms; cardio for any `distance_duration` exercise; `other`
+when there is no primary muscle) and each group to literal Tailwind classes (`text`, `tint`,
+`border`, `solid`, `gradient`, `edge`) and a lucide icon. Exercise tiles, workout exercise cards,
+muscle filter chips and History all use these. A plan's colour comes from its position among the
+ready-made plans (so the four seeded plans are always distinct) or, for own plans, a hash of its
+id: stable on every device, nothing stored. `usePlanStyle(id)` reads the cached plan list so a
+plan's workout header matches its card. The colours are `--train-<hue>` (text, themed in all
+three theme blocks of `global.css` for 4.5:1 contrast) and `--train-<hue>-solid` (fills that carry
+white text in both themes). Class strings must stay literal, because Tailwind only generates
+classes it finds as text. The page opens with `training-hero.tsx`, this week from
+`GET /training/summary` (hidden on the Workout tab while a workout is open, whose own gradient
+header shows time, sets and a progress bar of planned sets logged over planned, skipped exercises
+left out). History is grouped by Monday-start week with totals summed from the loaded sessions.
+
 ## Deletion
 
 There is no account deletion feature yet (as for messages and notifications). When one is added,

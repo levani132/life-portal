@@ -169,6 +169,14 @@ export function SetForm({
   );
 }
 
+/** Set types in colour (spec 024); the letter or number stays, so colour is never the only cue. */
+export const SET_TYPE_CHIPS: Record<SetType, string> = {
+  warmup: 'bg-train-core/15 text-train-core',
+  working: 'bg-accent/15 text-accent',
+  drop: 'bg-train-arms/15 text-train-arms',
+  failure: 'bg-rose-500/15 text-rose-400',
+};
+
 /** One logged set as a line: number, type mark, the values, and RPE. */
 export function SetLine({
   index,
@@ -208,7 +216,14 @@ export function SetLine({
         pending && 'opacity-60',
       )}
     >
-      <span className={clsx('w-6 shrink-0 text-center text-xs', mark ? 'font-semibold text-amber-400' : 'text-ink-faint')}>
+      <span
+        className={clsx(
+          'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold',
+          SET_TYPE_CHIPS[set.type],
+        )}
+        title={SET_TYPE_LABELS[set.type]}
+        aria-label={`Set ${index}, ${SET_TYPE_LABELS[set.type].toLowerCase()}`}
+      >
         {mark || index}
       </span>
       <span className="min-w-0 flex-1">

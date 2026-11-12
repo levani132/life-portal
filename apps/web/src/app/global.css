@@ -20,6 +20,19 @@
   --accent-solid: 3 105 161;
   --accent-solid-hover: 7 89 133;
   --on-accent: 255 255 255;
+  /* Training (spec 024): muscle-group hues for text and tints, and solid fills for white text. */
+  --train-push: 194 65 12;
+  --train-pull: 29 78 216;
+  --train-legs: 4 120 87;
+  --train-core: 161 72 8;
+  --train-arms: 109 40 217;
+  --train-cardio: 190 24 93;
+  --train-push-solid: 194 65 12;
+  --train-pull-solid: 37 99 235;
+  --train-legs-solid: 4 120 87;
+  --train-core-solid: 180 83 9;
+  --train-arms-solid: 124 58 237;
+  --train-cardio-solid: 219 39 119;
 }
 
 :root[data-theme='dark'] {
@@ -51,6 +64,12 @@
   --accent-solid: 14 165 233;
   --accent-solid-hover: 56 189 248;
   --on-accent: 12 14 20;
+  --train-push: 251 146 60;
+  --train-pull: 96 165 250;
+  --train-legs: 52 211 153;
+  --train-core: 251 191 36;
+  --train-arms: 167 139 250;
+  --train-cardio: 244 114 182;
 }
 
 /* Follow the OS even before JavaScript runs. Explicit preferences take priority. */
@@ -84,6 +103,12 @@
     --accent-solid: 14 165 233;
     --accent-solid-hover: 56 189 248;
     --on-accent: 12 14 20;
+    --train-push: 251 146 60;
+    --train-pull: 96 165 250;
+    --train-legs: 52 211 153;
+    --train-core: 251 191 36;
+    --train-arms: 167 139 250;
+    --train-cardio: 244 114 182;
   }
 }
 

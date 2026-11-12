@@ -2,6 +2,22 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-12: A colourful Training
+
+- **This week at a glance.** Training opens with a colourful header: workouts and time this week,
+  and your newest record or how long since your last workout. The tabs have icons.
+- **Colour by muscle group.** Push, pull, legs, core, arms and cardio each have a colour and an
+  icon, used on exercise cards, in the exercise list and on the muscle filter chips, which now
+  scroll sideways above the list.
+- **A workout you can follow.** The open workout has a header in its plan's colour with the time,
+  sets and a progress bar of planned sets done. Each exercise shows sets done against planned,
+  and set types (warm-up, working, drop, failure) are coloured chips. The rest timer is coloured
+  and counts down with a bar.
+- **Plans as cards.** Every plan has its own colour and icon, with its next workout. A plan's
+  page has a coloured header and its workouts are lettered A, B, C.
+- **History by week.** Workouts are grouped under This week, Last week and earlier weeks, each
+  with its workouts, sets and time, and each workout has a coloured date.
+
 ## 2026-11-12: Workout plans
 
 - **Ready-made plans.** Training has a Plans tab with four plans written for this app: Full body,

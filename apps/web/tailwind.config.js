@@ -41,6 +41,13 @@ module.exports = {
         ink: 'rgb(var(--ink) / <alpha-value>)',
         'ink-muted': 'rgb(var(--ink-muted) / <alpha-value>)',
         'ink-faint': 'rgb(var(--ink-faint) / <alpha-value>)',
+        // Training (spec 024): `train-<hue>` for text and tints, `-solid` for fills with white text.
+        ...Object.fromEntries(
+          ['push', 'pull', 'legs', 'core', 'arms', 'cardio'].flatMap((hue) => [
+            [`train-${hue}`, `rgb(var(--train-${hue}) / <alpha-value>)`],
+            [`train-${hue}-solid`, `rgb(var(--train-${hue}-solid) / <alpha-value>)`],
+          ]),
+        ),
       },
     },
   },

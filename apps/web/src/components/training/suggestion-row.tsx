@@ -60,10 +60,15 @@ export function SuggestionRows({
             key={index}
             className={clsx(
               'flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm tabular-nums',
-              isFirst ? 'border border-dashed border-border' : 'opacity-60',
+              isFirst ? 'border border-dashed border-accent/50 bg-accent/5' : 'opacity-60',
             )}
           >
-            <span className="w-6 shrink-0 text-center text-xs text-ink-faint">
+            <span
+              className={clsx(
+                'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-dashed text-xs font-bold',
+                target.type === 'warmup' ? 'border-train-core/50 text-train-core' : 'border-accent/50 text-accent',
+              )}
+            >
               {target.type === 'warmup' ? 'W' : firstIndex + index}
             </span>
             <span className="min-w-0 flex-1">

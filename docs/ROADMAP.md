@@ -69,7 +69,8 @@ search, connection actions and money widget sharing have their own tests.
    "self-reported". Moved ahead of diet plans (2026-11-12), because programs (diet, training or
    both) need both halves. Phases: 1 exercise catalogue and logging (spec 020, complete 2026-11-12, behind the
    `training` flag), 2 workout plans: ready-made and own plans, starting a workout from a plan
-   (spec 023, complete 2026-11-12), 3 training UI overhaul, 4 strength ranks and levels,
+   (spec 023, complete 2026-11-12), 3 training UI overhaul: colour by muscle group and plan, a weekly
+   header, progress in the open workout, History by week (spec 024, complete 2026-11-12), 4 strength ranks and levels,
    5 workout posts and friend leaderboards, then programs, with paid programs last.
 6. **Video through a service.** 014 records 30-second clips in the app and stores them as-is.
    Next: transcoding through Mux or Cloudflare Stream so every clip plays everywhere, library

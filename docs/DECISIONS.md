@@ -1409,3 +1409,16 @@ per-type opt-in keeps the rule for everything else instead of weakening it globa
 **Also decided.** One push per evaluation, not per award, so the first check after launch (which
 may backfill several badges) sends one "You earned n badges". Training consistency counts weeks
 with two workouts, not consecutive days, because rest days are part of training.
+
+## Training colours are derived, not stored (spec 024)
+
+**Decision.** Training's colours come from data it already has: an exercise's first primary
+muscle (or its measure, for cardio) and a plan's position among the ready-made plans, else a hash
+of its id. Nothing is persisted and the API did not change. Colours are `--train-<hue>` CSS
+variables, themed per theme block, plus `-solid` variants for white text.
+
+**Why.** A stored colour would be a second source of truth for something the muscles already say,
+and a user-picked plan colour is a feature nobody asked for yet. Two variables per hue because
+one value cannot be both readable as text on white and dark enough under white text in both
+themes. Plan colours by seed position, not hash, so the four ready-made plans never collide.
+

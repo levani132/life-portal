@@ -22,15 +22,15 @@ export function ExerciseLibrary() {
   const [openId, setOpenId] = useState<string | null>(null);
   return (
     <div className="space-y-4">
-      <div className="flex gap-1 rounded-lg border border-border p-1 text-sm" data-no-tab-swipe>
+      <div className="flex gap-1 rounded-xl bg-surface p-1 text-sm" data-no-tab-swipe>
         {(['exercises', 'machines'] as View[]).map((item) => (
           <button
             key={item}
             type="button"
             onClick={() => setView(item)}
             className={clsx(
-              'flex-1 rounded-md px-3 py-1.5',
-              view === item ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:text-ink',
+              'flex-1 rounded-lg px-3 py-2 font-semibold transition-colors',
+              view === item ? 'bg-surface-raised text-ink shadow-sm' : 'text-ink-muted hover:text-ink',
             )}
           >
             {item === 'exercises' ? 'Exercises' : 'My machines'}
