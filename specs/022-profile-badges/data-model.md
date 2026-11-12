@@ -58,8 +58,8 @@ The one persisted fact: a person reached a tier. Rows are immutable once inserte
   concurrent awards safe. `{userId: 1, createdAt: -1}` serves the Activity source.
 - **Write.** Upsert with `$setOnInsert` only. Never `$set`, never deleted, and there is no
   `PATCH`.
-- **Account deletion.** Rows are removed together with the user's other rows (the same path as
-  the other per-user collections).
+- **Account deletion.** There is no account-deletion path yet. When one is added, it must
+  remove these rows too.
 
 ## Collection: `badge_selections`
 
