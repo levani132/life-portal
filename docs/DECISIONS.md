@@ -1301,6 +1301,20 @@ and owns every value. The code fallback remains only for a feature never saved f
 flag ships with it), and it is shown as a concrete value, not as "default". Individual accounts
 keep "Group default", because inheriting from the group is meaningful there.
 
+## 2026-11-12: Training estimates use Epley; kg/lb is display only
+
+**Epley** (`load × (1 + reps / 30)`, one rep = the load) is the 1RM estimate, used only for
+working sets of 1–12 reps: past about 12 reps every formula drifts, and Epley and Brzycki agree
+closely below that. The estimate is never a bare number: it carries `basis` (formula, the set
+it came from, and the weigh-in day for bodyweight work) and the UI prints it (principle 6).
+
+**The weight unit changes no stored number.** Weights are whole grams; `training_profiles.weightUnit`
+only decides how they are shown and how a typed value is read (1 lb = 453.59237 g, rounded to
+grams once). Display keeps two decimals, so 225 lb reads back as "225 lb" and 1.25 kg plates
+survive; one decimal would have shown 101.25 kg as 101.3. The Home card is built on the server,
+so the summary carries the unit, read without creating a profile row: a dashboard read should
+not write.
+
 ## 2026-11-12: When a training set counts as a personal record
 
 Records (spec 020 US3) are computed on read from every set of an exercise, in **done order**

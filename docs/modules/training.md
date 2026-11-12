@@ -266,9 +266,10 @@ closing the app with writes still pending loses them. Weight fields use `Input` 
 
 ## Deletion
 
-Account deletion must remove the user's `workout_sessions`, `workout_exercises`, `workout_sets`,
+There is no account deletion feature yet (as for messages and notifications). When one is added,
+it must remove the user's `workout_sessions`, `workout_exercises`, `workout_sets`,
 `training_profiles`, private `exercises` and `training_machines`, and the photos those two
-reference in storage.
+reference in storage. Shared catalogue rows have no `userId` and stay.
 
 ## Verification
 

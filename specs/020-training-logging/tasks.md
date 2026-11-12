@@ -144,10 +144,10 @@ built and tested without US2 (search ranking and private additions).
 
 ## Phase 8: Polish and cross-cutting
 
-- [ ] T041 [P] Write `docs/modules/training.md`: purpose, collections (with the one-sentence justification for each), units, the snapshot rule, endpoints, derived formulas, cross-links (Nutrition weigh-ins, Dashboard, Health boundary), catalogue source and licence, what account deletion must remove
-- [ ] T042 [P] Append to `docs/DECISIONS.md` (training before programs; facts-only seed and why; one open session index; Epley; no burned energy) and `docs/CHANGELOG.md`; add training lines to `CLAUDE.md` (module list in Layout, and a "trip you up" entry for the workout snapshot rule beside the meal one)
-- [ ] T043 Run `npm run check` and `npm run build`; fix anything they report
-- [ ] T044 Run every scenario in `specs/020-training-logging/quickstart.md` against a local Mongo and the dev servers, on a phone-width viewport; confirm Food's targets are unchanged (SC-006) and fix what fails
+- [X] T041 [P] Write `docs/modules/training.md`: purpose, collections (with the one-sentence justification for each), units, the snapshot rule, endpoints, derived formulas, cross-links (Nutrition weigh-ins, Dashboard, Health boundary), catalogue source and licence, what account deletion must remove
+- [X] T042 [P] Append to `docs/DECISIONS.md` (training before programs; facts-only seed and why; one open session index; Epley; no burned energy) and `docs/CHANGELOG.md`; add training lines to `CLAUDE.md` (module list in Layout, and a "trip you up" entry for the workout snapshot rule beside the meal one)
+- [X] T043 Run `npm run check` and `npm run build`; fix anything they report
+- [X] T044 Run every scenario in `specs/020-training-logging/quickstart.md` against a local Mongo and the dev servers, on a phone-width viewport; confirm Food's targets are unchanged (SC-006) and fix what fails
 
 ---
 
@@ -183,6 +183,18 @@ built and tested without US2 (search ranking and private additions).
   second decimal); the units setting is a gear on `/training` that also holds the default rest;
   the effective load is computed by the API (`WorkoutSet.effectiveLoad`) because only it reads
   weigh-ins; the Home card is server-built, so `TrainingSummary` carries `weightUnit`.
+- 2026-11-12: Polish done (T041–T044); spec 020 complete. T041/T042: the module doc, decisions
+  and CLAUDE.md entry had grown with each story, so this added only what was missing (Epley and
+  display-only units in DECISIONS, and that no account deletion exists yet). T043: `npm run check`
+  and `npm run build` pass. T044, against a local Mongo: 876 shared exercises, none with an image
+  or instructions, unchanged after an API restart; "bench" search in 14 ms with the dataset
+  credit; Start again resumes the open session and the card offers Resume; a retried `requestId`
+  makes one set, two parallel sets both land; renaming an own exercise leaves the logged
+  snapshot; records and 1RM as expected (≈102 kg, Epley from 85 kg × 6); 225 lb stored as
+  102 058 g and shown as 102.06 kg; bodyweight load only with a weigh-in; Food's targets and
+  summary identical after a workout (SC-006, with real targets); an account without the flag gets
+  403 and no card (SC-007). The offline queue was exercised in the browser with the MVP and is
+  backed by the `requestId` retry check.
 
 ## Dependencies and execution order
 

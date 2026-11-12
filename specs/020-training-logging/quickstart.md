@@ -28,7 +28,7 @@ not auto-selected).
 4. **Records (story 3).** Log a second session with 85 kg × 6: the set is marked as a record
    (heaviest load and est. 1RM). Its est. 1RM reads ≈ 102 kg with "Epley, from 85 kg × 6". Delete
    that set: the record falls back to the first session's 80 kg × 8 (≈ 101 kg).
-5. **Units (story 5).** Set weight unit to lb; log 225 lb. Switch back to kg: it shows 102.1 kg.
+5. **Units (story 5).** Set weight unit to lb; log 225 lb. Switch back to kg: it shows 102.06 kg.
    The stored value is 102 058 g (check with `mongosh`: `db.workout_sets.find({}, {weightGrams: 1})`).
 6. **Bodyweight.** With no weigh-in, log 10 pull-ups: no load, volume or est. 1RM is shown.
    Add a weigh-in of 80 kg in Food for an earlier day: the same set now shows a load of 80 kg
