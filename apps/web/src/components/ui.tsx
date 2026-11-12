@@ -307,19 +307,22 @@ export function Modal({
             ✕
           </button>
         </div>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            onSubmit?.(event);
-          }}
-        >
-          <div className="space-y-3">{children}</div>
-          {error && (
-            <p className="mt-3 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
-              {error}
-            </p>
-          )}
-          {onSubmit && (
+        {/* A form only when there is something to submit: a form modal opened from inside a
+            plain one (the training picker's "Create exercise") would otherwise nest one <form> in
+            another, which is invalid HTML and breaks the inner one. */}
+        {onSubmit ? (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              onSubmit(event);
+            }}
+          >
+            <div className="space-y-3">{children}</div>
+            {error && (
+              <p className="mt-3 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                {error}
+              </p>
+            )}
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" className="btn-ghost" onClick={onClose}>
                 Cancel
@@ -328,8 +331,17 @@ export function Modal({
                 {pending ? 'Saving…' : submitLabel}
               </button>
             </div>
-          )}
-        </form>
+          </form>
+        ) : (
+          <div>
+            <div className="space-y-3">{children}</div>
+            {error && (
+              <p className="mt-3 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                {error}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

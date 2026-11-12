@@ -1268,3 +1268,26 @@ its own; it is signed wherever the name is shown, after that response's own chec
 profile carries a friend count: showing other people's counts would reveal the size of a private
 list. No cover photo: it would be a second upload flow for little, and the owner wanted the page
 to stay serious.
+
+## 2026-11-12: Training search ranks in memory; a workout's machine may be corrected
+
+**Search ranking (spec 020 US2).** `GET /training/exercises` filters in Mongo and ranks in the
+service: name or alias starts with the query, then a word starts with it, then it appears inside a
+word; recent use (90 days) first within each tier. Ranking needs every match before paging, and the
+catalogue is under a thousand rows, so it is done in memory with a 2,000-row cap rather than with an
+aggregation or a search index. Atlas Search is the move if the catalogue or private rows grow by an
+order of magnitude. The third tier exists because "row" otherwise listed "Ball throw" among the rows.
+
+**The machine part of a snapshot is correctable.** `workout_exercises.snapshot` still never
+refreshes from the catalogue, but `PATCH …/exercises/:weId {machineId}` sets the machine and copies
+its current name and brand. Saying which machine was used is a fact about the workout being
+corrected, not a catalogue change leaking backwards; renaming the machine afterwards changes no past
+workout.
+
+**Measure is locked once an exercise is logged** (409 `MEASURE_LOCKED`) rather than migrating old
+sets, whose fields were validated against the old measure.
+
+**`Modal` renders a `<form>` only when it has `onSubmit`.** The training picker opens "Create
+exercise" and "New machine" (form modals) from inside a plain modal; every `Modal` used to wrap its
+body in a form, so those nested one form in another (invalid HTML; React warns and the inner form is
+unreliable). A modal without `onSubmit` never submitted anything, so nothing else changes.

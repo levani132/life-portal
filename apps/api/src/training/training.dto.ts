@@ -1,5 +1,7 @@
 import {
   ArrayMaxSize,
+  ArrayMinSize,
+  IsBoolean,
   IsArray,
   IsIn,
   IsInt,
@@ -9,11 +11,22 @@ import {
   IsString,
   IsUUID,
   Matches,
+  MinLength,
+  ValidateIf,
   Max,
   MaxLength,
   Min,
 } from 'class-validator';
-import { SET_TYPES, WEIGHT_UNITS } from '@life-portal/shared-types';
+import {
+  EQUIPMENT_TYPES,
+  MEASURES,
+  MUSCLES,
+  SET_TYPES,
+  WEIGHT_UNITS,
+  type EquipmentType,
+  type Measure,
+  type Muscle,
+} from '@life-portal/shared-types';
 
 /**
  * Bounds that depend on the exercise's measure (which fields apply, their ranges) are checked
@@ -41,10 +54,65 @@ export class FinishSessionDto {
 export class AddSessionExerciseDto {
   @IsUUID() requestId!: string;
   @IsMongoId() exerciseId!: string;
+  @IsOptional() @IsMongoId() machineId?: string;
 }
 
 export class UpdateSessionExerciseDto {
   @IsOptional() @IsString() @MaxLength(500) notes?: string;
+  /** `null` clears the machine. */
+  @IsOptional() @ValidateIf((_, value) => value !== null) @IsMongoId() machineId?: string | null;
+}
+
+// ------------------------------------------------------------------ own exercises and machines
+// Create and update are separate classes on purpose: a subclass cannot drop the parent's
+// `@IsOptional()`, so "required on create" would silently become optional.
+
+export class CreateExerciseDto {
+  @IsString() @MinLength(1) @MaxLength(120) name!: string;
+  @IsOptional() @IsArray() @ArrayMaxSize(10) @IsString({ each: true }) @MaxLength(120, { each: true })
+  aliases?: string[];
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(MUSCLES.length) @IsIn(MUSCLES, { each: true })
+  primaryMuscles!: Muscle[];
+  @IsOptional() @IsArray() @ArrayMaxSize(MUSCLES.length) @IsIn(MUSCLES, { each: true })
+  secondaryMuscles?: Muscle[];
+  @IsIn(EQUIPMENT_TYPES) equipmentType!: EquipmentType;
+  @IsIn(MEASURES) measure!: Measure;
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) @MaxLength(500, { each: true })
+  instructions?: string[];
+  @IsOptional() @IsMongoId() imageMediaId?: string;
+}
+
+export class UpdateExerciseDto {
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(120) name?: string;
+  @IsOptional() @IsArray() @ArrayMaxSize(10) @IsString({ each: true }) @MaxLength(120, { each: true })
+  aliases?: string[];
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(MUSCLES.length) @IsIn(MUSCLES, { each: true })
+  primaryMuscles?: Muscle[];
+  @IsOptional() @IsArray() @ArrayMaxSize(MUSCLES.length) @IsIn(MUSCLES, { each: true })
+  secondaryMuscles?: Muscle[];
+  @IsOptional() @IsIn(EQUIPMENT_TYPES) equipmentType?: EquipmentType;
+  @IsOptional() @IsIn(MEASURES) measure?: Measure;
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) @MaxLength(500, { each: true })
+  instructions?: string[];
+  @IsOptional() @IsMongoId() imageMediaId?: string;
+  @IsOptional() @IsBoolean() removeImage?: boolean;
+}
+
+export class CreateMachineDto {
+  @IsString() @MinLength(1) @MaxLength(120) name!: string;
+  @IsOptional() @IsString() @MaxLength(80) brand?: string;
+  @IsIn(EQUIPMENT_TYPES) equipmentType!: EquipmentType;
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsMongoId({ each: true }) exerciseIds?: string[];
+  @IsOptional() @IsMongoId() imageMediaId?: string;
+}
+
+export class UpdateMachineDto {
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(120) name?: string;
+  @IsOptional() @IsString() @MaxLength(80) brand?: string;
+  @IsOptional() @IsIn(EQUIPMENT_TYPES) equipmentType?: EquipmentType;
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsMongoId({ each: true }) exerciseIds?: string[];
+  @IsOptional() @IsMongoId() imageMediaId?: string;
+  @IsOptional() @IsBoolean() removeImage?: boolean;
 }
 
 export class ReorderDto {

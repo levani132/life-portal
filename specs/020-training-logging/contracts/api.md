@@ -18,13 +18,14 @@ the unit preference is applied by the web client.
 
 | Method | Path | Body / query | Returns |
 |---|---|---|---|
-| `GET` | `/exercises` | `?q=&muscle=&equipment=&limit=30&skip=` | `ExerciseListItem[]`: shared + own, not archived. With `q`, prefix matches first, then contains; within each, exercises the caller used in the last 90 days first. |
+| `GET` | `/exercises` | `?q=&muscle=&equipment=&limit=30&skip=` | `ExerciseListItem[]`: shared + own, not archived. With `q`: a name or alias that starts with `q` first, then one with a word starting with it, then one containing it; within each tier, exercises the caller logged in the last 90 days first (`recent: true`). |
 | `GET` | `/exercises/:id` | | `Exercise` incl. `isOwn`, `attribution?`, `image.url?` (signed). Archived own rows are readable (history). |
 | `POST` | `/exercises` | `{name, aliases?, primaryMuscles, secondaryMuscles?, equipmentType, measure, instructions?, imageMediaId?}` | `Exercise` (private). |
 | `PATCH` | `/exercises/:id` | same fields, optional; `removeImage?` | `Exercise`. Own rows only (shared → 404). `measure` change on a logged exercise → 409. |
 | `DELETE` | `/exercises/:id` | | `{id, deleted: true}` or `{id, archived: true}` when logged. |
 | `GET` | `/exercises/:id/history` | `?before=<loggedAt cursor>` | `ExerciseHistory {exercise, sessions: [{sessionId, day, sets, bestSetId?, volumeGrams?, oneRepMax?: Estimate}], records: RecordSet, nextCursor?}`; 20 sessions a page. Records are computed over all of the caller's sets of this exercise. |
 | `GET` | `/machines` | `?exerciseId=` | `Machine[]` (own, not archived). |
+| `GET` | `/machines/:id` | | `Machine` (own; archived ones too). |
 | `POST` / `PATCH` / `DELETE` | `/machines`, `/machines/:id` | `{name, brand?, equipmentType, exerciseIds?, imageMediaId?, removeImage?}` | `Machine` / archive-or-delete like exercises. |
 
 `Estimate` is always `{valueGrams, basis: {formula: 'epley', fromSetId, weightGrams, reps, bodyWeightDay?}}`.

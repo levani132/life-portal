@@ -102,6 +102,15 @@ export interface ExerciseListItem {
   measure: Measure;
   /** A private exercise of the caller's, rather than a shared catalogue row. */
   isOwn: boolean;
+  /** The caller logged it in the last 90 days; such rows are listed first. */
+  recent?: boolean;
+}
+
+/** A signed, short-lived link to a stored photo. The storage key never leaves the API. */
+export interface TrainingImage {
+  url: string;
+  width: number;
+  height: number;
 }
 
 export interface Exercise extends ExerciseListItem {
@@ -113,6 +122,18 @@ export interface Exercise extends ExerciseListItem {
   archived: boolean;
   /** Set on shared rows taken from a dataset. */
   attribution?: { label: string; url: string };
+  image?: TrainingImage;
+}
+
+/** A specific machine, private to its creator in this phase. */
+export interface Machine {
+  id: string;
+  name: string;
+  brand?: string;
+  equipmentType: EquipmentType;
+  exerciseIds: string[];
+  archived: boolean;
+  image?: TrainingImage;
 }
 
 export interface TrainingProfile {
@@ -202,7 +223,35 @@ export interface StartSessionInput {
 export interface AddSessionExerciseInput {
   requestId: string;
   exerciseId: string;
+  machineId?: string;
 }
+
+/** A private exercise. Shared catalogue rows cannot be written. */
+export interface ExerciseInput {
+  name: string;
+  aliases?: string[];
+  primaryMuscles: Muscle[];
+  secondaryMuscles?: Muscle[];
+  equipmentType: EquipmentType;
+  measure: Measure;
+  instructions?: string[];
+  imageMediaId?: string;
+}
+
+export type ExercisePatch = Partial<ExerciseInput> & { removeImage?: boolean };
+
+export interface MachineInput {
+  name: string;
+  brand?: string;
+  equipmentType: EquipmentType;
+  exerciseIds?: string[];
+  imageMediaId?: string;
+}
+
+export type MachinePatch = Partial<MachineInput> & { removeImage?: boolean };
+
+/** `DELETE` of an exercise or machine: removed, or archived because a workout refers to it. */
+export type TrainingDeleteResult = { id: string; deleted: true } | { id: string; archived: true };
 
 export interface SetInput extends SetValues {
   requestId: string;

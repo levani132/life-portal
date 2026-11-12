@@ -2,7 +2,7 @@ import { Types } from 'mongoose';
 import catalogueFile from './catalogue/free-exercise-db.json';
 import { CatalogueSeeder, catalogueRow, type CatalogueFile } from './catalogue.seeder';
 import { CatalogueService } from './catalogue.service';
-import { FakeModel } from './fake-model.testing';
+import { FakeModel, fakeMedia } from './fake-model.testing';
 
 const file: CatalogueFile = {
   version: 1,
@@ -69,7 +69,7 @@ describe('CatalogueService', () => {
       { _id: new Types.ObjectId(), userId: 'them', name: 'Their squat', searchName: 'their squat', primaryMuscles: ['quadriceps'], equipmentType: 'machine', measure: 'weight_reps', archived: false },
       { _id: new Types.ObjectId(), userId: 'me', name: 'Old squat', searchName: 'old squat', primaryMuscles: ['quadriceps'], equipmentType: 'machine', measure: 'weight_reps', archived: true },
     );
-    const service = new CatalogueService(exercises as never);
+    const service = new CatalogueService(exercises as never, new FakeModel() as never, new FakeModel() as never, fakeMedia() as never);
     const found = await service.list('me', { q: 'SQUAT' });
     expect(found.map((e) => [e.name, e.isOwn])).toEqual([
       ['Barbell Squat', false],

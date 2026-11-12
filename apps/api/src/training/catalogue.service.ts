@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, type Model, type QueryFilter } from 'mongoose';
 import {
@@ -7,12 +7,17 @@ import {
   MUSCLES,
   type EquipmentType,
   type Exercise as ExerciseDto,
+  type ExerciseInput,
   type ExerciseListItem,
+  type ExercisePatch,
   type Measure,
   type Muscle,
+  type TrainingDeleteResult,
+  type TrainingImage,
 } from '@life-portal/shared-types';
 import { normaliseSearch } from '@life-portal/shared-domain';
-import { Exercise } from './training.schemas';
+import { MediaService } from '../media/media.service';
+import { Exercise, WorkoutExercise, WorkoutSet } from './training.schemas';
 
 type ExerciseRow = Exercise & { _id: unknown };
 
@@ -24,19 +29,62 @@ export interface CatalogueQuery {
   skip?: number;
 }
 
+/** "Recently used" for search ranking (contract: the last 90 days). */
+export const RECENT_DAYS = 90;
+/** More matches than this are not ranked; the catalogue has under a thousand rows. */
+const RANK_CAP = 2000;
+
 const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/** What search matches: the name and every alias, normalised. Server-built. */
+export function searchNameFor(name: string, aliases: string[] = []): string {
+  return [name, ...aliases].map(normaliseSearch).filter(Boolean).join(' | ');
+}
+
 /**
- * Reads the exercise catalogue: shared rows (no `userId`) plus the caller's own.
+ * Ranks search results: a name or alias that *starts* with the query first, then one with a
+ * word starting with it ("bent over row"), then one merely containing it ("throw"); within each
+ * tier, exercises the caller used recently first; then by name. Pure, so the order is testable
+ * without a database.
+ */
+export function rankExercises<T extends { name: string; searchName: string; id: string }>(
+  rows: T[],
+  q: string,
+  recent: ReadonlySet<string>,
+): T[] {
+  const tier = (row: T) => {
+    if (!q) return 0;
+    const parts = row.searchName.split(' | ');
+    if (parts.some((part) => part.startsWith(q))) return 0;
+    if (parts.some((part) => part.includes(` ${q}`))) return 1;
+    return 2;
+  };
+  return [...rows].sort((a, b) => {
+    const pa = tier(a);
+    const pb = tier(b);
+    if (pa !== pb) return pa - pb;
+    const ra = recent.has(a.id) ? 0 : 1;
+    const rb = recent.has(b.id) ? 0 : 1;
+    if (ra !== rb) return ra - rb;
+    return a.name.localeCompare(b.name, 'en') || a.id.localeCompare(b.id);
+  });
+}
+
+/**
+ * The exercise catalogue: shared rows (no `userId`) plus the caller's own.
  *
  * Deliberately not an `OwnedCrudService`: its `scoped()` adds `userId` to every filter, which
- * would hide the shared catalogue. Every read here goes through `visible()`, which is the one
- * place the shared-or-own rule is written. Writes (own rows only) arrive with spec 020's US2.
+ * would hide the shared catalogue. Every read goes through `visible()`, the one place the
+ * shared-or-own rule is written; every write goes through `own()`, so a shared row can never be
+ * changed through this API (it answers 404, as for anyone else's row).
  */
 @Injectable()
 export class CatalogueService {
   constructor(
     @InjectModel(Exercise.name) private readonly exercises: Model<Exercise>,
+    @InjectModel(WorkoutExercise.name) private readonly workoutExercises: Model<WorkoutExercise>,
+    @InjectModel(WorkoutSet.name) private readonly sets: Model<WorkoutSet>,
+    private readonly media: MediaService,
   ) {}
 
   /** Shared rows, or rows owned by this user. Nothing else is ever readable. */
@@ -50,7 +98,14 @@ export class CatalogueService {
     } as QueryFilter<Exercise>;
   }
 
-  async list(userId: string, query: CatalogueQuery = {}): Promise<ExerciseListItem[]> {
+  /** Exercise ids the caller logged a set of since `nowMs - 90 days`. */
+  async recentIds(userId: string, nowMs: number): Promise<Set<string>> {
+    const since = new Date(nowMs - RECENT_DAYS * 86_400_000);
+    const ids = await this.sets.distinct('exerciseId', { userId, loggedAt: { $gte: since } });
+    return new Set(ids.map(String));
+  }
+
+  async list(userId: string, query: CatalogueQuery = {}, nowMs = Date.now()): Promise<ExerciseListItem[]> {
     const extra: Record<string, unknown> = { archived: false };
     const q = normaliseSearch(query.q ?? '');
     if (q) extra['searchName'] = { $regex: escapeRegex(q) };
@@ -62,13 +117,26 @@ export class CatalogueService {
     }
     const limit = Math.min(Math.max(query.limit ?? 30, 1), 100);
     const skip = Math.max(query.skip ?? 0, 0);
-    const rows = await this.exercises
-      .find(this.visible(userId, extra))
-      .sort({ name: 1, _id: 1 })
-      .skip(skip)
-      .limit(limit)
-      .lean<ExerciseRow[]>();
-    return rows.map((row) => this.toListItem(row));
+    // Ranking needs every match, so it happens here rather than in Mongo. The catalogue is
+    // under a thousand rows and the fields are few.
+    const [rows, recent] = await Promise.all([
+      this.exercises
+        .find(this.visible(userId, extra))
+        .select('name searchName primaryMuscles equipmentType measure userId')
+        .sort({ name: 1, _id: 1 })
+        .limit(RANK_CAP)
+        .lean<ExerciseRow[]>(),
+      this.recentIds(userId, nowMs),
+    ]);
+    const ranked = rankExercises(
+      rows.map((row) => ({ row, id: String(row._id), name: row.name, searchName: row.searchName ?? '' })),
+      q,
+      recent,
+    );
+    return ranked.slice(skip, skip + limit).map(({ row, id }) => ({
+      ...this.toListItem(row),
+      ...(recent.has(id) ? { recent: true } : {}),
+    }));
   }
 
   /** One exercise. Archived own rows stay readable, because past workouts refer to them. */
@@ -95,6 +163,104 @@ export class CatalogueService {
     return row;
   }
 
+  // ---------------------------------------------------------------- own exercises
+
+  async create(userId: string, input: ExerciseInput): Promise<ExerciseDto> {
+    const aliases = cleanList(input.aliases);
+    const created = await this.exercises.create({
+      userId,
+      name: input.name.trim(),
+      aliases,
+      searchName: searchNameFor(input.name, aliases),
+      primaryMuscles: unique(input.primaryMuscles),
+      secondaryMuscles: unique(input.secondaryMuscles ?? []),
+      equipmentType: input.equipmentType,
+      measure: input.measure,
+      ...(cleanList(input.instructions).length ? { instructions: cleanList(input.instructions) } : {}),
+      archived: false,
+    });
+    const row = created.toObject() as ExerciseRow;
+    if (!input.imageMediaId) return this.toExercise(row);
+    try {
+      const image = await this.media.copyForTraining(userId, input.imageMediaId, 'exercises', String(row._id));
+      await this.exercises.updateOne({ _id: row._id, userId }, { $set: { image } });
+      return this.toExercise({ ...row, image });
+    } catch (error) {
+      // The photo is part of the same save: without it, undo the row so a retry is clean.
+      await this.exercises.deleteOne({ _id: row._id, userId });
+      throw error;
+    }
+  }
+
+  async update(userId: string, id: string, patch: ExercisePatch): Promise<ExerciseDto> {
+    const row = await this.own(userId, id);
+    if (patch.measure !== undefined && patch.measure !== row.measure && (await this.isLogged(userId, id))) {
+      // Past sets were validated against the old measure; their fields would stop making sense.
+      throw new ConflictException({
+        code: 'MEASURE_LOCKED',
+        message: 'This exercise is in a workout already, so how it is measured cannot change. Create a new exercise instead.',
+      });
+    }
+    const set: Record<string, unknown> = {};
+    const unset: Record<string, 1> = {};
+    if (patch.name !== undefined) set['name'] = patch.name.trim();
+    if (patch.aliases !== undefined) set['aliases'] = cleanList(patch.aliases);
+    if (patch.name !== undefined || patch.aliases !== undefined) {
+      set['searchName'] = searchNameFor(
+        (set['name'] as string | undefined) ?? row.name,
+        (set['aliases'] as string[] | undefined) ?? row.aliases ?? [],
+      );
+    }
+    if (patch.primaryMuscles !== undefined) set['primaryMuscles'] = unique(patch.primaryMuscles);
+    if (patch.secondaryMuscles !== undefined) set['secondaryMuscles'] = unique(patch.secondaryMuscles);
+    if (patch.equipmentType !== undefined) set['equipmentType'] = patch.equipmentType;
+    if (patch.measure !== undefined) set['measure'] = patch.measure;
+    if (patch.instructions !== undefined) {
+      const steps = cleanList(patch.instructions);
+      if (steps.length) set['instructions'] = steps;
+      else unset['instructions'] = 1;
+    }
+    if (patch.imageMediaId) {
+      set['image'] = await this.media.copyForTraining(userId, patch.imageMediaId, 'exercises', id);
+    } else if (patch.removeImage) {
+      unset['image'] = 1;
+    }
+    if (Object.keys(set).length || Object.keys(unset).length) {
+      await this.exercises.updateOne(
+        { _id: row._id, userId },
+        { ...(Object.keys(set).length ? { $set: set } : {}), ...(Object.keys(unset).length ? { $unset: unset } : {}) },
+      );
+    }
+    if (row.image && (patch.imageMediaId || patch.removeImage)) void this.media.deleteKey(row.image.key);
+    return this.get(userId, id);
+  }
+
+  /** Removed when nothing refers to it; archived when a workout does, so history keeps its id. */
+  async remove(userId: string, id: string): Promise<TrainingDeleteResult> {
+    const row = await this.own(userId, id, { includeArchived: true });
+    if (await this.isLogged(userId, id)) {
+      await this.exercises.updateOne({ _id: row._id, userId }, { $set: { archived: true } });
+      return { id, archived: true };
+    }
+    await this.exercises.deleteOne({ _id: row._id, userId });
+    void this.media.deleteKey(row.image?.key);
+    return { id, deleted: true };
+  }
+
+  /** The caller's own row. Shared and other people's rows are a 404, never a 403. */
+  private async own(userId: string, id: string, options: { includeArchived?: boolean } = {}): Promise<ExerciseRow> {
+    if (!isValidObjectId(id)) throw new NotFoundException(`Exercise ${id} not found`);
+    const row = await this.exercises
+      .findOne({ _id: id, userId, ...(options.includeArchived ? {} : { archived: false }) })
+      .lean<ExerciseRow>();
+    if (!row) throw new NotFoundException(`Exercise ${id} not found`);
+    return row;
+  }
+
+  private async isLogged(userId: string, exerciseId: string): Promise<boolean> {
+    return Boolean(await this.workoutExercises.exists({ userId, exerciseId }));
+  }
+
   private toListItem(row: ExerciseRow): ExerciseListItem {
     return {
       id: String(row._id),
@@ -106,16 +272,35 @@ export class CatalogueService {
     };
   }
 
-  private toExercise(row: ExerciseRow): ExerciseDto {
+  private async toExercise(row: ExerciseRow): Promise<ExerciseDto> {
     return {
       ...this.toListItem(row),
       aliases: row.aliases ?? [],
-      secondaryMuscles: row.secondaryMuscles as Muscle[],
+      secondaryMuscles: (row.secondaryMuscles ?? []) as Muscle[],
       mechanic: row.mechanic as ExerciseDto['mechanic'],
       level: row.level as ExerciseDto['level'],
       instructions: row.instructions,
       archived: row.archived,
       attribution: row.seedKey ? { ...CATALOGUE_CREDIT } : undefined,
+      image: await signImage(this.media, row.image),
     };
   }
+}
+
+/** A signed link for a stored photo; the key itself never leaves the API. */
+export async function signImage(
+  media: Pick<MediaService, 'signKey'>,
+  image: { key: string; width: number; height: number } | undefined,
+): Promise<TrainingImage | undefined> {
+  if (!image) return undefined;
+  const url = await media.signKey(image.key);
+  return url ? { url, width: image.width, height: image.height } : undefined;
+}
+
+function cleanList(values: string[] | undefined): string[] {
+  return unique((values ?? []).map((value) => value.trim()).filter(Boolean));
+}
+
+function unique<T>(values: T[]): T[] {
+  return [...new Set(values)];
 }

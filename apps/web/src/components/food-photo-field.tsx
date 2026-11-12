@@ -26,9 +26,12 @@ export function foodPhotoPayload(change: FoodPhotoChange) {
 export function FoodPhotoField({
   image,
   onChange,
+  hint = 'Shown with the food in your list and in posts.',
 }: {
   image?: FoodImage;
   onChange: (change: FoodPhotoChange) => void;
+  /** The line under "Photo". The training forms reuse this field for exercises and machines. */
+  hint?: string;
 }) {
   const config = useApi<MediaConfig>('/media/config');
   const [preview, setPreview] = useState<string | undefined>(image?.url);
@@ -81,7 +84,7 @@ export function FoodPhotoField({
       </button>
       <div className="min-w-0 text-sm">
         <p className="font-medium">Photo</p>
-        <p className="text-xs text-ink-muted">Shown with the food in your list and in posts.</p>
+        <p className="text-xs text-ink-muted">{hint}</p>
         {preview && progress === null && (
           <button
             type="button"

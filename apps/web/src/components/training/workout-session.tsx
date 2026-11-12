@@ -21,7 +21,7 @@ import {
   useWorkoutDay,
 } from '../../lib/training';
 import { clearQueueError, enqueue, useTrainingQueue } from '../../lib/training-queue';
-import { ExerciseSearch } from './exercise-picker';
+import { ExerciseSearch, MachineChoice } from './exercise-picker';
 import { RestTimer } from './rest-timer';
 import { SetForm, SetLine, type SetFormValue } from './set-row';
 
@@ -95,6 +95,8 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
   const profile = useTrainingProfile();
   const queue = useTrainingQueue();
   const [picking, setPicking] = useState(false);
+  /** Step two of adding: the exercise is chosen, the machine is not yet. */
+  const [chosen, setChosen] = useState<ExerciseListItem | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notes, setNotes] = useState(session.notes ?? '');
@@ -124,9 +126,16 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
   };
 
   const base = `/training/sessions/${session.id}`;
-  const addExercise = async (exercise: ExerciseListItem) => {
+  const addExercise = async (exercise: ExerciseListItem, machineId: string | null) => {
     setPicking(false);
-    await run(() => api.post(`${base}/exercises`, { requestId: crypto.randomUUID(), exerciseId: exercise.id }));
+    setChosen(null);
+    await run(() =>
+      api.post(`${base}/exercises`, {
+        requestId: crypto.randomUUID(),
+        exerciseId: exercise.id,
+        ...(machineId ? { machineId } : {}),
+      }),
+    );
   };
 
   const discard = async () => {
@@ -249,8 +258,20 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
         )}
       </div>
 
-      <Modal open={picking} onClose={() => setPicking(false)} title="Add exercise" wide>
-        <ExerciseSearch onPick={(exercise) => void addExercise(exercise)} autoFocus />
+      <Modal
+        open={picking}
+        onClose={() => {
+          setPicking(false);
+          setChosen(null);
+        }}
+        title={chosen ? 'Which machine?' : 'Add exercise'}
+        wide
+      >
+        {chosen ? (
+          <MachineChoice exercise={chosen} onChoose={(machineId) => void addExercise(chosen, machineId)} />
+        ) : (
+          <ExerciseSearch onPick={setChosen} autoFocus />
+        )}
       </Modal>
     </div>
   );
@@ -277,6 +298,21 @@ function ExerciseBlock({
 }) {
   const measure = exercise.snapshot.measure;
   const [editing, setEditing] = useState<WorkoutSet | null>(null);
+  const [choosingMachine, setChoosingMachine] = useState(false);
+  const [machineError, setMachineError] = useState<string | null>(null);
+  const machineLabel = [exercise.snapshot.machineName, exercise.snapshot.machineBrand].filter(Boolean).join(' · ');
+
+  const setMachine = async (machineId: string | null) => {
+    setChoosingMachine(false);
+    setMachineError(null);
+    if (machineId === (exercise.machineId ?? null)) return;
+    try {
+      await api.patch(`/training/sessions/${session.id}/exercises/${exercise.id}`, { machineId });
+      await revalidateTraining();
+    } catch (caught) {
+      setMachineError(caught instanceof ApiError ? caught.message : 'Could not change the machine.');
+    }
+  };
   const done = exercise.sets.length + pending.length;
   // Start the next set from the last one logged, else from the same set last time.
   const lastValue = pending.length ? pending[pending.length - 1].value : exercise.sets[exercise.sets.length - 1];
@@ -316,6 +352,22 @@ function ExerciseBlock({
         </>
       }
     >
+      <button
+        type="button"
+        className="mb-2 text-xs text-ink-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+        onClick={() => setChoosingMachine(true)}
+        disabled={busy}
+      >
+        {machineLabel ? `Machine: ${machineLabel}` : 'Choose machine'}
+      </button>
+      {machineError && <ErrorNote message={machineError} />}
+      <Modal open={choosingMachine} onClose={() => setChoosingMachine(false)} title="Which machine?">
+        <MachineChoice
+          exercise={{ id: exercise.exerciseId, name: exercise.snapshot.name, equipmentType: exercise.snapshot.equipmentType }}
+          currentId={exercise.machineId ?? ''}
+          onChoose={(machineId) => void setMachine(machineId)}
+        />
+      </Modal>
       {exercise.previous && (
         <p className="mb-2 text-xs text-ink-faint">
           Last time ({formatDay(exercise.previous.day)}):{' '}

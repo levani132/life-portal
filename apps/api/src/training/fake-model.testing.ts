@@ -39,6 +39,7 @@ function matchesValue(value: unknown, condition: unknown): boolean {
         case '$in': return (arg as unknown[]).some((item) => same(value, item));
         case '$ne': return !same(value, arg);
         case '$lt': return value !== undefined && compare(value, arg) < 0;
+        case '$gte': return value !== undefined && compare(value, arg) >= 0;
         case '$exists': return (value !== undefined) === arg;
         case '$regex': return typeof value === 'string' && new RegExp(arg as string).test(value);
         default: throw new Error(`fake model: unsupported operator ${op}`);
@@ -119,8 +120,22 @@ export class FakeModel {
   }
 
   private apply(doc: Doc, update: Record<string, Record<string, unknown>>) {
-    Object.assign(doc, update['$set'] ?? {});
-    for (const key of Object.keys(update['$unset'] ?? {})) delete doc[key];
+    // Dotted paths ("snapshot.machineName") reach into embedded documents, as in Mongo.
+    const parent = (path: string) => {
+      const parts = path.split('.');
+      const last = parts.pop() as string;
+      let at = doc as Record<string, unknown>;
+      for (const part of parts) at = (at[part] ??= {}) as Record<string, unknown>;
+      return { at, last };
+    };
+    for (const [path, value] of Object.entries(update['$set'] ?? {})) {
+      const { at, last } = parent(path);
+      at[last] = clone(value);
+    }
+    for (const path of Object.keys(update['$unset'] ?? {})) {
+      const { at, last } = parent(path);
+      delete at[last];
+    }
   }
 
   async updateOne(filter: Filter, update: Record<string, Record<string, unknown>>) {
@@ -140,6 +155,16 @@ export class FakeModel {
     const deletedCount = this.docs.length - keep.length;
     this.docs.splice(0, this.docs.length, ...keep);
     return { deletedCount };
+  }
+
+  async distinct(field: string, filter: Filter = {}) {
+    const values = this.docs.filter((doc) => matches(doc, filter)).map((doc) => doc[field]);
+    return values.filter((value, index) => values.findIndex((other) => same(other, value)) === index);
+  }
+
+  async exists(filter: Filter = {}) {
+    const doc = this.docs.find((row) => matches(row, filter));
+    return doc ? { _id: doc._id } : null;
   }
 
   async countDocuments(filter: Filter = {}) {
@@ -163,4 +188,20 @@ export class FakeModel {
     }
     return { upsertedCount, modifiedCount };
   }
+}
+
+/** A stand-in for `MediaService`: copies "succeed", signing returns a fake link, deletes are recorded. */
+export function fakeMedia() {
+  const deleted: string[] = [];
+  return {
+    deleted,
+    copyForTraining: async (_userId: string, mediaId: string, kind: string, ownerId: string) => {
+      if (mediaId === 'bad'.padEnd(24, '0')) throw new Error('That photo can no longer be used.');
+      return { key: `training/${kind}/${ownerId}-${mediaId}.jpg`, width: 800, height: 600 };
+    },
+    signKey: async (key: string) => `https://signed.test/${key}`,
+    deleteKey: async (key?: string) => {
+      if (key) deleted.push(key);
+    },
+  };
 }

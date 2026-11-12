@@ -79,16 +79,16 @@ built and tested without US2 (search ranking and private additions).
 
 ### Tests
 
-- [ ] T022 [P] [US2] Spec `apps/api/src/training/catalogue.service.spec.ts`: prefix before contains, recent (90 days) first, muscle/equipment filters, aliases match; private rows invisible to others; shared rows cannot be patched or deleted (404); deleting a logged private exercise/machine archives it and history still resolves it; changing `measure` on a logged exercise gives 409
+- [X] T022 [P] [US2] Spec `apps/api/src/training/catalogue.service.spec.ts`: prefix before contains, recent (90 days) first, muscle/equipment filters, aliases match; private rows invisible to others; shared rows cannot be patched or deleted (404); deleting a logged private exercise/machine archives it and history still resolves it; changing `measure` on a logged exercise gives 409
 
 ### Implementation
 
-- [ ] T023 [US2] Extend `catalogue.service.ts`: search ranking (prefix, contains, recent-use from `workout_sets` by `(userId, exerciseId, loggedAt)`), create/update/delete-or-archive own exercises with `imageMediaId`/`removeImage` through `MediaModule` (as foods do), signed `image.url` on reads
-- [ ] T024 [US2] Machines in `apps/api/src/training/machines.service.ts`: CRUD with archive-on-delete, `exerciseIds` must be readable, photo via `MediaModule`; routes `GET/POST/PATCH/DELETE /machines`
-- [ ] T025 [US2] Exercise and machine routes in `training.module.ts` (`POST/PATCH/DELETE /exercises/:id`, machines)
-- [ ] T026 [P] [US2] `apps/web/src/components/training/exercise-picker.tsx`: debounced search, muscle and equipment filters, recent first, "Create exercise" and machine choice for the exercise; replaces the basic picker from T018
-- [ ] T027 [P] [US2] `apps/web/src/components/training/exercise-form.tsx` and `machine-form.tsx`: private additions with photo (reuse `food-photo-field.tsx` patterns)
-- [ ] T028 [US2] Exercises tab: catalogue browser, exercise detail (muscles, equipment, own instructions/photo, "Own" badge) and the dataset credit, in `apps/web/src/app/training/page.tsx`
+- [X] T023 [US2] Extend `catalogue.service.ts`: search ranking (prefix, contains, recent-use from `workout_sets` by `(userId, exerciseId, loggedAt)`), create/update/delete-or-archive own exercises with `imageMediaId`/`removeImage` through `MediaModule` (as foods do), signed `image.url` on reads
+- [X] T024 [US2] Machines in `apps/api/src/training/machines.service.ts`: CRUD with archive-on-delete, `exerciseIds` must be readable, photo via `MediaModule`; routes `GET/POST/PATCH/DELETE /machines`
+- [X] T025 [US2] Exercise and machine routes in `training.module.ts` (`POST/PATCH/DELETE /exercises/:id`, machines)
+- [X] T026 [P] [US2] `apps/web/src/components/training/exercise-picker.tsx`: debounced search, muscle and equipment filters, recent first, "Create exercise" and machine choice for the exercise; replaces the basic picker from T018
+- [X] T027 [P] [US2] `apps/web/src/components/training/exercise-form.tsx` and `machine-form.tsx`: private additions with photo (reuse `food-photo-field.tsx` patterns)
+- [X] T028 [US2] Exercises tab: catalogue browser, exercise detail (muscles, equipment, own instructions/photo, "Own" badge) and the dataset credit, in `apps/web/src/app/training/page.tsx`
 
 **Checkpoint**: any exercise is findable in seconds, and a missing machine can be added and used.
 
@@ -158,6 +158,13 @@ built and tested without US2 (search ranking and private additions).
   `catalogue.seeder.spec.ts` with a `CatalogueService` list test; API specs run on
   `fake-model.testing.ts` (no in-memory Mongo in the repo); the Home card (US4) is not built, so
   `/training` is reached from Menu.
+- 2026-11-12: US2 done (T022–T028). Differences from the task text: search ranks in three tiers
+  (name or alias starts with the query, a word starts with it, it appears inside a word), not two,
+  because "row" otherwise ranked "Ball throw" with the rows; the machine part of a workout
+  exercise's snapshot is set by `PATCH machineId` (the contract's rule) and the exercise part
+  never is; `Modal` renders a `<form>` only when it has `onSubmit`, so a form opened from the
+  picker is not nested in another form. Photos were not checked end to end locally (no R2 here;
+  the field hides itself and the API answers 503).
 
 ## Dependencies and execution order
 

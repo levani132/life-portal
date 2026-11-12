@@ -6,7 +6,7 @@ import { ChevronLeft } from 'lucide-react';
 import type { SessionDetail, SessionListItem, SessionPage } from '@life-portal/shared-types';
 import { formatDay } from '@life-portal/shared-domain';
 import { AppShell, PageHeader } from '../../components/app-shell';
-import { ExerciseSearch } from '../../components/training/exercise-picker';
+import { ExerciseLibrary } from '../../components/training/exercise-library';
 import { CurrentWorkout, WorkoutSession } from '../../components/training/workout-session';
 import { EmptyState, ErrorNote, Panel, Spinner } from '../../components/ui';
 import { api } from '../../lib/api';
@@ -52,11 +52,7 @@ function Training() {
       </div>
       {tab === 'workout' && <CurrentWorkout />}
       {tab === 'history' && <History />}
-      {tab === 'exercises' && (
-        <Panel title="Exercises" description="The catalogue you pick from when logging.">
-          <ExerciseSearch />
-        </Panel>
-      )}
+      {tab === 'exercises' && <ExerciseLibrary />}
     </>
   );
 }

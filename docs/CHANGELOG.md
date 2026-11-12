@@ -2,6 +2,19 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-12: Training: your own exercises and machines
+
+- **Better exercise search.** Names that start with what you type come first, then whole words,
+  then the rest, and exercises you did in the last 90 days are marked "recent" and listed first.
+  Filter by muscle and equipment.
+- **Create your own exercises** when the catalogue lacks one, with other names search will find,
+  muscles, equipment, how it is measured, steps and a photo. Only you see them.
+- **Your machines.** Add the specific machines at your gym (name, brand, photo, what they are used
+  for). When you add an exercise to a workout you can say which machine you used, and change it
+  later from the exercise's card.
+- **An Exercises tab** to browse the catalogue, open an exercise's details, and edit or delete your
+  own. Deleting something a past workout uses archives it instead, so your history stays intact.
+
 ## 2026-11-12: Your profile, one way, one tap away
 
 - **Your profile looks the same however you get there.** Tapping your own name on a post used to

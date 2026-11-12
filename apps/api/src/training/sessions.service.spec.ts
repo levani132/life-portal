@@ -2,7 +2,8 @@ import { BadRequestException, ConflictException, NotFoundException } from '@nest
 import { randomUUID } from 'node:crypto';
 import { Types } from 'mongoose';
 import { CatalogueService } from './catalogue.service';
-import { FakeModel } from './fake-model.testing';
+import { FakeModel, fakeMedia } from './fake-model.testing';
+import { MachinesService } from './machines.service';
 import { SessionsService } from './sessions.service';
 
 const ME = 'user-me';
@@ -15,12 +16,16 @@ function fixture() {
   const sessions = new FakeModel([['userId', 'requestId'], ['userId', '?status=open']]);
   const workoutExercises = new FakeModel([['userId', 'requestId']]);
   const sets = new FakeModel([['userId', 'requestId']]);
-  const catalogue = new CatalogueService(exercises as never);
+  const machineRows = new FakeModel();
+  const media = fakeMedia();
+  const catalogue = new CatalogueService(exercises as never, workoutExercises as never, sets as never, media as never);
+  const machines = new MachinesService(machineRows as never, workoutExercises as never, catalogue, media as never);
   const service = new SessionsService(
     sessions as never,
     workoutExercises as never,
     sets as never,
     catalogue,
+    machines,
   );
   const bench = new Types.ObjectId();
   const pullUp = new Types.ObjectId();
@@ -30,7 +35,7 @@ function fixture() {
     { _id: pullUp, name: 'Pullups', searchName: 'pullups', primaryMuscles: ['lats'], secondaryMuscles: [], equipmentType: 'bodyweight', measure: 'bodyweight_reps', seedKey: 'fedb:pullups', archived: false, aliases: [] },
     { _id: secret, userId: OTHER, name: 'Their machine press', searchName: 'their machine press', primaryMuscles: ['chest'], secondaryMuscles: [], equipmentType: 'machine', measure: 'weight_reps', archived: false, aliases: [] },
   );
-  return { service, exercises, sessions, workoutExercises, sets, bench: String(bench), pullUp: String(pullUp), secret: String(secret) };
+  return { service, machines, machineRows, exercises, sessions, workoutExercises, sets, bench: String(bench), pullUp: String(pullUp), secret: String(secret) };
 }
 
 async function startWithBench(f: ReturnType<typeof fixture>, at = T0) {

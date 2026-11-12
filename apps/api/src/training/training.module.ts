@@ -24,14 +24,19 @@ import { RequireModule } from '../access/access.module';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { CatalogueSeeder } from './catalogue.seeder';
 import { CatalogueService } from './catalogue.service';
+import { MachinesService } from './machines.service';
 import { TrainingProfileService } from './profile.service';
 import { SessionsService } from './sessions.service';
 import {
   AddSessionExerciseDto,
+  CreateExerciseDto,
+  CreateMachineDto,
   CreateSetDto,
   FinishSessionDto,
   ReorderDto,
   StartSessionDto,
+  UpdateExerciseDto,
+  UpdateMachineDto,
   UpdateSessionDto,
   UpdateSessionExerciseDto,
   UpdateSetDto,
@@ -75,6 +80,7 @@ export class TrainingController {
     private readonly catalogue: CatalogueService,
     private readonly profiles: TrainingProfileService,
     private readonly sessions: SessionsService,
+    private readonly machines: MachinesService,
   ) {}
 
   // ---------------------------------------------------------------- profile
@@ -106,6 +112,57 @@ export class TrainingController {
   @Get('exercises/:id')
   exercise(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     return this.catalogue.get(userId, id);
+  }
+
+  @Post('exercises')
+  createExercise(@CurrentUser('userId') userId: string, @Body() dto: CreateExerciseDto) {
+    return this.catalogue.create(userId, dto);
+  }
+
+  /** Own exercises only: a shared row answers 404. */
+  @Patch('exercises/:id')
+  updateExercise(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateExerciseDto,
+  ) {
+    return this.catalogue.update(userId, id, dto);
+  }
+
+  @Delete('exercises/:id')
+  deleteExercise(@CurrentUser('userId') userId: string, @Param('id') id: string) {
+    return this.catalogue.remove(userId, id);
+  }
+
+  // ---------------------------------------------------------------- machines
+
+  @Get('machines')
+  listMachines(@CurrentUser('userId') userId: string, @Query('exerciseId') exerciseId?: string) {
+    return this.machines.list(userId, exerciseId || undefined);
+  }
+
+  @Get('machines/:id')
+  machine(@CurrentUser('userId') userId: string, @Param('id') id: string) {
+    return this.machines.get(userId, id);
+  }
+
+  @Post('machines')
+  createMachine(@CurrentUser('userId') userId: string, @Body() dto: CreateMachineDto) {
+    return this.machines.create(userId, dto);
+  }
+
+  @Patch('machines/:id')
+  updateMachine(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateMachineDto,
+  ) {
+    return this.machines.update(userId, id, dto);
+  }
+
+  @Delete('machines/:id')
+  deleteMachine(@CurrentUser('userId') userId: string, @Param('id') id: string) {
+    return this.machines.remove(userId, id);
   }
 
   // ---------------------------------------------------------------- sessions
@@ -183,7 +240,7 @@ export class TrainingController {
   }
 
   @Patch('sessions/:id/exercises/:weId')
-  updateExercise(
+  updateSessionExercise(
     @CurrentUser('userId') userId: string,
     @Param('id') id: string,
     @Param('weId') weId: string,
@@ -240,7 +297,7 @@ export class TrainingController {
     ]),
   ],
   controllers: [TrainingController],
-  providers: [CatalogueSeeder, CatalogueService, TrainingProfileService, SessionsService],
+  providers: [CatalogueSeeder, CatalogueService, MachinesService, TrainingProfileService, SessionsService],
   exports: [SessionsService],
 })
 export class TrainingModule {}

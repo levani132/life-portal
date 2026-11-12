@@ -10,9 +10,9 @@ phases and must be computable from what this module records.
 **Contracts:** `libs/shared/types/src/lib/training.ts`
 **Spec:** `specs/020-training-logging/` (spec, plan, research R1–R11, data model, API contract)
 
-**Status (2026-11-12):** the MVP (spec 020 tasks T001–T021) is built: the catalogue, workout
-logging, history. Not built yet: search ranking and private exercises/machines (US2), records and
-1RM (US3), the Home card (US4), kg/lb and bodyweight loads (US5).
+**Status (2026-11-12):** built: the catalogue, workout logging and history (MVP, T001–T021), and
+search ranking, private exercises and machines (US2, T022–T028). Not built yet: records and 1RM
+(US3), the Home card (US4), kg/lb and bodyweight loads (US5).
 
 ## Access
 
@@ -65,8 +65,13 @@ on `(userId, exerciseId, loggedAt)`.
 `workout_exercises.snapshot` holds `{name, equipmentType, measure, primaryMuscles, machineName?,
 machineBrand?}` as they were when the exercise was added. Renaming or correcting a catalogue row
 never rewrites a past workout. The service builds it; DTOs have no field for it
-(`forbidNonWhitelisted` turns one into a 400); it is never refreshed on PATCH; `exerciseId` is not
-editable. A set's `exerciseId` is copied from its workout exercise at creation, as an immutable
+(`forbidNonWhitelisted` turns one into a 400); `exerciseId` is not editable.
+
+The one part a PATCH may set is the **machine**: `PATCH …/exercises/:weId {machineId}` sets
+`machineId` and copies that machine's current name and brand into the snapshot (`null` clears all
+three). Which machine was used is a correction to what happened, not a refresh of the catalogue,
+so renaming the machine later still leaves past workouts alone. The exercise part is never
+refreshed. A set's `exerciseId` is copied from its workout exercise at creation, as an immutable
 reference for history queries.
 
 ## Measures
@@ -102,7 +107,40 @@ Mapping (`catalogueMeasure`): cardio → distance and time; stretching or a stat
 no equipment or "body only" → bodyweight reps; everything else → weight × reps.
 
 `CatalogueService` does not extend `OwnedCrudService`: its `scoped()` would hide shared rows.
-`visible()` is the one place the shared-or-own filter is written.
+`visible()` is the one place the shared-or-own filter is written; writes go through `own()`
+(`{_id, userId}`), so a shared row or someone else's answers 404 to PATCH and DELETE.
+
+### Search
+
+`searchName` is the name and every alias, each normalised (`normaliseSearch`), joined by ` | `
+(`searchNameFor`). Mongo filters by a contains-regex plus the muscle and equipment filters; the
+service then ranks every match in memory (`rankExercises`, capped at 2,000 rows, so paging with
+`skip` happens after ranking):
+
+1. a name or alias that starts with the query,
+2. one with a word that starts with it ("bent over **row**"),
+3. one that merely contains it ("th**row**");
+
+within each tier, exercises the caller logged in the last 90 days first (`recent: true`, from
+`workout_sets.distinct('exerciseId')` on `(userId, exerciseId, loggedAt)`), then by name.
+
+### Own exercises and machines
+
+A person can create exercises (private rows in `exercises`) and machines (`training_machines`,
+always private in this phase). Both may carry a photo, copied by `MediaService.copyForTraining`
+from an upload under `training/<userId>/<exercises|machines>/`, exactly as a food's; responses carry
+a signed `image.url`, never the key. If the photo cannot be copied on create, the new row is
+removed again so a retry starts clean.
+
+- **Delete** removes the row (and its photo) when no workout refers to it, and **archives** it
+  when one does (`{id, archived: true}`): hidden from search and machine lists, still readable by
+  id for the history that names it.
+- **Measure is locked** once an exercise is in any workout: changing it is a 409
+  `MEASURE_LOCKED`, because past sets were validated against the old measure.
+- A machine's `exerciseIds` (≤ 20) must all be readable by its owner. When adding an exercise to
+  a workout, the picker offers machines linked to it first, then the person's other machines of
+  the same equipment type; it skips the question when the person has no machines and the
+  exercise is not machine, cable or Smith machine work.
 
 ## Endpoints
 
@@ -112,15 +150,19 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | --- | --- | --- |
 | `GET`/`PUT` | `/profile` | Upserted on first read. |
 | `GET` | `/exercises?q=&muscle=&equipment=&limit=&skip=` | Shared + own, not archived, by name. |
-| `GET` | `/exercises/:id` | Includes attribution on shared rows. |
+| `GET` | `/exercises/:id` | Includes attribution on shared rows, signed `image.url` on own ones. |
+| `POST` | `/exercises` | A private exercise. |
+| `PATCH`/`DELETE` | `/exercises/:id` | Own rows only (shared → 404). Measure locked once logged (409). Delete archives a logged one. |
+| `GET` | `/machines?exerciseId=` | Own, not archived. |
+| `GET`/`POST`/`PATCH`/`DELETE` | `/machines`, `/machines/:id` | Like exercises: archive when a workout names it. |
 | `POST` | `/sessions` `{requestId, day}` | Returns the open session with `resumed: true` instead of a second one. |
 | `GET` | `/sessions/current` | 204 when none is open. |
 | `GET` | `/sessions?cursor=` | 20 a page, newest day first. |
 | `GET`/`PATCH`/`DELETE` | `/sessions/:id` | Detail includes each exercise's `previous` sets. Delete removes its exercises and sets. |
 | `POST` | `/sessions/:id/finish` `{at?: now\|lastSet}` | 409 `EMPTY_SESSION` when it has no sets. |
-| `POST` | `/sessions/:id/exercises` `{requestId, exerciseId}` | Builds the snapshot. |
+| `POST` | `/sessions/:id/exercises` `{requestId, exerciseId, machineId?}` | Builds the snapshot, with the machine's name and brand. |
 | `POST` | `/sessions/:id/exercises/order` `{ids}` | The complete id array. |
-| `PATCH`/`DELETE` | `/sessions/:id/exercises/:weId` | Notes only; delete removes its sets. |
+| `PATCH`/`DELETE` | `/sessions/:id/exercises/:weId` | `{notes?, machineId?}` (`null` clears the machine); delete removes its sets. |
 | `POST` | `/sessions/:id/exercises/:weId/sets` | Validated against the snapshot's measure. |
 | `PATCH`/`DELETE` | `/sets/:setId` | `null` clears an optional field. |
 
@@ -151,7 +193,10 @@ real instants set by the server, because durations need them.
 ## Web
 
 `/training` has three tabs: Workout (the open session, or Start workout), History (past sessions,
-each opening for reading and editing) and Exercises (catalogue search). Sets go through
+each opening for reading and editing) and Exercises (the catalogue with filters and a detail view,
+where own exercises can be edited or deleted, and My machines). Adding an exercise to a workout is
+two steps: the exercise (with "Create exercise" for what the catalogue lacks), then which machine
+(with "New machine"); a workout exercise's machine can be changed from its card. Sets go through
 `lib/training-queue.ts`: each is shown at once as a pending row, sent in order, and retried on
 `online`, focus and every 5 s after a network or server error. The queue is in memory only:
 closing the app with writes still pending loses them. Weight fields use `Input` with
@@ -169,5 +214,7 @@ reference in storage.
 catalogue mapping), `apps/api/src/training/sessions.service.spec.ts` (one open session including
 the race, retries, snapshots, measure validation, finish rules, history paging, cascades, 404s for
 other users) and `catalogue.seeder.spec.ts` (idempotent seed, user rows untouched, version bumps,
-facts-only file). The specs run on `fake-model.testing.ts`, an in-memory stand-in for the query
+facts-only file) and `catalogue.service.spec.ts` (ranking tiers, recent use, filters, aliases,
+privacy, 404 on shared rows, measure lock, delete-or-archive, photo rollback, machines and the
+machine part of the snapshot). The specs run on `fake-model.testing.ts`, an in-memory stand-in for the query
 shapes these services use. Manual checks: `specs/020-training-logging/quickstart.md`.
