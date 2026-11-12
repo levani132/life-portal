@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, type Model, type QueryFilter } from 'mongoose';
 import {
@@ -17,7 +17,7 @@ import {
 } from '@life-portal/shared-types';
 import { normaliseSearch } from '@life-portal/shared-domain';
 import { MediaService } from '../media/media.service';
-import { Exercise, WorkoutExercise, WorkoutSet } from './training.schemas';
+import { Exercise, TrainingPlan, WorkoutExercise, WorkoutSet } from './training.schemas';
 
 type ExerciseRow = Exercise & { _id: unknown };
 
@@ -85,6 +85,7 @@ export class CatalogueService {
     @InjectModel(WorkoutExercise.name) private readonly workoutExercises: Model<WorkoutExercise>,
     @InjectModel(WorkoutSet.name) private readonly sets: Model<WorkoutSet>,
     private readonly media: MediaService,
+    @Optional() @InjectModel(TrainingPlan.name) private readonly plans?: Model<TrainingPlan>,
   ) {}
 
   /** Shared rows, or rows owned by this user. Nothing else is ever readable. */
@@ -235,10 +236,13 @@ export class CatalogueService {
     return this.get(userId, id);
   }
 
-  /** Removed when nothing refers to it; archived when a workout does, so history keeps its id. */
+  /**
+   * Removed when nothing refers to it; archived when a workout or one of the person's own plans
+   * does, so history keeps its id and the plan keeps working (spec 023).
+   */
   async remove(userId: string, id: string): Promise<TrainingDeleteResult> {
     const row = await this.own(userId, id, { includeArchived: true });
-    if (await this.isLogged(userId, id)) {
+    if ((await this.isLogged(userId, id)) || (await this.inOwnPlan(userId, id))) {
       await this.exercises.updateOne({ _id: row._id, userId }, { $set: { archived: true } });
       return { id, archived: true };
     }
@@ -259,6 +263,11 @@ export class CatalogueService {
 
   private async isLogged(userId: string, exerciseId: string): Promise<boolean> {
     return Boolean(await this.workoutExercises.exists({ userId, exerciseId }));
+  }
+
+  private async inOwnPlan(userId: string, exerciseId: string): Promise<boolean> {
+    if (!this.plans) return false;
+    return Boolean(await this.plans.exists({ userId, 'workouts.exercises.exerciseId': exerciseId }));
   }
 
   private toListItem(row: ExerciseRow): ExerciseListItem {

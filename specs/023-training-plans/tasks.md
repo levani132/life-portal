@@ -78,16 +78,16 @@ plan) is testable without US2 (own plans) or US3 (progress).
 
 ### Tests
 
-- [ ] T020 [P] [US2] Spec `apps/api/src/training/plans.service.spec.ts`: create assigns ids and `userId`, a retried `requestId` returns the original; `PUT` keeps sent workout/exercise ids, assigns new ones to items without, removes left-out items, refuses an id not in the plan (400); validation messages name the field; an exercise id that is someone else's own exercise → 400; shared plan `PUT`/`DELETE` → 404, another user's plan → 404 on read and write; copy of shared and own plans gives `<name> (copy)` trimmed to 80, new ids, `copiedFrom`; the 101st own plan (create or copy) → 409 `PLAN_LIMIT`; delete leaves sessions untouched. Add to `catalogue.service.spec.ts`: deleting an own exercise used only by an own plan archives it
+- [X] T020 [P] [US2] Spec `apps/api/src/training/plans.service.spec.ts`: create assigns ids and `userId`, a retried `requestId` returns the original; `PUT` keeps sent workout/exercise ids, assigns new ones to items without, removes left-out items, refuses an id not in the plan (400); validation messages name the field; an exercise id that is someone else's own exercise → 400; shared plan `PUT`/`DELETE` → 404, another user's plan → 404 on read and write; copy of shared and own plans gives `<name> (copy)` trimmed to 80, new ids, `copiedFrom`; the 101st own plan (create or copy) → 409 `PLAN_LIMIT`; delete leaves sessions untouched. Add to `catalogue.service.spec.ts`: deleting an own exercise used only by an own plan archives it
 
 ### Implementation
 
-- [ ] T021 [US2] DTOs in `apps/api/src/training/training.dto.ts`: `CreatePlanDto {requestId, name, description?, workouts: PlanWorkoutDto[]}`, `ReplacePlanDto` (same without `requestId`, items may carry `id`), `PlanWorkoutDto {id?, name, exercises}`, `PlanExerciseDto {id?, exerciseId, restSeconds?, note?, targets: PlanTargetDto[]}`, `PlanTargetDto` (ints with `@IsInt`/`@Min`/`@Max`, `type` in `warmup|working`), `CopyPlanDto {requestId}`; nested `@ValidateNested` + `@Type`, array sizes from `PLAN_LIMITS`
-- [ ] T022 [US2] Write side of `apps/api/src/training/plans.service.ts`: `create`, `replace`, `copy`, `remove` per `contracts/api.md`; check exercise ids (shared or the caller's own, archived allowed), then `validatePlan`; the 100-plan limit counted on own plans; writes always filter by `userId`
-- [ ] T023 [US2] Routes `POST /training/plans`, `PUT /training/plans/:id`, `POST /training/plans/:id/copy`, `DELETE /training/plans/:id` in `apps/api/src/training/training.module.ts`
-- [ ] T024 [US2] In `apps/api/src/training/catalogue.service.ts` `remove()`: also archive (not delete) an own exercise found in `training_plans` with `userId` and `workouts.exercises.exerciseId`
-- [ ] T025 [US2] Web `apps/web/src/components/training/plan-editor.tsx`: name, description, workouts (add, rename, remove, move up/down), exercises per workout (add via the existing exercise picker, remove, move up/down, rest, note), targets per exercise shaped by the exercise's measure (add/remove sets, reps or range, weight in the person's unit via `parseWeight`, assistance, time via `parseDuration`, distance, warm-up toggle); errors from `validatePlan` shown inline before saving; saves with `POST` or `PUT`. Up/down buttons, not drag (tab swiping)
-- [ ] T026 [US2] Web: "New plan" in `plans-list.tsx`; in `plan-detail.tsx` Copy for every plan (opens the copy), Edit and Delete (with confirm) for own plans only, and "Based on <name>" when `copiedFrom` is set; archived own exercises shown with an "archived" note in plan detail and the editor
+- [X] T021 [US2] DTOs in `apps/api/src/training/training.dto.ts`: `CreatePlanDto {requestId, name, description?, workouts: PlanWorkoutDto[]}`, `ReplacePlanDto` (same without `requestId`, items may carry `id`), `PlanWorkoutDto {id?, name, exercises}`, `PlanExerciseDto {id?, exerciseId, restSeconds?, note?, targets: PlanTargetDto[]}`, `PlanTargetDto` (ints with `@IsInt`/`@Min`/`@Max`, `type` in `warmup|working`), `CopyPlanDto {requestId}`; nested `@ValidateNested` + `@Type`, array sizes from `PLAN_LIMITS`
+- [X] T022 [US2] Write side of `apps/api/src/training/plans.service.ts`: `create`, `replace`, `copy`, `remove` per `contracts/api.md`; check exercise ids (shared or the caller's own, archived allowed), then `validatePlan`; the 100-plan limit counted on own plans; writes always filter by `userId`
+- [X] T023 [US2] Routes `POST /training/plans`, `PUT /training/plans/:id`, `POST /training/plans/:id/copy`, `DELETE /training/plans/:id` in `apps/api/src/training/training.module.ts`
+- [X] T024 [US2] In `apps/api/src/training/catalogue.service.ts` `remove()`: also archive (not delete) an own exercise found in `training_plans` with `userId` and `workouts.exercises.exerciseId`
+- [X] T025 [US2] Web `apps/web/src/components/training/plan-editor.tsx`: name, description, workouts (add, rename, remove, move up/down), exercises per workout (add via the existing exercise picker, remove, move up/down, rest, note), targets per exercise shaped by the exercise's measure (add/remove sets, reps or range, weight in the person's unit via `parseWeight`, assistance, time via `parseDuration`, distance, warm-up toggle); errors from `validatePlan` shown inline before saving; saves with `POST` or `PUT`. Up/down buttons, not drag (tab swiping)
+- [X] T026 [US2] Web: "New plan" in `plans-list.tsx`; in `plan-detail.tsx` Copy for every plan (opens the copy), Edit and Delete (with confirm) for own plans only, and "Based on <name>" when `copiedFrom` is set; archived own exercises shown with an "archived" note in plan detail and the editor
 
 **Checkpoint**: quickstart 7 and 8 pass; push to main.
 
@@ -123,6 +123,21 @@ plan) is testable without US2 (own plans) or US3 (progress).
 ---
 
 ## Progress
+
+- 2026-11-12: US2 done (T020–T026); `npm run check` passes (933 tests), and the API and the web
+  editor were run against a local Mongo at phone width. Differences from the task text:
+  - The list and plan view stay in `components/training/plans.tsx`; Copy, Edit and Delete sit in a
+    row under the plan's title (as header actions they squeezed the title at 375px).
+  - Copy opens the copy straight in the editor, since a copy is made to be changed.
+  - A rep range is typed in one field, `8-12` (or `8–12`); the API still stores `reps`/`repsMax`.
+  - A 400 also returns `problems: [{path, message}]`; the editor shows the same problems from
+    `validatePlan` before sending, located as `Workout A · Barbell Squat · set 1`.
+  - The fake model's dotted paths now reach through arrays, as Mongo's do, for the
+    `workouts.exercises.exerciseId` lookups.
+  - Checked locally: copy (and a retried copy) of Push / Pull / Legs; `PUT` reordering workouts
+    kept their ids; an empty target, an unknown id and an extra field → 400; `PUT`/`DELETE` of a
+    shared plan → 404; a workout started from the copy kept its names after the plan was
+    deleted; deleting an own exercise used by a plan archived it and the plan still showed it.
 
 - 2026-11-12: MVP done (T001–T019); `npm run check` passes (888 tests across the three projects), and the flow was run against
   a local Mongo with the API and web at phone width. Differences from the task text:

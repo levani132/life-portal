@@ -35,11 +35,14 @@ import { TrainingSummaryService } from './summary.service';
 import { Today } from '../common/today';
 import {
   AddSessionExerciseDto,
+  CopyPlanDto,
   CreateExerciseDto,
+  CreatePlanDto,
   CreateMachineDto,
   CreateSetDto,
   FinishSessionDto,
   ReorderDto,
+  ReplacePlanDto,
   StartSessionDto,
   SwapSessionExerciseDto,
   UpdateExerciseDto,
@@ -203,6 +206,26 @@ export class TrainingController {
   @Get('plans/:id')
   plan(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     return this.plans.detail(userId, id);
+  }
+
+  @Post('plans')
+  createPlan(@CurrentUser('userId') userId: string, @Body() dto: CreatePlanDto) {
+    return this.plans.create(userId, dto);
+  }
+
+  @Put('plans/:id')
+  replacePlan(@CurrentUser('userId') userId: string, @Param('id') id: string, @Body() dto: ReplacePlanDto) {
+    return this.plans.replace(userId, id, dto);
+  }
+
+  @Post('plans/:id/copy')
+  copyPlan(@CurrentUser('userId') userId: string, @Param('id') id: string, @Body() dto: CopyPlanDto) {
+    return this.plans.copy(userId, id, dto.requestId);
+  }
+
+  @Delete('plans/:id')
+  removePlan(@CurrentUser('userId') userId: string, @Param('id') id: string) {
+    return this.plans.remove(userId, id);
   }
 
   // ---------------------------------------------------------------- sessions

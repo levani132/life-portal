@@ -50,11 +50,19 @@ function matchesValue(value: unknown, condition: unknown): boolean {
   return same(value, condition);
 }
 
+function walk(value: unknown, parts: string[]): unknown[] {
+  if (!parts.length) return [value];
+  if (Array.isArray(value) && !/^\d+$/.test(parts[0])) return value.flatMap((item) => walk(item, parts));
+  const [part, ...rest] = parts;
+  return walk((value as Record<string, unknown> | undefined)?.[part], rest);
+}
+
 export function matches(doc: Doc, filter: Filter): boolean {
   return Object.entries(filter).every(([key, condition]) => {
     if (key === '$or') return (condition as Filter[]).some((branch) => matches(doc, branch));
-    const value = key.split('.').reduce<unknown>((at, part) => (at as Record<string, unknown> | undefined)?.[part], doc);
-    return matchesValue(value, condition);
+    // Like Mongo, a dotted path reaches through arrays ("workouts.exercises.exerciseId").
+    const values = walk(doc, key.split('.'));
+    return values.length === 1 ? matchesValue(values[0], condition) : values.some((value) => matchesValue(value, condition));
   });
 }
 

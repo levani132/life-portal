@@ -16,11 +16,15 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import {
   EQUIPMENT_TYPES,
   MEASURES,
   MUSCLES,
+  PLAN_LIMITS,
+  PLAN_TARGET_TYPES,
   SET_TYPES,
   WEIGHT_UNITS,
   type EquipmentType,
@@ -149,4 +153,53 @@ export class CreateSetDto extends UpdateSetDto {
 export class UpdateTrainingProfileDto {
   @IsOptional() @IsIn(WEIGHT_UNITS) weightUnit?: (typeof WEIGHT_UNITS)[number];
   @IsOptional() @IsInt() @Min(0) @Max(900) defaultRestSeconds?: number;
+}
+
+// ------------------------------------------------------------------ plans (spec 023)
+// Shape and size only. Which fields a target may carry depends on its exercise's measure, so
+// `validatePlan` checks that in the service, with the same rules the editor uses.
+
+export class PlanTargetDto {
+  @IsIn(PLAN_TARGET_TYPES) type!: (typeof PLAN_TARGET_TYPES)[number];
+  @IsOptional() @IsInt() reps?: number;
+  @IsOptional() @IsInt() repsMax?: number;
+  @IsOptional() @IsInt() weightGrams?: number;
+  @IsOptional() @IsInt() assistGrams?: number;
+  @IsOptional() @IsInt() durationSeconds?: number;
+  @IsOptional() @IsInt() distanceMeters?: number;
+}
+
+export class PlanExerciseDto {
+  /** The id it was given; absent for a new exercise. */
+  @IsOptional() @IsString() @MaxLength(100) id?: string;
+  @IsMongoId() exerciseId!: string;
+  @IsOptional() @IsInt() @Min(0) @Max(PLAN_LIMITS.restMax) restSeconds?: number;
+  @IsOptional() @IsString() @MaxLength(PLAN_LIMITS.note) note?: string;
+  @IsArray() @ArrayMinSize(PLAN_LIMITS.targetsMin) @ArrayMaxSize(PLAN_LIMITS.targetsMax)
+  @ValidateNested({ each: true }) @Type(() => PlanTargetDto)
+  targets!: PlanTargetDto[];
+}
+
+export class PlanWorkoutDto {
+  @IsOptional() @IsString() @MaxLength(100) id?: string;
+  @IsString() @MaxLength(PLAN_LIMITS.name) name!: string;
+  @IsArray() @ArrayMaxSize(PLAN_LIMITS.exercises)
+  @ValidateNested({ each: true }) @Type(() => PlanExerciseDto)
+  exercises!: PlanExerciseDto[];
+}
+
+export class ReplacePlanDto {
+  @IsString() @MaxLength(PLAN_LIMITS.name) name!: string;
+  @IsOptional() @IsString() @MaxLength(PLAN_LIMITS.description) description?: string;
+  @IsArray() @ArrayMaxSize(PLAN_LIMITS.workouts)
+  @ValidateNested({ each: true }) @Type(() => PlanWorkoutDto)
+  workouts!: PlanWorkoutDto[];
+}
+
+export class CreatePlanDto extends ReplacePlanDto {
+  @IsUUID() requestId!: string;
+}
+
+export class CopyPlanDto {
+  @IsUUID() requestId!: string;
 }

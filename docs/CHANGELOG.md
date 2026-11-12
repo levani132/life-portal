@@ -12,6 +12,10 @@ User-visible changes. Newest first.
 - **Change it as you go.** Skip an exercise, swap it for another before you log it, remove it or
   add your own. Finishing keeps only what you logged, and History shows the workout under its
   plan name. Starting an empty workout works as before.
+- **Your own plans.** Make a plan from scratch with New plan, or copy a ready-made one and change
+  it: rename it, add, remove and reorder workouts and exercises, and set each planned set's reps
+  (or a range like 8-12), weight, time or distance, rest and a note. Problems are pointed out
+  before saving. Deleting a plan leaves the workouts you did from it in History.
 
 ## 2026-11-12: Badges on your profile
 

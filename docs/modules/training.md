@@ -103,6 +103,19 @@ against the vendored catalogue, so a bad plan fails the tests before it can be s
 production. Like the catalogue, shared plans bypass `OwnedCrudService` (`PlansService` writes its
 `$or` filters itself).
 
+**Own plans** (US2) are created, copied, replaced and deleted whole. `PUT` replaces the plan (last
+write wins): a workout or exercise that carries an `id` keeps it, so sessions keep pointing at
+their workout; an `id` not in the plan, or sent twice, is a 400; items without one get a new
+ObjectId hex string; items left out are removed. Exercise ids must be shared or the caller's own
+(archived own ones too, so a plan keeps working after its exercise is deleted); anything else is a
+`validatePlan` problem at `workouts.N.exercises.M.exerciseId`. A 400 carries `problems: [{path,
+message}]` as well as the messages. Copy works on any plan the caller can read, names it
+`<name> (copy)` within 80 characters, gives every item a new id and records `copiedFrom {planId,
+name}`, which is never followed (the original may change or go). A person keeps at most 100 own
+plans (409 `PLAN_LIMIT` on create or copy). Deleting a plan leaves sessions alone: they carry their
+own frozen `plan` names. Deleting an own exercise that one of the person's own plans uses archives
+it instead (`CatalogueService.remove`), as a logged one is.
+
 **Targets** carry the same fields as a set, plus `repsMax` for a range and `type`
 (`warmup`/`working`). `validatePlanTarget` requires reps for rep measures, time for `duration`
 and distance or time for `distance_duration`; weight is optional (the person fills it in).
@@ -220,6 +233,10 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `PATCH`/`DELETE` | `/sets/:setId` | `null` clears an optional field. PATCH returns `{set, records}`. |
 | `GET` | `/plans` | `{shared, own}`; shared in seed-file order, archived left out (spec 023). |
 | `GET` | `/plans/:id` | Workouts with each exercise's name, measure and targets. Archived shared plans still readable. |
+| `POST` | `/plans` | `{requestId, name, description?, workouts}` → the new own plan; a retried `requestId` returns it. 409 `PLAN_LIMIT` at 100. |
+| `PUT` | `/plans/:id` | Replaces an own plan whole, keeping sent ids (see Plans). Shared or someone else's → 404. |
+| `POST` | `/plans/:id/copy` | `{requestId}` → an own copy of any readable plan, with `copiedFrom`. |
+| `DELETE` | `/plans/:id` | Own plans only. Sessions started from it are unchanged. |
 | `POST` | `/sessions` `{…, planId, planWorkoutId}` | Spec 023: both or neither; copies the workout's exercises and targets. |
 | `PATCH` | `/sessions/:id/exercises/:weId` `{skipped}` | Only for an exercise with `planned` (400 otherwise). |
 | `POST` | `/sessions/:id/exercises/:weId/swap` `{requestId, exerciseId, machineId?}` | 409 `HAS_SETS` once a set is logged. |
@@ -306,7 +323,9 @@ real instants set by the server, because durations need them.
 ## Web
 
 `/training` has four tabs: Workout (the open session, or Start empty workout and Choose a plan),
-Plans (ready-made and own plans; a plan's workouts each with Start; spec 023), History (past sessions,
+Plans (ready-made and own plans; a plan's workouts each with Start; Copy on every plan and Edit /
+Delete on own ones, with `plan-editor.tsx` editing a whole plan and reordering by up/down buttons,
+never drag, because the tabs swipe; spec 023), History (past sessions,
 each opening for reading and editing) and Exercises (the catalogue with filters and a detail view,
 where own exercises can be edited or deleted, and My machines). Adding an exercise to a workout is
 two steps: the exercise (with "Create exercise" for what the catalogue lacks), then which machine

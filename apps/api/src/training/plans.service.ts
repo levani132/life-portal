@@ -1,14 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { isValidObjectId, type Model, type QueryFilter } from 'mongoose';
-import type {
-  EquipmentType,
-  Measure,
-  PlanDetail,
-  PlanList,
-  PlanListItem,
-  PlanTarget,
+import { isValidObjectId, Types, type Model, type QueryFilter } from 'mongoose';
+import {
+  PLAN_LIMITS,
+  type EquipmentType,
+  type Measure,
+  type PlanDetail,
+  type PlanInput,
+  type PlanList,
+  type PlanListItem,
+  type PlanTarget,
 } from '@life-portal/shared-types';
+import { validatePlan } from '@life-portal/shared-domain';
 import plansFile from './catalogue/plans.json';
 import type { PlansFile } from './plan.seeder';
 import { Exercise, TrainingPlan } from './training.schemas';
@@ -89,6 +92,158 @@ export class PlansService {
     };
   }
 
+  // ---------------------------------------------------------------- own plans (US2)
+
+  /** A new own plan. Ids are assigned here; a retried `requestId` returns the original. */
+  async create(userId: string, input: PlanInput & { requestId: string }): Promise<PlanDetail> {
+    const retried = await this.plans.findOne({ userId, requestId: input.requestId }).lean<PlanRow>();
+    if (retried) return this.detail(userId, String(retried._id));
+    await this.assertUnderLimit(userId);
+    const clean = await this.checked(userId, input, new Map(), new Map());
+    try {
+      const created = await this.plans.create({ userId, requestId: input.requestId, archived: false, ...clean });
+      return this.detail(userId, String(created._id));
+    } catch (error) {
+      if ((error as { code?: number }).code !== 11000) throw error;
+      const winner = await this.plans.findOne({ userId, requestId: input.requestId }).lean<PlanRow>();
+      if (!winner) throw error;
+      return this.detail(userId, String(winner._id));
+    }
+  }
+
+  /**
+   * Replaces the whole of an own plan (last write wins, research R1). An item that carries an `id`
+   * keeps it, so sessions keep pointing at their workout; an unknown `id` is refused rather than
+   * trusted; items without one are new; items left out are removed.
+   */
+  async replace(userId: string, id: string, input: PlanInput): Promise<PlanDetail> {
+    const row = await this.own(userId, id);
+    const workoutIds = new Map(row.workouts.map((workout) => [workout.id, workout]));
+    const exerciseIds = new Map(
+      row.workouts.flatMap((workout) => workout.exercises.map((exercise) => [exercise.id, exercise] as const)),
+    );
+    const clean = await this.checked(userId, input, workoutIds, exerciseIds);
+    await this.plans.updateOne(
+      { _id: row._id, userId },
+      clean.description === undefined
+        ? { $set: { name: clean.name, workouts: clean.workouts }, $unset: { description: 1 } }
+        : { $set: clean },
+      { runValidators: true },
+    );
+    return this.detail(userId, id);
+  }
+
+  /** Any plan the caller can see, as a new own plan with new ids. Never linked to the original. */
+  async copy(userId: string, id: string, requestId: string): Promise<PlanDetail> {
+    const retried = await this.plans.findOne({ userId, requestId }).lean<PlanRow>();
+    if (retried) return this.detail(userId, String(retried._id));
+    const source = await this.readable(userId, id);
+    await this.assertUnderLimit(userId);
+    const suffix = ' (copy)';
+    const created = await this.plans.create({
+      userId,
+      requestId,
+      archived: false,
+      name: `${source.name.slice(0, PLAN_LIMITS.name - suffix.length)}${suffix}`,
+      ...(source.description ? { description: source.description } : {}),
+      copiedFrom: { planId: String(source._id), name: source.name },
+      workouts: source.workouts.map((workout) => ({
+        id: newId(),
+        name: workout.name,
+        exercises: workout.exercises.map((exercise) => ({
+          id: newId(),
+          exerciseId: exercise.exerciseId,
+          ...(exercise.restSeconds != null ? { restSeconds: exercise.restSeconds } : {}),
+          ...(exercise.note ? { note: exercise.note } : {}),
+          targets: exercise.targets.map(toTarget),
+        })),
+      })),
+    });
+    return this.detail(userId, String(created._id));
+  }
+
+  /** Own plans only. Sessions started from it keep their frozen names and suggestions. */
+  async remove(userId: string, id: string): Promise<{ id: string; deleted: true }> {
+    const row = await this.own(userId, id);
+    await this.plans.deleteOne({ _id: row._id, userId });
+    return { id, deleted: true };
+  }
+
+  private async assertUnderLimit(userId: string) {
+    if ((await this.plans.countDocuments({ userId })) >= PLAN_LIMITS.ownPlans) {
+      throw new ConflictException({
+        code: 'PLAN_LIMIT',
+        message: `You can keep up to ${PLAN_LIMITS.ownPlans} plans. Delete one to make room.`,
+      });
+    }
+  }
+
+  /** The caller's own plan; shared and other people's plans are a 404, as for exercises. */
+  private async own(userId: string, id: string): Promise<PlanRow> {
+    if (!isValidObjectId(id)) throw new NotFoundException(`Plan ${id} not found`);
+    const row = await this.plans.findOne({ _id: id, userId }).lean<PlanRow>();
+    if (!row) throw new NotFoundException(`Plan ${id} not found`);
+    return row;
+  }
+
+  /**
+   * Trims and checks a plan, resolving ids: a sent id must be one of `known`, each at most once.
+   * Exercises must be shared or the caller's own (archived own ones too, so a plan keeps working
+   * after its exercise is deleted).
+   */
+  private async checked(
+    userId: string,
+    input: PlanInput,
+    knownWorkouts: Map<string, unknown>,
+    knownExercises: Map<string, unknown>,
+  ) {
+    const ids = [...new Set(input.workouts.flatMap((w) => w.exercises.map((e) => e.exerciseId)))].filter(isValidObjectId);
+    const rows = await this.exercises
+      .find({ _id: { $in: ids }, $or: [{ userId: { $exists: false } }, { userId }] })
+      .select('measure')
+      .lean<{ _id: unknown; measure: string }[]>();
+    const measures = new Map(rows.map((row) => [String(row._id), row.measure as Measure]));
+    const plan: PlanInput = {
+      name: input.name.trim(),
+      description: input.description?.trim() || undefined,
+      workouts: input.workouts.map((workout) => ({
+        ...workout,
+        name: workout.name.trim(),
+        exercises: workout.exercises.map((exercise) => ({
+          ...exercise,
+          note: exercise.note?.trim() || undefined,
+          targets: exercise.targets.map(toTarget),
+        })),
+      })),
+    };
+    const problems = validatePlan(plan, (exerciseId) => measures.get(exerciseId));
+    if (problems.length) {
+      throw new BadRequestException({ message: problems.map((p) => p.message), problems });
+    }
+    const seen = new Set<string>();
+    const resolve = (id: string | undefined, known: Map<string, unknown>) => {
+      if (id === undefined) return newId();
+      if (!known.has(id) || seen.has(id)) throw new BadRequestException(`Unknown or repeated id ${id} in this plan.`);
+      seen.add(id);
+      return id;
+    };
+    return {
+      name: plan.name,
+      description: plan.description,
+      workouts: plan.workouts.map((workout) => ({
+        id: resolve(workout.id, knownWorkouts),
+        name: workout.name,
+        exercises: workout.exercises.map((exercise) => ({
+          id: resolve(exercise.id, knownExercises),
+          exerciseId: exercise.exerciseId,
+          ...(exercise.restSeconds != null ? { restSeconds: exercise.restSeconds } : {}),
+          ...(exercise.note ? { note: exercise.note } : {}),
+          targets: exercise.targets,
+        })),
+      })),
+    };
+  }
+
   /** The raw plan, shared or the caller's own (archived ones too), or 404. */
   async readable(userId: string, id: string): Promise<PlanRow> {
     if (!isValidObjectId(id)) throw new NotFoundException(`Plan ${id} not found`);
@@ -97,6 +252,8 @@ export class PlansService {
     return row;
   }
 }
+
+const newId = () => new Types.ObjectId().toHexString();
 
 const stamp = (row: PlanRow) => (row.updatedAt ?? row.createdAt)?.getTime() ?? 0;
 

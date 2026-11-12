@@ -20,7 +20,8 @@ function fixture() {
   const sets = new FakeModel([['userId', 'requestId']]);
   const machineRows = new FakeModel();
   const media = fakeMedia();
-  const catalogue = new CatalogueService(exercises as never, workoutExercises as never, sets as never, media as never);
+  const plans = new FakeModel();
+  const catalogue = new CatalogueService(exercises as never, workoutExercises as never, sets as never, media as never, plans as never);
   const machines = new MachinesService(machineRows as never, workoutExercises as never, catalogue, media as never);
   const sessionRows = new FakeModel([['userId', 'requestId'], ['userId', '?status=open']]);
   const progress = new ProgressService(sessionRows as never, workoutExercises as never, sets as never, catalogue, { weighInsUpTo: async () => [] } as never);
@@ -33,7 +34,7 @@ function fixture() {
     });
     return String(_id);
   };
-  return { catalogue, machines, sessions, exercises, workoutExercises, sets, machineRows, media, shared };
+  return { catalogue, machines, sessions, plans, exercises, workoutExercises, sets, machineRows, media, shared };
 }
 
 const own = {
@@ -176,6 +177,18 @@ describe('CatalogueService: own exercises', () => {
     // Archived: gone from search, still readable for the workouts that name it.
     expect(await f.catalogue.list(ME, { q: 'iso' }, NOW)).toEqual([]);
     expect((await f.catalogue.get(ME, logged.id)).archived).toBe(true);
+  });
+
+  it('archives an exercise one of the person’s own plans uses, so the plan keeps working', async () => {
+    const f = fixture();
+    const planned = await f.catalogue.create(ME, own);
+    const exercise = { id: 'e1', exerciseId: planned.id, targets: [{ type: 'working', reps: 8 }] };
+    f.plans.docs.push({ _id: new Types.ObjectId(), userId: ME, name: 'Mine', archived: false, workouts: [{ id: 'w1', name: 'A', exercises: [exercise] }] });
+    expect(await f.catalogue.remove(ME, planned.id)).toEqual({ id: planned.id, archived: true });
+    // Someone else's plan naming it would not count (it could not, but the filter is the owner's).
+    const other = await f.catalogue.create(ME, own);
+    f.plans.docs.push({ _id: new Types.ObjectId(), userId: OTHER, name: 'Theirs', archived: false, workouts: [{ id: 'w1', name: 'A', exercises: [{ ...exercise, exerciseId: other.id }] }] });
+    expect(await f.catalogue.remove(ME, other.id)).toEqual({ id: other.id, deleted: true });
   });
 });
 
