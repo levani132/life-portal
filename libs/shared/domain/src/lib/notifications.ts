@@ -59,6 +59,23 @@ export function shouldNotify(input: {
   return null;
 }
 
+/**
+ * Whether a personal reminder (spec 025: rest over) may be sent. It has no actor, so only the
+ * recipient's own switches and features apply: no self, block or mute rules.
+ */
+export function shouldRemind(input: {
+  type: NotificationType;
+  prefs: StoredNotificationPreferences | undefined;
+  requires: FeatureId[];
+  recipientAccess: FeatureAccess;
+}): SkipReason | null {
+  if (!input.prefs?.enabled) return 'not-enabled';
+  if (!typeEnabled(input.prefs, input.type)) return 'type-off';
+  if (!input.recipientAccess.push || input.requires.some((id) => !input.recipientAccess[id]))
+    return 'recipient-feature';
+  return null;
+}
+
 /** Sends after this instant count as "inside the window", so the next one is suppressed. */
 export function collapseCutoff(now: Date, windowMs: number): Date {
   return new Date(now.getTime() - windowMs);
@@ -124,6 +141,9 @@ export function notificationText(
       return { title, body: `reposted ${postName(event.postTitle)}` };
     case 'badgeEarned':
       return badgeEarnedText(event.targetId ?? '', event.badgeTier, event.count);
+    case 'restOver':
+      // Lock-screen text stays generic: no exercise, weight or plan reaches it.
+      return { title: 'Rest over', body: 'Time for your next set.' };
     case 'postLike':
       return {
         title,

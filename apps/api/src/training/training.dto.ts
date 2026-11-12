@@ -5,6 +5,7 @@ import {
   IsArray,
   IsIn,
   IsInt,
+  IsISO8601,
   IsMongoId,
   IsNumber,
   IsOptional,
@@ -53,6 +54,11 @@ export class UpdateSessionDto {
   @IsOptional() @Matches(DAY, { message: 'day must be a calendar date in YYYY-MM-DD form' })
   day?: string;
   @IsOptional() @IsString() @MaxLength(2000) notes?: string;
+}
+
+/** Spec 025: when this rest ends, or `null` to cancel. Required, so a missing field is a 400. */
+export class RestAlarmDto {
+  @ValidateIf((_, value) => value !== null) @IsISO8601({ strict: true }) at!: string | null;
 }
 
 export class FinishSessionDto {

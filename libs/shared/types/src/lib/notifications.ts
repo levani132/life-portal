@@ -11,6 +11,7 @@ export const NOTIFICATION_TYPES = [
   'postRepost',
   'message',
   'badgeEarned',
+  'restOver',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

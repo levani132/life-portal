@@ -1465,3 +1465,17 @@ Notification API has no ongoing or chronometer notification on Android; the sche
 notification proposal (Notification Triggers) was abandoned. A rest-over notification through
 the existing web push is possible and is the natural next step.
 
+## 2026-11-12: Rest-over pushes are personal reminders, timed in memory (spec 025)
+
+**Decision.** `restOver` is a `personal` notification type sent with `NotificationsService.remind()`,
+not `notify()` with `selfAllowed`. The browser tells the API when the rest ends; the API holds one
+`setTimeout` per person and never stores it.
+
+**Why.** `selfAllowed` exists for a member's own doing reported back to them (a badge) and stays
+limited to that; a reminder has no actor at all, so the actor, block and mute rules are
+meaningless for it rather than bypassed. Only the browser knows the rest (superset rule, ±15 s,
+Skip), so it must send the time. In memory because the free tier has no job runner and a rest
+lasts minutes: losing a pending alarm on a restart costs one missed reminder, and storing it
+would persist something derived. **Cost:** with more than one API instance, an alarm lives on
+whichever instance received the last update; it still fires once.
+

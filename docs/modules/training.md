@@ -177,6 +177,16 @@ round and round; else the last set's exercise while not done; else the first nei
 skipped. Done exercises collapse to one green line and expand on tap; finished workouts are
 shown expanded.
 
+**Rest over push** (`rest-alarm.service.ts`). The browser alone knows when a rest ends (the
+superset rule, ±15 s, Skip), so `RestAlarmSync` (mounted with the workout bar, on every page)
+sends `PUT /sessions/:id/rest-alarm {at}` whenever that time changes, and `{at: null}` when the
+rest is skipped or is 0. The server keeps **one in-memory timer per person** and sends the
+`restOver` reminder through `NotificationsService.remind()` when it fires. `at` must be at most
+20 minutes ahead; a time already past sets nothing; the session must be the caller's open one
+(404 otherwise). Finishing or discarding the workout clears the timer. Nothing is stored: a
+restart loses a pending alarm, and the next set sets a new one. Several open devices send the
+same time, which just replaces the timer.
+
 **The workout bar.** `components/training/workout-bar.tsx`, inside the app header (so
 `--header-offset` counts it and the rest timer still sticks under it), on every page while a
 session is open: current exercise, time, rest countdown. It reads `sessions/current` (revalidated
@@ -285,6 +295,7 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `POST` | `/sessions` `{…, planId, planWorkoutId}` | Spec 023: both or neither; copies the workout's exercises and targets. |
 | `PATCH` | `/sessions/:id/exercises/:weId` `{skipped}` | Only for an exercise with `planned` (400 otherwise). |
 | `POST` | `/sessions/:id/exercises/:weId/swap` `{requestId, exerciseId, machineId?}` | 409 `HAS_SETS` once a set is logged. |
+| `PUT` | `/sessions/:id/rest-alarm` `{at: ISO \| null}` | Spec 025: 204. Sets, moves or cancels the person's rest-over push (in memory). |
 | `GET` | `/summary?today=` | The Home card's figures (`TrainingSummary`, with `weightUnit`, read without creating a profile); also in `GET /api/dashboard`. |
 
 ## Derived values (computed on read, never stored)

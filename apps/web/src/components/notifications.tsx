@@ -241,6 +241,7 @@ const TYPE_LABELS: { type: NotificationType; label: string; hint: string }[] = [
     hint: 'From friends, unless you muted that conversation',
   },
   { type: 'badgeEarned', label: 'Badges', hint: 'When you earn a new badge' },
+  { type: 'restOver', label: 'Rest timer', hint: 'When your rest between sets is over' },
 ];
 
 function Toggle({
@@ -277,6 +278,7 @@ export function NotificationSettings() {
   const config = useApi<NotificationsConfig>('/notifications/config');
   const portal = useApi<PortalState>('/portal');
   const messaging = !!portal.data?.access.messages;
+  const training = !!portal.data?.access.training;
   const available = !!config.data?.available;
   const prefs = useApi<NotificationPreferences>(available ? '/notifications/preferences' : null);
   const devices = useApi<PushDeviceSummary[]>(available ? '/notifications/devices' : null);
@@ -337,7 +339,7 @@ export function NotificationSettings() {
             checked={data.enabled}
             onChange={(enabled) => void update({ enabled })}
           />
-          {TYPE_LABELS.filter(({ type }) => type !== 'message' || messaging).map(({ type, label, hint }) => (
+          {TYPE_LABELS.filter(({ type }) => (type !== 'message' || messaging) && (type !== 'restOver' || training)).map(({ type, label, hint }) => (
             <Toggle
               key={type}
               label={label}
@@ -437,6 +439,8 @@ function activityText(item: ActivityItem): string {
       return `${who} sent you a message`;
     case 'badgeEarned':
       return badgeEarnedText(item.badgeId ?? '', item.badgeTier).body;
+    case 'restOver':
+      return 'Your rest is over';
   }
 }
 

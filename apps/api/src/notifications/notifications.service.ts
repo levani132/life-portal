@@ -23,6 +23,7 @@ import {
   notificationTag,
   notificationText,
   shouldNotify,
+  shouldRemind,
   typeEnabled,
   type ActivityRow,
 } from '@life-portal/shared-domain';
@@ -60,6 +61,12 @@ export interface NotificationTypeDef {
    * are the same person. Every other type keeps the `'self'` safeguard.
    */
   selfAllowed?: true;
+  /**
+   * A personal reminder from the app (spec 025: rest over), not something another member did.
+   * Sent only through `remind()`, never `notify()`; it has no actor, so only the recipient's own
+   * switches and features apply. Not a way around `selfAllowed`: no member action is involved.
+   */
+  personal?: true;
 }
 
 /** Supplies Activity rows from data its module owns. Rows by blocked users are filtered here. */
@@ -254,11 +261,38 @@ export class NotificationsService {
    * rejects: a failing push service must not fail the like, comment or request (SC-007).
    */
   async notify(event: NotificationEvent): Promise<void> {
+    if (this.types.get(event.type)?.personal) return;
     try {
       await this.deliver(event);
     } catch (error) {
       this.logger.warn(
         `Notification ${event.type} not sent: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    }
+  }
+
+  /**
+   * A personal reminder (a `personal` type) to its recipient. Like `notify()`, callers do not
+   * await it and it never rejects.
+   */
+  async remind(input: { type: NotificationType; recipientId: string; targetId: string }): Promise<void> {
+    const def = this.types.get(input.type);
+    if (!def?.personal) return;
+    try {
+      if (!this.sender.configured) return;
+      const [prefs, recipientAccess] = await Promise.all([
+        this.preferences.findOne({ userId: input.recipientId }).lean(),
+        this.accessFor(input.recipientId),
+      ]);
+      if (!recipientAccess) return;
+      if (shouldRemind({ type: input.type, prefs: prefs ?? undefined, requires: def.requires, recipientAccess })) return;
+      const event: NotificationEvent = { ...input, actorId: input.recipientId, actorName: '' };
+      if (def.suppress && (await def.suppress(event))) return;
+      const devices = await this.devices.find({ userId: input.recipientId }).lean();
+      if (devices.length) await this.sendToDevices(devices, event, def, prefs ?? undefined, 0);
+    } catch (error) {
+      this.logger.warn(
+        `Reminder ${input.type} not sent: ${error instanceof Error ? error.message : 'unknown error'}`,
       );
     }
   }
@@ -289,9 +323,19 @@ export class NotificationsService {
     if (def.suppress && (await def.suppress(event))) return;
     const devices = await this.devices.find({ userId: event.recipientId }).lean();
     if (!devices.length) return;
-    const key = def.collapseKey(event);
-    const others = await this.collapse(event, key, def.windowMs);
+    const others = await this.collapse(event, def.collapseKey(event), def.windowMs);
     if (others === null) return;
+    await this.sendToDevices(devices, event, def, prefs ?? undefined, others);
+  }
+
+  private async sendToDevices(
+    devices: (PushDevice & { _id: unknown })[],
+    event: NotificationEvent,
+    def: NotificationTypeDef,
+    prefs: { showCommentPreviews?: boolean; showMessagePreviews?: boolean } | undefined,
+    others: number,
+  ) {
+    const key = def.collapseKey(event);
     const text = notificationText(event, {
       showCommentPreviews: prefs?.showCommentPreviews === true,
       showMessagePreviews: prefs?.showMessagePreviews === true,

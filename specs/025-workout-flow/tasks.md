@@ -8,4 +8,5 @@
 - [x] T006 Web US3: done/current states and collapsing in `workout-session.tsx`
 - [x] T007 Web US4: `workout-bar.tsx` in the header; Training page publishes whether the Workout tab shows
 - [x] T008 Web US5: superset links in the editor, plan view and workout; superset badges
+- [x] T010 US6: `restOver` personal reminders (`remind()`, `shouldRemind`), `RestAlarmService` + `PUT /sessions/:id/rest-alarm`, `RestAlarmSync` in the web, settings toggle; tests
 - [x] T009 Docs: training module doc, CHANGELOG, DECISIONS, ROADMAP

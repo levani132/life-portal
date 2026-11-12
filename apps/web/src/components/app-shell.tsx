@@ -129,7 +129,7 @@ function Portal({ children }: { children: ReactNode }) {
             </div>
           </div>
           {/* Spec 025: while a workout is open. Inside the header, so it counts in --header-offset. */}
-          <WorkoutBar enabled={!!portal.data.access.training} />
+          <WorkoutBar enabled={!!portal.data.access.training} push={!!portal.data.access.push} />
         </ScrollHeader>
       )}
       <HealthSyncBridge key={user.id} enabled={portal.data.access.nutrition} />

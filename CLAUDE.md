@@ -192,7 +192,8 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   user/badge/tier), so erasing history never revokes one; progress is always derived. Badges
   read other modules only through their exported reads, and evaluation runs when the browser
   calls `POST /badges/check` — there is no event bus. `badgeEarned` is the only `selfAllowed`
-  notification; don't use that flag to let any other type notify its own actor. See
+  notification; don't use that flag to let any other type notify its own actor. A reminder from
+  the app with no actor (`restOver`) is a `personal` type sent with `remind()`, not `notify()`. See
   `docs/modules/badges.md`.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are

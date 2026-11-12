@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-12: Rest over, on your lock screen
+
+- **A notification when your rest is over.** With notifications on, your phone tells you when
+  it's time for the next set, even with the screen locked. +15s, −15s and Skip move or cancel it,
+  and there is none in the middle of a superset. Turn it off under Notifications › Rest timer.
+
 ## 2026-11-12: A workout that follows you
 
 - **Duplicate a day.** In the plan editor every workout has a Duplicate button, so Push / Pull /

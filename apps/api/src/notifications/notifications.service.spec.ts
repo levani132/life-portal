@@ -206,6 +206,51 @@ describe('NotificationsService.notify', () => {
   });
 });
 
+describe('NotificationsService.remind (spec 025)', () => {
+  const rest: NotificationTypeDef = {
+    type: 'restOver',
+    requires: ['training'],
+    windowMs: 0,
+    personal: true,
+    collapseKey: (e) => e.targetId,
+    url: () => '/training',
+  };
+
+  it('sends a personal reminder to its recipient with generic lock-screen text', async () => {
+    const f = fixture();
+    f.service.register(rest);
+    await f.service.remind({ type: 'restOver', recipientId: 'owner', targetId: 'session1' });
+    expect(f.sender.send).toHaveBeenCalledWith(
+      f.device,
+      expect.objectContaining({ title: 'Rest over', body: 'Time for your next set.', url: '/training', tag: 'restOver:session1' }),
+    );
+    // No actor: no block or mute lookup, and no collapse row.
+    expect(f.graph.between).not.toHaveBeenCalled();
+    expect(f.deliveries.create).not.toHaveBeenCalled();
+  });
+
+  it('respects the main switch, the type switch and the recipient’s features', async () => {
+    const f = fixture();
+    f.service.register(rest);
+    f.setPrefs({ enabled: false });
+    await f.service.remind({ type: 'restOver', recipientId: 'owner', targetId: 's' });
+    f.setPrefs({ enabled: true, types: { restOver: false } });
+    await f.service.remind({ type: 'restOver', recipientId: 'owner', targetId: 's' });
+    f.setPrefs({ enabled: true });
+    f.access.forUser.mockResolvedValueOnce({ access: { ...all, training: false } });
+    await f.service.remind({ type: 'restOver', recipientId: 'owner', targetId: 's' });
+    expect(f.sender.send).not.toHaveBeenCalled();
+  });
+
+  it('is the only way to send a personal type, and only personal types go through it', async () => {
+    const f = fixture();
+    f.service.register(rest);
+    await f.service.notify({ type: 'restOver', recipientId: 'owner', actorId: 'owner', actorName: '', targetId: 's' });
+    await f.service.remind({ type: 'postLike', recipientId: 'owner', targetId: 'post1' });
+    expect(f.sender.send).not.toHaveBeenCalled();
+  });
+});
+
 describe('NotificationsService devices', () => {
   it('upserts by endpoint, so a shared device moves to whoever signed in', async () => {
     const f = fixture();
@@ -272,6 +317,7 @@ describe('NotificationsService preferences and activity', () => {
       postRepost: true,
       message: true,
       badgeEarned: true,
+      restOver: true,
     });
     expect(prefs.showCommentPreviews).toBe(false);
     expect(prefs.offerHiddenUntil).toBe('2026-11-15T12:00:00.000Z');

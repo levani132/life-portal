@@ -32,6 +32,7 @@ import { NutritionModule } from '../nutrition/nutrition.module';
 import { TrainingProfileService } from './profile.service';
 import { SessionsService } from './sessions.service';
 import { TrainingSummaryService } from './summary.service';
+import { RestAlarmService } from './rest-alarm.service';
 import { Today } from '../common/today';
 import {
   AddSessionExerciseDto,
@@ -49,6 +50,7 @@ import {
   UpdateMachineDto,
   UpdateSessionDto,
   UpdateSessionExerciseDto,
+  RestAlarmDto,
   UpdateSetDto,
   UpdateTrainingProfileDto,
 } from './training.dto';
@@ -96,6 +98,7 @@ export class TrainingController {
     private readonly progress: ProgressService,
     private readonly summaries: TrainingSummaryService,
     private readonly plans: PlansService,
+    private readonly alarms: RestAlarmService,
   ) {}
 
   /** The Home card's figures, for the person's `today` (spec 020 US4). */
@@ -274,17 +277,32 @@ export class TrainingController {
 
   @Post('sessions/:id/finish')
   @HttpCode(200)
-  finish(
+  async finish(
     @CurrentUser('userId') userId: string,
     @Param('id') id: string,
     @Body() dto: FinishSessionDto,
   ) {
-    return this.sessions.finish(userId, id, dto.at);
+    const finished = await this.sessions.finish(userId, id, dto.at);
+    this.alarms.clear(userId);
+    return finished;
   }
 
   @Delete('sessions/:id')
-  remove(@CurrentUser('userId') userId: string, @Param('id') id: string) {
-    return this.sessions.remove(userId, id);
+  async remove(@CurrentUser('userId') userId: string, @Param('id') id: string) {
+    const removed = await this.sessions.remove(userId, id);
+    this.alarms.clear(userId);
+    return removed;
+  }
+
+  /** Spec 025: a push when this rest ends. The browser sends it after each set and each change. */
+  @Put('sessions/:id/rest-alarm')
+  @HttpCode(204)
+  async restAlarm(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Body() dto: RestAlarmDto,
+  ): Promise<void> {
+    await this.alarms.set(userId, id, dto.at);
   }
 
   // ---------------------------------------------------------------- exercises in a session
@@ -379,7 +397,7 @@ export class TrainingController {
     ]),
   ],
   controllers: [TrainingController],
-  providers: [CatalogueSeeder, PlanSeeder, PlansService, CatalogueService, MachinesService, ProgressService, TrainingProfileService, SessionsService, TrainingSummaryService],
+  providers: [CatalogueSeeder, PlanSeeder, PlansService, CatalogueService, MachinesService, ProgressService, TrainingProfileService, SessionsService, TrainingSummaryService, RestAlarmService],
   exports: [SessionsService, TrainingSummaryService],
 })
 export class TrainingModule {}

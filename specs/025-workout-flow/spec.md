@@ -68,7 +68,18 @@ round again until the superset is done.
 - FR-005 The timer's ±15 s and Skip apply to the current rest only and live in memory.
 - FR-006 The bar reads `GET /training/sessions/current`; no new endpoint.
 
+### US6 — A push when rest is over (P2, added after US1–US5)
+
+With notifications on, a push says "Rest over · Time for your next set." when the rest after a
+set ends, even with the phone locked. ±15 s moves it, Skip cancels it, mid-superset there is
+none, and finishing or discarding the workout cancels it. It can be turned off under
+Notifications › Rest timer.
+
+- FR-007 The browser sends `PUT /training/sessions/:id/rest-alarm {at | null}` whenever the end
+  of the rest changes; the API keeps one in-memory timer per person (never stored) and sends a
+  `restOver` personal reminder through `NotificationsService.remind()`.
+
 ## Out of scope
 
-- A notification when rest ends, and a live/ongoing notification (not possible for a PWA; a rest
-  notification through web push is a possible follow-up).
+- A live/ongoing notification with a running clock (music- or flight-style). Not possible for a
+  PWA: iOS Live Activities need a native app and the web has no ongoing notification.

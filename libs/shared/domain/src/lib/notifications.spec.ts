@@ -7,6 +7,7 @@ import {
   notificationTag,
   notificationText,
   shouldNotify,
+  shouldRemind,
   type ActivityRow,
 } from './notifications';
 
@@ -310,5 +311,24 @@ describe('badgeEarnedText', () => {
         { showCommentPreviews: false, showMessagePreviews: false, others: 0 },
       ),
     ).toEqual(badgeEarnedText('firstWorkout', 1, 1));
+  });
+});
+
+describe('shouldRemind (spec 025)', () => {
+  const remind = { type: 'restOver' as const, prefs: { enabled: true }, requires: ['training' as const], recipientAccess: all };
+  it('sends with notifications on, the type on and the features present', () => {
+    expect(shouldRemind(remind)).toBeNull();
+  });
+  it('honours the recipient’s own switches and features', () => {
+    expect(shouldRemind({ ...remind, prefs: undefined })).toBe('not-enabled');
+    expect(shouldRemind({ ...remind, prefs: { enabled: true, types: { restOver: false } } })).toBe('type-off');
+    expect(shouldRemind({ ...remind, recipientAccess: { ...all, push: false } })).toBe('recipient-feature');
+    expect(shouldRemind({ ...remind, recipientAccess: { ...all, training: false } })).toBe('recipient-feature');
+  });
+  it('keeps lock-screen text generic', () => {
+    expect(notificationText({ type: 'restOver', actorName: '' }, { showCommentPreviews: false })).toEqual({
+      title: 'Rest over',
+      body: 'Time for your next set.',
+    });
   });
 });

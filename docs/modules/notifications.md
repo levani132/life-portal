@@ -118,6 +118,19 @@ Current types:
 | `postRepost` | PostEngagementService | 15 min | post | `/posts/:id` |
 | `message` | MessagesService | none (replaces per conversation) | conversation | `/messages/:id` |
 | `badgeEarned` | BadgesService (`selfAllowed`) | none (one per evaluation) | recipient | `/profile?badge=:id` |
+| `restOver` | RestAlarmService (`personal`, sent with `remind()`) | none | session | `/training` |
+
+## Personal reminders: `remind()` (spec 025)
+
+A reminder from the app itself, not something another member did: today only `restOver`, the
+end of a rest between sets. Its type is registered with `personal: true` and sent only with
+`remind({type, recipientId, targetId})`; `notify()` refuses a personal type and `remind()`
+refuses any other. There is no actor, so the self, block, mute and actor-feature rules do not
+apply (`shouldRemind`): only the recipient's main switch, the type's switch, `push` and the
+type's `requires`. No collapse row is written and no Activity source exists, so a reminder never
+shows in Activity. This is not a second `selfAllowed`: no member action is being reported back
+to its actor. The lock-screen text is generic ("Rest over · Time for your next set.") and never
+names an exercise or a weight.
 
 ## Web
 
