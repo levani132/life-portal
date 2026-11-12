@@ -1237,3 +1237,17 @@ the umbrella. What shipped is the user control (task A): Not interested and hide
 `feed_feedback`. Hiding an author excludes them rather than down-weighting, because with no
 ranking there is nothing to weigh; it can become "show fewer" when ranking exists. Recorded rule:
 private nutrition logs, weight, targets and Apple Health never drive recommendations.
+
+## 2026-11-12: Training comes before diet plans, and its catalogue is facts only
+
+The owner wants programs (diet, training or both, possibly paid). Programs need both halves, so
+training was built first (spec 020). Its exercise catalogue is seeded from free-exercise-db,
+whose data is public domain, but **only its facts** are imported: its images have no stated
+source and an open issue claims some come from ExRx.net, and its instruction text has the same
+unknown origin. So shared exercises have no pictures or instructions yet; licensed ones are a
+later addition. The catalogue seeds itself at boot (production needs it, the free tier has no job
+runner) and only when the file's `version` changes. One open workout per person is enforced by a
+partial unique index, which is why `status` is stored next to `endedAt`. Sets are their own rows
+so two devices never overwrite each other. Training produces no burned-energy figure: Apple
+Health's Active Energy already feeds Food, and counting a workout too would double it.
+

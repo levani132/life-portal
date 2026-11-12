@@ -106,6 +106,19 @@ describe('social authorization policy', () => {
       }),
     ).toEqual([]);
   });
+  it('never shares training, even when its audience says public (spec 020)', () => {
+    const access = resolveFeatureAccess('developer');
+    expect(
+      sharedModuleOrder({
+        selected: ['training', 'money'],
+        ownerAccess: access,
+        viewerAccess: access,
+        visibility: { training: 'public', money: 'public' },
+        order: [],
+        friends: true,
+      }),
+    ).toEqual(['money']);
+  });
   it('keeps social disabled for production and configurable independently of modules', () => {
     expect(resolveFeatureAccess('production').social).toBe(false);
     expect(resolveFeatureAccess('internal').social).toBe(true);

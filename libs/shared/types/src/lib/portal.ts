@@ -8,6 +8,7 @@ export const MODULE_IDS = [
   'personal',
   'projects',
   'epam',
+  'training',
 ] as const;
 export type ModuleId = (typeof MODULE_IDS)[number];
 export const COHORTS = ['production', 'internal'] as const;
@@ -79,7 +80,21 @@ export const MODULES: {
     description: 'Your private work dashboard',
     href: '/boards/epam',
   },
+  {
+    id: 'training',
+    name: 'Training',
+    description: 'Workouts, exercises and records',
+    href: '/training',
+  },
 ];
+/**
+ * Modules whose cards never appear on a profile. EPAM is a private work dashboard; training is
+ * private until its sharing phase (spec 020).
+ */
+export const UNSHAREABLE_MODULES: readonly ModuleId[] = ['epam', 'training'];
+export function isShareableModule(id: ModuleId): boolean {
+  return !UNSHAREABLE_MODULES.includes(id);
+}
 export const SETUP_STEPS = [
   'modules',
   'privacy',

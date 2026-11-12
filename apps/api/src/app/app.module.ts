@@ -21,6 +21,7 @@ import { ItemsModule } from '../items/items.module';
 import { LoansModule } from '../loans/loans.module';
 import { McpModule } from '../mcp/mcp.module';
 import { NutritionModule } from '../nutrition/nutrition.module';
+import { TrainingModule } from '../training/training.module';
 import { PersonalModule } from '../personal/personal.module';
 import { SettingsModule } from '../settings/settings.module';
 import { SpendingModule } from '../spending/spending.module';
@@ -58,6 +59,7 @@ import { MediaModule } from '../media/media.module';
     BoardsModule,
     PersonalModule,
     NutritionModule,
+    TrainingModule,
     SpendingModule,
     DashboardModule,
     McpModule,

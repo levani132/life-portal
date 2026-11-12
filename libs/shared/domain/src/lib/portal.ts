@@ -50,6 +50,7 @@ export function moduleForPath(path: string): FeatureId | undefined {
       people: 'social',
       profile: 'social',
       nutrition: 'nutrition',
+      training: 'training',
       cashflow: 'money',
       spending: 'money',
       stocks: 'stocks',

@@ -1,7 +1,8 @@
 # Life Portal — agent guide
 
 A private-by-default dashboard for each account's financial and personal state: debts, cash flow,
-sellable assets, share holdings, work obligations, side projects, personal plans and food.
+sellable assets, share holdings, work obligations, side projects, personal plans, food and
+training.
 
 **Read these before changing anything:**
 
@@ -33,7 +34,7 @@ sellable assets, share holdings, work obligations, side projects, personal plans
 apps/api          NestJS 11 · MongoDB via Mongoose 9 · JWT auth
 apps/web          Next.js 16 App Router · Tailwind · SWR · Recharts
 libs/shared/types Contracts shared by both. Zero runtime dependencies.
-libs/shared/domain Pure projection/scenario/valuation/nutrition/fx logic. 238 unit tests.
+libs/shared/domain Pure projection/scenario/valuation/nutrition/training/fx logic.
 .specify/         Spec Kit: constitution, templates, /speckit-* skills
 docs/             Module docs, decisions, changelog
 ```
@@ -97,6 +98,11 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   says `undefined`, and every `a ?? b` fallback silently breaks. This caused two real bugs; see
   `docs/DECISIONS.md`. Use `centsField` (no default) for optional, `requiredCentsField` for
   required.
+- **A logged workout exercise freezes the exercise too.** `workout_exercises.snapshot` follows the
+  meal rule below: built by the server, never accepted from a request, never refreshed, and
+  `exerciseId` is not editable. Training stores whole grams, metres and seconds; kg/lb is display
+  only. Its shared catalogue rows have no `userId`, so `CatalogueService` cannot use
+  `OwnedCrudService` (see `docs/modules/training.md`).
 - **A logged meal freezes the food's numbers.** `meal_entries.facts` is a snapshot taken at log
   time — the one place in this codebase where a value is copied rather than referenced, so that
   correcting a food never rewrites past days. Never refresh it on a `PATCH`, never accept it from a

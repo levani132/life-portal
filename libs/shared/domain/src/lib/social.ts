@@ -1,5 +1,6 @@
 import {
   MODULE_IDS,
+  isShareableModule,
   type Audience,
   type ConnectionAction,
   type FeatureAccess,
@@ -62,6 +63,7 @@ export const MODULE_CARD_IDS: Record<ModuleId, string> = {
   personal: 'personal',
   projects: 'projects',
   epam: 'board:epam',
+  training: 'training',
 };
 const DEFAULT_ORDER: Record<ModuleId, number> = {
   loans: 1,
@@ -72,6 +74,7 @@ const DEFAULT_ORDER: Record<ModuleId, number> = {
   epam: 10,
   personal: 20,
   nutrition: 25,
+  training: 30,
 };
 export function sharedModuleOrder(input: {
   selected: ModuleId[];
@@ -87,7 +90,7 @@ export function sharedModuleOrder(input: {
   };
   return MODULE_IDS.filter(
     (id) =>
-      id !== 'epam' &&
+      isShareableModule(id) &&
       input.selected.includes(id) &&
       input.ownerAccess[id] &&
       input.viewerAccess[id] &&

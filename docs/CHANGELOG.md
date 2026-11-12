@@ -2,6 +2,16 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-12: Training, first version (behind a flag)
+
+A new **Training** module for logging gym workouts, on for the internal cohort only. Start a
+workout, pick exercises from a catalogue of about 870, and log each set as you go: weight and
+reps, bodyweight or assisted reps, time, or distance and time, with an optional set type and RPE.
+Each exercise shows what you did last time, the next set starts from your last one, and a rest
+timer runs after every set. If the signal drops, sets wait on screen and are sent when it comes
+back. History lists past workouts, and any of them can be opened and corrected. Records, the Home
+card, kg/lb and your own exercises and machines come next.
+
 ## 2026-11-12: Not interested, in For You
 
 A post's menu in For You has **Not interested** and **Hide {name} from For You**. The post (or

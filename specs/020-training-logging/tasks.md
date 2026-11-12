@@ -24,23 +24,23 @@ built and tested without US2 (search ranking and private additions).
 
 ## Phase 1: Setup
 
-- [ ] T001 Add `'training'` to `MODULE_IDS` and a `MODULES` entry `{id: 'training', name: 'Training', description: 'Workouts, exercises and records', href: '/training'}` in `libs/shared/types/src/lib/portal.ts`; add `training` to `UpdateAccessDto` (same pattern as `forYou`) in `apps/api/src/access/access.module.ts`. Check `resolveFeatureAccess` in `libs/shared/domain/src/lib/portal.ts` gives internal/developer on, production off, and add a case for `training` to `libs/shared/domain/src/lib/portal.spec.ts`
-- [ ] T002 [P] Make `training` never shareable: exclude it wherever `epam` is excluded in `libs/shared/domain/src/lib/social.ts` (widget key map, ordering, the shareable filter) and in `apps/api/src/social/shared-widgets.service.ts`; hide its audience control in `apps/web/src/components/portal-preferences.tsx`; add a test in `libs/shared/domain/src/lib/social.spec.ts`
-- [ ] T003 [P] Vendor the catalogue: download `exercises.json` from yuhonas/free-exercise-db, keep **only** `id, name, force, level, mechanic, equipment, primaryMuscles, secondaryMuscles, category` per entry (drop `instructions` and `images`, research R1), write it to `apps/api/src/training/catalogue/free-exercise-db.json` with a top-level `{version: 1, source: 'free-exercise-db (Unlicense)', exercises: [...]}`
+- [X] T001 Add `'training'` to `MODULE_IDS` and a `MODULES` entry `{id: 'training', name: 'Training', description: 'Workouts, exercises and records', href: '/training'}` in `libs/shared/types/src/lib/portal.ts`; add `training` to `UpdateAccessDto` (same pattern as `forYou`) in `apps/api/src/access/access.module.ts`. Check `resolveFeatureAccess` in `libs/shared/domain/src/lib/portal.ts` gives internal/developer on, production off, and add a case for `training` to `libs/shared/domain/src/lib/portal.spec.ts`
+- [X] T002 [P] Make `training` never shareable: exclude it wherever `epam` is excluded in `libs/shared/domain/src/lib/social.ts` (widget key map, ordering, the shareable filter) and in `apps/api/src/social/shared-widgets.service.ts`; hide its audience control in `apps/web/src/components/portal-preferences.tsx`; add a test in `libs/shared/domain/src/lib/social.spec.ts`
+- [X] T003 [P] Vendor the catalogue: download `exercises.json` from yuhonas/free-exercise-db, keep **only** `id, name, force, level, mechanic, equipment, primaryMuscles, secondaryMuscles, category` per entry (drop `instructions` and `images`, research R1), write it to `apps/api/src/training/catalogue/free-exercise-db.json` with a top-level `{version: 1, source: 'free-exercise-db (Unlicense)', exercises: [...]}`
 
 ---
 
 ## Phase 2: Foundational (blocks every story)
 
-- [ ] T004 Create `libs/shared/types/src/lib/training.ts`: `MUSCLES`, `EQUIPMENT_TYPES`, `MEASURES`, `SET_TYPES`, `WEIGHT_UNITS`, `RECORD_KINDS` constants and types, and the response shapes from `contracts/api.md` (`Exercise`, `ExerciseListItem`, `Machine`, `TrainingProfile`, `SessionDetail`, `SessionListItem`, `SessionExercise`, `WorkoutSet`, `Estimate`, `RecordSet`, `ExerciseHistory`, `TrainingSummary`); export from the lib's `index.ts`
-- [ ] T005 Create `libs/shared/domain/src/lib/training.ts` with `setFieldsFor(measure)` (allowed/required fields per measure, data-model.md) and `catalogueMeasure(entry)` (dataset category/equipment → measure, research R2) and `normaliseSearch(text)` (lower-case, accents folded, punctuation removed); export from the lib's index
-- [ ] T006 [P] Tests for T005 in `libs/shared/domain/src/lib/training.spec.ts`: every measure's allowed/required set, each dataset category mapping including `body only` and `cardio`, normalisation of accents and punctuation
-- [ ] T007 Create the six schemas with the indexes in data-model.md in `apps/api/src/training/training.schemas.ts`: `Exercise`, `TrainingMachine`, `TrainingProfile`, `WorkoutSession` (partial unique `{userId}` where `status: 'open'`), `WorkoutExercise`, `WorkoutSet`; optional numbers without defaults; `image.key` excluded from `toJSON`
-- [ ] T008 Create `apps/api/src/training/catalogue.seeder.ts`: on `onModuleInit`, if the count of shared rows with `seedVersion === file.version` differs from the file's length, bulk-upsert by `seedKey = 'fedb:' + id` (name, aliases `[]`, muscles, `equipmentType` mapped to `EQUIPMENT_TYPES`, `measure` via `catalogueMeasure`, mechanic, level, `searchName`, `seedVersion`); never touch rows with a `userId`; log the counts. Spec in `apps/api/src/training/catalogue.seeder.spec.ts`: idempotent on a second run, user rows untouched
-- [ ] T009 Create `apps/api/src/training/catalogue.service.ts` with the read side used by every story: `list(userId, {q, muscle, equipment, limit, skip})` and `get(userId, id)` using the `$or` shared/own filter (data-model.md access rule), never extending `OwnedCrudService` (comment why)
-- [ ] T010 Create `apps/api/src/training/training.module.ts` (controller class with `@RequireModule('training')`, `@Controller('training')`, `Cache-Control: private, no-store` on every route, `GET /exercises` and `GET /exercises/:id`), `apps/api/src/training/training.dto.ts`, and import `TrainingModule` in `apps/api/src/app/app.module.ts`
-- [ ] T011 Add `TrainingProfile` read/upsert (`GET`/`PUT /profile`) in `apps/api/src/training/profile.service.ts`, seeding only fields the caller did not send (CLAUDE.md `$set`/`$setOnInsert` trap)
-- [ ] T012 [P] Add the web route shell `apps/web/src/app/training/page.tsx` with tabs Workout · History · Exercises and a `useTraining*` SWR hooks file `apps/web/src/lib/training.ts` (fetchers for the contract, `today`/`day` from `lib/local-day.ts`)
+- [X] T004 Create `libs/shared/types/src/lib/training.ts`: `MUSCLES`, `EQUIPMENT_TYPES`, `MEASURES`, `SET_TYPES`, `WEIGHT_UNITS`, `RECORD_KINDS` constants and types, and the response shapes from `contracts/api.md` (`Exercise`, `ExerciseListItem`, `Machine`, `TrainingProfile`, `SessionDetail`, `SessionListItem`, `SessionExercise`, `WorkoutSet`, `Estimate`, `RecordSet`, `ExerciseHistory`, `TrainingSummary`); export from the lib's `index.ts`
+- [X] T005 Create `libs/shared/domain/src/lib/training.ts` with `setFieldsFor(measure)` (allowed/required fields per measure, data-model.md) and `catalogueMeasure(entry)` (dataset category/equipment → measure, research R2) and `normaliseSearch(text)` (lower-case, accents folded, punctuation removed); export from the lib's index
+- [X] T006 [P] Tests for T005 in `libs/shared/domain/src/lib/training.spec.ts`: every measure's allowed/required set, each dataset category mapping including `body only` and `cardio`, normalisation of accents and punctuation
+- [X] T007 Create the six schemas with the indexes in data-model.md in `apps/api/src/training/training.schemas.ts`: `Exercise`, `TrainingMachine`, `TrainingProfile`, `WorkoutSession` (partial unique `{userId}` where `status: 'open'`), `WorkoutExercise`, `WorkoutSet`; optional numbers without defaults; `image.key` excluded from `toJSON`
+- [X] T008 Create `apps/api/src/training/catalogue.seeder.ts`: on `onModuleInit`, if the count of shared rows with `seedVersion === file.version` differs from the file's length, bulk-upsert by `seedKey = 'fedb:' + id` (name, aliases `[]`, muscles, `equipmentType` mapped to `EQUIPMENT_TYPES`, `measure` via `catalogueMeasure`, mechanic, level, `searchName`, `seedVersion`); never touch rows with a `userId`; log the counts. Spec in `apps/api/src/training/catalogue.seeder.spec.ts`: idempotent on a second run, user rows untouched
+- [X] T009 Create `apps/api/src/training/catalogue.service.ts` with the read side used by every story: `list(userId, {q, muscle, equipment, limit, skip})` and `get(userId, id)` using the `$or` shared/own filter (data-model.md access rule), never extending `OwnedCrudService` (comment why)
+- [X] T010 Create `apps/api/src/training/training.module.ts` (controller class with `@RequireModule('training')`, `@Controller('training')`, `Cache-Control: private, no-store` on every route, `GET /exercises` and `GET /exercises/:id`), `apps/api/src/training/training.dto.ts`, and import `TrainingModule` in `apps/api/src/app/app.module.ts`
+- [X] T011 Add `TrainingProfile` read/upsert (`GET`/`PUT /profile`) in `apps/api/src/training/profile.service.ts`, seeding only fields the caller did not send (CLAUDE.md `$set`/`$setOnInsert` trap)
+- [X] T012 [P] Add the web route shell `apps/web/src/app/training/page.tsx` with tabs Workout · History · Exercises and a `useTraining*` SWR hooks file `apps/web/src/lib/training.ts` (fetchers for the contract, `today`/`day` from `lib/local-day.ts`)
 
 **Checkpoint**: flag works, catalogue seeded and listable, `/training` renders.
 
@@ -54,18 +54,18 @@ built and tested without US2 (search ranking and private additions).
 
 ### Tests
 
-- [ ] T013 [P] [US1] Service spec `apps/api/src/training/sessions.service.spec.ts`: two concurrent `POST /sessions` give one open session (duplicate-key race answered with the existing row); a retried `requestId` for session/exercise/set returns the original; a set with a field its measure disallows is rejected; the snapshot is server-built and unchanged after renaming the exercise; PATCH cannot change `exerciseId`; finishing an empty session gives 409 `EMPTY_SESSION`; deleting a session deletes its exercises and sets; another user's ids answer 404
+- [X] T013 [P] [US1] Service spec `apps/api/src/training/sessions.service.spec.ts`: two concurrent `POST /sessions` give one open session (duplicate-key race answered with the existing row); a retried `requestId` for session/exercise/set returns the original; a set with a field its measure disallows is rejected; the snapshot is server-built and unchanged after renaming the exercise; PATCH cannot change `exerciseId`; finishing an empty session gives 409 `EMPTY_SESSION`; deleting a session deletes its exercises and sets; another user's ids answer 404
 
 ### Implementation
 
-- [ ] T014 [US1] Implement `apps/api/src/training/sessions.service.ts`: `start` (returns open session with `resumed: true`), `current`, `list` (cursor), `detail` (exercises in order with sets, `previous` sets of each exercise from the most recent earlier session, derived `durationSeconds`, `isStale` > 12 h since last activity), `update` (day, notes), `finish` (`now` | `lastSet`), `remove`
-- [ ] T015 [US1] In the same service: `addExercise` (builds `snapshot` from the exercise and optional machine, checks both are readable/owned), `updateExercise` (notes, machine → refresh machine name only), `reorderExercises` (full id array), `removeExercise`; `addSet`/`updateSet`/`removeSet` validated with `setFieldsFor(snapshot.measure)` and the bounds in data-model.md, `loggedAt` set by the server
-- [ ] T016 [US1] Wire the session routes from `contracts/api.md` in `apps/api/src/training/training.module.ts` with DTOs in `training.dto.ts` (no snapshot or `exerciseId` fields on PATCH DTOs)
-- [ ] T017 [P] [US1] Client retry queue `apps/web/src/lib/training-queue.ts`: writes keyed by `requestId`, optimistic rows, retried on `online`/focus, never duplicated
-- [ ] T018 [US1] `apps/web/src/components/training/workout-session.tsx`: start/resume, stale-session prompt (finish at last set / discard), add exercise via a basic picker over `GET /exercises`, reorder, notes, finish (empty → offer discard), using the queue
-- [ ] T019 [P] [US1] `apps/web/src/components/training/set-row.tsx`: fields from `setFieldsFor(measure)`, pre-filled from the last set (or `previous`), `Input` with `inputMode="decimal"` for weights and `numeric` for reps, set type and RPE selectors, previous result shown alongside
-- [ ] T020 [P] [US1] Rest timer in `apps/web/src/components/training/rest-timer.tsx`: counts from the last set's `loggedAt` using `defaultRestSeconds`; client-only
-- [ ] T021 [US1] History tab list of past sessions with a session view (read and edit) in `apps/web/src/app/training/page.tsx`
+- [X] T014 [US1] Implement `apps/api/src/training/sessions.service.ts`: `start` (returns open session with `resumed: true`), `current`, `list` (cursor), `detail` (exercises in order with sets, `previous` sets of each exercise from the most recent earlier session, derived `durationSeconds`, `isStale` > 12 h since last activity), `update` (day, notes), `finish` (`now` | `lastSet`), `remove`
+- [X] T015 [US1] In the same service: `addExercise` (builds `snapshot` from the exercise and optional machine, checks both are readable/owned), `updateExercise` (notes, machine → refresh machine name only), `reorderExercises` (full id array), `removeExercise`; `addSet`/`updateSet`/`removeSet` validated with `setFieldsFor(snapshot.measure)` and the bounds in data-model.md, `loggedAt` set by the server
+- [X] T016 [US1] Wire the session routes from `contracts/api.md` in `apps/api/src/training/training.module.ts` with DTOs in `training.dto.ts` (no snapshot or `exerciseId` fields on PATCH DTOs)
+- [X] T017 [P] [US1] Client retry queue `apps/web/src/lib/training-queue.ts`: writes keyed by `requestId`, optimistic rows, retried on `online`/focus, never duplicated
+- [X] T018 [US1] `apps/web/src/components/training/workout-session.tsx`: start/resume, stale-session prompt (finish at last set / discard), add exercise via a basic picker over `GET /exercises`, reorder, notes, finish (empty → offer discard), using the queue
+- [X] T019 [P] [US1] `apps/web/src/components/training/set-row.tsx`: fields from `setFieldsFor(measure)`, pre-filled from the last set (or `previous`), `Input` with `inputMode="decimal"` for weights and `numeric` for reps, set type and RPE selectors, previous result shown alongside
+- [X] T020 [P] [US1] Rest timer in `apps/web/src/components/training/rest-timer.tsx`: counts from the last set's `loggedAt` using `defaultRestSeconds`; client-only
+- [X] T021 [US1] History tab list of past sessions with a session view (read and edit) in `apps/web/src/app/training/page.tsx`
 
 **Checkpoint**: a full workout can be logged, reloaded, resumed, finished and edited.
 
@@ -150,6 +150,14 @@ built and tested without US2 (search ranking and private additions).
 - [ ] T044 Run every scenario in `specs/020-training-logging/quickstart.md` against a local Mongo and the dev servers, on a phone-width viewport; confirm Food's targets are unchanged (SC-006) and fix what fails
 
 ---
+
+## Progress
+
+- 2026-11-12: MVP done (T001–T021), with `npm run check` passing and the API and UI checked
+  against a local Mongo. Differences from the task text: T008's seeder spec is in
+  `catalogue.seeder.spec.ts` with a `CatalogueService` list test; API specs run on
+  `fake-model.testing.ts` (no in-memory Mongo in the repo); the Home card (US4) is not built, so
+  `/training` is reached from Menu.
 
 ## Dependencies and execution order
 

@@ -7,6 +7,7 @@ import { ArrowDown, ArrowUp, Check, ShieldCheck } from 'lucide-react';
 import {
   SETUP_STEPS,
   MODULES,
+  isShareableModule,
   type Audience,
   type ModuleId,
   type PortalPreferences,
@@ -41,6 +42,7 @@ const CARD_ID: Record<ModuleId, string> = {
   personal: 'personal',
   projects: 'projects',
   epam: 'board:epam',
+  training: 'training',
 };
 const STEPS = [
   'Your modules',
@@ -267,7 +269,7 @@ function PreferencesEditor({
                       }}
                     >
                       <option value="private">Only me</option>
-                      {module.id !== 'epam' && (
+                      {isShareableModule(module.id) && (
                         <>
                           <option value="friends">Friends</option>
                           <option value="public">

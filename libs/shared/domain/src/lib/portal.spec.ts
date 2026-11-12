@@ -20,12 +20,19 @@ describe('portal policy', () => {
   it('allows internal general modules but reserves EPAM for the developer', () => {
     const access = resolveFeatureAccess('internal', { epam: true });
     expect(access.epam).toBe(false);
-    expect(MODULE_IDS.filter((id) => access[id])).toHaveLength(7);
+    expect(MODULE_IDS.filter((id) => access[id])).toHaveLength(8);
     expect(
       Object.values(
         resolveFeatureAccess('developer', { nutrition: false }),
       ).every(Boolean),
     ).toBe(true);
+  });
+  it('releases training to internal and developer accounts only (spec 020)', () => {
+    expect(resolveFeatureAccess('production').training).toBe(false);
+    expect(resolveFeatureAccess('internal').training).toBe(true);
+    expect(resolveFeatureAccess('developer').training).toBe(true);
+    expect(resolveFeatureAccess('production', { training: true }).training).toBe(true);
+    expect(moduleForPath('/training')).toBe('training');
   });
   it('applies explicit false overrides and never adds new flags to a saved selection', () => {
     const access = resolveFeatureAccess('production', {
