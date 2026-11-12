@@ -1383,6 +1383,18 @@ evaluation" marker is needed.
   had only `@Prop`s and `SchemaFactory.createForClass`; Mongo then stored every workout as `{}`
   while every unit test (on the in-memory fake) passed. Found by running the app. A string-union
   field also needs an explicit `type: String`, or the API refuses to boot.
+- **Own plans are replaced whole (`PUT`), last write wins.** One person edits a plan, usually on
+  one device; a patch language for nested lists (move, insert, remove) would be most of the code
+  for no gain. What must not be lost is identity, so a sent `id` is kept and an `id` the plan does
+  not have is refused (400) rather than trusted: a client cannot invent ids that sessions point at.
+- **A copy is unlinked.** `copiedFrom {planId, name}` is a label for "Based on", never followed:
+  updates to a ready-made plan do not flow into copies, and deleting the original changes nothing.
+- **Progress and "next" are computed on read from sessions** (principle III). Storing a
+  "current workout" pointer would have to be repaired on every session delete and edit; reading
+  the sessions that carry `plan` needs one indexed query, and a deleted session just stops
+  counting. An open session counts as done, so the next suggestion moves on as soon as you start.
+- **An own exercise a plan uses is archived, not deleted**, as one a workout used already was, so
+  a plan never names something that no longer exists.
 
 ## 2026-11-12: The badge notification is the one a person sends themself
 

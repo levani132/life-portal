@@ -115,14 +115,42 @@ plan) is testable without US2 (own plans) or US3 (progress).
 
 ## Phase 6: Polish and cross-cutting
 
-- [ ] T031 [P] Update `docs/modules/training.md`: the `training_plans` schema and indexes, the `plan`/`planned`/`skipped` session fields, the plan endpoints and swap, the pure functions and their rules (positional consumption, pre-fill, next wraps), the seeder and its catalogue check, and that shared plans bypass `OwnedCrudService` like the catalogue
-- [ ] T032 [P] Append to `docs/DECISIONS.md` (suggestions copied at start as a third snapshot; positional consumption instead of a per-set link; whole-plan PUT with stable ids), to `docs/CHANGELOG.md` (workout plans), and mark phase 2 built in `docs/ROADMAP.md`; extend the CLAUDE.md workout-exercise "trip you up" line with `planned` (server-built, never from a request, never refreshed)
-- [ ] T033 Run `npm run check` and `npm run build`; fix what fails
-- [ ] T034 Run every scenario in `specs/023-training-plans/quickstart.md` against a local Mongo and the dev servers at phone width; confirm Food unchanged (SC-007) and an empty start still one tap (SC-006); record results under a Progress section in this file
+- [X] T031 [P] Update `docs/modules/training.md`: the `training_plans` schema and indexes, the `plan`/`planned`/`skipped` session fields, the plan endpoints and swap, the pure functions and their rules (positional consumption, pre-fill, next wraps), the seeder and its catalogue check, and that shared plans bypass `OwnedCrudService` like the catalogue
+- [X] T032 [P] Append to `docs/DECISIONS.md` (suggestions copied at start as a third snapshot; positional consumption instead of a per-set link; whole-plan PUT with stable ids), to `docs/CHANGELOG.md` (workout plans), and mark phase 2 built in `docs/ROADMAP.md`; extend the CLAUDE.md workout-exercise "trip you up" line with `planned` (server-built, never from a request, never refreshed)
+- [X] T033 Run `npm run check` and `npm run build`; fix what fails
+- [X] T034 Run every scenario in `specs/023-training-plans/quickstart.md` against a local Mongo and the dev servers at phone width; confirm Food unchanged (SC-007) and an empty start still one tap (SC-006); record results under a Progress section in this file
 
 ---
 
 ## Progress
+
+- 2026-11-12: Polish done (T031–T034). Spec 023 is complete.
+  - T031/T032: `docs/modules/training.md` already covered the schema, session fields, endpoints,
+    swap, pure functions and seeder as each story landed; `docs/DECISIONS.md` gained the
+    whole-plan `PUT`, unlinked copies, progress on read and archiving rules; the roadmap marks
+    phase 2 complete; CHANGELOG and CLAUDE.md were updated with US1–US3.
+  - T033: `npm run check` (951 tests) and `npm run build` pass.
+  - T034, every quickstart scenario against a fresh local Mongo, through the API (the screens were
+    checked at phone width as each story landed):
+    1. Four ready-made plans (2/2/3/1 workouts), none skipped; still 4 after an API restart.
+    2. Push starts as "Push · Push / Pull / Legs" with 5 exercises; bench 4 sets, rest 2:30.
+    3. The second Push pre-fills bench from last time (60 kg × 6).
+    4. With one set logged the summary counts one workout; finishing keeps only bench.
+    5. Skip clears suggestions and un-skip restores 3; the swap keeps position 2 and 3 targets;
+       swapping bench after a set → 409 `HAS_SETS`; Plank added by hand has no plan.
+    6. Starting Legs with Push open resumes Push.
+    7. Editing and deleting a copy left its open session's names and suggestions identical; History
+       keeps "Push / Pull / Legs (copy)".
+    8. "My split" 3 × 5 with an own exercise, a time target and a 10–12 range; reordering
+       persisted; 12–10 → 400 naming the range; deleting the own exercise archived it and the plan
+       still shows it.
+    9. Push done → Pull next; after Legs, next wraps to Push; the plan is suggested; deleting
+       Legs makes Legs next again.
+    10. An empty start has no plan and no exercises; adding works.
+    11. Food's profile and day summary are identical around a plan workout, apart from
+        `profile.updatedAt`, which changes on every read of the profile whether or not anyone
+        trains (it is upserted on read; not training's doing).
+    12. With `training` off for the account, `/training/plans` and `/plans/suggested` → 403.
 
 - 2026-11-12: US3 done (T027–T030); `npm run check` passes (951 tests), and scenario 9 was run
   against a local Mongo with the web at phone width. Differences from the task text:
