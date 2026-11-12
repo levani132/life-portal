@@ -11,6 +11,7 @@ import {
   describeOneRepMax,
   formatRecordValue,
   formatWeight,
+  useWeightUnit,
 } from '../../lib/training';
 import { SetLine } from './set-row';
 
@@ -21,6 +22,7 @@ import { SetLine } from './set-row';
 export function ExerciseHistory({ exerciseId }: { exerciseId: string }) {
   const [cursors, setCursors] = useState<(string | undefined)[]>([undefined]);
   const first = useApi<History>(`/training/exercises/${exerciseId}/history`);
+  const unit = useWeightUnit();
   if (first.error) return <ErrorNote message={(first.error as Error).message} />;
   if (!first.data) return <Spinner />;
   const { records, exercise } = first.data;
@@ -35,7 +37,7 @@ export function ExerciseHistory({ exerciseId }: { exerciseId: string }) {
               <div key={record.kind} className="contents">
                 <dt className="text-ink-faint">{RECORD_LABELS[record.kind]}</dt>
                 <dd className="min-w-0">
-                  <span className="font-medium tabular-nums">{formatRecordValue(record)}</span>
+                  <span className="font-medium tabular-nums">{formatRecordValue(record, unit)}</span>
                   <span className="ml-2 text-xs text-ink-faint">
                     {[formatDay(record.day), record.kind === 'best_1rm' ? 'Epley estimate' : '', bodyWeightNote(record.bodyWeightDay)]
                       .filter(Boolean)
@@ -74,6 +76,7 @@ function HistoryPage({
   isLast: boolean;
   onMore: (cursor: string) => void;
 }) {
+  const unit = useWeightUnit();
   const { data, error } = useApi<History>(
     `/training/exercises/${exerciseId}/history${cursor ? `?before=${encodeURIComponent(cursor)}` : ''}`,
   );
@@ -82,14 +85,14 @@ function HistoryPage({
   return (
     <>
       {data.sessions.map((session) => {
-        const estimate = session.oneRepMax && describeOneRepMax(session.oneRepMax);
+        const estimate = session.oneRepMax && describeOneRepMax(session.oneRepMax, unit);
         let working = 0;
         return (
           <section key={session.sessionId} className="rounded-xl border border-border p-3">
             <header className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
               <span className="font-medium">{formatDay(session.day)}</span>
               {session.volumeGrams !== undefined && (
-                <span className="text-xs text-ink-faint">Volume {formatWeight(session.volumeGrams)}</span>
+                <span className="text-xs text-ink-faint">Volume {formatWeight(session.volumeGrams, unit)}</span>
               )}
             </header>
             {session.sets.map((set) => (

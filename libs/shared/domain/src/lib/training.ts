@@ -482,7 +482,7 @@ export function weekSummary(input: {
   sessions: readonly { id: string; day: string; status: 'open' | 'finished'; durationSeconds: number }[];
   records: readonly (RecordEntry & { exerciseName: string })[];
   today: string;
-}): TrainingSummary {
+}): Omit<TrainingSummary, 'weightUnit'> {
   const monday = addDays(input.today, -((weekdayOf(input.today) + 6) % 7));
   const past = input.sessions.filter((session) => session.day <= input.today);
   const week = past.filter((session) => session.day >= monday);

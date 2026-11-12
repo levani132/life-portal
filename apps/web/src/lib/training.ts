@@ -1,7 +1,14 @@
 'use client';
 
 import { mutate } from 'swr';
-import { formatDay, formatDistance, formatDuration, formatWeight } from '@life-portal/shared-domain';
+import {
+  displayToGrams,
+  formatDay,
+  formatDistance,
+  formatDuration,
+  formatWeight,
+  gramsToDisplay,
+} from '@life-portal/shared-domain';
 import type {
   Measure,
   OneRepMaxEstimate,
@@ -9,6 +16,7 @@ import type {
   SetType,
   SetValues,
   TrainingProfile,
+  WeightUnit,
   WorkoutSet,
 } from '@life-portal/shared-types';
 import { useApi } from './hooks';
@@ -28,9 +36,16 @@ export function revalidateTraining(): Promise<unknown> {
   return mutate((key) => typeof key === 'string' && key.startsWith('/training'));
 }
 
-export function useTrainingProfile(): TrainingProfile {
-  const { data } = useApi<TrainingProfile>('/training/profile');
-  return data ?? { weightUnit: 'kg', defaultRestSeconds: 90 };
+export const PROFILE_KEY = '/training/profile';
+
+export function useTrainingProfile(): TrainingProfile & { loaded: boolean } {
+  const { data } = useApi<TrainingProfile>(PROFILE_KEY);
+  return { ...(data ?? { weightUnit: 'kg', defaultRestSeconds: 90 }), loaded: !!data };
+}
+
+/** The person's display unit (spec 020 US5). Display and input only; stored weights are grams. */
+export function useWeightUnit(): WeightUnit {
+  return useTrainingProfile().weightUnit;
 }
 
 /**
@@ -63,17 +78,18 @@ export {
 } from '@life-portal/shared-domain';
 
 /** A set in one line, e.g. `80 kg × 8`, `+10 kg × 12`, `−20 kg × 8`, `2 km in 9:30`. */
-export function describeSet(set: SetValues, measure: Measure): string {
+export function describeSet(set: SetValues, measure: Measure, unit: WeightUnit = 'kg'): string {
+  const w = (grams: number) => formatWeight(grams, unit);
   switch (measure) {
     case 'weight_reps':
-      return `${formatWeight(set.weightGrams ?? 0)} × ${set.reps ?? 0}`;
+      return `${w(set.weightGrams ?? 0)} × ${set.reps ?? 0}`;
     case 'bodyweight_reps':
-      return set.weightGrams ? `+${formatWeight(set.weightGrams)} × ${set.reps}` : `${set.reps} reps`;
+      return set.weightGrams ? `+${w(set.weightGrams)} × ${set.reps}` : `${set.reps} reps`;
     case 'assisted_reps':
-      return `−${formatWeight(set.assistGrams ?? 0)} × ${set.reps ?? 0}`;
+      return `−${w(set.assistGrams ?? 0)} × ${set.reps ?? 0}`;
     case 'duration':
       return set.weightGrams
-        ? `${formatDuration(set.durationSeconds ?? 0)} with ${formatWeight(set.weightGrams)}`
+        ? `${formatDuration(set.durationSeconds ?? 0)} with ${w(set.weightGrams)}`
         : formatDuration(set.durationSeconds ?? 0);
     case 'distance_duration':
       return `${formatDistance(set.distanceMeters ?? 0)} in ${formatDuration(set.durationSeconds ?? 0)}`;
@@ -89,12 +105,15 @@ export function bodyWeightNote(day: string | undefined): string {
  * An estimate is never shown without its basis (principle 6):
  * `est. 1RM 116.67 kg`, and `Epley, from 100 kg × 5`.
  */
-export function describeOneRepMax(estimate: OneRepMaxEstimate): { value: string; basis: string } {
+export function describeOneRepMax(
+  estimate: OneRepMaxEstimate,
+  unit: WeightUnit = 'kg',
+): { value: string; basis: string } {
   const { basis } = estimate;
   const note = bodyWeightNote(basis.bodyWeightDay);
   return {
-    value: `est. 1RM ${formatWeight(estimate.valueGrams)}`,
-    basis: `Epley, from ${formatWeight(basis.weightGrams)} × ${basis.reps}${note ? `; ${note}` : ''}`,
+    value: `est. 1RM ${formatWeight(estimate.valueGrams, unit)}`,
+    basis: `Epley, from ${formatWeight(basis.weightGrams, unit)} × ${basis.reps}${note ? `; ${note}` : ''}`,
   };
 }
 
@@ -127,11 +146,14 @@ export function humanise(value: string): string {
 
 // ------------------------------------------------------------------ input parsing
 
-/** `'80'`/`'80.5'` kg → whole grams, or `undefined` for an empty or unreadable field. */
-export function parseKg(text: string): number | undefined {
+/**
+ * `'80'`/`'80.5'` in the person's unit → whole grams, converted once, or `undefined` for an empty
+ * or unreadable field.
+ */
+export function parseWeight(text: string, unit: WeightUnit = 'kg'): number | undefined {
   if (!text.trim()) return undefined;
   const value = Number(text.replace(',', '.'));
-  return Number.isFinite(value) ? Math.round(value * 1000) : undefined;
+  return Number.isFinite(value) ? displayToGrams(value, unit) : undefined;
 }
 
 export function parseWhole(text: string): number | undefined {
@@ -149,14 +171,12 @@ export function parseDuration(text: string): number | undefined {
   return Math.round(parts.reduce((total, part) => total * 60 + part, 0));
 }
 
-const trim = (value: number, digits: number) => String(Number(value.toFixed(digits)));
-
 /** The text a field shows for a stored value, so a new set can start from the last one. */
-export function toFields(set: Partial<WorkoutSet> | undefined) {
+export function toFields(set: Partial<WorkoutSet> | undefined, unit: WeightUnit = 'kg') {
   return {
     reps: set?.reps !== undefined ? String(set.reps) : '',
-    weight: set?.weightGrams !== undefined ? trim(set.weightGrams / 1000, 2) : '',
-    assist: set?.assistGrams !== undefined ? trim(set.assistGrams / 1000, 2) : '',
+    weight: set?.weightGrams !== undefined ? String(gramsToDisplay(set.weightGrams, unit)) : '',
+    assist: set?.assistGrams !== undefined ? String(gramsToDisplay(set.assistGrams, unit)) : '',
     duration: set?.durationSeconds !== undefined ? formatDuration(set.durationSeconds) : '',
     distance: set?.distanceMeters !== undefined ? String(set.distanceMeters) : '',
   };

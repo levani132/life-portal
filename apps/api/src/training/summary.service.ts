@@ -9,6 +9,7 @@ import {
   sessionDurationSeconds,
   weekSummary,
 } from '@life-portal/shared-domain';
+import { TrainingProfileService } from './profile.service';
 import { ProgressService } from './progress.service';
 import { WorkoutExercise, WorkoutSession, WorkoutSet } from './training.schemas';
 
@@ -29,15 +30,17 @@ export class TrainingSummaryService {
     @InjectModel(WorkoutExercise.name) private readonly workoutExercises: Model<WorkoutExercise>,
     @InjectModel(WorkoutSet.name) private readonly sets: Model<WorkoutSet>,
     private readonly progress: ProgressService,
+    private readonly profiles: TrainingProfileService,
   ) {}
 
   async summary(userId: string, today: string): Promise<TrainingSummary> {
     // 14 days covers this week (at most 7) and the record window.
     const since = addDays(today, -(RECENT_RECORD_DAYS - 1));
-    const [recent, last, open] = await Promise.all([
+    const [recent, last, open, profile] = await Promise.all([
       this.sessions.find({ userId, day: { $gte: since } }).lean<SessionRow[]>(),
       this.sessions.findOne({ userId, day: { $lte: today } }).sort({ day: -1, startedAt: -1 }).lean<SessionRow>(),
       this.sessions.findOne({ userId, status: 'open' }).lean<SessionRow>(),
+      this.profiles.read(userId),
     ]);
     const byId = new Map<string, SessionRow>();
     for (const row of [...recent, last, open]) if (row) byId.set(String(row._id), row);
@@ -69,7 +72,8 @@ export class TrainingSummaryService {
         }),
       };
     });
-    return weekSummary({ sessions, records: await this.recentRecords(userId, exerciseRows, since, today), today });
+    const records = await this.recentRecords(userId, exerciseRows, since, today);
+    return { ...weekSummary({ sessions, records, today }), weightUnit: profile.weightUnit };
   }
 
   /**

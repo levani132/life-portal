@@ -220,6 +220,8 @@ export interface TrainingSummary {
   latestRecord?: RecordEntry & { exerciseName: string };
   /** Days since the last workout's day, when there is no recent record. */
   daysSinceLast?: number;
+  /** The person's display unit, so the server-built card shows a record as the page would. */
+  weightUnit: WeightUnit;
   /** The open workout, if one is in progress: the card then offers Resume. */
   openSessionId?: string;
 }
@@ -243,6 +245,12 @@ export interface WorkoutSet extends SetValues {
   loggedAt: string;
   /** Records this set set when it was done (computed on read; empty or absent for most sets). */
   records?: RecordKind[];
+  /**
+   * Bodyweight and assisted sets only: the load the set moved, body weight from the weigh-in on
+   * or before the session's day (± added load or assistance). Absent without a weigh-in: no load
+   * is invented (FR-020). Computed on read, never stored.
+   */
+  effectiveLoad?: { grams: number; bodyWeightDay: string };
 }
 
 export interface SessionExercise {

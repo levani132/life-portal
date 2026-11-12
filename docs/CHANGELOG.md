@@ -2,6 +2,15 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-12: Training in pounds, and loads from your weigh-ins
+
+- **kg or lb.** The gear on Training sets your weight unit (and the default rest). Every weight
+  is shown and typed in it; switching shows the same lifts converted and changes nothing you
+  logged.
+- **Bodyweight and assisted sets show the load they moved**, e.g. "85 kg load · from weigh-in
+  1 Nov", using your weigh-in from Food on or before that day. Without a weigh-in you see your
+  reps and nothing made up.
+
 ## 2026-11-12: Training on Home
 
 - **A Training card on Home**: workouts and time this week, then your newest personal record from

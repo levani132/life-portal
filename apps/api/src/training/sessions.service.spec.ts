@@ -324,6 +324,23 @@ describe('ProgressService: records and history', () => {
     const history = await f.progress.history(ME, f.pullUp);
     expect(history.sessions[0].volumeGrams).toBe(90_000 * 6);
     expect(history.sessions[0].oneRepMax?.basis).toMatchObject({ weightGrams: 90_000, bodyWeightDay: '2026-11-01' });
+    expect(history.sessions[0].sets[0].effectiveLoad).toEqual({ grams: 90_000, bodyWeightDay: '2026-11-01' });
+  });
+
+  it('labels a set’s effective load with its weigh-in, and invents none without one (US5)', async () => {
+    const f = fixture();
+    const session = await f.service.start(ME, { requestId: randomUUID(), day: '2026-11-12' }, T0);
+    const pull = await f.service.addExercise(ME, session.id, { requestId: randomUUID(), exerciseId: f.pullUp });
+    const bare = await f.service.addSet(ME, session.id, pull.id, { requestId: randomUUID(), reps: 6 }, T0);
+    expect(bare.set.effectiveLoad).toBeUndefined();
+    f.weighIns.push({ day: '2026-11-01', weightGrams: 80_000 });
+    const loaded = await f.service.addSet(ME, session.id, pull.id, { requestId: randomUUID(), reps: 6, weightGrams: 5_000 }, T0);
+    expect(loaded.set.effectiveLoad).toEqual({ grams: 85_000, bodyWeightDay: '2026-11-01' });
+    const bench = await f.service.addExercise(ME, session.id, { requestId: randomUUID(), exerciseId: f.bench });
+    const plain = await f.service.addSet(ME, session.id, bench.id, { requestId: randomUUID(), reps: 5, weightGrams: 60_000 }, T0);
+    expect(plain.set.effectiveLoad).toBeUndefined();
+    const detail = await f.service.detail(ME, session.id);
+    expect(detail.exercises[0].sets.map((set) => set.effectiveLoad?.grams)).toEqual([80_000, 85_000]);
   });
 
   it('pages history 20 sessions at a time and never shows another person’s sets', async () => {

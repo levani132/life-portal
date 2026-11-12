@@ -18,6 +18,15 @@ export class TrainingProfileService {
     @InjectModel(TrainingProfile.name) private readonly profiles: Model<TrainingProfile>,
   ) {}
 
+  /** The profile without creating a row, for reads elsewhere (the Home card). */
+  async read(userId: string): Promise<TrainingProfileDto> {
+    const row = await this.profiles.findOne({ userId }).lean();
+    return {
+      weightUnit: (row?.weightUnit ?? DEFAULTS.weightUnit) as WeightUnit,
+      defaultRestSeconds: row?.defaultRestSeconds ?? DEFAULTS.defaultRestSeconds,
+    };
+  }
+
   get(userId: string): Promise<TrainingProfileDto> {
     return this.upsert(userId, {});
   }

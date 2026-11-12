@@ -14,7 +14,7 @@ function fixture(selectedModules: string[]) {
   const nutrition = summary();
   const spending = summary();
   const training = summary();
-  training.summary.mockResolvedValue({ workoutsThisWeek: 2, secondsThisWeek: 5400, daysSinceLast: 1 });
+  training.summary.mockResolvedValue({ workoutsThisWeek: 2, secondsThisWeek: 5400, daysSinceLast: 1, weightUnit: 'kg' });
   nutrition.summary.mockResolvedValue({
     targetsAvailable: false,
     eatenKcal: 0,
@@ -103,11 +103,12 @@ describe('selected dashboard', () => {
     f.training.summary.mockResolvedValue({
       workoutsThisWeek: 1,
       secondsThisWeek: 600,
+      weightUnit: 'lb',
       openSessionId: 's1',
       latestRecord: { kind: 'heaviest', value: 100000, setId: 'x', sessionId: 's1', day: '2026-11-12', exerciseName: 'Bench press' },
     });
     const open = (await f.service.build('person', '2026-11-12')).cards.find((item) => item.id === 'training');
-    expect(open?.stats[2]).toMatchObject({ label: 'PR · Bench press', value: '100 kg' });
+    expect(open?.stats[2]).toMatchObject({ label: 'PR · Bench press', value: '220.46 lb' });
     expect(open?.quickAction?.kind).toBe('resume-workout');
   });
 });

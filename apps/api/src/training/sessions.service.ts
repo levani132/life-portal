@@ -382,13 +382,13 @@ export class SessionsService {
 
   /** A set response with the records it holds (computed on read, contract `{set, records}`). */
   private async withRecords(userId: string, parent: ExerciseRow, row: SetRow): Promise<SetResult> {
-    const records = await this.progress.recordsForSet(
+    const { records, effectiveLoad } = await this.progress.figuresForSet(
       userId,
       parent.exerciseId,
       parent.snapshot.measure as Measure,
       String(row._id),
     );
-    return { set: { ...toSet(row), records }, records };
+    return { set: { ...toSet(row), records, ...(effectiveLoad ? { effectiveLoad } : {}) }, records };
   }
 
   /**
@@ -495,7 +495,11 @@ export class SessionsService {
         );
         return {
           ...item,
-          sets: item.sets.map((set) => ({ ...set, records: own?.marks.get(set.id) ?? [] })),
+          sets: item.sets.map((set) => ({
+            ...set,
+            records: own?.marks.get(set.id) ?? [],
+            ...ProgressService.loadField(own, set.id),
+          })),
           previous: previous.get(exercise.exerciseId),
           oneRepMax: ProgressService.sessionOneRepMax(own, id),
         };

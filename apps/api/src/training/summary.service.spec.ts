@@ -5,6 +5,7 @@ import { FakeModel, fakeMedia } from './fake-model.testing';
 import { MachinesService } from './machines.service';
 import { ProgressService } from './progress.service';
 import { SessionsService } from './sessions.service';
+import { TrainingProfileService } from './profile.service';
 import { TrainingSummaryService } from './summary.service';
 
 const ME = 'user-me';
@@ -23,7 +24,14 @@ function fixture() {
   const nutrition = { weighInsUpTo: async () => [] };
   const progress = new ProgressService(sessions as never, workoutExercises as never, sets as never, catalogue, nutrition as never);
   const service = new SessionsService(sessions as never, workoutExercises as never, sets as never, catalogue, machines, progress);
-  const summary = new TrainingSummaryService(sessions as never, workoutExercises as never, sets as never, progress);
+  const profileRows = new FakeModel();
+  const summary = new TrainingSummaryService(
+    sessions as never,
+    workoutExercises as never,
+    sets as never,
+    progress,
+    new TrainingProfileService(profileRows as never),
+  );
   const bench = new Types.ObjectId();
   exercises.docs.push({
     _id: bench, name: 'Barbell Bench Press', searchName: 'barbell bench press', primaryMuscles: ['chest'], secondaryMuscles: [],
@@ -39,13 +47,20 @@ function fixture() {
     if (!open) await service.finish(ME, session.id, 'now', at(day, 18, 30));
     return session.id;
   };
-  return { summary, workout };
+  return { summary, workout, profileRows };
 }
 
 describe('TrainingSummaryService (spec 020 US4)', () => {
   it('is empty for someone who has never trained', async () => {
     const f = fixture();
-    expect(await f.summary.summary(ME, TODAY)).toEqual({ workoutsThisWeek: 0, secondsThisWeek: 0 });
+    expect(await f.summary.summary(ME, TODAY)).toEqual({ workoutsThisWeek: 0, secondsThisWeek: 0, weightUnit: 'kg' });
+    expect(f.profileRows.docs).toHaveLength(0); // reading the unit creates no profile
+  });
+
+  it('carries the person’s weight unit for the card', async () => {
+    const f = fixture();
+    f.profileRows.docs.push({ _id: new Types.ObjectId(), userId: ME, weightUnit: 'lb', defaultRestSeconds: 90 });
+    expect((await f.summary.summary(ME, TODAY)).weightUnit).toBe('lb');
   });
 
   it('counts this week only, and shows a record set in the last 14 days', async () => {

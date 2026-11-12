@@ -13,8 +13,8 @@ phases and must be computable from what this module records.
 **Status (2026-11-12):** built: the catalogue, workout logging and history (MVP, T001–T021), and
 search ranking, private exercises and machines (US2, T022–T028), and progress: per-exercise
 history, personal records and labelled 1RM estimates (US3, T029–T034), and the Home card (US4,
-T035–T037). Not built yet: kg/lb display and the "from weigh-in" label on bodyweight set rows
-(US5).
+T035–T037), and units and effective loads (US5, T038–T040). Phase 1 is complete apart from the
+polish tasks (T041–T044).
 
 ## Access
 
@@ -36,8 +36,12 @@ auto-selected; existing accounts add it from Manage modules.
 | RPE | 1–10 in half steps (a scale, not a quantity) | `rpe` |
 
 Optional numbers have **no default**: "no added weight" and "weight not recorded" are different
-facts. kg/lb is a display preference (`training_profiles.weightUnit`); nothing converted is
-stored. The web turns grams into "80 kg" in `apps/web/src/lib/training.ts` only.
+facts. kg/lb is a display preference (`training_profiles.weightUnit`, set from the gear on
+`/training`); nothing converted is stored. Conversion is `gramsToDisplay` / `displayToGrams` in
+`libs/shared/domain/src/lib/training-format.ts`: 1 lb = 453.59237 g exactly, a typed value is
+rounded to whole grams **once**, and display shows two decimals (225 lb → 102 058 g → "102.06 kg",
+and back to "225 lb"). Switching the unit rewrites nothing; a set form open during a switch
+re-fills its weights from grams so a kg number is never sent as lb.
 
 ## Collections
 
@@ -166,9 +170,9 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `POST` | `/sessions/:id/exercises` `{requestId, exerciseId, machineId?}` | Builds the snapshot, with the machine's name and brand. |
 | `POST` | `/sessions/:id/exercises/order` `{ids}` | The complete id array. |
 | `PATCH`/`DELETE` | `/sessions/:id/exercises/:weId` | `{notes?, machineId?}` (`null` clears the machine); delete removes its sets. |
-| `POST` | `/sessions/:id/exercises/:weId/sets` | Validated against the snapshot's measure. Returns `{set, records}`. |
+| `POST` | `/sessions/:id/exercises/:weId/sets` | Validated against the snapshot's measure. Returns `{set, records}`; bodyweight and assisted sets carry `effectiveLoad` when a weigh-in exists. |
 | `PATCH`/`DELETE` | `/sets/:setId` | `null` clears an optional field. PATCH returns `{set, records}`. |
-| `GET` | `/summary?today=` | The Home card's figures (`TrainingSummary`); also in `GET /api/dashboard`. |
+| `GET` | `/summary?today=` | The Home card's figures (`TrainingSummary`, with `weightUnit`, read without creating a profile); also in `GET /api/dashboard`. |
 
 ## Derived values (computed on read, never stored)
 
@@ -210,6 +214,10 @@ Nothing is stored, so correcting or deleting a set moves every figure at once.
     heavier**: 10 × 80 kg after 8 × 80 kg is a record even if 12 × 60 kg came before. The
     current best of that kind is simply the most reps in one set, with its load.
   - **Current bests** (`records` in history) are over every set ever, the earliest on a tie.
+- **Effective load on a set** (`WorkoutSet.effectiveLoad`, US5): bodyweight and assisted sets
+  in a session detail, a set response and history carry `{grams, bodyWeightDay}`, shown as
+  "85 kg load · from weigh-in 1 Nov". Without a weigh-in on or before the day it is absent and
+  only the reps show. Weight × reps sets never carry it (their load is their weight).
 - **Session figures**: `bestSetOf` (highest 1RM, else load, reps, distance, time) and
   `sessionVolumeGrams`; `SessionExercise.oneRepMax` is the best estimate in that session.
 

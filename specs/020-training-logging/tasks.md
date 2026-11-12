@@ -136,9 +136,9 @@ built and tested without US2 (search ranking and private additions).
 
 **Independent test**: quickstart scenarios 5 and 6.
 
-- [ ] T038 [P] [US5] `gramsToDisplay`/`displayToGrams` in `libs/shared/domain/src/lib/training.ts` (1 lb = 453.59237 g, rounded once) with tests (225 lb → 102 058 g → 102.1 kg)
-- [ ] T039 [US5] Units setting (kg/lb, default rest) on the training page, using `PUT /profile`; every weight input and display in `set-row.tsx`, `exercise-history.tsx` and `training-card.tsx` goes through the conversion
-- [ ] T040 [US5] Bodyweight and assisted sets show the effective load labelled "from weigh-in <day>", and nothing load-based without a weigh-in, in `set-row.tsx` and `exercise-history.tsx`
+- [X] T038 [P] [US5] `gramsToDisplay`/`displayToGrams` in `libs/shared/domain/src/lib/training.ts` (1 lb = 453.59237 g, rounded once) with tests (225 lb → 102 058 g → 102.1 kg)
+- [X] T039 [US5] Units setting (kg/lb, default rest) on the training page, using `PUT /profile`; every weight input and display in `set-row.tsx`, `exercise-history.tsx` and `training-card.tsx` goes through the conversion
+- [X] T040 [US5] Bodyweight and assisted sets show the effective load labelled "from weigh-in <day>", and nothing load-based without a weigh-in, in `set-row.tsx` and `exercise-history.tsx`
 
 ---
 
@@ -177,6 +177,12 @@ built and tested without US2 (search ranking and private additions).
   `HomeWidget` (dumbbell icon, play-icon action); Menu already listed Training. The record
   formatters moved to `libs/shared/domain/src/lib/training-format.ts` so the server-built card
   matches the page.
+- 2026-11-12: US5 done (T038–T040). Differences from the task text: the conversion lives in
+  `training-format.ts` (with the other display functions), not `training.ts`; display shows two
+  decimals, so 102 058 g reads "102.06 kg" rather than "102.1 kg" (1.25 kg plates need the
+  second decimal); the units setting is a gear on `/training` that also holds the default rest;
+  the effective load is computed by the API (`WorkoutSet.effectiveLoad`) because only it reads
+  weigh-ins; the Home card is server-built, so `TrainingSummary` carries `weightUnit`.
 
 ## Dependencies and execution order
 

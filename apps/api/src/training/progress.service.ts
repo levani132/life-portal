@@ -13,6 +13,7 @@ import {
   bestOneRepMax,
   bestSetOf,
   bodyWeightOn,
+  effectiveLoadGrams,
   personalRecords,
   sessionVolumeGrams,
   type BodyWeight,
@@ -24,6 +25,7 @@ import { toSet, type SetRow } from './set-row';
 import { WorkoutExercise, WorkoutSession, WorkoutSet } from './training.schemas';
 
 type SessionRow = WorkoutSession & { _id: unknown };
+type SetLoad = { grams: number; bodyWeightDay: string };
 type ExerciseRow = WorkoutExercise & { _id: unknown };
 
 /** History pages: 20 sessions. */
@@ -36,6 +38,7 @@ export interface ExerciseProgress {
   measure: Measure;
   /** In done order: session day, session start, set order. */
   sets: ProgressSet[];
+  byId: Map<string, ProgressSet>;
   rows: Map<string, SetRow>;
   sessions: Map<string, { day: string; startedAt: Date }>;
   marks: Map<string, RecordKind[]>;
@@ -124,6 +127,7 @@ export class ProgressService {
       result.set(`${exerciseId}:${measure}`, {
         measure,
         sets,
+        byId: new Map(sets.map((set) => [set.id, set])),
         rows: new Map(mine.map(({ row }) => [String(row._id), row])),
         sessions,
         marks: personalRecords(measure, sets).marks,
@@ -132,10 +136,26 @@ export class ProgressService {
     return result;
   }
 
-  /** The record kinds one set holds, for a set create or update response. */
-  async recordsForSet(userId: string, exerciseId: string, measure: Measure, setId: string): Promise<RecordKind[]> {
+  /** The record kinds one set holds and its effective load, for a set create or update response. */
+  async figuresForSet(
+    userId: string,
+    exerciseId: string,
+    measure: Measure,
+    setId: string,
+  ): Promise<{ records: RecordKind[]; effectiveLoad?: SetLoad }> {
     const progress = (await this.load(userId, [{ exerciseId, measure }])).get(`${exerciseId}:${measure}`);
-    return progress?.marks.get(setId) ?? [];
+    return { records: progress?.marks.get(setId) ?? [], ...ProgressService.loadField(progress, setId) };
+  }
+
+  /**
+   * `{effectiveLoad}` for a bodyweight or assisted set with a weigh-in on or before its day, else
+   * `{}`: a plain weight × reps set's load is its weight, and without a weigh-in there is none.
+   */
+  static loadField(progress: ExerciseProgress | undefined, setId: string): { effectiveLoad?: SetLoad } {
+    if (!progress || !NEEDS_BODY_WEIGHT.has(progress.measure)) return {};
+    const set = progress.byId.get(setId);
+    const load = set && effectiveLoadGrams(progress.measure, set, set.body);
+    return load?.bodyWeightDay ? { effectiveLoad: { grams: load.grams, bodyWeightDay: load.bodyWeightDay } } : {};
   }
 
   /** The best estimate among one session's sets of an exercise. */
@@ -175,7 +195,9 @@ export class ProgressService {
       day: group.day,
       sets: group.sets.flatMap((set) => {
         const row = progress?.rows.get(set.id);
-        return row ? [{ ...toSet(row), records: progress?.marks.get(set.id) ?? [] }] : [];
+        return row
+          ? [{ ...toSet(row), records: progress?.marks.get(set.id) ?? [], ...ProgressService.loadField(progress, set.id) }]
+          : [];
       }),
       bestSetId: bestSetOf(measure, group.sets),
       volumeGrams: sessionVolumeGrams(measure, group.sets),

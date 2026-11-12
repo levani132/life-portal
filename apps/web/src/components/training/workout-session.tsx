@@ -19,6 +19,7 @@ import {
   revalidateTraining,
   useCurrentSession,
   useTrainingProfile,
+  useWeightUnit,
   useWorkoutDay,
 } from '../../lib/training';
 import { clearQueueError, enqueue, useTrainingQueue } from '../../lib/training-queue';
@@ -302,7 +303,8 @@ function ExerciseBlock({
   const [editing, setEditing] = useState<WorkoutSet | null>(null);
   const [choosingMachine, setChoosingMachine] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const estimate = exercise.oneRepMax && describeOneRepMax(exercise.oneRepMax);
+  const unit = useWeightUnit();
+  const estimate = exercise.oneRepMax && describeOneRepMax(exercise.oneRepMax, unit);
   const [machineError, setMachineError] = useState<string | null>(null);
   const machineLabel = [exercise.snapshot.machineName, exercise.snapshot.machineBrand].filter(Boolean).join(' · ');
 
@@ -381,7 +383,7 @@ function ExerciseBlock({
       {exercise.previous && (
         <p className="mb-2 text-xs text-ink-faint">
           Last time ({formatDay(exercise.previous.day)}):{' '}
-          {exercise.previous.sets.map((set) => describeSet(set, measure)).join(', ')}
+          {exercise.previous.sets.map((set) => describeSet(set, measure, unit)).join(', ')}
         </p>
       )}
       <div className="mb-3">

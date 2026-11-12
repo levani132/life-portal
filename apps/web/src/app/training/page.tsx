@@ -7,6 +7,7 @@ import type { SessionDetail, SessionListItem, SessionPage } from '@life-portal/s
 import { formatDay } from '@life-portal/shared-domain';
 import { AppShell, PageHeader } from '../../components/app-shell';
 import { ExerciseLibrary } from '../../components/training/exercise-library';
+import { TrainingSettings } from '../../components/training/training-settings';
 import { CurrentWorkout, WorkoutSession } from '../../components/training/workout-session';
 import { EmptyState, ErrorNote, Panel, Spinner } from '../../components/ui';
 import { api } from '../../lib/api';
@@ -32,7 +33,7 @@ function Training() {
   const [tab, setTab] = useState<Tab>('workout');
   return (
     <>
-      <PageHeader title="Training" subtitle="Log workouts and look back at them." />
+      <PageHeader title="Training" subtitle="Log workouts and look back at them." actions={<TrainingSettings />} />
       <div role="tablist" aria-label="Training" className="mb-4 flex gap-1 rounded-lg border border-border p-1" data-no-tab-swipe>
         {TABS.map((item) => (
           <button

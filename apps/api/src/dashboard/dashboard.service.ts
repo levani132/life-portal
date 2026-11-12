@@ -587,7 +587,7 @@ export class DashboardService {
     const record = training.latestRecord;
     const since = training.daysSinceLast;
     const third: WidgetStat = record
-      ? { label: `PR · ${record.exerciseName}`, value: formatRecordValue(record), tone: 'good' }
+      ? { label: `PR · ${record.exerciseName}`, value: formatRecordValue(record, training.weightUnit), tone: 'good' }
       : {
           label: 'Last workout',
           value:

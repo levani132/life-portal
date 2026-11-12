@@ -1,4 +1,4 @@
-import type { RecordEntry, RecordKind } from '@life-portal/shared-types';
+import type { RecordEntry, RecordKind, WeightUnit } from '@life-portal/shared-types';
 
 /**
  * Training's render-edge formatting (spec 020): whole grams, metres and seconds become "80 kg",
@@ -8,8 +8,26 @@ import type { RecordEntry, RecordKind } from '@life-portal/shared-types';
 
 const trim = (value: number, digits: number) => String(Number(value.toFixed(digits)));
 
-export function formatWeight(grams: number): string {
-  return `${trim(grams / 1000, 2)} kg`;
+/** The international avoirdupois pound, exactly. */
+export const GRAMS_PER_POUND = 453.59237;
+
+const GRAMS_PER_UNIT: Record<WeightUnit, number> = { kg: 1000, lb: GRAMS_PER_POUND };
+
+/**
+ * Whole grams as the person's unit, to two decimals: `102058` → `102.06` kg or `225` lb. Display
+ * only (research R9); a stored weight is never converted.
+ */
+export function gramsToDisplay(grams: number, unit: WeightUnit = 'kg'): number {
+  return Number((grams / GRAMS_PER_UNIT[unit]).toFixed(2));
+}
+
+/** A typed weight in the person's unit → whole grams, rounded once: `225` lb → `102058`. */
+export function displayToGrams(value: number, unit: WeightUnit = 'kg'): number {
+  return Math.round(value * GRAMS_PER_UNIT[unit]);
+}
+
+export function formatWeight(grams: number, unit: WeightUnit = 'kg'): string {
+  return `${trim(gramsToDisplay(grams, unit), 2)} ${unit}`;
 }
 
 /** `95` → `1:35`, `3725` → `1:02:05`. */
@@ -40,13 +58,15 @@ export const RECORD_LABELS: Record<RecordKind, string> = {
 };
 
 /** A record's value, e.g. `120 kg`, `12 reps at 80 kg`, `4:40 /km`. */
-export function formatRecordValue(record: RecordEntry): string {
+export function formatRecordValue(record: RecordEntry, unit: WeightUnit = 'kg'): string {
   switch (record.kind) {
     case 'heaviest':
     case 'best_1rm':
-      return formatWeight(record.value);
+      return formatWeight(record.value, unit);
     case 'most_reps':
-      return record.loadGrams !== undefined ? `${record.value} reps at ${formatWeight(record.loadGrams)}` : `${record.value} reps`;
+      return record.loadGrams !== undefined
+        ? `${record.value} reps at ${formatWeight(record.loadGrams, unit)}`
+        : `${record.value} reps`;
     case 'longest_duration':
       return formatDuration(record.value);
     case 'longest_distance':
