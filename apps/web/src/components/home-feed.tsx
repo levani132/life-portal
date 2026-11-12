@@ -17,9 +17,13 @@ import { PostsList } from './posts';
  * there is no one-way follow yet.
  *
  * Both lists stay mounted once opened, so each keeps its own page, paging history and loaded
- * posts. The window scrolls the page; when the strip is pinned, switching restores the other
- * tab's own scroll position (or the top of the feed the first time). The strip is tap and
+ * posts. The window scrolls the page; once the feed is scrolled into, switching restores the
+ * other tab's own scroll position (or the top of the feed the first time). The strip is tap and
  * keyboard only, and marked `data-no-tab-swipe`, so it never fights the app's tab swiping.
+ *
+ * The strip is deliberately **not sticky**: when the header hides, anything pinned to the top
+ * sits in the iOS status-bar band, which shows through hollow (see `--top-chrome` in
+ * `global.css`). Scrolling up brings the header back; the strip is at the top of the feed.
  */
 export const FEED_TABS = [
   { id: 'forYou', label: 'For You' },
@@ -54,16 +58,11 @@ export function HomeFeed() {
     }
   }, []);
 
-  /** The window scroll at which the strip becomes pinned under the header. */
+  /** The window scroll at which the feed starts: the strip at the very top of the screen. */
   const pinAt = useCallback(() => {
     const node = section.current;
-    const bar = strip.current;
-    if (!node || !bar) return 0;
-    return (
-      node.getBoundingClientRect().top +
-      window.scrollY -
-      parseFloat(getComputedStyle(bar).top || '0')
-    );
+    if (!node) return 0;
+    return node.getBoundingClientRect().top + window.scrollY;
   }, []);
 
   const select = useCallback(
@@ -83,12 +82,12 @@ export function HomeFeed() {
   );
 
   // After the switch renders, before paint: if the feed was scrolled into, land where this tab
-  // was left (never above the pinned strip). Above that, the widgets are shared, so stay put.
+  // was left (never above the top of the feed). Above that, the widgets are shared, so stay put.
   useLayoutEffect(() => {
     if (!pending.current) return;
     pending.current = false;
     const pin = pinAt();
-    // Sitting exactly on the pinned strip counts as being in the feed (a pixel of rounding).
+    // Sitting exactly at the top of the feed counts as being in it (a pixel of rounding).
     if (window.scrollY >= pin - 1)
       window.scrollTo(0, Math.max(pin, scrolls.current[tab] ?? pin));
   }, [tab, pinAt]);
@@ -121,7 +120,7 @@ export function HomeFeed() {
         aria-label="Feed"
         data-no-tab-swipe
         onKeyDown={onKeyDown}
-        className="sticky top-[var(--header-offset,var(--top-chrome))] z-30 -mx-4 mb-3 flex gap-6 border-b border-border bg-surface/95 px-4 backdrop-blur transition-[top] duration-200"
+        className="-mx-4 mb-3 flex gap-6 border-b border-border px-4"
       >
         {FEED_TABS.map((t) => {
           const selected = t.id === tab;
@@ -155,7 +154,7 @@ export function HomeFeed() {
           aria-labelledby={`feed-tab-${t.id}`}
           hidden={t.id !== tab}
           // At least a screen tall, so a tab that is still loading (or short) can stay scrolled
-          // to the pinned strip instead of the page snapping back up to the widgets.
+          // to the top of the feed instead of the page snapping back up to the widgets.
           className="min-h-screen"
         >
           {opened.has(t.id) &&

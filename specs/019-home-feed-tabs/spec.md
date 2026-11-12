@@ -15,7 +15,8 @@ exactly as before ("From your friends" and the Wall list).
   (never above the strip); above that, nothing moves.
 - The last tab is remembered for the browser session only (`sessionStorage`).
 - The strip is `role="tablist"` with arrow/Home/End keys, tap only (no swipe,
-  `data-no-tab-swipe`), and sticks under the header via `--header-offset`, which the header
-  sets to its own height (or `--top-chrome` while hidden).
+  `data-no-tab-swipe`). It is **not sticky** (changed 2026-11-12 after testing on an iPhone:
+  with the header hidden, a pinned strip sat in the status-bar band, which showed through
+  hollow). It scrolls away with the feed.
 
 Out of scope: infinite scroll, one-way follows, ranking (#3), reels-style UI.

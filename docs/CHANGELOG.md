@@ -6,8 +6,9 @@ User-visible changes. Newest first.
 
 Where the flag is on, Home's feed has two tabs under the widgets. **For You** opens first and
 shows public posts from people across Life Portal who chose to be found; **Friends** is the feed
-you had before. Each tab keeps its place and its page when you switch, the strip stays under the
-header while you scroll, and Home remembers which tab you were on until you close the app.
+you had before. Each tab keeps its place and its page when you switch, and Home remembers which
+tab you were on until you close the app. The tabs scroll away with the feed rather than sticking
+to the top, which left a hollow band under the iPhone status bar.
 
 ## 2026-11-12: For You feed API (behind a flag)
 
