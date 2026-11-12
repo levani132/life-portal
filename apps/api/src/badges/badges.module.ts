@@ -1,4 +1,5 @@
 import {
+  Body,
   CallHandler,
   Controller,
   ExecutionContext,
@@ -6,11 +7,15 @@ import {
   Injectable,
   Module,
   NestInterceptor,
+  Param,
   Post,
+  Put,
   UseInterceptors,
 } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import type { Response } from 'express';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsIn } from 'class-validator';
+import { BADGE_IDS, MAX_EQUIPPED_BADGES, type BadgeId } from '@life-portal/shared-types';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { User, UserSchema } from '../auth/schemas/user.schema';
 import { Today } from '../common/today';
@@ -24,6 +29,14 @@ import {
   BadgeSelectionSchema,
 } from './badges.schemas';
 import { BadgesService } from './badges.service';
+
+class EquipBadgesDto {
+  @IsArray()
+  @ArrayMaxSize(MAX_EQUIPPED_BADGES)
+  @ArrayUnique()
+  @IsIn(BADGE_IDS, { each: true })
+  badgeIds!: BadgeId[];
+}
 
 @Injectable()
 class BadgesNoStore implements NestInterceptor {
@@ -48,6 +61,14 @@ export class BadgesController {
 
   @Post('check') check(@CurrentUser('userId') userId: string, @Today() today: string) {
     return this.badges.check(userId, today);
+  }
+
+  @Put('me/equipped') equip(@CurrentUser('userId') userId: string, @Body() dto: EquipBadgesDto) {
+    return this.badges.equip(userId, dto.badgeIds);
+  }
+
+  @Get('people/:id') person(@CurrentUser('userId') userId: string, @Param('id') id: string) {
+    return this.badges.forPerson(userId, id);
   }
 }
 

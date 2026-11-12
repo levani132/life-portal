@@ -9,11 +9,15 @@ their own; the UI is a tab on your own profile.
 - **Catalogue and contracts:** `libs/shared/types/src/lib/badges.ts`
 - **Spec:** `specs/022-profile-badges/` (spec, plan, research R1–R10, data model, API contract)
 
-**Status (2026-11-12):** the MVP is built (US1, T001–T021). It covers the standard and food
-badges, earned from history and shown privately in the owner's collection. Still to come:
-- **US2:** equipping.
+**Status (2026-11-12):** built:
+- **US1:** standard and food badges, earned from history and shown privately in the owner's
+  collection.
+- **US2:** equipping up to three.
 - **US3:** other people's view.
-- **US4:** training badges. The catalogue already lists them, but they are not evaluated yet.
+
+Still to come:
+- **US4:** training badges. The catalogue lists them, but they are hidden until their rules
+  exist.
 - **US5:** the earned notification.
 
 ## Catalogue
@@ -111,7 +115,8 @@ All routes are under `/api/badges` and answer `Cache-Control: private, no-store`
 |---|---|---|
 | `GET /me?today=` | `social` | `MyBadges`: accessible badges, each earned one with its tiers and dates; locked ones with private `progress`; `isNew` for awards made by this call; `equipped`, filtered to earned and accessible badges |
 | `POST /check?today=` | signed in | `{newBadgeIds}` |
-| `PUT /me/equipped`, `GET /people/:id` | US2, US3 | not built yet; see `contracts/api.md` |
+| `PUT /me/equipped` `{badgeIds}` | `social` | `{equipped}`. The DTO allows 0–3 unique catalogue ids. Any id that is not earned, or whose feature is off, is refused with 400 `BADGE_NOT_EARNED` (listing the ids). |
+| `GET /people/:id` | Same gate as `/social/profiles/:id`: the viewer has `social`; the target exists and has `social`; no block either way. Anything else is a 404. | `PersonBadges`: the target's equipped ids that are earned and accessible **to the target**, each `{badgeId, tier: highest, earnedOn}`. No progress, no locked or unequipped badges, and no evaluation. |
 
 ## UI
 
@@ -122,6 +127,25 @@ is active, because the collection holds private progress.
   quiet ring and "New".
 - **Marks:** a lucide icon and a name. Tiers are told apart by a tint step, never medals,
   points or sound.
+
+### Showing badges (US2, US3)
+
+- **Equipping is consent.** Equipping a badge is the owner's explicit choice to show that badge.
+  It exposes nothing else from its module: training stays unshareable, and meal audiences are
+  unchanged.
+- **The header row.** Equipped badges sit under the name and @username. Nothing renders when
+  none are equipped.
+- **On your own live profile:**
+  - the row comes from `/badges/me`;
+  - tapping an earned badge (in the row or the Badges tab) opens a sheet with **Show on
+    profile**, **Move left / right** and **Remove from profile**;
+  - with three already shown, the sheet lists the three to choose which to **replace**, so a
+    fourth is never added silently.
+  - **Saving** is optimistic, followed by a `/badges` revalidation.
+- **"View as" and other people:** both read `/badges/people/:id`, so the preview is exactly what
+  is sent to others. Tapping a badge shows its name, rule and earned date.
+- **The tier is not stored with the choice**, so an equipped streak shows the higher tier as soon
+  as it is earned.
 
 ## Cross-links
 

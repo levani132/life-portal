@@ -20,6 +20,8 @@ import {
   UserX,
 } from 'lucide-react';
 import type {
+  BadgeId,
+  PublicBadge,
   ConnectionAction,
   MediaConfig,
   SharedWidget,
@@ -29,7 +31,15 @@ import type {
 import { useSocialApi } from '../lib/social-hooks';
 export { useSocialApi, SOCIAL_REFRESH } from '../lib/social-hooks';
 import { DailyFoodDiary } from './shared-food-diary';
-import { BadgeCollection } from './badges';
+import {
+  BadgeCollection,
+  BadgeDetail,
+  EquippedBadges,
+  OwnBadgeSheet,
+  equippedOf,
+  useMyBadges,
+  usePersonBadges,
+} from './badges';
 import { checkBadges } from '../lib/badges';
 import { PostsList } from './posts';
 import type { PortalState } from '@life-portal/shared-types';
@@ -326,6 +336,29 @@ const HEADER_ICON =
  * a post, a link): it is decided by who you are, never by the route. The header carries the
  * actions as icons on its band, so nothing pushes the posts down a row of buttons.
  */
+/**
+ * Equipped badges under the name (spec 022). Your own live profile reads your collection, so a
+ * tap opens the equip sheet; "View as" and other people read exactly what others are sent.
+ */
+function HeaderBadges({ userId, live }: { userId: string; live: boolean }) {
+  const mine = useMyBadges(live);
+  const others = usePersonBadges(live ? null : userId);
+  const [detail, setDetail] = useState<PublicBadge | null>(null);
+  const [own, setOwn] = useState<BadgeId | null>(null);
+  const badges = live ? (mine.data ? equippedOf(mine.data) : []) : (others.data?.equipped ?? []);
+  return (
+    <>
+      <EquippedBadges
+        badges={badges}
+        onSelect={(badge) => (live ? setOwn(badge.badgeId) : setDetail(badge))}
+      />
+      <BadgeDetail badge={detail} onClose={() => setDetail(null)} />
+      {live && mine.data && (
+        <OwnBadgeSheet badgeId={own} mine={mine.data} onClose={() => setOwn(null)} />
+      )}
+    </>
+  );
+}
 export function ProfileView({ userId }: { userId?: string }) {
   const { user } = useAuth();
   const own = !userId || userId === user?.id;
@@ -393,6 +426,7 @@ export function ProfileView({ userId }: { userId?: string }) {
             <span>@{person.username}</span>
             <RelationshipChip person={person} />
           </p>
+          <HeaderBadges userId={person.userId} live={own && preview === 'normal'} />
           {person.bio && (
             <p className="mt-3 whitespace-pre-wrap break-words text-ink-muted">
               {person.bio}

@@ -23,8 +23,12 @@ User-visible changes. Newest first.
   day you actually reached it.
 - **Earned is earned.** Deleting old meals, breaking a streak or unfriending someone never takes a
   badge away.
-- **Progress is private.** "8 of 30 days" is visible only to you. Showing badges on your profile
-  for others comes next.
+- **Progress is private.** "8 of 30 days" is visible only to you.
+- **Show up to three badges under your name.** Tap an earned badge to show it on your profile,
+  move it, or remove it. With three already shown, you choose which one to replace.
+- **Everyone who can see your profile sees only the badges you chose to show.** Tapping one shows
+  what it's for and when it was earned. Your other badges, progress, meals and workouts stay
+  private. "View as" shows exactly what others see.
 
 ## 2026-11-12: Turning on Training works again
 

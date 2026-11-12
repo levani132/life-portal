@@ -1,9 +1,15 @@
-import { ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { resolveFeatureAccess } from '@life-portal/shared-domain';
 import type { FeatureId } from '@life-portal/shared-types';
 import { BadgesService } from './badges.service';
 
 const USER = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+const OTHER = 'bbbbbbbbbbbbbbbbbbbbbbbb';
 const TODAY = '2026-11-12';
 const day = (offset: number) =>
   new Date(Date.UTC(2026, 10, 12 + offset)).toISOString().slice(0, 10);
@@ -17,6 +23,10 @@ function fixture(
     postDays?: string[];
     friends?: (string | undefined)[];
     equipped?: string[];
+    /** Flags off for the other person (OTHER) only. */
+    otherOff?: FeatureId[];
+    blocked?: boolean;
+    otherMissing?: boolean;
   } = {},
 ) {
   const store: Award[] = [];
@@ -29,6 +39,12 @@ function fixture(
       lean(() => store.filter((row) => row.userId === userId).map((row) => ({ ...row }))),
     ),
     // Behaves like the unique index: the second insert of a key is a no-op.
+    distinct: jest.fn().mockImplementation(
+      async (_: string, filter: { userId: string; badgeId: { $in: string[] } }) =>
+        store
+          .filter((row) => row.userId === filter.userId && filter.badgeId.$in.includes(row.badgeId))
+          .map((row) => row.badgeId),
+    ),
     updateOne: jest.fn().mockImplementation(
       async (
         filter: { userId: string; badgeId: string; tier: number },
@@ -46,10 +62,14 @@ function fixture(
       },
     ),
   };
+  let equipped = options.equipped;
   const selections = {
     findOne: jest.fn().mockImplementation(() =>
-      lean(() => (options.equipped ? { userId: USER, equipped: options.equipped } : null)),
+      lean(() => (equipped ? { userId: USER, equipped } : null)),
     ),
+    updateOne: jest.fn().mockImplementation(async (_: unknown, update: { $set: { equipped: string[] } }) => {
+      equipped = update.$set.equipped;
+    }),
   };
   const users = {
     findById: jest.fn().mockImplementation(() =>
@@ -57,10 +77,14 @@ function fixture(
     ),
   };
   const off = Object.fromEntries((options.off ?? []).map((flag) => [flag, false]));
+  const otherOff = Object.fromEntries((options.otherOff ?? []).map((flag) => [flag, false]));
   const access = {
-    forUser: jest.fn().mockImplementation(async () => ({
-      access: resolveFeatureAccess('internal', off),
-    })),
+    forUser: jest.fn().mockImplementation(async (userId: string) => {
+      if (userId === OTHER && options.otherMissing) throw new UnauthorizedException();
+      return {
+        access: resolveFeatureAccess('internal', userId === OTHER ? otherOff : off),
+      };
+    }),
     require: jest.fn().mockImplementation(async (_: string, flag: FeatureId) => {
       if (options.off?.includes(flag)) throw new ForbiddenException();
     }),
@@ -77,7 +101,10 @@ function fixture(
   };
   const posts = { originalPostDays: jest.fn().mockResolvedValue(options.postDays ?? []) };
   const portal = { get: jest.fn().mockResolvedValue({ setupCompleted: true }) };
-  const graph = { acceptedSince: jest.fn().mockResolvedValue(options.friends ?? []) };
+  const graph = {
+    acceptedSince: jest.fn().mockResolvedValue(options.friends ?? []),
+    isBlocked: jest.fn().mockResolvedValue(!!options.blocked),
+  };
   const service = new BadgesService(
     awards as never,
     selections as never,
@@ -88,7 +115,7 @@ function fixture(
     portal as never,
     graph as never,
   );
-  return { service, store, nutrition, posts, graph, portal };
+  return { service, store, nutrition, posts, graph, portal, access };
 }
 
 describe('BadgesService.evaluate', () => {
@@ -175,5 +202,89 @@ describe('BadgesService.check', () => {
       ['earlyMember', 'firstPost', 'setup'].sort(),
     );
     expect((await service.check(USER, TODAY)).newBadgeIds).toEqual([]);
+  });
+});
+
+describe('BadgesService.equip', () => {
+  it('saves earned badges in the order given', async () => {
+    const { service } = fixture({ foodDays: 8 });
+    await service.evaluate(USER, TODAY);
+    expect(await service.equip(USER, ['loggingStreak', 'earlyMember'])).toEqual({
+      equipped: ['loggingStreak', 'earlyMember'],
+    });
+    expect((await service.mine(USER, TODAY)).equipped).toEqual(['loggingStreak', 'earlyMember']);
+  });
+
+  it('refuses a badge that is not earned', async () => {
+    const { service } = fixture();
+    await service.evaluate(USER, TODAY);
+    await expect(service.equip(USER, ['earlyMember', 'firstPost'])).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('refuses an earned badge whose feature is off', async () => {
+    const { service } = fixture({ foodDays: 8, off: ['nutrition'] });
+    await service.evaluate(USER, TODAY);
+    await expect(service.equip(USER, ['loggingStreak'])).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('clears with an empty list', async () => {
+    const { service } = fixture({ equipped: ['earlyMember'] });
+    expect(await service.equip(USER, [])).toEqual({ equipped: [] });
+  });
+});
+
+describe('BadgesService.forPerson', () => {
+  /** USER owns the badges; OTHER looks at them. The fixture's store is shared by both ids. */
+  async function viewed(options: Parameters<typeof fixture>[0] = {}) {
+    const fx = fixture({ foodDays: 31, ...options });
+    await fx.service.evaluate(USER, TODAY);
+    await fx.service.equip(USER, ['loggingStreak', 'earlyMember']);
+    return fx;
+  }
+
+  it('shows only equipped badges, each at its highest tier, with no progress', async () => {
+    const { service } = await viewed();
+    const result = await service.forPerson(OTHER, USER);
+    expect(result).toEqual({
+      equipped: [
+        { badgeId: 'loggingStreak', tier: 30, earnedOn: expect.any(String) },
+        { badgeId: 'earlyMember', tier: 1, earnedOn: '2026-07-01' },
+      ],
+    });
+    expect(JSON.stringify(result)).not.toMatch(/progress|onTargetStreak|current/);
+  });
+
+  it('is a 404 when either has blocked the other', async () => {
+    const { service } = await viewed({ blocked: true });
+    await expect(service.forPerson(OTHER, USER)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('is a 404 for an unknown person or one without social', async () => {
+    const { service } = await viewed({ otherMissing: true });
+    await expect(service.forPerson(USER, OTHER)).rejects.toBeInstanceOf(NotFoundException);
+    const off = await viewed({ otherOff: ['social'] });
+    await expect(off.service.forPerson(USER, OTHER)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(off.service.forPerson(USER, 'not-an-id')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('drops equipped badges of a feature the owner has lost', async () => {
+    const fx = await viewed();
+    fx.access.forUser.mockImplementation(async () => ({
+      access: resolveFeatureAccess('internal', { nutrition: false }),
+    }));
+    expect((await fx.service.forPerson(OTHER, USER)).equipped.map((b) => b.badgeId)).toEqual([
+      'earlyMember',
+    ]);
+  });
+
+  it('needs social for the viewer', async () => {
+    const { service } = fixture({ off: ['social'] });
+    await expect(service.forPerson(USER, OTHER)).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

@@ -213,17 +213,17 @@ shown in the owner's collection with private progress.
 **Independent test**: equip two, reorder them and reload, and the header shows them in that
 order. Equipping a fourth asks which one to replace.
 
-- [ ] T022 [US2] Add `PUT /badges/me/equipped` to `BadgesController` with an `EquipBadgesDto`:
+- [x] T022 [US2] Add `PUT /badges/me/equipped` to `BadgesController` with an `EquipBadgesDto`:
   - **Validation:** `@IsArray`, `@ArrayMaxSize(MAX_EQUIPPED_BADGES)`, `@ArrayUnique`, and
     `@IsIn` over the catalogue ids.
   - **`BadgesService.equip(userId, ids)`:** require `social`, check that each id has an award
     and is accessible (otherwise 400 `BADGE_NOT_EARNED`), then upsert the selection with `$set`
     only.
   - **Returns** `{equipped}`.
-- [ ] T023 [US2] Add equip cases to `badges.service.spec.ts`: an unearned badge returns 400; an
+- [x] T023 [US2] Add equip cases to `badges.service.spec.ts`: an unearned badge returns 400; an
   inaccessible badge returns 400; a 4th id is rejected by the DTO; order is preserved; an
   equipped tiered badge reports its highest tier.
-- [ ] T024 [US2] In `apps/web/src/components/badges.tsx`, add `BadgeSheet` for your own earned
+- [x] T024 [US2] In `apps/web/src/components/badges.tsx`, add `BadgeSheet` for your own earned
   badges:
   - **Details:** name, description with the tier filled in, and the earned date.
   - **Equip / Unequip.** When 3 are already equipped, it lists the equipped three to pick one to
@@ -231,7 +231,7 @@ order. Equipping a fourth asks which one to replace.
   - **`EquippedBadges`:** the row of `BadgeMark`s. When it is your own, add move-left and
     move-right controls in the sheet.
   - **Saving** does an optimistic SWR update with `PUT`.
-- [ ] T025 [US2] Render `EquippedBadges` in the profile header in `apps/web/src/components/social.tsx`,
+- [x] T025 [US2] Render `EquippedBadges` in the profile header in `apps/web/src/components/social.tsx`,
   under the name or @username line. Render nothing when the list is empty, and wrap at 375 px
   without pushing the name. Tapping a badge in your own collection opens `BadgeSheet`.
 
@@ -246,7 +246,7 @@ order. Equipping a fourth asks which one to replace.
 **Independent test**: B sees A's equipped badges and their details. The response contains no
 progress. A blocked pair gets a 404.
 
-- [ ] T026 [US3] Add `GET /badges/people/:userId` to `BadgesController`, with
+- [x] T026 [US3] Add `GET /badges/people/:userId` to `BadgesController`, with
   `BadgesService.forPerson(viewerId, targetId)`:
   - **Gate:**
     - the viewer has `social` (otherwise 403);
@@ -257,18 +257,22 @@ progress. A blocked pair gets a 404.
   - **Returns** `PersonBadges`: the target's equipped ids, filtered by the **target's** access
     and their awards, each as `{badgeId, tier: highest, earnedOn}`.
   - **No evaluation** runs here.
-- [ ] T027 [US3] Add people-route cases to `badges.service.spec.ts`:
+- [x] T027 [US3] Add people-route cases to `badges.service.spec.ts`:
   - only equipped badges are returned;
   - no `progress` key appears anywhere (assert on the serialized JSON);
   - a blocked pair gets a 404 both ways;
   - when the target loses nutrition, their equipped food badges are dropped;
   - a viewer without `social` gets a 403.
-- [ ] T028 [US3] In `apps/web/src/components/social.tsx`, fetch `/badges/people/<id>` in
+- [x] T028 [US3] In `apps/web/src/components/social.tsx`, fetch `/badges/people/<id>` in
   parallel with the profile for other people, and for yourself while "View as" is active. Render
   it with `EquippedBadges`. A tapped badge opens a read-only `BadgeSheet` (name, rule, earned
   date). With no badges, render nothing.
 
 **Checkpoint**: quickstart scenarios 6, 7 and 8 pass.
+
+**As built (2026-11-12):** the own header reads `/badges/me`, which is SWR-shared with the
+Badges tab. Its `OwnBadgeSheet` handles equip, replace, move and remove. "View as" and other
+profiles read `/badges/people/:id` and open a read-only `BadgeDetail`.
 
 ---
 

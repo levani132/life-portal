@@ -47,6 +47,10 @@ SocialService registers the `friendRequest` and `friendAccepted` notification ty
 Activity source for incoming requests and accepted requests
 ([notifications](notifications.md)). It sends after a state-changing `request` or `accept`.
 
+The profile header shows equipped [badges](badges.md) from `GET /api/badges/people/:id` (your own
+live profile reads `/badges/me`). It is fetched beside the profile rather than embedded, because
+Posts imports Social and Badges reads Posts. That endpoint repeats this module's profile gate.
+
 `SocialGraphService.acceptedSince(userId)` returns the `acceptedAt` day of each current, unblocked
 friendship, or `undefined` for older rows, for [badges](badges.md). Unfriending erases
 `acceptedAt`, which is why badge awards are stored rather than derived.

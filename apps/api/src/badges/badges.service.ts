@@ -1,6 +1,11 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, isValidObjectId } from 'mongoose';
 import {
   BADGE_CATALOGUE,
   type BadgeDefinition,
@@ -9,6 +14,8 @@ import {
   type BadgeView,
   type FeatureAccess,
   type MyBadges,
+  type PersonBadges,
+  type PublicBadge,
 } from '@life-portal/shared-types';
 import { evaluateBadges, type BadgeEvaluation } from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
@@ -154,5 +161,71 @@ export class BadgesService {
   async check(userId: string, today: string): Promise<{ newBadgeIds: BadgeId[] }> {
     const { created } = await this.evaluate(userId, today);
     return { newBadgeIds: [...new Set(created.map((row) => row.badgeId as BadgeId))] };
+  }
+
+  /**
+   * Replaces the equipped list (US2). Every id must be earned and accessible now; the DTO has
+   * already checked the count, uniqueness and that each id is in the catalogue.
+   */
+  async equip(userId: string, badgeIds: BadgeId[]): Promise<{ equipped: BadgeId[] }> {
+    await this.access.require(userId, 'social');
+    const [{ access }, earned] = await Promise.all([
+      this.access.forUser(userId),
+      this.awards.distinct('badgeId', { userId, badgeId: { $in: badgeIds } }),
+    ]);
+    const refused = badgeIds.filter((id) => {
+      const def = BADGE_CATALOGUE.find((badge) => badge.id === id);
+      return !def || !accessible(def, access) || !earned.includes(id);
+    });
+    if (refused.length) {
+      throw new BadRequestException({
+        code: 'BADGE_NOT_EARNED',
+        message: 'Only badges you have earned can be shown on your profile.',
+        badgeIds: refused,
+      });
+    }
+    await this.selections.updateOne(
+      { userId },
+      { $set: { equipped: badgeIds } },
+      { upsert: true },
+    );
+    return { equipped: badgeIds };
+  }
+
+  /**
+   * What anyone who may see a profile sees (US3): the equipped badges, each at its highest tier,
+   * and nothing else. The gate mirrors `SocialService.profile`: the viewer has `social`, the
+   * target exists and has `social`, and neither has blocked the other; otherwise 404, so the
+   * answer never says whether the person exists. No evaluation runs here.
+   */
+  async forPerson(viewerId: string, targetId: string): Promise<PersonBadges> {
+    const missing = () => new NotFoundException('Profile not found.');
+    if (!isValidObjectId(targetId)) throw missing();
+    await this.access.require(viewerId, 'social');
+    if (viewerId !== targetId && (await this.graph.isBlocked(viewerId, targetId))) throw missing();
+    let target: FeatureAccess;
+    try {
+      target = (await this.access.forUser(targetId)).access;
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw missing();
+      throw error;
+    }
+    if (!target.social) throw missing();
+    const selection = await this.selections.findOne({ userId: targetId }).lean();
+    const ids = selection?.equipped ?? [];
+    if (!ids.length) return { equipped: [] };
+    const awards = await this.awards
+      .find({ userId: targetId, badgeId: { $in: ids } })
+      .select('badgeId tier earnedOn')
+      .lean<AwardRow[]>();
+    const equipped = ids.flatMap((id): PublicBadge[] => {
+      const def = BADGE_CATALOGUE.find((badge) => badge.id === id);
+      const top = awards
+        .filter((row) => row.badgeId === id)
+        .sort((a, b) => b.tier - a.tier)[0];
+      if (!def || !top || !accessible(def, target)) return [];
+      return [{ badgeId: def.id, tier: top.tier, earnedOn: top.earnedOn }];
+    });
+    return { equipped };
   }
 }
