@@ -1,4 +1,4 @@
-import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, Optional, type OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import {
@@ -10,6 +10,7 @@ import {
 } from '@life-portal/shared-domain';
 import { EXERCISE_LEVELS, MECHANICS } from '@life-portal/shared-types';
 import catalogueFile from './catalogue/free-exercise-db.json';
+import { PlanSeeder } from './plan.seeder';
 import { Exercise } from './training.schemas';
 
 export interface CatalogueFile {
@@ -58,10 +59,13 @@ export class CatalogueSeeder implements OnModuleInit {
 
   constructor(
     @InjectModel(Exercise.name) private readonly exercises: Model<Exercise>,
+    @Optional() private readonly plans?: PlanSeeder,
   ) {}
 
-  onModuleInit() {
-    return this.seed(catalogueFile as CatalogueFile);
+  /** Ready-made plans name catalogue exercises, so they are seeded only after it (spec 023). */
+  async onModuleInit() {
+    await this.seed(catalogueFile as CatalogueFile);
+    await this.plans?.seed();
   }
 
   async seed(file: CatalogueFile): Promise<{ upserted: number; skipped: boolean }> {

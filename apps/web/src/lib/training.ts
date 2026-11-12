@@ -38,6 +38,10 @@ export function revalidateTraining(): Promise<unknown> {
 
 export const PROFILE_KEY = '/training/profile';
 
+/** Spec 023: plans. */
+export const PLANS_KEY = '/training/plans';
+export const planKey = (id: string) => `/training/plans/${id}`;
+
 export function useTrainingProfile(): TrainingProfile & { loaded: boolean } {
   const { data } = useApi<TrainingProfile>(PROFILE_KEY);
   return { ...(data ?? { weightUnit: 'kg', defaultRestSeconds: 90 }), loaded: !!data };
@@ -76,6 +80,7 @@ export {
   formatRecordValue,
   formatWeight,
 } from '@life-portal/shared-domain';
+export { describeTarget, prefillFor } from '@life-portal/shared-domain';
 
 /** A set in one line, e.g. `80 kg × 8`, `+10 kg × 12`, `−20 kg × 8`, `2 km in 9:30`. */
 export function describeSet(set: SetValues, measure: Measure, unit: WeightUnit = 'kg'): string {

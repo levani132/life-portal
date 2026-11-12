@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, type Model } from 'mongoose';
@@ -11,6 +12,8 @@ import {
   type EquipmentType,
   type Measure,
   type Muscle,
+  type PlanTarget,
+  type PlannedExercise,
   type RecordKind,
   type SessionDetail,
   type SessionExercise,
@@ -23,11 +26,13 @@ import {
 import {
   isStaleSession,
   isValidRpe,
+  openTargets,
   sessionDurationSeconds,
   validateSetValues,
 } from '@life-portal/shared-domain';
 import { CatalogueService } from './catalogue.service';
 import { MachinesService } from './machines.service';
+import { PlansService, toTarget } from './plans.service';
 import { ProgressService } from './progress.service';
 import { toSet, type SetRow } from './set-row';
 import { WorkoutExercise, WorkoutSession, WorkoutSet } from './training.schemas';
@@ -63,19 +68,34 @@ export class SessionsService {
     private readonly catalogue: CatalogueService,
     private readonly machines: MachinesService,
     private readonly progress: ProgressService,
+    @Optional() private readonly plans?: PlansService,
   ) {}
 
   // ---------------------------------------------------------------- sessions
 
+  /**
+   * Starts a workout, empty or (spec 023) from a plan's workout. A plan start copies the
+   * workout's exercises and targets onto the session (`planned`): suggestions are fixed here and
+   * never follow later edits of the plan. An open session is resumed instead, with nothing added.
+   */
   async start(
     userId: string,
-    input: { requestId: string; day: string },
+    input: { requestId: string; day: string; planId?: string; planWorkoutId?: string },
     nowMs = Date.now(),
   ): Promise<SessionDetail> {
+    if (Boolean(input.planId) !== Boolean(input.planWorkoutId)) {
+      throw new BadRequestException('Send both planId and planWorkoutId, or neither.');
+    }
     const retried = await this.sessions.findOne({ userId, requestId: input.requestId }).lean<SessionRow>();
-    if (retried) return this.detailOf(userId, retried, nowMs);
+    if (retried) {
+      await this.finishPlanStart(userId, retried);
+      return this.detailOf(userId, retried, nowMs);
+    }
     const open = await this.sessions.findOne({ userId, status: 'open' }).lean<SessionRow>();
     if (open) return { ...(await this.detailOf(userId, open, nowMs)), resumed: true };
+    const fromPlan = input.planId && input.planWorkoutId
+      ? await this.planWorkout(userId, input.planId, input.planWorkoutId)
+      : undefined;
     try {
       const created = await this.sessions.create({
         userId,
@@ -83,8 +103,20 @@ export class SessionsService {
         day: input.day,
         status: 'open',
         startedAt: new Date(nowMs),
+        ...(fromPlan
+          ? {
+              plan: {
+                planId: String(fromPlan.plan._id),
+                planWorkoutId: fromPlan.workout.id,
+                planName: fromPlan.plan.name,
+                workoutName: fromPlan.workout.name,
+              },
+            }
+          : {}),
       });
-      return this.detailOf(userId, created.toObject() as SessionRow, nowMs);
+      const row = created.toObject() as SessionRow;
+      if (fromPlan) await this.addPlanned(userId, row, fromPlan.workout);
+      return this.detailOf(userId, row, nowMs);
     } catch (error) {
       if (!isDuplicateKey(error)) throw error;
       // Lost a race: the same request retried, or another device opened a session first.
@@ -152,6 +184,7 @@ export class SessionsService {
           .filter((exercise) => exercise.sessionId === id)
           .map((exercise) => exercise.snapshot.name),
         setCount: own.length,
+        ...(row.plan ? { plan: { planName: row.plan.planName, workoutName: row.plan.workoutName } } : {}),
       };
     });
     const last = page[page.length - 1];
@@ -211,6 +244,7 @@ export class SessionsService {
         message: 'This workout has no sets yet. Discard it instead?',
       });
     }
+    await this.dropUnloggedPlanned(userId, id);
     const endedAt = at === 'lastSet' ? lastSet.loggedAt : new Date(Math.max(nowMs, session.startedAt.getTime()));
     await this.sessions.updateOne(
       { _id: session._id, userId, status: 'open' },
@@ -254,14 +288,7 @@ export class SessionsService {
         ...(machine ? { machineId: String(machine._id) } : {}),
         // The one deliberate copy: what the exercise was called and how it was measured when it
         // was done. Built here, never from the request.
-        snapshot: {
-          name: exercise.name,
-          equipmentType: exercise.equipmentType,
-          measure: exercise.measure,
-          primaryMuscles: exercise.primaryMuscles,
-          ...(machine ? { machineName: machine.name } : {}),
-          ...(machine?.brand ? { machineBrand: machine.brand } : {}),
-        },
+        snapshot: snapshotOf(exercise, machine),
       });
       return this.toSessionExercise(created.toObject() as ExerciseRow, []);
     } catch (error) {
@@ -276,11 +303,16 @@ export class SessionsService {
     userId: string,
     sessionId: string,
     workoutExerciseId: string,
-    patch: { notes?: string; machineId?: string | null },
+    patch: { notes?: string; machineId?: string | null; skipped?: boolean },
   ): Promise<SessionExercise> {
     const row = await this.ownedExercise(userId, sessionId, workoutExerciseId);
     const set: Record<string, unknown> = {};
     const unset: Record<string, 1> = {};
+    if (patch.skipped !== undefined) {
+      if (!row.planned) throw new BadRequestException('Only an exercise from a plan can be skipped.');
+      if (patch.skipped) set['skipped'] = true;
+      else unset['skipped'] = 1;
+    }
     if (patch.notes !== undefined) {
       if (patch.notes.trim()) set['notes'] = patch.notes.trim();
       else unset['notes'] = 1;
@@ -325,6 +357,64 @@ export class SessionsService {
       })),
     );
     return ids;
+  }
+
+  /**
+   * Spec 023: replaces an exercise that has no sets yet with another, in the same place. A new
+   * row, with a new snapshot, because `exerciseId` is never editable. The plan's targets carry
+   * over when the measure is the same; otherwise the same number of empty sets remain.
+   */
+  async swapExercise(
+    userId: string,
+    sessionId: string,
+    workoutExerciseId: string,
+    input: { requestId: string; exerciseId: string; machineId?: string },
+  ): Promise<SessionExercise> {
+    await this.ownedSession(userId, sessionId);
+    const retried = await this.exercises.findOne({ userId, requestId: input.requestId }).lean<ExerciseRow>();
+    if (retried) return this.toSessionExercise(retried, []);
+    const row = await this.ownedExercise(userId, sessionId, workoutExerciseId);
+    if (await this.sets.exists({ userId, workoutExerciseId })) {
+      throw new ConflictException({
+        code: 'HAS_SETS',
+        message: 'This exercise already has sets. Add the other exercise instead.',
+      });
+    }
+    const exercise = await this.catalogue.readable(userId, input.exerciseId);
+    const machine = input.machineId ? await this.machines.owned(userId, input.machineId) : undefined;
+    const planned = row.planned
+      ? {
+          planExerciseId: row.planned.planExerciseId,
+          ...(row.planned.restSeconds != null ? { restSeconds: row.planned.restSeconds } : {}),
+          ...(row.planned.note ? { note: row.planned.note } : {}),
+          targets:
+            exercise.measure === row.snapshot.measure
+              ? row.planned.targets.map(toTarget)
+              : row.planned.targets.map((target) => ({ type: target.type ?? 'working' })),
+        }
+      : undefined;
+    let created: ExerciseRow;
+    try {
+      created = (
+        await this.exercises.create({
+          userId,
+          sessionId,
+          requestId: input.requestId,
+          order: row.order,
+          exerciseId: String(exercise._id),
+          ...(machine ? { machineId: String(machine._id) } : {}),
+          snapshot: snapshotOf(exercise, machine),
+          ...(planned ? { planned } : {}),
+        })
+      ).toObject() as ExerciseRow;
+    } catch (error) {
+      if (!isDuplicateKey(error)) throw error;
+      const winner = await this.exercises.findOne({ userId, requestId: input.requestId }).lean<ExerciseRow>();
+      if (!winner) throw error;
+      return this.toSessionExercise(winner, []);
+    }
+    await this.exercises.deleteOne({ _id: row._id, userId });
+    return this.toSessionExercise(created, []);
   }
 
   async removeExercise(
@@ -428,6 +518,87 @@ export class SessionsService {
     return { id: setId, deleted: true };
   }
 
+  // ---------------------------------------------------------------- plan starts (spec 023)
+
+  /** The plan (shared or the caller's) and its workout, or 404; 400 when it has no exercises. */
+  private async planWorkout(userId: string, planId: string, planWorkoutId: string) {
+    if (!this.plans) throw new NotFoundException(`Plan ${planId} not found`);
+    const plan = await this.plans.readable(userId, planId);
+    const workout = plan.workouts.find((candidate) => candidate.id === planWorkoutId);
+    if (!workout) throw new NotFoundException(`Workout ${planWorkoutId} not found in this plan`);
+    if (!workout.exercises.length) {
+      throw new BadRequestException({
+        code: 'EMPTY_WORKOUT',
+        message: 'This workout has no exercises yet. Add some to the plan first.',
+      });
+    }
+    return { plan, workout };
+  }
+
+  /**
+   * One workout exercise per planned exercise, with its targets copied. Each row's `requestId` is
+   * derived from the session's, so a retried start fills in what is missing and never doubles.
+   */
+  private async addPlanned(
+    userId: string,
+    session: SessionRow,
+    workout: { exercises: { id: string; exerciseId: string; restSeconds?: number; note?: string; targets: PlanTarget[] }[] },
+  ) {
+    const sessionId = String(session._id);
+    const exercises = await Promise.all(
+      workout.exercises.map((planned) =>
+        this.catalogue.readable(userId, planned.exerciseId, { includeArchived: true }),
+      ),
+    );
+    for (const [order, planned] of workout.exercises.entries()) {
+      const exercise = exercises[order];
+      try {
+        await this.exercises.create({
+          userId,
+          sessionId,
+          requestId: `${session.requestId}:${planned.id}`,
+          order,
+          exerciseId: String(exercise._id),
+          snapshot: snapshotOf(exercise),
+          planned: {
+            planExerciseId: planned.id,
+            ...(planned.restSeconds != null ? { restSeconds: planned.restSeconds } : {}),
+            ...(planned.note ? { note: planned.note } : {}),
+            targets: planned.targets.map(toTarget),
+          },
+        });
+      } catch (error) {
+        if (!isDuplicateKey(error)) throw error;
+      }
+    }
+  }
+
+  /** A retried plan start whose first attempt died before adding its exercises. */
+  private async finishPlanStart(userId: string, session: SessionRow) {
+    if (!session.plan || session.status !== 'open') return;
+    if (await this.exercises.exists({ userId, sessionId: String(session._id) })) return;
+    try {
+      const { workout } = await this.planWorkout(userId, session.plan.planId, session.plan.planWorkoutId);
+      await this.addPlanned(userId, session, workout);
+    } catch {
+      // The plan changed or went away in between: the workout stays as it is.
+    }
+  }
+
+  /** On finish, planned exercises with nothing logged are not part of the workout (FR-016). */
+  private async dropUnloggedPlanned(userId: string, sessionId: string) {
+    const planned = await this.exercises
+      .find({ userId, sessionId, planned: { $exists: true } })
+      .select('_id')
+      .lean<ExerciseRow[]>();
+    if (!planned.length) return;
+    const logged = new Set(
+      (await this.sets.distinct('workoutExerciseId', { userId, sessionId })).map(String),
+    );
+    const unlogged = planned.map((row) => String(row._id)).filter((id) => !logged.has(id));
+    if (unlogged.length) await this.exercises.deleteMany({ userId, sessionId, _id: { $in: unlogged } });
+  }
+
   // ---------------------------------------------------------------- helpers
 
   private assertValid(measure: Measure, values: Record<string, number | undefined>, rpe?: number) {
@@ -487,6 +658,7 @@ export class SessionsService {
       durationSeconds: sessionDurationSeconds({ startedAt, endedAt: session.endedAt?.toISOString(), lastSetAt }),
       isStale: isStaleSession({ status, startedAt, lastSetAt }, nowMs),
       lastSetAt,
+      ...(session.plan ? { plan: toSessionPlan(session.plan) } : {}),
       exercises: exercises.map((exercise) => {
         const own = progress.get(`${exercise.exerciseId}:${exercise.snapshot.measure}`);
         const item = this.toSessionExercise(
@@ -542,6 +714,13 @@ export class SessionsService {
   }
 
   private toSessionExercise(row: ExerciseRow, sets: SetRow[]): SessionExercise {
+    const planned: PlannedExercise | undefined = row.planned
+      ? {
+          ...(row.planned.restSeconds != null ? { restSeconds: row.planned.restSeconds } : {}),
+          ...(row.planned.note ? { note: row.planned.note } : {}),
+          targets: row.planned.targets.map(toTarget),
+        }
+      : undefined;
     return {
       id: String(row._id),
       sessionId: row.sessionId,
@@ -558,8 +737,35 @@ export class SessionsService {
       },
       notes: row.notes,
       sets: sets.map(toSet),
+      ...(planned ? { planned } : {}),
+      skipped: Boolean(row.skipped),
+      openTargets: openTargets(planned, sets.length, Boolean(row.skipped)),
     };
   }
+}
+
+/** What an exercise was when it was added to a workout. Built here, never from a request. */
+function snapshotOf(
+  exercise: { name: string; equipmentType: string; measure: string; primaryMuscles: string[] },
+  machine?: { name: string; brand?: string },
+) {
+  return {
+    name: exercise.name,
+    equipmentType: exercise.equipmentType,
+    measure: exercise.measure,
+    primaryMuscles: exercise.primaryMuscles,
+    ...(machine ? { machineName: machine.name } : {}),
+    ...(machine?.brand ? { machineBrand: machine.brand } : {}),
+  };
+}
+
+function toSessionPlan(plan: NonNullable<SessionRow['plan']>) {
+  return {
+    planId: plan.planId,
+    planWorkoutId: plan.planWorkoutId,
+    planName: plan.planName,
+    workoutName: plan.workoutName,
+  };
 }
 
 /** The value fields of a set or request. With `keepNull`, `null` survives to mean "clear it". */

@@ -1,7 +1,8 @@
 'use client';
 
+import clsx from 'clsx';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, History as HistoryIcon, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, History as HistoryIcon, Plus, Repeat, SkipForward, Trash2 } from 'lucide-react';
 import type {
   ExerciseListItem,
   SessionDetail,
@@ -27,6 +28,7 @@ import { ExerciseHistory } from './exercise-history';
 import { ExerciseSearch, MachineChoice } from './exercise-picker';
 import { RestTimer } from './rest-timer';
 import { SetForm, SetLine, type SetFormValue } from './set-row';
+import { SuggestionRows, suggestionValue } from './suggestion-row';
 
 interface PendingSet {
   sessionId: string;
@@ -49,7 +51,7 @@ function useNow(active: boolean) {
 }
 
 /** The Workout tab: the open session, or a way to start one. */
-export function CurrentWorkout() {
+export function CurrentWorkout({ onBrowsePlans }: { onBrowsePlans?: () => void }) {
   const { data, error, isLoading } = useCurrentSession();
   const workoutDay = useWorkoutDay();
   const [starting, setStarting] = useState(false);
@@ -76,9 +78,16 @@ export function CurrentWorkout() {
         <EmptyState
           message="No workout in progress."
           action={
-            <button type="button" className="btn-primary" disabled={starting} onClick={() => void start()}>
-              {starting ? 'Starting…' : 'Start workout'}
-            </button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <button type="button" className="btn-primary" disabled={starting} onClick={() => void start()}>
+                {starting ? 'Starting…' : 'Start empty workout'}
+              </button>
+              {onBrowsePlans && (
+                <button type="button" className="btn-ghost" onClick={onBrowsePlans}>
+                  Choose a plan
+                </button>
+              )}
+            </div>
           }
         />
         {startError && <div className="mt-3"><ErrorNote message={startError} /></div>}
@@ -177,6 +186,12 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
     void run(() => api.post(`${base}/exercises/order`, { ids }));
   };
 
+  // The rest after a set from a plan is the plan's rest for that exercise (spec 023).
+  const lastSetExercise = session.lastSetAt
+    ? session.exercises.find((exercise) => exercise.sets.some((set) => set.loggedAt === session.lastSetAt))
+    : undefined;
+  const restSeconds = lastSetExercise?.planned?.restSeconds ?? profile.defaultRestSeconds;
+
   const elapsed = open
     ? Math.max(0, Math.floor((now - Date.parse(session.startedAt)) / 1000))
     : session.durationSeconds;
@@ -184,7 +199,13 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
   return (
     <div className="space-y-4">
       <Panel
-        title={open ? 'Workout in progress' : `Workout · ${formatDay(session.day)}`}
+        title={
+          session.plan
+            ? `${session.plan.workoutName} · ${session.plan.planName}`
+            : open
+              ? 'Workout in progress'
+              : `Workout · ${formatDay(session.day)}`
+        }
         description={`${formatDay(session.day)} · ${formatDuration(elapsed)}${open ? '' : ' · finished'}`}
         actions={
           open ? (
@@ -219,7 +240,7 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
           </div>
         )}
         {error && <div className="mb-3"><ErrorNote message={error} /></div>}
-        {open && <RestTimer since={session.lastSetAt} seconds={profile.defaultRestSeconds} />}
+        {open && <RestTimer since={session.lastSetAt} seconds={restSeconds} />}
         <Textarea
           className="mt-3"
           value={notes}
@@ -246,6 +267,15 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
               void run(() => api.delete(`${base}/exercises/${exercise.id}`));
             }
           }}
+          onSkip={(skipped) => void run(() => api.patch(`${base}/exercises/${exercise.id}`, { skipped }))}
+          onSwap={(replacement) =>
+            void run(() =>
+              api.post(`${base}/exercises/${exercise.id}/swap`, {
+                requestId: crypto.randomUUID(),
+                exerciseId: replacement.id,
+              }),
+            )
+          }
           busy={busy}
         />
       ))}
@@ -288,6 +318,8 @@ function ExerciseBlock({
   canMoveDown,
   onMove,
   onRemove,
+  onSkip,
+  onSwap,
   busy,
 }: {
   session: SessionDetail;
@@ -297,12 +329,15 @@ function ExerciseBlock({
   canMoveDown: boolean;
   onMove: (by: -1 | 1) => void;
   onRemove: () => void;
+  onSkip: (skipped: boolean) => void;
+  onSwap: (exercise: ExerciseListItem) => void;
   busy: boolean;
 }) {
   const measure = exercise.snapshot.measure;
   const [editing, setEditing] = useState<WorkoutSet | null>(null);
   const [choosingMachine, setChoosingMachine] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [swapping, setSwapping] = useState(false);
   const unit = useWeightUnit();
   const estimate = exercise.oneRepMax && describeOneRepMax(exercise.oneRepMax, unit);
   const [machineError, setMachineError] = useState<string | null>(null);
@@ -322,7 +357,13 @@ function ExerciseBlock({
   const done = exercise.sets.length + pending.length;
   // Start the next set from the last one logged, else from the same set last time.
   const lastValue = pending.length ? pending[pending.length - 1].value : exercise.sets[exercise.sets.length - 1];
-  const initial = lastValue ?? exercise.previous?.sets[done] ?? exercise.previous?.sets[exercise.previous.sets.length - 1];
+  // From a plan (spec 023): the open targets still to do, after any sets waiting to be sent.
+  const suggestions = exercise.openTargets.slice(pending.length);
+  const next = suggestions[0] ? suggestionValue(exercise, suggestions[0], done, lastValue) : undefined;
+  const initial: Partial<WorkoutSet> | undefined =
+    next?.value ?? lastValue ?? exercise.previous?.sets[done] ?? exercise.previous?.sets[exercise.previous.sets.length - 1];
+  const fromPlan = Boolean(exercise.planned);
+  const canSwap = fromPlan && done === 0 && session.status === 'open';
 
   const log = (value: SetFormValue) => {
     const requestId = crypto.randomUUID();
@@ -346,6 +387,23 @@ function ExerciseBlock({
         .join(' · ')}
       actions={
         <>
+          {canSwap && (
+            <button type="button" className="text-ink-faint hover:text-ink" disabled={busy} onClick={() => setSwapping(true)} aria-label={`Swap ${exercise.snapshot.name}`} title="Swap for another exercise">
+              <Repeat className="h-4 w-4" />
+            </button>
+          )}
+          {fromPlan && session.status === 'open' && (
+            <button
+              type="button"
+              className={clsx('hover:text-ink', exercise.skipped ? 'text-amber-400' : 'text-ink-faint')}
+              disabled={busy}
+              onClick={() => onSkip(!exercise.skipped)}
+              aria-label={exercise.skipped ? `Do ${exercise.snapshot.name} after all` : `Skip ${exercise.snapshot.name}`}
+              title={exercise.skipped ? 'Un-skip' : 'Skip'}
+            >
+              <SkipForward className="h-4 w-4" />
+            </button>
+          )}
           <button type="button" className="text-ink-faint hover:text-ink" onClick={() => setShowHistory(true)} aria-label={`${exercise.snapshot.name} history`}>
             <HistoryIcon className="h-4 w-4" />
           </button>
@@ -380,6 +438,26 @@ function ExerciseBlock({
       <Modal open={showHistory} onClose={() => setShowHistory(false)} title={exercise.snapshot.name} wide>
         <ExerciseHistory exerciseId={exercise.exerciseId} />
       </Modal>
+      <Modal open={swapping} onClose={() => setSwapping(false)} title={`Swap ${exercise.snapshot.name}`} wide>
+        <ExerciseSearch
+          autoFocus
+          onPick={(replacement) => {
+            setSwapping(false);
+            onSwap(replacement);
+          }}
+        />
+      </Modal>
+      {exercise.planned && (
+        <p className="mb-2 text-xs text-ink-faint">
+          {[
+            `Plan: ${exercise.planned.targets.length} sets`,
+            exercise.planned.restSeconds != null ? `rest ${formatDuration(exercise.planned.restSeconds)}` : '',
+            exercise.planned.note ?? '',
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </p>
+      )}
       {exercise.previous && (
         <p className="mb-2 text-xs text-ink-faint">
           Last time ({formatDay(exercise.previous.day)}):{' '}
@@ -400,7 +478,25 @@ function ExerciseBlock({
           </p>
         )}
       </div>
-      <SetForm key={done} measure={measure} initial={initial} submitLabel="Log set" onSubmit={log} />
+      {exercise.skipped ? (
+        <p className="text-sm text-ink-faint">
+          Skipped.{' '}
+          <button type="button" className="underline" disabled={busy} onClick={() => onSkip(false)}>
+            Do it after all
+          </button>
+        </p>
+      ) : (
+        <>
+          <SuggestionRows
+            measure={measure}
+            targets={suggestions}
+            firstIndex={done + 1}
+            first={next}
+            onLog={log}
+          />
+          <SetForm key={`${done}:${suggestions.length}`} measure={measure} initial={initial} submitLabel="Log set" onSubmit={log} />
+        </>
+      )}
       {editing && (
         <EditSet set={editing} measure={measure} onClose={() => setEditing(null)} />
       )}

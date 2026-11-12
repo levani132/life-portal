@@ -100,7 +100,9 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   required.
 - **A logged workout exercise freezes the exercise too.** `workout_exercises.snapshot` follows the
   meal rule below: built by the server, never accepted from a request, never refreshed, and
-  `exerciseId` is not editable. Training stores whole grams, metres and seconds; kg/lb is display
+  `exerciseId` is not editable. A workout started from a plan follows the same rule for
+  `workout_exercises.planned` and `workout_sessions.plan`: copied from the plan at start, never
+  from a request, never refreshed; a swap is a new row (spec 023). Training stores whole grams, metres and seconds; kg/lb is display
   only. Its shared catalogue rows have no `userId`, so `CatalogueService` cannot use
   `OwnedCrudService` (see `docs/modules/training.md`).
 - **A logged meal freezes the food's numbers.** `meal_entries.facts` is a snapshot taken at log

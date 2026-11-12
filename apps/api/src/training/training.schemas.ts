@@ -5,8 +5,10 @@ import {
   MEASURES,
   MECHANICS,
   MUSCLES,
+  PLAN_TARGET_TYPES,
   SET_TYPES,
   WEIGHT_UNITS,
+  type PlanTargetType,
 } from '@life-portal/shared-types';
 import { baseSchemaOptions, requiredDayField } from '../common/mongoose';
 
@@ -99,6 +101,90 @@ export class TrainingProfile {
 
 export const TrainingProfileSchema = SchemaFactory.createForClass(TrainingProfile);
 
+// ------------------------------------------------------------------ plans (spec 023)
+
+/** One planned set. Same fields and units as a set; which apply follows the exercise's measure. */
+@Schema({ _id: false, versionKey: false })
+class PlanTargetDoc {
+  @Prop({ type: String, required: true, enum: PLAN_TARGET_TYPES, default: 'working' }) type!: PlanTargetType;
+  @Prop(optionalInt(1, 1000)) reps?: number;
+  @Prop(optionalInt(1, 1000)) repsMax?: number;
+  @Prop(optionalInt(0, 1_000_000)) weightGrams?: number;
+  @Prop(optionalInt(1, 500_000)) assistGrams?: number;
+  @Prop(optionalInt(1, 86_400)) durationSeconds?: number;
+  @Prop(optionalInt(1, 1_000_000)) distanceMeters?: number;
+}
+const PlanTargetSchema = SchemaFactory.createForClass(PlanTargetDoc);
+
+@Schema({ _id: false, versionKey: false })
+class PlanExerciseDoc {
+  /** Stable within the plan (research R2). */
+  @Prop({ required: true }) id!: string;
+  @Prop({ required: true }) exerciseId!: string;
+  @Prop(optionalInt(0, 900)) restSeconds?: number;
+  @Prop({ trim: true, maxlength: 200 }) note?: string;
+  @Prop({ type: [PlanTargetSchema], default: [] }) targets!: PlanTargetDoc[];
+}
+const PlanExerciseSchema = SchemaFactory.createForClass(PlanExerciseDoc);
+
+@Schema({ _id: false, versionKey: false })
+class PlanWorkoutDoc {
+  /** Stable: sessions point at it, so progress survives edits and re-seeds. */
+  @Prop({ required: true }) id!: string;
+  @Prop({ required: true, trim: true, maxlength: 80 }) name!: string;
+  @Prop({ type: [PlanExerciseSchema], default: [] }) exercises!: PlanExerciseDoc[];
+}
+const PlanWorkoutSchema = SchemaFactory.createForClass(PlanWorkoutDoc);
+
+class CopiedFromDoc {
+  @Prop({ required: true }) planId!: string;
+  @Prop({ required: true }) name!: string;
+}
+
+/**
+ * A workout plan. Shared (ready-made) plans have no `userId` and are written only by
+ * `PlanSeeder`, like catalogue exercises; own plans belong to one person. One document holds the
+ * whole plan, because it is read and saved whole (research R1).
+ */
+@Schema({ ...baseSchemaOptions, collection: 'training_plans' })
+export class TrainingPlan {
+  @Prop() userId?: string;
+  @Prop({ required: true, trim: true, maxlength: 80 }) name!: string;
+  @Prop({ trim: true, maxlength: 1000 }) description?: string;
+  @Prop({ type: [PlanWorkoutSchema], default: [] }) workouts!: PlanWorkoutDoc[];
+  @Prop() seedKey?: string;
+  @Prop() seedVersion?: number;
+  /** Where a copy came from. Informational only; never followed for data. */
+  @Prop({ type: CopiedFromDoc }) copiedFrom?: CopiedFromDoc;
+  @Prop() requestId?: string;
+  /** Shared plans dropped from the seed file. Hidden from lists, still readable by id. */
+  @Prop({ default: false }) archived!: boolean;
+}
+
+export const TrainingPlanSchema = SchemaFactory.createForClass(TrainingPlan);
+TrainingPlanSchema.index({ userId: 1, archived: 1, updatedAt: -1 });
+TrainingPlanSchema.index({ seedKey: 1 }, { unique: true, partialFilterExpression: { seedKey: { $exists: true } } });
+TrainingPlanSchema.index(
+  { userId: 1, requestId: 1 },
+  { unique: true, partialFilterExpression: { requestId: { $exists: true } } },
+);
+TrainingPlanSchema.index({ userId: 1, 'workouts.exercises.exerciseId': 1 });
+
+class SessionPlanDoc {
+  @Prop({ required: true }) planId!: string;
+  @Prop({ required: true }) planWorkoutId!: string;
+  @Prop({ required: true }) planName!: string;
+  @Prop({ required: true }) workoutName!: string;
+}
+
+/** A plan exercise's targets, copied onto a workout exercise at start. Never edited. */
+class PlannedDoc {
+  @Prop({ required: true }) planExerciseId!: string;
+  @Prop() restSeconds?: number;
+  @Prop() note?: string;
+  @Prop({ type: [PlanTargetSchema], default: [] }) targets!: PlanTargetDoc[];
+}
+
 // ------------------------------------------------------------------ sessions
 
 @Schema({ ...baseSchemaOptions, collection: 'workout_sessions' })
@@ -115,6 +201,11 @@ export class WorkoutSession {
   @Prop({ required: true, type: Date }) startedAt!: Date;
   @Prop({ type: Date }) endedAt?: Date;
   @Prop({ trim: true, maxlength: 2000 }) notes?: string;
+  /**
+   * Spec 023: the plan workout it was started from, with the names as they were then. Frozen:
+   * renaming or deleting the plan never changes a past or open workout.
+   */
+  @Prop({ type: SessionPlanDoc }) plan?: SessionPlanDoc;
 }
 
 export const WorkoutSessionSchema = SchemaFactory.createForClass(WorkoutSession);
@@ -124,6 +215,7 @@ WorkoutSessionSchema.index(
   { unique: true, partialFilterExpression: { status: 'open' }, name: 'one_open_session' },
 );
 WorkoutSessionSchema.index({ userId: 1, day: -1, startedAt: -1 });
+WorkoutSessionSchema.index({ userId: 1, 'plan.planId': 1, day: -1 });
 
 // ------------------------------------------------------------------ exercises in a session
 
@@ -152,6 +244,12 @@ export class WorkoutExercise {
   @Prop() machineId?: string;
   @Prop({ required: true, type: ExerciseSnapshotDoc }) snapshot!: ExerciseSnapshotDoc;
   @Prop({ trim: true, maxlength: 500 }) notes?: string;
+  /**
+   * Spec 023: the plan's targets for this exercise, copied at start: the snapshot rule applied to
+   * suggestions. Built by the server, never accepted from a request, never refreshed.
+   */
+  @Prop({ type: PlannedDoc }) planned?: PlannedDoc;
+  @Prop() skipped?: boolean;
 }
 
 export const WorkoutExerciseSchema = SchemaFactory.createForClass(WorkoutExercise);

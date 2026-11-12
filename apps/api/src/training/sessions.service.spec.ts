@@ -5,6 +5,7 @@ import { CatalogueService } from './catalogue.service';
 import { FakeModel, fakeMedia } from './fake-model.testing';
 import { MachinesService } from './machines.service';
 import { ProgressService } from './progress.service';
+import { PlansService } from './plans.service';
 import { SessionsService } from './sessions.service';
 
 const ME = 'user-me';
@@ -353,5 +354,190 @@ describe('ProgressService: records and history', () => {
     expect(next.nextCursor).toBeUndefined();
     expect((await f.progress.history(OTHER, f.bench)).sessions).toEqual([]);
     await expect(f.progress.history(ME, f.bench, 'nonsense')).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+// ------------------------------------------------------------------ spec 023: starting from a plan
+
+describe('SessionsService: plan workouts (spec 023)', () => {
+  function planFixture() {
+    const f = fixture();
+    const plansModel = new FakeModel([['userId', 'requestId']]);
+    const plans = new PlansService(plansModel as never, f.exercises as never);
+    const service = new SessionsService(
+      f.sessions as never,
+      f.workoutExercises as never,
+      f.sets as never,
+      new CatalogueService(f.exercises as never, f.workoutExercises as never, f.sets as never, fakeMedia() as never),
+      f.machines,
+      f.progress,
+      plans,
+    );
+    const planId = new Types.ObjectId();
+    plansModel.docs.push({
+      _id: planId,
+      name: 'Push / Pull',
+      seedKey: 'plan:pp',
+      archived: false,
+      workouts: [
+        {
+          id: 'pp:push',
+          name: 'Push',
+          exercises: [
+            { id: 'pp:push:0', exerciseId: f.bench, restSeconds: 150, targets: [{ type: 'warmup', reps: 10 }, { type: 'working', reps: 6, repsMax: 8 }, { type: 'working', reps: 6, repsMax: 8 }] },
+            { id: 'pp:push:1', exerciseId: f.pullUp, restSeconds: 90, targets: [{ type: 'working', reps: 8 }, { type: 'working', reps: 8 }] },
+          ],
+        },
+        { id: 'pp:empty', name: 'Empty', exercises: [] },
+      ],
+    });
+    const start = (requestId = randomUUID(), planWorkoutId = 'pp:push') =>
+      service.start(ME, { requestId, day: '2026-11-12', planId: String(planId), planWorkoutId }, T0);
+    return { ...f, service, plansModel, planId: String(planId), start };
+  }
+
+  it('copies the workout’s exercises and targets onto the session, in order', async () => {
+    const f = planFixture();
+    const session = await f.start();
+    expect(session.plan).toEqual({ planId: f.planId, planWorkoutId: 'pp:push', planName: 'Push / Pull', workoutName: 'Push' });
+    expect(session.exercises.map((e) => e.snapshot.name)).toEqual(['Barbell Bench Press', 'Pullups']);
+    expect(session.exercises[0].planned).toEqual({
+      restSeconds: 150,
+      targets: [{ type: 'warmup', reps: 10 }, { type: 'working', reps: 6, repsMax: 8 }, { type: 'working', reps: 6, repsMax: 8 }],
+    });
+    expect(session.exercises[0].openTargets).toHaveLength(3);
+    expect(session.exercises[0].skipped).toBe(false);
+  });
+
+  it('never doubles the exercises when the start is retried', async () => {
+    const f = planFixture();
+    const requestId = randomUUID();
+    const first = await f.start(requestId);
+    const again = await f.start(requestId);
+    expect(again.id).toBe(first.id);
+    expect(f.workoutExercises.docs).toHaveLength(2);
+  });
+
+  it('fills in a retried start whose first attempt added no exercises', async () => {
+    const f = planFixture();
+    const requestId = randomUUID();
+    const first = await f.start(requestId);
+    f.workoutExercises.docs.splice(0);
+    const again = await f.start(requestId);
+    expect(again.id).toBe(first.id);
+    expect(again.exercises).toHaveLength(2);
+  });
+
+  it('resumes an open workout instead, adding nothing', async () => {
+    const f = planFixture();
+    const open = await f.service.start(ME, { requestId: randomUUID(), day: '2026-11-12' }, T0);
+    const second = await f.start();
+    expect(second.id).toBe(open.id);
+    expect(second.resumed).toBe(true);
+    expect(second.exercises).toEqual([]);
+    expect(f.sessions.docs).toHaveLength(1);
+  });
+
+  it('answers 404 for unknown plans and workouts, someone else’s plan, and 400 for an empty workout', async () => {
+    const f = planFixture();
+    await expect(f.service.start(ME, { requestId: randomUUID(), day: '2026-11-12', planId: String(new Types.ObjectId()), planWorkoutId: 'x' })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(f.start(randomUUID(), 'nope')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(f.start(randomUUID(), 'pp:empty')).rejects.toBeInstanceOf(BadRequestException);
+    f.plansModel.docs[0]['userId'] = OTHER;
+    await expect(f.start()).rejects.toBeInstanceOf(NotFoundException);
+    await expect(f.service.start(ME, { requestId: randomUUID(), day: '2026-11-12', planId: f.planId })).rejects.toBeInstanceOf(BadRequestException);
+    expect(f.sessions.docs).toHaveLength(0);
+  });
+
+  it('keeps the suggestions and names when the plan is edited or deleted', async () => {
+    const f = planFixture();
+    const session = await f.start();
+    const plan = f.plansModel.docs[0] as unknown as Record<string, unknown> & { workouts: { name: string; exercises: { targets: unknown[] }[] }[] };
+    plan['name'] = 'Renamed';
+    plan.workouts[0].name = 'Renamed push';
+    plan.workouts[0].exercises[0].targets = [{ type: 'working', reps: 1 }];
+    let detail = await f.service.detail(ME, session.id, T0);
+    expect(detail.plan?.planName).toBe('Push / Pull');
+    expect(detail.plan?.workoutName).toBe('Push');
+    expect(detail.exercises[0].planned?.targets).toHaveLength(3);
+    f.plansModel.docs.splice(0);
+    detail = await f.service.detail(ME, session.id, T0);
+    expect(detail.exercises[0].openTargets).toHaveLength(3);
+  });
+
+  it('uses targets up as sets are logged, and gives them back when a set is deleted', async () => {
+    const f = planFixture();
+    const session = await f.start();
+    const bench = session.exercises[0];
+    const { set } = await f.service.addSet(ME, session.id, bench.id, { requestId: randomUUID(), type: 'warmup', reps: 10, weightGrams: 40_000 }, min(1));
+    let detail = await f.service.detail(ME, session.id, min(2));
+    expect(detail.exercises[0].openTargets).toEqual([{ type: 'working', reps: 6, repsMax: 8 }, { type: 'working', reps: 6, repsMax: 8 }]);
+    await f.service.removeSet(ME, set.id);
+    detail = await f.service.detail(ME, session.id, min(3));
+    expect(detail.exercises[0].openTargets).toHaveLength(3);
+  });
+
+  it('skips and un-skips a planned exercise, and refuses skipping one added by hand', async () => {
+    const f = planFixture();
+    const session = await f.start();
+    const skipped = await f.service.updateExercise(ME, session.id, session.exercises[1].id, { skipped: true });
+    expect(skipped.skipped).toBe(true);
+    expect(skipped.openTargets).toEqual([]);
+    const back = await f.service.updateExercise(ME, session.id, session.exercises[1].id, { skipped: false });
+    expect(back.openTargets).toHaveLength(2);
+    const added = await f.service.addExercise(ME, session.id, { requestId: randomUUID(), exerciseId: f.bench });
+    await expect(f.service.updateExercise(ME, session.id, added.id, { skipped: true })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('swaps an exercise with no sets in place, carrying targets when the measure matches', async () => {
+    const f = planFixture();
+    const press = new Types.ObjectId();
+    const plank = new Types.ObjectId();
+    f.exercises.docs.push(
+      { _id: press, name: 'Machine Press', searchName: 'machine press', primaryMuscles: ['chest'], secondaryMuscles: [], equipmentType: 'machine', measure: 'weight_reps', seedKey: 'fedb:mp', archived: false, aliases: [] },
+      { _id: plank, name: 'Plank', searchName: 'plank', primaryMuscles: ['abdominals'], secondaryMuscles: [], equipmentType: 'bodyweight', measure: 'duration', seedKey: 'fedb:plank', archived: false, aliases: [] },
+    );
+    const session = await f.start();
+    const requestId = randomUUID();
+    const swapped = await f.service.swapExercise(ME, session.id, session.exercises[0].id, { requestId, exerciseId: String(press) });
+    expect(swapped.snapshot.name).toBe('Machine Press');
+    expect(swapped.order).toBe(0);
+    expect(swapped.planned?.targets).toHaveLength(3);
+    expect(swapped.planned?.targets[1]).toEqual({ type: 'working', reps: 6, repsMax: 8 });
+    const retried = await f.service.swapExercise(ME, session.id, session.exercises[0].id, { requestId, exerciseId: String(press) });
+    expect(retried.id).toBe(swapped.id);
+    const toPlank = await f.service.swapExercise(ME, session.id, session.exercises[1].id, { requestId: randomUUID(), exerciseId: String(plank) });
+    expect(toPlank.planned?.targets).toEqual([{ type: 'working' }, { type: 'working' }]);
+    const detail = await f.service.detail(ME, session.id, T0);
+    expect(detail.exercises.map((e) => e.snapshot.name)).toEqual(['Machine Press', 'Plank']);
+  });
+
+  it('refuses to swap an exercise that has sets', async () => {
+    const f = planFixture();
+    const session = await f.start();
+    await f.service.addSet(ME, session.id, session.exercises[0].id, { requestId: randomUUID(), reps: 8, weightGrams: 60_000 }, min(1));
+    await expect(
+      f.service.swapExercise(ME, session.id, session.exercises[0].id, { requestId: randomUUID(), exerciseId: f.pullUp }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('keeps only what was logged on finish, and still refuses an empty finish', async () => {
+    const f = planFixture();
+    const session = await f.start();
+    await expect(f.service.finish(ME, session.id, 'now', min(5))).rejects.toBeInstanceOf(ConflictException);
+    expect(f.workoutExercises.docs).toHaveLength(2);
+    await f.service.addSet(ME, session.id, session.exercises[0].id, { requestId: randomUUID(), reps: 8, weightGrams: 60_000 }, min(1));
+    const byHand = await f.service.addExercise(ME, session.id, { requestId: randomUUID(), exerciseId: f.pullUp });
+    const done = await f.service.finish(ME, session.id, 'now', min(30));
+    expect(done.exercises.map((e) => e.id)).toEqual([session.exercises[0].id, byHand.id]);
+    const list = await f.service.list(ME);
+    expect(list.sessions[0].plan).toEqual({ planName: 'Push / Pull', workoutName: 'Push' });
+  });
+
+  it('starting an empty workout is unchanged', async () => {
+    const f = planFixture();
+    const session = await f.service.start(ME, { requestId: randomUUID(), day: '2026-11-12' }, T0);
+    expect(session.plan).toBeUndefined();
+    expect(session.exercises).toEqual([]);
   });
 });

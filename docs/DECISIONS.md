@@ -1363,3 +1363,23 @@ current goal; this is labelled in the badge's description.
 **Earned dates come from history.** An award is dated the day the history reached the tier, not
 the day the check ran. Launch backfill and back-dated logging then follow one rule, and no "first
 evaluation" marker is needed.
+
+## 2026-11-12: How workout plans become a workout (spec 023)
+
+- **A started plan copies its targets onto the workout (`planned`) — a third snapshot.** Editing
+  or deleting a plan must not change a workout in progress or in history, and the suggestions must
+  survive a reload or another device. Reading the plan live would let an edit rewrite a workout.
+  Suggestions are not stored as unlogged sets: every volume, record and summary query would have
+  to exclude them forever.
+- **Logged sets use targets up in order; nothing links a set to a target.** "Three sets of eight"
+  means three sets, so the open suggestions are `targets.slice(loggedCount)`. No extra field to
+  keep consistent through edits and deletes, and deleting a set brings its suggestion back.
+- **A swap is a new row.** `exerciseId` stays immutable on a workout exercise, so swapping replaces
+  the row in the same position, and only before any set is logged.
+- **One document per plan, with stable inner ids.** A plan is read and saved whole by one person;
+  sessions point at a workout `id`, so ids survive edits and re-seeds (seeded workouts use the
+  file's keys).
+- **Nested Mongoose classes need `@Schema()`.** The plan's workout/exercise/target classes first
+  had only `@Prop`s and `SchemaFactory.createForClass`; Mongo then stored every workout as `{}`
+  while every unit test (on the in-memory fake) passed. Found by running the app. A string-union
+  field also needs an explicit `type: String`, or the API refuses to boot.

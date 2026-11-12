@@ -27,3 +27,4 @@ export * from './lib/share-out';
 export * from './lib/training';
 export * from './lib/training-format';
 export * from './lib/badges';
+export * from './lib/training-plans';

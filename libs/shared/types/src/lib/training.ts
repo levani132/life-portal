@@ -266,6 +266,11 @@ export interface SessionExercise {
   previous?: { sessionId: string; day: string; sets: WorkoutSet[] };
   /** The best estimate from this session's sets of the exercise. */
   oneRepMax?: OneRepMaxEstimate;
+  /** Spec 023: the plan's targets, copied when the workout started. Never edited afterwards. */
+  planned?: PlannedExercise;
+  /** Derived: the planned targets not yet used up by logged sets, in order. `[]` when skipped. */
+  openTargets: PlanTarget[];
+  skipped: boolean;
 }
 
 export interface SessionListItem {
@@ -277,6 +282,7 @@ export interface SessionListItem {
   durationSeconds: number;
   exerciseNames: string[];
   setCount: number;
+  plan?: { planName: string; workoutName: string };
 }
 
 export interface SessionDetail {
@@ -293,6 +299,8 @@ export interface SessionDetail {
   /** When the last set was logged, if any. */
   lastSetAt?: string;
   exercises: SessionExercise[];
+  /** Spec 023: the plan workout this session was started from, with names as they were then. */
+  plan?: SessionPlan;
   /** Set when `POST /sessions` found a session already open. */
   resumed?: boolean;
 }
@@ -307,6 +315,15 @@ export interface SessionPage {
 export interface StartSessionInput {
   requestId: string;
   day: string;
+  /** Spec 023: start from a plan's workout. Both or neither. */
+  planId?: string;
+  planWorkoutId?: string;
+}
+
+export interface SwapSessionExerciseInput {
+  requestId: string;
+  exerciseId: string;
+  machineId?: string;
 }
 
 export interface AddSessionExerciseInput {
@@ -350,3 +367,106 @@ export interface SetInput extends SetValues {
 }
 
 export type SetPatch = Partial<Omit<SetInput, 'requestId'>>;
+
+// ------------------------------------------------------------------ plans (spec 023)
+
+export const PLAN_TARGET_TYPES = ['warmup', 'working'] as const;
+export type PlanTargetType = (typeof PLAN_TARGET_TYPES)[number];
+
+/** What one planned set aims for. Same fields and units as a set; which apply follows the measure. */
+export interface PlanTarget extends SetValues {
+  type: PlanTargetType;
+  /** With `reps`, the top of a rep range (`reps`–`repsMax`). */
+  repsMax?: number;
+}
+
+export const PLAN_LIMITS = {
+  name: 80,
+  description: 1000,
+  workouts: 14,
+  exercises: 30,
+  targetsMin: 1,
+  targetsMax: 20,
+  restMax: 900,
+  note: 200,
+  ownPlans: 100,
+} as const;
+
+export interface PlanExerciseInput {
+  id?: string;
+  exerciseId: string;
+  restSeconds?: number;
+  note?: string;
+  targets: PlanTarget[];
+}
+
+export interface PlanWorkoutInput {
+  id?: string;
+  name: string;
+  exercises: PlanExerciseInput[];
+}
+
+export interface PlanInput {
+  name: string;
+  description?: string;
+  workouts: PlanWorkoutInput[];
+}
+
+export interface PlanListItem {
+  id: string;
+  name: string;
+  description?: string;
+  isOwn: boolean;
+  workoutCount: number;
+  exerciseCount: number;
+  /** The last day any of its workouts was done (US3). */
+  lastDoneDay?: string;
+  nextWorkout?: { id: string; name: string };
+}
+
+export interface PlanExerciseDetail {
+  id: string;
+  exerciseId: string;
+  exercise: { name: string; measure: Measure; equipmentType: EquipmentType; archived: boolean };
+  restSeconds?: number;
+  note?: string;
+  targets: PlanTarget[];
+}
+
+export interface PlanWorkoutDetail {
+  id: string;
+  name: string;
+  lastDoneDay?: string;
+  isNext: boolean;
+  exercises: PlanExerciseDetail[];
+}
+
+export interface PlanDetail {
+  id: string;
+  name: string;
+  description?: string;
+  isOwn: boolean;
+  archived: boolean;
+  copiedFrom?: { planId: string; name: string };
+  workouts: PlanWorkoutDetail[];
+}
+
+export interface PlanList {
+  shared: PlanListItem[];
+  own: PlanListItem[];
+}
+
+/** Frozen on a session started from a plan. */
+export interface SessionPlan {
+  planId: string;
+  planWorkoutId: string;
+  planName: string;
+  workoutName: string;
+}
+
+/** Frozen on a workout exercise that came from a plan. */
+export interface PlannedExercise {
+  restSeconds?: number;
+  note?: string;
+  targets: PlanTarget[];
+}

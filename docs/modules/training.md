@@ -50,8 +50,9 @@ re-fills its weights from grams so a kg number is never sent as lb.
 | `exercises` | The catalogue. Shared rows have no `userId` and are written only by the seeder; private rows have one. One catalogue for everyone instead of a copy per account. |
 | `training_machines` | Specific machines, private to their creator (US2). The dataset only knows generic equipment. |
 | `training_profiles` | One row per user: `weightUnit`, `defaultRestSeconds`. Upserted on first read, seeding only fields the caller did not send. |
-| `workout_sessions` | One workout: `day`, `status`, `startedAt`, `endedAt?`, `notes?`, `requestId`. |
-| `workout_exercises` | An exercise within a session, in `order`, with a frozen `snapshot`. |
+| `training_plans` | Workout plans (spec 023). One document per plan with `workouts[] → exercises[] → targets[]` embedded, because a plan is read and saved whole. Shared (ready-made) plans have no `userId`, a `seedKey` and `seedVersion`, and are written only by `PlanSeeder`; own plans have a `userId`. Workout and exercise `id`s are stable strings (seed keys like `push-pull-legs:push` for shared plans) because sessions point at them. `archived` marks a shared plan dropped from the seed file. |
+| `workout_sessions` | One workout: `day`, `status`, `startedAt`, `endedAt?`, `notes?`, `requestId`, and `plan? {planId, planWorkoutId, planName, workoutName}` when started from a plan (frozen). |
+| `workout_exercises` | An exercise within a session, in `order`, with a frozen `snapshot`; from a plan also `planned {planExerciseId, restSeconds?, note?, targets}` (frozen) and `skipped?`. |
 | `workout_sets` | **The event row.** One performed set. Everything about progress derives from these. |
 
 Sessions, exercises and sets are three collections, not one document with arrays, so two devices
@@ -64,7 +65,9 @@ on `(userId, exerciseId, loggedAt)`.
   enforces "at most one open workout". `status` is stored beside `endedAt` only because Mongo
   cannot build a partial index on a field being absent.
 - Unique `(userId, requestId)` on sessions, workout exercises and sets: retry safety.
-- `exercises.seedKey` unique where present: the seeder's upsert key.
+- `exercises.seedKey` unique where present: the seeder's upsert key. Same for `training_plans.seedKey`.
+- `workout_sessions {userId, 'plan.planId', day}`: plan progress (spec 023 US3).
+- `training_plans {userId, 'workouts.exercises.exerciseId'}`: is an own exercise used by a plan.
 
 ## The snapshot rule (second instance, after `meal_entries`)
 
@@ -79,6 +82,49 @@ three). Which machine was used is a correction to what happened, not a refresh o
 so renaming the machine later still leaves past workouts alone. The exercise part is never
 refreshed. A set's `exerciseId` is copied from its workout exercise at creation, as an immutable
 reference for history queries.
+
+### Third instance: a plan's targets (spec 023)
+
+Starting a plan's workout copies each planned exercise's targets onto its workout exercise as
+`planned`, and the plan and workout names onto the session as `plan`. Editing or deleting the
+plan afterwards changes neither an open nor a finished workout. Same rules as the snapshot: built
+by the server from the plan, no DTO field for either, never refreshed. `skipped` is the only
+plan-related field a PATCH sets.
+
+## Plans (spec 023)
+
+**Ready-made plans** live in `apps/api/src/training/catalogue/plans.json` (our own content;
+exercises named by catalogue `seedKey`, e.g. `fedb:Barbell_Squat`). `PlanSeeder` runs at the end
+of `CatalogueSeeder.onModuleInit`, because it resolves those keys to exercise ids: when fewer
+shared plans carry the file's version than the file has, it upserts each by `seedKey`; a plan
+naming a missing exercise or a target its measure does not allow is logged and skipped; a shared
+plan dropped from the file is archived, never deleted. `plan.seeder.spec.ts` checks the real file
+against the vendored catalogue, so a bad plan fails the tests before it can be skipped in
+production. Like the catalogue, shared plans bypass `OwnedCrudService` (`PlansService` writes its
+`$or` filters itself).
+
+**Targets** carry the same fields as a set, plus `repsMax` for a range and `type`
+(`warmup`/`working`). `validatePlanTarget` requires reps for rep measures, time for `duration`
+and distance or time for `distance_duration`; weight is optional (the person fills it in).
+`validatePlan` checks `PLAN_LIMITS` (name 80, description 1000, 14 workouts, 30 exercises a
+workout, 1–20 targets, rest 0–900 s). Both live in `libs/shared/domain/src/lib/training-plans.ts`.
+
+**Suggestions** in a started workout are derived, never stored as sets:
+- `openTargets(planned, loggedSetCount, skipped)` = `targets.slice(loggedSetCount)`: logged sets
+  use targets up in order, whatever their values; deleting a set brings its target back.
+- `prefillFor(measure, target, previousSets, position)`: last time's set at the same position,
+  else last time's last set, else the target (low end of a range, planned weight if any). The web
+  carries a weight logged earlier in the same workout into a target without one, so the second
+  set of a new exercise is still one tap.
+- **Swap** (`POST …/exercises/:weId/swap`) replaces a workout exercise that has no sets with a new
+  row in the same `order` (409 `HAS_SETS` otherwise): `exerciseId` stays immutable. Targets carry
+  over when the measure matches; otherwise the same number of empty targets of the same types.
+- **Finish** deletes workout exercises with `planned` and no sets (skipped or not), after the
+  `EMPTY_SESSION` check, so a workout with nothing logged keeps its suggestions.
+- A plan start's exercise rows get `requestId = <session requestId>:<planExerciseId>`, so a
+  retried start fills in what is missing and never doubles. Starting while a workout is open
+  returns it with `resumed: true` and adds nothing. A workout with no exercises answers 400
+  `EMPTY_WORKOUT`.
 
 ## Measures
 
@@ -172,6 +218,11 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `PATCH`/`DELETE` | `/sessions/:id/exercises/:weId` | `{notes?, machineId?}` (`null` clears the machine); delete removes its sets. |
 | `POST` | `/sessions/:id/exercises/:weId/sets` | Validated against the snapshot's measure. Returns `{set, records}`; bodyweight and assisted sets carry `effectiveLoad` when a weigh-in exists. |
 | `PATCH`/`DELETE` | `/sets/:setId` | `null` clears an optional field. PATCH returns `{set, records}`. |
+| `GET` | `/plans` | `{shared, own}`; shared in seed-file order, archived left out (spec 023). |
+| `GET` | `/plans/:id` | Workouts with each exercise's name, measure and targets. Archived shared plans still readable. |
+| `POST` | `/sessions` `{…, planId, planWorkoutId}` | Spec 023: both or neither; copies the workout's exercises and targets. |
+| `PATCH` | `/sessions/:id/exercises/:weId` `{skipped}` | Only for an exercise with `planned` (400 otherwise). |
+| `POST` | `/sessions/:id/exercises/:weId/swap` `{requestId, exerciseId, machineId?}` | 409 `HAS_SETS` once a set is logged. |
 | `GET` | `/summary?today=` | The Home card's figures (`TrainingSummary`, with `weightUnit`, read without creating a profile); also in `GET /api/dashboard`. |
 
 ## Derived values (computed on read, never stored)
@@ -254,7 +305,8 @@ real instants set by the server, because durations need them.
 
 ## Web
 
-`/training` has three tabs: Workout (the open session, or Start workout), History (past sessions,
+`/training` has four tabs: Workout (the open session, or Start empty workout and Choose a plan),
+Plans (ready-made and own plans; a plan's workouts each with Start; spec 023), History (past sessions,
 each opening for reading and editing) and Exercises (the catalogue with filters and a detail view,
 where own exercises can be edited or deleted, and My machines). Adding an exercise to a workout is
 two steps: the exercise (with "Create exercise" for what the catalogue lacks), then which machine
@@ -268,8 +320,8 @@ closing the app with writes still pending loses them. Weight fields use `Input` 
 
 There is no account deletion feature yet (as for messages and notifications). When one is added,
 it must remove the user's `workout_sessions`, `workout_exercises`, `workout_sets`,
-`training_profiles`, private `exercises` and `training_machines`, and the photos those two
-reference in storage. Shared catalogue rows have no `userId` and stay.
+`training_profiles`, own `training_plans`, private `exercises` and `training_machines`, and the photos those two
+reference in storage. Shared catalogue rows and ready-made plans have no `userId` and stay.
 
 ## Verification
 

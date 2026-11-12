@@ -39,6 +39,9 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 export class StartSessionDto {
   @IsUUID() requestId!: string;
   @Matches(DAY, { message: 'day must be a calendar date in YYYY-MM-DD form' }) day!: string;
+  /** Spec 023: start a plan's workout. Both or neither; checked in the service. */
+  @IsOptional() @IsMongoId() planId?: string;
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(100) planWorkoutId?: string;
 }
 
 export class UpdateSessionDto {
@@ -61,6 +64,15 @@ export class UpdateSessionExerciseDto {
   @IsOptional() @IsString() @MaxLength(500) notes?: string;
   /** `null` clears the machine. */
   @IsOptional() @ValidateIf((_, value) => value !== null) @IsMongoId() machineId?: string | null;
+  /** Spec 023: only for an exercise that came from a plan. */
+  @IsOptional() @IsBoolean() skipped?: boolean;
+}
+
+/** Spec 023: the replacement for an exercise with no sets. There is no field for `planned`. */
+export class SwapSessionExerciseDto {
+  @IsUUID() requestId!: string;
+  @IsMongoId() exerciseId!: string;
+  @IsOptional() @IsMongoId() machineId?: string;
 }
 
 // ------------------------------------------------------------------ own exercises and machines

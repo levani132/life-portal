@@ -7,6 +7,7 @@ import type { SessionDetail, SessionListItem, SessionPage } from '@life-portal/s
 import { formatDay } from '@life-portal/shared-domain';
 import { AppShell, PageHeader } from '../../components/app-shell';
 import { ExerciseLibrary } from '../../components/training/exercise-library';
+import { Plans } from '../../components/training/plans';
 import { TrainingSettings } from '../../components/training/training-settings';
 import { CurrentWorkout, WorkoutSession } from '../../components/training/workout-session';
 import { EmptyState, ErrorNote, Panel, Spinner } from '../../components/ui';
@@ -16,6 +17,7 @@ import { formatDuration, sessionKey } from '../../lib/training';
 
 const TABS = [
   { id: 'workout', label: 'Workout' },
+  { id: 'plans', label: 'Plans' },
   { id: 'history', label: 'History' },
   { id: 'exercises', label: 'Exercises' },
 ] as const;
@@ -51,7 +53,8 @@ function Training() {
           </button>
         ))}
       </div>
-      {tab === 'workout' && <CurrentWorkout />}
+      {tab === 'workout' && <CurrentWorkout onBrowsePlans={() => setTab('plans')} />}
+      {tab === 'plans' && <Plans onStarted={() => setTab('workout')} />}
       {tab === 'history' && <History />}
       {tab === 'exercises' && <ExerciseLibrary />}
     </>
@@ -99,6 +102,11 @@ function History() {
               <span className="min-w-0">
                 <span className="block text-sm font-medium">
                   {formatDay(session.day)}
+                  {session.plan && (
+                    <span className="ml-2 font-normal text-ink-muted">
+                      {session.plan.workoutName} · {session.plan.planName}
+                    </span>
+                  )}
                   {session.status === 'open' && <span className="ml-2 text-xs text-emerald-400">in progress</span>}
                 </span>
                 <span className="block truncate text-xs text-ink-faint">

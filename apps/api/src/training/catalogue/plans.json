@@ -1,0 +1,943 @@
+{
+  "version": 1,
+  "plans": [
+    {
+      "seedKey": "plan:full-body",
+      "name": "Full body (3 days a week)",
+      "description": "Two alternating whole-body workouts. Train three days a week, A then B then A, and carry on in order. A good first plan with a barbell.",
+      "workouts": [
+        {
+          "key": "full-body:a",
+          "name": "Workout A",
+          "exercises": [
+            {
+              "exercise": "fedb:Barbell_Squat",
+              "restSeconds": 150,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Barbell_Bench_Press_-_Medium_Grip",
+              "restSeconds": 150,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Bent_Over_Barbell_Row",
+              "restSeconds": 120,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Plank",
+              "restSeconds": 60,
+              "targets": [
+                {
+                  "type": "working",
+                  "durationSeconds": 45
+                },
+                {
+                  "type": "working",
+                  "durationSeconds": 45
+                },
+                {
+                  "type": "working",
+                  "durationSeconds": 45
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "full-body:b",
+          "name": "Workout B",
+          "exercises": [
+            {
+              "exercise": "fedb:Romanian_Deadlift",
+              "restSeconds": 150,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Standing_Military_Press",
+              "restSeconds": 150,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Wide-Grip_Lat_Pulldown",
+              "restSeconds": 90,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 12
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Dumbbell_Lunges",
+              "restSeconds": 90,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "seedKey": "plan:upper-lower",
+      "name": "Upper / Lower",
+      "description": "An upper-body day and a lower-body day. Repeat the pair two times a week for four sessions.",
+      "workouts": [
+        {
+          "key": "upper-lower:upper",
+          "name": "Upper",
+          "exercises": [
+            {
+              "exercise": "fedb:Barbell_Bench_Press_-_Medium_Grip",
+              "restSeconds": 150,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Seated_Cable_Rows",
+              "restSeconds": 120,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Seated_Dumbbell_Press",
+              "restSeconds": 90,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Wide-Grip_Lat_Pulldown",
+              "restSeconds": 90,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Dumbbell_Bicep_Curl",
+              "restSeconds": 60,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Triceps_Pushdown",
+              "restSeconds": 60,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "upper-lower:lower",
+          "name": "Lower",
+          "exercises": [
+            {
+              "exercise": "fedb:Barbell_Squat",
+              "restSeconds": 180,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Romanian_Deadlift",
+              "restSeconds": 150,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Leg_Press",
+              "restSeconds": 120,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Lying_Leg_Curls",
+              "restSeconds": 90,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Standing_Calf_Raises",
+              "restSeconds": 60,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                },
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                },
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "seedKey": "plan:push-pull-legs",
+      "name": "Push / Pull / Legs",
+      "description": "Pressing, pulling and leg days in turn. Run it three to six days a week, always continuing with the next workout.",
+      "workouts": [
+        {
+          "key": "push-pull-legs:push",
+          "name": "Push",
+          "exercises": [
+            {
+              "exercise": "fedb:Barbell_Bench_Press_-_Medium_Grip",
+              "restSeconds": 150,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Standing_Military_Press",
+              "restSeconds": 120,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 10
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Incline_Dumbbell_Press",
+              "restSeconds": 90,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 12
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Side_Lateral_Raise",
+              "restSeconds": 60,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                },
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                },
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Triceps_Pushdown",
+              "restSeconds": 60,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "push-pull-legs:pull",
+          "name": "Pull",
+          "exercises": [
+            {
+              "exercise": "fedb:Barbell_Deadlift",
+              "restSeconds": 180,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 5
+                },
+                {
+                  "type": "working",
+                  "reps": 5
+                },
+                {
+                  "type": "working",
+                  "reps": 5
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Pullups",
+              "restSeconds": 120,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 10
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 10
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 10
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Seated_Cable_Rows",
+              "restSeconds": 90,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 12
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Face_Pull",
+              "restSeconds": 60,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                },
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                },
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Hammer_Curls",
+              "restSeconds": 60,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "push-pull-legs:legs",
+          "name": "Legs",
+          "exercises": [
+            {
+              "exercise": "fedb:Barbell_Squat",
+              "restSeconds": 180,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 8
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Leg_Press",
+              "restSeconds": 120,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Lying_Leg_Curls",
+              "restSeconds": 90,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Leg_Extensions",
+              "restSeconds": 60,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                },
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                },
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Seated_Calf_Raise",
+              "restSeconds": 60,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                },
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                },
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                },
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "seedKey": "plan:bodyweight",
+      "name": "Bodyweight at home",
+      "description": "One whole-body workout with no equipment beyond a sturdy table or bar for rows. Do it two or three times a week.",
+      "workouts": [
+        {
+          "key": "bodyweight:full",
+          "name": "Full body",
+          "exercises": [
+            {
+              "exercise": "fedb:Pushups",
+              "restSeconds": 60,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 15
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 15
+                },
+                {
+                  "type": "working",
+                  "reps": 8,
+                  "repsMax": 15
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Bodyweight_Squat",
+              "restSeconds": 60,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 15,
+                  "repsMax": 20
+                },
+                {
+                  "type": "working",
+                  "reps": 15,
+                  "repsMax": 20
+                },
+                {
+                  "type": "working",
+                  "reps": 15,
+                  "repsMax": 20
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Inverted_Row",
+              "restSeconds": 60,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 6,
+                  "repsMax": 12
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Bodyweight_Walking_Lunge",
+              "restSeconds": 60,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                },
+                {
+                  "type": "working",
+                  "reps": 10,
+                  "repsMax": 12
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Butt_Lift_Bridge",
+              "restSeconds": 45,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                },
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                },
+                {
+                  "type": "working",
+                  "reps": 12,
+                  "repsMax": 15
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Plank",
+              "restSeconds": 45,
+              "targets": [
+                {
+                  "type": "working",
+                  "durationSeconds": 45
+                },
+                {
+                  "type": "working",
+                  "durationSeconds": 45
+                },
+                {
+                  "type": "working",
+                  "durationSeconds": 45
+                }
+              ]
+            },
+            {
+              "exercise": "fedb:Crunches",
+              "restSeconds": 45,
+              "targets": [
+                {
+                  "type": "working",
+                  "reps": 15,
+                  "repsMax": 20
+                },
+                {
+                  "type": "working",
+                  "reps": 15,
+                  "repsMax": 20
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

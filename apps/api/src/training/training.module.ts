@@ -24,6 +24,8 @@ import { RequireModule } from '../access/access.module';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { CatalogueSeeder } from './catalogue.seeder';
 import { CatalogueService } from './catalogue.service';
+import { PlanSeeder } from './plan.seeder';
+import { PlansService } from './plans.service';
 import { MachinesService } from './machines.service';
 import { ProgressService } from './progress.service';
 import { NutritionModule } from '../nutrition/nutrition.module';
@@ -39,6 +41,7 @@ import {
   FinishSessionDto,
   ReorderDto,
   StartSessionDto,
+  SwapSessionExerciseDto,
   UpdateExerciseDto,
   UpdateMachineDto,
   UpdateSessionDto,
@@ -51,6 +54,8 @@ import {
   ExerciseSchema,
   TrainingMachine,
   TrainingMachineSchema,
+  TrainingPlan,
+  TrainingPlanSchema,
   TrainingProfile,
   TrainingProfileSchema,
   WorkoutExercise,
@@ -87,6 +92,7 @@ export class TrainingController {
     private readonly machines: MachinesService,
     private readonly progress: ProgressService,
     private readonly summaries: TrainingSummaryService,
+    private readonly plans: PlansService,
   ) {}
 
   /** The Home card's figures, for the person's `today` (spec 020 US4). */
@@ -187,6 +193,18 @@ export class TrainingController {
     return this.machines.remove(userId, id);
   }
 
+  // ---------------------------------------------------------------- plans (spec 023)
+
+  @Get('plans')
+  listPlans(@CurrentUser('userId') userId: string) {
+    return this.plans.list(userId);
+  }
+
+  @Get('plans/:id')
+  plan(@CurrentUser('userId') userId: string, @Param('id') id: string) {
+    return this.plans.detail(userId, id);
+  }
+
   // ---------------------------------------------------------------- sessions
 
   @Post('sessions')
@@ -271,6 +289,17 @@ export class TrainingController {
     return this.sessions.updateExercise(userId, id, weId, dto);
   }
 
+  /** Spec 023: replace an exercise that has no sets yet, in the same place. */
+  @Post('sessions/:id/exercises/:weId/swap')
+  swapExercise(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Param('weId') weId: string,
+    @Body() dto: SwapSessionExerciseDto,
+  ) {
+    return this.sessions.swapExercise(userId, id, weId, dto);
+  }
+
   @Delete('sessions/:id/exercises/:weId')
   removeExercise(
     @CurrentUser('userId') userId: string,
@@ -313,6 +342,7 @@ export class TrainingController {
     MongooseModule.forFeature([
       { name: Exercise.name, schema: ExerciseSchema },
       { name: TrainingMachine.name, schema: TrainingMachineSchema },
+      { name: TrainingPlan.name, schema: TrainingPlanSchema },
       { name: TrainingProfile.name, schema: TrainingProfileSchema },
       { name: WorkoutSession.name, schema: WorkoutSessionSchema },
       { name: WorkoutExercise.name, schema: WorkoutExerciseSchema },
@@ -320,7 +350,7 @@ export class TrainingController {
     ]),
   ],
   controllers: [TrainingController],
-  providers: [CatalogueSeeder, CatalogueService, MachinesService, ProgressService, TrainingProfileService, SessionsService, TrainingSummaryService],
+  providers: [CatalogueSeeder, PlanSeeder, PlansService, CatalogueService, MachinesService, ProgressService, TrainingProfileService, SessionsService, TrainingSummaryService],
   exports: [SessionsService, TrainingSummaryService],
 })
 export class TrainingModule {}

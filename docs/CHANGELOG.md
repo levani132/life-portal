@@ -2,6 +2,17 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-12: Workout plans
+
+- **Ready-made plans.** Training has a Plans tab with four plans written for this app: Full body,
+  Upper / Lower, Push / Pull / Legs and Bodyweight at home. Open one and tap Start on a workout.
+- **Suggested sets.** A plan workout opens with its exercises and planned sets as suggestions,
+  pre-filled from what you did last time (or from the plan). When you did what it says, the tick
+  logs it in one tap; otherwise change the values and log the set as usual.
+- **Change it as you go.** Skip an exercise, swap it for another before you log it, remove it or
+  add your own. Finishing keeps only what you logged, and History shows the workout under its
+  plan name. Starting an empty workout works as before.
+
 ## 2026-11-12: Badges on your profile
 
 - **A Badges tab on your own profile.** It lists what you've earned from what you already do:
