@@ -18,6 +18,7 @@ import { HomeWidget } from './home-widget';
 import { WidgetCarousel } from './widget-carousel';
 import { LogFoodModal } from './log-food-modal';
 import { PostsList } from './posts';
+import { HomeFeed } from './home-feed';
 import {
   EmptyState,
   ErrorNote,
@@ -153,7 +154,8 @@ export function Dashboard() {
         </WidgetCarousel>
       )}
 
-      {canReadPosts && (
+      {canReadPosts && portal.data?.access.forYou && <HomeFeed />}
+      {canReadPosts && !portal.data?.access.forYou && (
         <section
           id="wall"
           className="mt-5 scroll-mt-20"

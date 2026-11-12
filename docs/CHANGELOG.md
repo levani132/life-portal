@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-12: For You and Friends on Home (behind a flag)
+
+Where the flag is on, Home's feed has two tabs under the widgets. **For You** opens first and
+shows public posts from people across Life Portal who chose to be found; **Friends** is the feed
+you had before. Each tab keeps its place and its page when you switch, the strip stays under the
+header while you scroll, and Home remembers which tab you were on until you close the app.
+
 ## 2026-11-12: For You feed API (behind a flag)
 
 A new feed source finds public posts from people across Life Portal, newest first, for the

@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Apple,
   CalendarDays,
@@ -48,25 +48,40 @@ import {
 export function PostsList({
   authorId,
   preview = 'normal',
+  feed = 'wall',
+  empty,
 }: {
   authorId?: string;
   preview?: 'normal' | 'friend' | 'stranger';
+  /** `wall` is Wall and profiles (`GET /posts`); `forYou` is public discovery (spec 018). */
+  feed?: 'wall' | 'forYou';
+  /** Replaces the default empty-state card. */
+  empty?: ReactNode;
 }) {
   const [cursor, setCursor] = useState<string | undefined>();
   const [history, setHistory] = useState<(string | undefined)[]>([]);
-  const [scope, setScope] = useState(`${authorId ?? ''}:${preview}`);
-  const nextScope = `${authorId ?? ''}:${preview}`;
+  const [scope, setScope] = useState(`${feed}:${authorId ?? ''}:${preview}`);
+  const nextScope = `${feed}:${authorId ?? ''}:${preview}`;
   if (scope !== nextScope) {
     setScope(nextScope);
     setCursor(undefined);
     setHistory([]);
   }
-  const query = new URLSearchParams({
-    ...(authorId ? { authorId } : {}),
-    preview,
-    ...(cursor ? { cursor } : {}),
-  });
-  const result = useApi<PostPage>(`/posts?${query}`, SOCIAL_REFRESH);
+  const query = new URLSearchParams(
+    feed === 'forYou'
+      ? { ...(cursor ? { cursor } : {}) }
+      : {
+          ...(authorId ? { authorId } : {}),
+          preview,
+          ...(cursor ? { cursor } : {}),
+        },
+  );
+  const path = feed === 'forYou' ? '/posts/for-you' : '/posts';
+  const search = query.toString();
+  const result = useApi<PostPage>(
+    search ? `${path}?${search}` : path,
+    SOCIAL_REFRESH,
+  );
   if (result.error)
     return <ErrorNote message={(result.error as Error).message} />;
   if (!result.data || result.isLoading)
@@ -78,7 +93,8 @@ export function PostsList({
           <PostCard key={post.repost?.id ?? post.id} post={post} />
         ))}
       </div>
-      {result.data.posts.length === 0 && (
+      {result.data.posts.length === 0 && history.length === 0 && empty}
+      {result.data.posts.length === 0 && !empty && (
         <div className="card p-6 text-sm text-ink-muted">
           {authorId
             ? 'No posts shared with this audience yet.'
