@@ -18,7 +18,7 @@ malformed or foreign ids answer 404, weights always grams. New types live in
 | `DELETE` | `/plans/:id` | | `{id, deleted: true}`. Own plans only (shared → 404). Sessions are untouched. |
 
 Validation (400, message names the field and limit) uses `validatePlan`: name 1–80, description
-≤ 1000, 1–14 workouts, ≤ 30 exercises a workout, 1–20 targets an exercise, rest 0–900 s, targets
+≤ 1000, 0–14 workouts, ≤ 30 exercises a workout, 1–20 targets an exercise, rest 0–900 s, targets
 shaped by the exercise's measure (`reps` required for rep measures, `repsMax > reps`, `durationSeconds`
 for `duration`, distance or time for `distance_duration`). `exerciseId` must be a shared exercise or
 one of the caller's own (archived allowed).
@@ -27,7 +27,7 @@ one of the caller's own (archived allowed).
 
 | Method | Path | Change |
 |---|---|---|
-| `POST` | `/sessions` | Body gains optional `{planId, planWorkoutId}` (both or neither). With them: the session gets `plan {planId, planWorkoutId, planName, workoutName}` and one workout exercise per planned exercise, in order, each with its server-built `snapshot` and `planned` copy. If a session is already open, it is returned with `resumed: true` and nothing is added; the client tells the person which workout is open. Unknown plan or workout id → 404. An empty planned workout starts an empty session with `plan` set. |
+| `POST` | `/sessions` | Body gains optional `{planId, planWorkoutId}` (both or neither). With them: the session gets `plan {planId, planWorkoutId, planName, workoutName}` and one workout exercise per planned exercise, in order, each with its server-built `snapshot` and `planned` copy. If a session is already open, it is returned with `resumed: true` and nothing is added; the client tells the person which workout is open. Unknown plan or workout id → 404. A planned workout with no exercises answers 400 `{code: 'EMPTY_WORKOUT'}` (spec edge case: it can be saved, not started). |
 | `GET` | `/sessions/:id`, `/sessions/current` | `SessionDetail` gains `plan?`. Each `SessionExercise` gains `planned?: {restSeconds?, note?, targets: PlanTarget[]}`, `openTargets: PlanTarget[]` (derived, R5; `[]` when skipped or not from a plan) and `skipped: boolean`. `previous` is unchanged and is what the client pre-fills from. |
 | `GET` | `/sessions` | `SessionListItem` gains `plan?: {planName, workoutName}`. |
 | `PATCH` | `/sessions/:id/exercises/:weId` | Body gains `skipped?: boolean`. 400 when the exercise has no `planned` block. |

@@ -12,7 +12,7 @@ One document per plan. Shared (ready-made) plans have no `userId`; own plans hav
 | `userId` | string? | Absent on shared plans. Set from the session on create, never from a request. |
 | `name` | string | Required, trimmed, 1–80 chars. |
 | `description` | string? | ≤ 1000 chars. |
-| `workouts` | `PlanWorkout[]` | 1–14 items, order is the array order. |
+| `workouts` | `PlanWorkout[]` | 0–14 items, order is the array order. A plan may be saved empty while being built; it cannot be started until the chosen workout has an exercise. |
 | `seedKey` | string? | Shared plans only, e.g. `plan:ppl`. Unique among shared rows. |
 | `seedVersion` | number? | Shared plans only; the `plans.json` version that last wrote the row. |
 | `copiedFrom` | `{planId, name}`? | Set by copy; informational ("Based on Push / Pull / Legs"). Never followed for data. |
@@ -26,7 +26,7 @@ One document per plan. Shared (ready-made) plans have no `userId`; own plans hav
 |---|---|---|
 | `id` | string | Stable. Own plans: ObjectId hex assigned by the server; shared: the seed key (`ppl:push`). Unique within the plan. |
 | `name` | string | Required, 1–80 chars. |
-| `exercises` | `PlanExercise[]` | 0–30 items (a workout may be empty while being built; starting an empty one starts an empty session). |
+| `exercises` | `PlanExercise[]` | 0–30 items (a workout may be empty while being built; Start on it answers 400 `EMPTY_WORKOUT`). |
 
 ### `PlanExercise` (embedded)
 
