@@ -32,6 +32,7 @@ import type {
 } from '@life-portal/shared-types';
 import {
   addDays,
+  ageOn,
   cheatDayInfo,
   dayTotals,
   decorateEntry,
@@ -41,6 +42,7 @@ import {
   mealSuggestions,
   nextCheatDay,
   nutritionTargets,
+  type FoodDayFacts,
   perServingTotals,
   servingsToAmount,
   snapshotFacts,
@@ -658,6 +660,52 @@ export class NutritionService {
       .select('day weightGrams')
       .lean<{ day: string; weightGrams: number }[]>();
     return rows.map((row) => ({ day: row.day, weightGrams: row.weightGrams }));
+  }
+
+  /**
+   * Facts for profile badges (spec 022): whole kcal eaten per logged day up to `today`, that
+   * day's **starting** calorie target (no Apple Health adjustment, which cannot be reproduced for
+   * past days), and the cheat weekdays. Only these facts leave the module. The target is computed
+   * once per (weigh-in in effect, age) pair, not once per day. Empty when nothing was logged, and
+   * then no profile is read or created.
+   */
+  async badgeInputs(
+    userId: string,
+    today: string,
+  ): Promise<{ days: FoodDayFacts[]; cheatDays: number[] }> {
+    const rows = await this.entries
+      .find({ userId, day: { $lte: today } })
+      .select('day amount facts')
+      .lean<{ day: string; amount: number; facts: MealEntryDto['facts'] }[]>();
+    if (!rows.length) return { days: [], cheatDays: [] };
+    const eaten = new Map<string, number>();
+    for (const row of rows) {
+      eaten.set(
+        row.day,
+        (eaten.get(row.day) ?? 0) + entryTotals(row.amount, row.facts).energyKcal,
+      );
+    }
+    const [profile, weighIns] = await Promise.all([
+      this.profile(userId),
+      this.listWeighIns(userId),
+    ]);
+    const cache = new Map<string, number | undefined>();
+    let pointer = -1;
+    const days = [...eaten.keys()].sort().map((day): FoodDayFacts => {
+      while (pointer + 1 < weighIns.length && weighIns[pointer + 1].day <= day) pointer += 1;
+      const key = `${pointer}|${profile.birthDate ? ageOn(profile.birthDate, day) : ''}`;
+      if (!cache.has(key)) {
+        const targets = nutritionTargets({ profile, weighIns, today: day });
+        cache.set(key, targets.available ? targets.energyKcal?.value : undefined);
+      }
+      const targetKcal = cache.get(key);
+      return {
+        day,
+        eatenKcal: eaten.get(day) ?? 0,
+        ...(targetKcal != null ? { targetKcal: Math.round(targetKcal) } : {}),
+      };
+    });
+    return { days, cheatDays: profile.cheatDays ?? [] };
   }
 
   async listWeighIns(userId: string): Promise<WeighInDto[]> {

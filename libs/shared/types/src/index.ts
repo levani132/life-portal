@@ -16,3 +16,4 @@ export * from './lib/posts';
 export * from './lib/notifications';
 export * from './lib/messages';
 export * from './lib/training';
+export * from './lib/badges';

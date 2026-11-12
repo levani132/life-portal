@@ -195,6 +195,18 @@ Public foods can be imported by other users via `POST /foods/import-public/:id`.
 food becomes the user's own copy with `source: 'imported'` and `sourceRef` pointing to the
 original food's ID.
 
+## Badge facts (022)
+
+`badgeInputs(userId, today)` is the only nutrition read [badges](badges.md) uses. It returns:
+- **`eatenKcal`:** whole kcal eaten per logged day up to `today`.
+- **`targetKcal`:** that day's **starting** calorie target. It is the `nutritionTargets` value
+  with the weigh-in in effect that day and the age on that day. There is no Health activity
+  adjustment, because that cannot be reproduced for past days.
+- **`cheatDays`:** the configured cheat weekdays.
+
+The target is computed once per (weigh-in, age) pair, not per day. When nothing is logged, the
+method returns early and reads no profile.
+
 ## Cross-links
 
 - **Dashboard.** `nutrition` is in `WIDGET_KEYS`; `DashboardService.nutritionCard()` renders

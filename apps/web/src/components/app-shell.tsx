@@ -26,6 +26,7 @@ import { PeopleSearch } from './people-search';
 import { PortalLoader } from './portal-loader';
 import { PullToRefresh } from './pull-to-refresh';
 import { ProfileView } from './social';
+import { useBadgeCheckOnStart } from '../lib/badges';
 import { TabHost, type HostTab } from './tab-host';
 import { ErrorNote } from './ui';
 
@@ -59,6 +60,7 @@ function Portal({ children }: { children: ReactNode }) {
     portal.data?.access.social ? '/social/requests/count' : null,
     { revalidateOnFocus: true, refreshInterval: 30000 },
   );
+  useBadgeCheckOnStart(!!portal.data, !!portal.data?.access.nutrition);
   const needsSetup =
     !!portal.data && !portal.data.setupCompleted && !portal.data.setupDismissed;
   useEffect(() => {

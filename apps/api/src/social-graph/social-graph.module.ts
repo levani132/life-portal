@@ -115,6 +115,21 @@ export class SocialGraphService {
       ),
     ];
   }
+  /**
+   * The acceptance day of each current, unblocked friendship, for profile badges (spec 022).
+   * `undefined` for rows accepted before `acceptedAt` existed.
+   */
+  async acceptedSince(userId: string): Promise<(string | undefined)[]> {
+    const rows = await this.connections
+      .find({
+        $or: [{ lowId: userId }, { highId: userId }],
+        state: 'accepted',
+        'blockedBy.0': { $exists: false },
+      })
+      .select('acceptedAt')
+      .lean<{ acceptedAt?: Date }[]>();
+    return rows.map((row) => row.acceptedAt?.toISOString().slice(0, 10));
+  }
   /** Accepted, unblocked friendships: the count on your own profile. */
   async friendCount(userId: string): Promise<number> {
     return this.connections.countDocuments({

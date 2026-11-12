@@ -79,6 +79,18 @@ export class PostsService {
     @InjectModel(FeedFeedbackRecord.name)
     private readonly feedback: Model<FeedFeedbackRecord>,
   ) {}
+
+  /**
+   * The (UTC) creation day of each original, live post, for profile badges (spec 022). Reposts and
+   * removed posts do not count.
+   */
+  async originalPostDays(userId: string): Promise<string[]> {
+    const rows = await this.posts
+      .find({ userId, deleted: false, ...ORIGINAL })
+      .select('createdAt')
+      .lean<{ createdAt: Date }[]>();
+    return rows.map((row) => row.createdAt.toISOString().slice(0, 10));
+  }
   private id(id: string) {
     if (!isValidObjectId(id)) throw new NotFoundException('Post not found.');
     return id;

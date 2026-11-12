@@ -22,6 +22,7 @@ import { LoansModule } from '../loans/loans.module';
 import { McpModule } from '../mcp/mcp.module';
 import { NutritionModule } from '../nutrition/nutrition.module';
 import { TrainingModule } from '../training/training.module';
+import { BadgesModule } from '../badges/badges.module';
 import { PersonalModule } from '../personal/personal.module';
 import { SettingsModule } from '../settings/settings.module';
 import { SpendingModule } from '../spending/spending.module';
@@ -60,6 +61,7 @@ import { MediaModule } from '../media/media.module';
     PersonalModule,
     NutritionModule,
     TrainingModule,
+    BadgesModule,
     SpendingModule,
     DashboardModule,
     McpModule,

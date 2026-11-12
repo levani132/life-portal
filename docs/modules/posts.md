@@ -20,6 +20,9 @@ Explicit publishing is separate from live widget sharing: a private Food widget 
 
 Deletion erases the stored food snapshot, caption and media list, deletes the media files from storage (also on moderation), while retaining an owner/request tombstone so a retried publish cannot resurrect it. Previously imported copies remain recipient-owned; the composer and import UI explain this.
 
+`originalPostDays(userId)` returns the UTC creation day of each live original post (reposts and
+removed posts excluded), for the [badges](badges.md) "First post" badge.
+
 ## API
 
 Authenticated `/api/posts` routes require **social + nutrition + foodPosts**, evaluated server-side. Production still has Food only by default; internal and developer accounts receive the new flag. Author feature access is also rechecked on every read/import. All responses use `Cache-Control: private, no-store`.

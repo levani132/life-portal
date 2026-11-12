@@ -22,7 +22,7 @@ tested on its own.
 
 ## Phase 1: Setup (shared contracts)
 
-- [ ] T001 [P] Create `libs/shared/types/src/lib/badges.ts`:
+- [x] T001 [P] Create `libs/shared/types/src/lib/badges.ts`:
   - **Types:** `BadgeFamily`, `BadgeId`, `BadgeDefinition`, `BadgeView`, `MyBadges`,
     `PublicBadge`, `PersonBadges`, `EquipBadgesBody`.
   - **Catalogue:** `BADGE_CATALOGUE`, the eleven entries exactly as in the data-model table.
@@ -31,7 +31,7 @@ tested on its own.
     `nutrition`, `training` or `foodPosts`) and its icon key.
   - **Constants:** `EARLY_MEMBER_CUTOFF: string | null = null` and `MAX_EQUIPPED_BADGES = 3`.
   - **Export** everything from `libs/shared/types/src/index.ts`.
-- [ ] T002 [P] Create `libs/shared/domain/src/lib/badges.ts` with the exported function
+- [x] T002 [P] Create `libs/shared/domain/src/lib/badges.ts` with the exported function
   signatures from data-model.md: `loggingStreak`, `onTargetDays`, `weeklyConsistency`,
   `countMilestones`, `evaluateBadges` and the `BadgeInputs` type. Bodies throw
   `not implemented`. Export from `libs/shared/domain/src/index.ts`.
@@ -40,14 +40,14 @@ tested on its own.
 
 ## Phase 2: Foundational (blocks every story)
 
-- [ ] T003 Create `apps/api/src/badges/badges.schemas.ts`:
+- [x] T003 Create `apps/api/src/badges/badges.schemas.ts`:
   - **`BadgeAward`** (`badge_awards`): `userId`, `badgeId`, `tier`, `earnedOn` via
     `requiredDayField`, `source` enum `rule|challenge`, optional `sourceId` with **no
     default**, and `baseSchemaOptions`.
     - Unique index `{userId:1, badgeId:1, tier:1}`.
     - Index `{userId:1, createdAt:-1}`.
   - **`BadgeSelection`** (`badge_selections`): unique `userId`, and `equipped: string[]`.
-- [ ] T004 Create `apps/api/src/badges/badges.module.ts`:
+- [x] T004 Create `apps/api/src/badges/badges.module.ts`:
   - **Imports:** `MongooseModule.forFeature` (both schemas), `NutritionModule`, `PostsModule`,
     `PortalModule` and `TrainingModule`. `AccessService`, `SocialGraphService` and
     `NotificationsService` are global or imported as other modules do; check how
@@ -57,7 +57,7 @@ tested on its own.
   - **Registration:** import `BadgesModule` in `apps/api/src/app/app.module.ts`.
   - **Check:** `npm run dev:api` boots, with no DI or cycle error. PostsModule must not import
     BadgesModule.
-- [ ] T005 Create `apps/api/src/badges/badges.service.ts`:
+- [x] T005 Create `apps/api/src/badges/badges.service.ts`:
   - The constructor takes both models, `AccessService`, `NutritionService`, `PostsService`,
     `PortalService`, `SessionsService`, `SocialGraphService`, `NotificationsService` and the
     `users` model, or whatever exported read exposes `createdAt`.
@@ -83,7 +83,7 @@ shown in the owner's collection with private progress.
 
 ### Tests (write first, see them fail)
 
-- [ ] T006 [P] [US1] Write `libs/shared/domain/src/lib/badges.spec.ts` for `loggingStreak` and
+- [x] T006 [P] [US1] Write `libs/shared/domain/src/lib/badges.spec.ts` for `loggingStreak` and
   `countMilestones`:
   - a gap breaks the run;
   - today without entries does not break a run that ended yesterday;
@@ -92,7 +92,7 @@ shown in the owner's collection with private progress.
   - duplicate days are ignored;
   - unsorted input works;
   - `countMilestones` dates are the n-th event's day.
-- [ ] T007 [P] [US1] In the same spec, cover `onTargetDays`:
+- [x] T007 [P] [US1] In the same spec, cover `onTargetDays`:
   - the ±10% boundary, inclusive, checked in integers (`|e−t|*10 <= t`);
   - no target means the day neither counts nor qualifies, and breaks the streak;
   - a day without entries breaks the streak;
@@ -100,7 +100,7 @@ shown in the owner's collection with private progress.
     was on target;
   - the total counts any on-target day, including a cheat day that was on target;
   - today never breaks a streak.
-- [ ] T008 [P] [US1] In the same spec, cover `evaluateBadges` for the standard and food
+- [x] T008 [P] [US1] In the same spec, cover `evaluateBadges` for the standard and food
   families:
   - progress `{current, next}` toward the lowest unreached tier;
   - badges with every tier reached carry no progress;
@@ -109,10 +109,10 @@ shown in the owner's collection with private progress.
 
 ### Implementation
 
-- [ ] T009 [US1] Implement `loggingStreak`, `onTargetDays` and `countMilestones` in
+- [x] T009 [US1] Implement `loggingStreak`, `onTargetDays` and `countMilestones` in
   `libs/shared/domain/src/lib/badges.ts` until T006–T007 pass. Use existing date helpers from
   `nutrition.ts` (`weekdayOf`, day arithmetic); never `new Date()` without an argument.
-- [ ] T010 [US1] Implement `evaluateBadges(input, today)` for the standard and food families in
+- [x] T010 [US1] Implement `evaluateBadges(input, today)` for the standard and food families in
   the same file, until T008 passes.
   - **Inputs:**
     - `accountCreatedOn`
@@ -122,7 +122,7 @@ shown in the owner's collection with private progress.
     - `food?: {days: {day, eatenKcal, targetKcal?}[], cheatDays}`
     - `training?` (US4)
   - **Missing dates:** a missing `acceptedAt` or setup date becomes `today`.
-- [ ] T011 [P] [US1] Add `badgeInputs(userId, today)` to `apps/api/src/nutrition/nutrition.service.ts`:
+- [x] T011 [P] [US1] Add `badgeInputs(userId, today)` to `apps/api/src/nutrition/nutrition.service.ts`:
   - **Reads:** entries with `day <= today`, projected to what `decorateEntry` needs for kcal,
     summed per day into whole kcal; weigh-ins via `weighInsUpTo`; and the profile.
   - **Targets:** compute `nutritionTargets({profile, weighIns, today: day})` once per distinct
@@ -131,14 +131,14 @@ shown in the owner's collection with private progress.
     `activityTargets`.
   - **Returns** `{days, cheatDays}`. Add a case to `nutrition.service.spec.ts`: two weigh-ins
     give two different targets, and the result has no activity adjustment.
-- [ ] T012 [P] [US1] Add `originalPostDays(userId): Promise<string[]>` to
+- [x] T012 [P] [US1] Add `originalPostDays(userId): Promise<string[]>` to
   `apps/api/src/posts/posts.service.ts`. Filter on `{userId, deleted:false, repostOf:{$exists:false}}`,
   project `createdAt`, and map to UTC day strings. Document in the posts doc that this
   approximates the day.
-- [ ] T013 [P] [US1] Add `acceptedSince(userId): Promise<(string|undefined)[]>` to
+- [x] T013 [P] [US1] Add `acceptedSince(userId): Promise<(string|undefined)[]>` to
   `SocialGraphService` in `apps/api/src/social-graph/social-graph.module.ts`. It covers accepted
   rows with an empty `blockedBy`, mapping `acceptedAt` to a day string or `undefined`.
-- [ ] T014 [US1] Implement `BadgesService.evaluate(userId, today)` in `badges.service.ts`:
+- [x] T014 [US1] Implement `BadgesService.evaluate(userId, today)` in `badges.service.ts`:
   1. Load the existing awards.
   2. Skip loading any family whose every tier is already awarded.
   3. Gather the inputs (T011–T013, `PortalService.get(userId).setupCompleted`, and the user's
@@ -149,7 +149,7 @@ shown in the owner's collection with private progress.
 
   Inaccessible badges are still awarded (R10). The nutrition inputs are loaded only if the user
   has ever had nutrition data, which is cheap to check.
-- [ ] T015 [US1] Implement `BadgesService.mine(userId, today): MyBadges` in
+- [x] T015 [US1] Implement `BadgesService.mine(userId, today): MyBadges` in
   `badges.service.ts`:
   - Call `evaluate`, then filter the catalogue by `accessible`.
   - Build each `BadgeView`:
@@ -158,33 +158,33 @@ shown in the owner's collection with private progress.
     - `isNew` for this call's awards.
   - Return them with the selection's `equipped` list, filtered to ids that are earned and
     accessible.
-- [ ] T016 [US1] Add routes to `BadgesController`:
+- [x] T016 [US1] Add routes to `BadgesController`:
   - **`GET /badges/me?today=`:** the `social` gate (`AccessService.require`) and a validated
     `today` DTO.
   - **`POST /badges/check?today=`:** returns `{newBadgeIds}`.
-- [ ] T017 [US1] Write `apps/api/src/badges/badges.service.spec.ts` (mocks as in
+- [x] T017 [US1] Write `apps/api/src/badges/badges.service.spec.ts` (mocks as in
   `social.service.spec.ts`). It covers:
   - two concurrent `evaluate` calls create one award each;
   - awards survive when the inputs later shrink (meals deleted, friend removed);
   - nutrition access off hides food badges from `mine` but keeps their rows;
   - `mine` never includes unearned ids in `equipped`.
-- [ ] T018 [P] [US1] Create `apps/web/src/components/badges.tsx`:
+- [x] T018 [P] [US1] Create `apps/web/src/components/badges.tsx`:
   - **`BadgeMark`:** a small rounded pill with a lucide icon (from the icon key), the name and
     the tier label ("30-day streak"). Tiers are told apart by a quiet tint step, with no medals.
   - **`BadgeCollection`:** a wrapping grid of earned badges (with dates), then locked badges
     (muted, with "8 of 30 days"). Badges with `isNew` get a one-time ring. It must not scroll
     sideways.
   - **Tone (FR-018):** no confetti, no sound.
-- [ ] T019 [P] [US1] Create `apps/web/src/lib/badges.ts`:
+- [x] T019 [P] [US1] Create `apps/web/src/lib/badges.ts`:
   - **`checkBadges()`:** fire-and-forget `POST /badges/check?today=<localDay>`, throttled to once
     per 30 s per tab. Take `today` from the same helper meals use with `dayStartHour`.
   - **On a non-empty `newBadgeIds`:** SWR `mutate` the `/badges/me` keys and the own
     `/badges/people/<me>` key.
-- [ ] T020 [US1] In `apps/web/src/components/social.tsx`, fetch `/badges/me?today=` for your own
+- [x] T020 [US1] In `apps/web/src/components/social.tsx`, fetch `/badges/me?today=` for your own
   profile and render a "Badges" section with `BadgeCollection` on your own profile. Put it in
   the About tab, or below the header when the Posts/About tabs are absent. Add a "Badges" count
   link to `OwnStats` that scrolls to it.
-- [ ] T021 [US1] Call `checkBadges()`:
+- [x] T021 [US1] Call `checkBadges()`:
   - after a successful meal create in `apps/web/src/components/log-food-modal.tsx` and
     `apps/web/src/app/nutrition/page.tsx`, wherever they POST entries;
   - after a successful publish in `apps/web/src/components/post-composer.tsx`;
@@ -193,6 +193,16 @@ shown in the owner's collection with private progress.
     behind the user being signed in.
 
 **Checkpoint**: US1 quickstart scenarios 1 (without the notification) and 5 pass.
+
+**As built (2026-11-12):**
+- **T020:** the collection is a **Badges tab** on your own profile (Posts · Badges · About),
+  hidden while "View as" is active. There is no separate count link in `OwnStats`.
+- **T021:** instead of editing each call site, `lib/api.ts` gained an `onSuccessfulWrite`
+  hook, and `lib/badges.ts` matches the qualifying POST paths there. This covers every
+  meal-logging route (entries, repeat, saved meal, cheat queue, composer), `/posts` and workout
+  finish. Friend accept calls `checkBadges()` in `useConnection`. The throttle is trailing, so a
+  write right after another is still checked.
+- **Hidden until US4:** training badges stay out of `GET /badges/me` until their rules exist.
 
 ---
 

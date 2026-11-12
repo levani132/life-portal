@@ -2,6 +2,19 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-12: Badges on your profile
+
+- **A Badges tab on your own profile.** It lists what you've earned from what you already do:
+  - finishing setup, a first post, a first friend, ten friends, and being an early member;
+  - logging streaks of 7, 30, 100 and 365 days;
+  - streaks and totals of days within 10% of your calorie target.
+- **You start with what you've already done.** Past history counts, and each badge is dated the
+  day you actually reached it.
+- **Earned is earned.** Deleting old meals, breaking a streak or unfriending someone never takes a
+  badge away.
+- **Progress is private.** "8 of 30 days" is visible only to you. Showing badges on your profile
+  for others comes next.
+
 ## 2026-11-12: Turning on Training works again
 
 - **Choosing modules no longer fails with "moduleVisibility.property training should not

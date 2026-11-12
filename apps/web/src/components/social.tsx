@@ -29,6 +29,8 @@ import type {
 import { useSocialApi } from '../lib/social-hooks';
 export { useSocialApi, SOCIAL_REFRESH } from '../lib/social-hooks';
 import { DailyFoodDiary } from './shared-food-diary';
+import { BadgeCollection } from './badges';
+import { checkBadges } from '../lib/badges';
 import { PostsList } from './posts';
 import type { PortalState } from '@life-portal/shared-types';
 import { api } from '../lib/api';
@@ -126,6 +128,7 @@ function useConnection(person: SocialPerson, onChanged?: () => void) {
     );
     if (success) {
       if (value === 'request') requestNotificationOffer('friend');
+      if (value === 'accept') checkBadges();
       onChanged?.();
     }
   }
@@ -327,7 +330,7 @@ export function ProfileView({ userId }: { userId?: string }) {
   const { user } = useAuth();
   const own = !userId || userId === user?.id;
   const [preview, setPreview] = useState<Preview>('normal');
-  const [tab, setTab] = useState<'posts' | 'about'>('posts');
+  const [tab, setTab] = useState<'posts' | 'badges' | 'about'>('posts');
   const portal = useApi<PortalState>('/portal');
   const path = own
     ? `/social/me?preview=${preview}`
@@ -350,6 +353,13 @@ export function ProfileView({ userId }: { userId?: string }) {
     !!portal.data?.access.foodPosts &&
     portal.data.access.nutrition &&
     portal.data.access.social;
+  // The badge collection holds private progress, so it is only on your own, un-previewed profile.
+  const tabs = [
+    ...(posts ? (['posts'] as const) : []),
+    ...(own && preview === 'normal' ? (['badges'] as const) : []),
+    'about' as const,
+  ];
+  const shown = tabs.find((value) => value === tab) ?? tabs[0];
   return (
     <div className="mx-auto max-w-3xl">
       <section className="card relative">
@@ -413,34 +423,36 @@ export function ProfileView({ userId }: { userId?: string }) {
           </button>
         </div>
       )}
-      {posts && (
+      {tabs.length > 1 && (
         <div
           className="mt-5 inline-flex rounded-full border border-border bg-surface-raised p-1"
           role="tablist"
           aria-label="Profile sections"
         >
-          {(['posts', 'about'] as const).map((value) => (
+          {tabs.map((value) => (
             <button
               type="button"
               key={value}
               role="tab"
-              aria-selected={tab === value}
+              aria-selected={shown === value}
               className={
-                tab === value
+                shown === value
                   ? 'rounded-full bg-accent-solid px-4 py-1.5 text-sm font-medium text-on-accent'
                   : 'rounded-full px-4 py-1.5 text-sm text-ink-muted hover:text-ink'
               }
               onClick={() => setTab(value)}
             >
-              {value === 'posts' ? 'Posts' : 'About'}
+              {value === 'posts' ? 'Posts' : value === 'badges' ? 'Badges' : 'About'}
             </button>
           ))}
         </div>
       )}
-      {tab === 'posts' && posts ? (
+      {shown === 'posts' ? (
         <div className="mt-4">
           <PostsList authorId={person.userId} preview={viewAs} />
         </div>
+      ) : shown === 'badges' ? (
+        <BadgeCollection />
       ) : (
         <>
           <div className="mb-4 mt-6 flex items-center justify-between gap-4">

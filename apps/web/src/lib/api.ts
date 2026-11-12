@@ -85,6 +85,18 @@ async function refreshSession(): Promise<boolean> {
   }
 }
 
+/**
+ * Called after every successful write. Lets a cross-cutting concern (profile badges, spec 022)
+ * react to the writes it cares about without every call site knowing about it. A listener must
+ * not throw and must not await anything the caller waits on.
+ */
+type WriteListener = (method: string, path: string) => void;
+const writeListeners = new Set<WriteListener>();
+export function onSuccessfulWrite(listener: WriteListener): () => void {
+  writeListeners.add(listener);
+  return () => writeListeners.delete(listener);
+}
+
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
@@ -123,6 +135,15 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   if (!response.ok) throw await parseError(response);
+  if (method !== 'GET') {
+    for (const listener of writeListeners) {
+      try {
+        listener(method, path);
+      } catch {
+        // A listener never breaks the write that triggered it.
+      }
+    }
+  }
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }

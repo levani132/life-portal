@@ -1334,3 +1334,32 @@ week's workout today still happened last week.
 - **Bodyweight loads need a weigh-in on or before the day.** Without one there is no load, so no
   volume, heaviest or 1RM: no figure rather than a guessed one (FR-020). The weigh-in day travels
   with every figure that used it.
+
+## 2026-11-12: Badge awards are stored facts; progress is derived
+
+Profile badges (spec 022) store one row per person, badge and tier the moment a tier is reached,
+and nothing else about progress. The award is a fact about a moment, like a published post, not
+a cache of a live value. It is never recomputed, edited or deleted, so later edits to history
+cannot revoke it.
+- **Why it has to be stored:** unfriending unsets `acceptedAt` and sets the pair back to
+  `none`, so "had a first friend" cannot be derived afterwards. Deleting meals would likewise
+  revoke streak badges.
+- **What stays derived:** streak lengths, totals and on-target days are computed on every
+  evaluation (principle III).
+
+**Evaluation is triggered by the browser.** There is no event bus, the free tier allows no
+worker, and Nutrition, Training, Posts and SocialGraph must not import Badges (Posts imports
+Social, so a cycle would follow). So evaluation runs on the badges read and on a throttled,
+unawaited `POST /badges/check`. The web fires it from the API client's `onSuccessfulWrite` hook
+after qualifying writes, and once at app start. Writes from MCP or a Shortcut are picked up at
+the next app start.
+
+**"On target" uses the starting target.** It is the target before the Apple Health activity
+adjustment, with the weigh-in in effect on that day. The adjustment depends on Health samples
+that are deleted on disconnect, so it cannot be reproduced for past days. Weekly banking already
+uses the same figure. The Food profile is not versioned, so past days are judged against the
+current goal; this is labelled in the badge's description.
+
+**Earned dates come from history.** An award is dated the day the history reached the tier, not
+the day the check ran. Launch backfill and back-dated logging then follow one rule, and no "first
+evaluation" marker is needed.
