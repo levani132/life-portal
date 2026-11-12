@@ -143,7 +143,8 @@ badge arrives, and tapping it opens the collection.
 - **Concurrent awards.** Two devices completing the qualifying action at the same moment
   produce one award and at most one notification.
 - **Back-dated logging.** Filling in a missed day later can complete a streak, and the badge is
-  then awarded. The earned date is the day it was awarded, not the back-dated day.
+  then awarded. The earned date is the day the history shows the tier
+  was reached, the same rule as at launch (research R7).
 - **Blocked viewers** see nothing, because the profile itself is not shown to them.
 
 ## Requirements *(mandatory)*
@@ -191,7 +192,9 @@ badge arrives, and tapping it opens the collection.
 - **FR-007**: Awarding MUST be idempotent: repeating the evaluation, or evaluating
   concurrently, never creates a duplicate award or a second notification.
 - **FR-008**: Food day boundaries MUST follow the person's `dayStartHour`. "On target" MUST use
-  the same daily calorie target the food log shows for that day. Configured cheat days MUST be
+  that day's **starting** calorie target: the target before the Apple Health activity
+  adjustment, computed with the weigh-in in effect on that day. The adjustment cannot be
+  reproduced for past days. See research R6. Configured cheat days MUST be
   skipped, neither breaking nor extending an on-target streak.
 - **FR-009**: Only completed workouts MUST count toward training badges. A week that has not
   ended MUST NOT break a consistency run.
