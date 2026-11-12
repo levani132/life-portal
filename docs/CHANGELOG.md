@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-12: Turning on Training works again
+
+- **Choosing modules no longer fails with "moduleVisibility.property training should not
+  exist".** Saving your modules sends every module's visibility, and the server did not know
+  Training's. It now accepts it (always private, like EPAM), and choosing all nine modules at
+  once works too.
+
 ## 2026-11-12: Training in pounds, and loads from your weigh-ins
 
 - **kg or lb.** The gear on Training sets your weight unit (and the default rest). Every weight

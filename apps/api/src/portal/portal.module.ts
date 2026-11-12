@@ -42,7 +42,7 @@ import { NutritionModule } from '../nutrition/nutrition.module';
 import { NutritionService } from '../nutrition/nutrition.service';
 import { SettingsModule, SettingsService } from '../settings/settings.module';
 
-class VisibilityDto {
+export class VisibilityDto {
   @ValidateIf((_, value: unknown) => value !== undefined)
   @IsIn(AUDIENCES)
   nutrition?: Audience;
@@ -67,6 +67,11 @@ class VisibilityDto {
   @ValidateIf((_, value: unknown) => value !== undefined)
   @IsIn(['private'])
   epam?: Audience;
+  // Training is unshareable (UNSHAREABLE_MODULES), like EPAM: the web still sends it in the full
+  // map, so it must be accepted, but only as private.
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsIn(['private'])
+  training?: Audience;
 }
 export class PortalPreferencesDto implements PortalPreferences {
   @ValidateIf((_, value: unknown) => value !== undefined)
@@ -78,7 +83,7 @@ export class PortalPreferencesDto implements PortalPreferences {
   @ValidateIf((_, value: unknown) => value !== undefined)
   @IsArray()
   @ArrayUnique()
-  @ArrayMaxSize(8)
+  @ArrayMaxSize(MODULE_IDS.length)
   @IsIn(MODULE_IDS, { each: true })
   selectedModules?: ModuleId[];
   @ValidateIf((_, value: unknown) => value !== undefined)

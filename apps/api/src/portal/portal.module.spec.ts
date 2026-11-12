@@ -1,6 +1,27 @@
-import { PortalService } from './portal.module';
-import { resolveFeatureAccess } from '@life-portal/shared-domain';
-import type { ModuleId, UserSettings } from '@life-portal/shared-types';
+import { ValidationPipe } from '@nestjs/common';
+import { PortalPreferencesDto, PortalService } from './portal.module';
+import { privateModuleVisibility, resolveFeatureAccess } from '@life-portal/shared-domain';
+import { MODULE_IDS, type ModuleId, type UserSettings } from '@life-portal/shared-types';
+
+/** The same pipe settings as `main.ts`: unknown properties are an error, not ignored. */
+const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
+const validate = (body: unknown) =>
+  pipe.transform(body, { type: 'body', metatype: PortalPreferencesDto });
+
+describe('portal preferences validation', () => {
+  it('accepts every module in the visibility map the web sends back, training included', async () => {
+    await expect(validate({ moduleVisibility: privateModuleVisibility() })).resolves.toBeDefined();
+  });
+
+  it('accepts selecting every module at once', async () => {
+    await expect(validate({ selectedModules: [...MODULE_IDS] })).resolves.toBeDefined();
+  });
+
+  it('keeps unshareable modules private', async () => {
+    await expect(validate({ moduleVisibility: { training: 'friends' } })).rejects.toBeDefined();
+    await expect(validate({ moduleVisibility: { epam: 'friends' } })).rejects.toBeDefined();
+  });
+});
 
 describe('portal preferences across releases', () => {
   it('freezes the initial selection so newly released modules do not appear automatically', async () => {
