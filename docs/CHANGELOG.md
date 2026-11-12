@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-12: The rest timer stays in view
+
+- **The rest countdown follows you down the workout.** While you rest, the timer stays pinned
+  just under the app header as you scroll through exercises, on phones and desktop, and goes away
+  when the rest is over or you tap Hide.
+
 ## 2026-11-12: A colourful Training
 
 - **This week at a glance.** Training opens with a colourful header: workouts and time this week,

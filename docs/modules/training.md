@@ -367,6 +367,16 @@ classes it finds as text. The page opens with `training-hero.tsx`, this week fro
 header shows time, sets and a progress bar of planned sets logged over planned, skipped exercises
 left out). History is grouped by Monday-start week with totals summed from the loaded sessions.
 
+**The rest timer sticks under the header (issue #4, display only).** `rest-timer.tsx` counts down
+from `lastSetAt` on the client; nothing about it is stored. It is a direct child of the workout's
+list (below the header card, above the exercises), because a `position: sticky` element only
+sticks within its parent, and it is one element that changes position, never a second copy, so
+its countdown and Hide keep their state and there is never a duplicate. It sticks at
+`--header-offset`, which `ScrollHeader` publishes (its height while shown, `0px` once hidden), on a
+solid `bg-surface` band. With no header showing it pads itself by `--header-band`
+(`var(--top-chrome)`), so it fills the iOS status-bar band instead of leaving it hollow. It
+renders nothing when there is no rest to show, so no empty bar stays pinned.
+
 ## Deletion
 
 There is no account deletion feature yet (as for messages and notifications). When one is added,

@@ -319,7 +319,6 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
             </div>
           )}
           {error && <ErrorNote message={error} />}
-          {open && <RestTimer since={session.lastSetAt} seconds={restSeconds} />}
           <Textarea
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
@@ -331,6 +330,9 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
           />
         </div>
       </section>
+
+      {/* Outside the card, so it can stick while the exercises scroll (see RestTimer). */}
+      {open && <RestTimer since={session.lastSetAt} seconds={restSeconds} />}
 
       {session.exercises.map((exercise, index) => (
         <ExerciseBlock

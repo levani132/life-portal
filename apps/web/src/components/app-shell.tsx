@@ -4,7 +4,7 @@ import { HealthSyncBridge } from './apple-health';
 import clsx from 'clsx';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Home,
   Menu,
@@ -267,8 +267,35 @@ function ScrollHeader({
   hidden: boolean;
   onReveal: () => void;
 }) {
+  const ref = useRef<HTMLElement>(null);
+  // Where the visible header ends, for content that sticks under it (the workout's rest timer).
+  // `--header-offset` is the header's height while it shows and 0 once it hides; `--header-band`
+  // is the safe-area band such content must then fill itself, on a solid background, because
+  // the iOS status bar shows through hollow over anything pinned at the very top.
+  useEffect(() => {
+    const root = document.documentElement;
+    const node = ref.current;
+    const apply = () => {
+      const height = !hidden && node ? node.offsetHeight : 0;
+      root.style.setProperty('--header-offset', `${height}px`);
+      root.style.setProperty('--header-band', height ? '0px' : 'var(--top-chrome)');
+    };
+    apply();
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(apply);
+    if (node) observer?.observe(node);
+    return () => observer?.disconnect();
+  }, [hidden]);
+  useEffect(
+    () => () => {
+      document.documentElement.style.removeProperty('--header-offset');
+      document.documentElement.style.removeProperty('--header-band');
+    },
+    [],
+  );
   return (
     <header
+      ref={ref}
       onFocusCapture={onReveal}
       className={clsx(
         'portal-header sticky top-0 z-40 bg-surface/95 pt-[var(--top-chrome)] backdrop-blur transition-transform duration-200',

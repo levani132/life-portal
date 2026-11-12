@@ -1422,3 +1422,16 @@ and a user-picked plan colour is a feature nobody asked for yet. Two variables p
 one value cannot be both readable as text on white and dark enough under white text in both
 themes. Plan colours by seed position, not hash, so the four ready-made plans never collide.
 
+## 2026-11-12: Sticky content sits under the header and fills the status-bar band itself (issue #4)
+
+**Decision.** The app header publishes `--header-offset` (its height while shown, `0px` once
+hidden) and `--header-band` (`0px` while shown, `var(--top-chrome)` once hidden) on `<html>`.
+Content that sticks to the top (the workout's rest timer) uses `top: var(--header-offset)`, a
+solid background and `padding-top: var(--header-band)`.
+
+**Why.** Home's feed tabs once stuck at `--top-chrome` when the header hid, and the iOS status-bar
+band above them showed through hollow, so they were made non-sticky (spec 019). The rest timer has
+to stick, so it fills that band itself, as the chat header does. On Training the header never
+hides, so today it simply sits under the header. It is the same element made sticky, not a copy
+shown on scroll, so its state can't fork and there is never a duplicate.
+
