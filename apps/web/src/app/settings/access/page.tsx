@@ -44,7 +44,7 @@ function Access() {
     <div className="mx-auto max-w-2xl">
       <PageHeader
         title="Feature access"
-        subtitle="Choose defaults for each audience, or override an individual account."
+        subtitle="Set what each group gets, or override an individual account."
       />
       <Field label="Manage access for">
         <Select
@@ -73,6 +73,7 @@ function Access() {
           target={target}
           user={user}
           policy={policy}
+          policies={policies.data ?? []}
           onSaved={async () => {
             await users.mutate();
             await policies.mutate();
@@ -92,19 +93,23 @@ function AccessEditor({
   target,
   user,
   policy,
+  policies,
   onSaved,
 }: {
   target: string;
   user?: AccessUser;
   policy?: CohortPolicy;
+  policies: CohortPolicy[];
   onSaved: () => Promise<void>;
 }) {
   const [cohort, setCohort] = useState<UserCohort>(
     policy?.cohort ?? (user?.cohort === 'internal' ? 'internal' : 'production'),
   );
+  // A group always has a concrete value per feature; only an individual can inherit.
   const [overrides, setOverrides] = useState<Partial<FeatureAccess>>(
-    user?.overrides ?? policy?.overrides ?? {},
+    user?.overrides ?? (policy ? editableAccess(policy.access) : {}),
   );
+  const groupAccess = policies.find((p) => p.cohort === cohort)?.access;
   const [saved, setSaved] = useState(false);
   const action = useAction();
   return (
@@ -146,7 +151,7 @@ function AccessEditor({
         {FEATURES.filter((m) => m.id !== 'epam').map((m) => (
           <label key={m.id} className="flex items-center justify-between gap-4">
             <span>{m.name}</span>
-            <span className="w-40">
+            <span className="w-44 shrink-0">
               <Select
                 aria-label={`${m.name} feature access`}
                 value={
@@ -165,9 +170,14 @@ function AccessEditor({
                   setSaved(false);
                 }}
               >
-                <option value="default">
-                  {user ? 'Group default' : 'Built-in default'}
-                </option>
+                {user && (
+                  <option value="default">
+                    Group default
+                    {groupAccess
+                      ? ` (${groupAccess[m.id] ? 'on' : 'off'})`
+                      : ''}
+                  </option>
+                )}
                 <option value="true">Enabled</option>
                 <option value="false">Disabled</option>
               </Select>
@@ -187,5 +197,12 @@ function AccessEditor({
         </div>
       </fieldset>
     </form>
+  );
+}
+
+/** Every feature the editor shows, as a full map: EPAM is never configurable. */
+function editableAccess(access: FeatureAccess): Partial<FeatureAccess> {
+  return Object.fromEntries(
+    FEATURES.filter((f) => f.id !== 'epam').map((f) => [f.id, access[f.id]]),
   );
 }

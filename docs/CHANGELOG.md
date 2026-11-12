@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-12: Feature access shows real values for groups
+
+- **Groups have no hidden defaults.** For All production users and All internal users, every
+  feature now shows Enabled or Disabled, the value those accounts actually get, and you set it.
+  The "Built-in default" option is gone.
+- **Individual accounts show what they inherit.** "Group default" now says whether that is on or
+  off for the account's group.
+
 ## 2026-11-12: Training: your own exercises and machines
 
 - **Better exercise search.** Names that start with what you type come first, then whole words,

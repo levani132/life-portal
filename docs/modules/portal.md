@@ -16,8 +16,13 @@ collection stores cohort overrides because releases need changing without a depl
 There is no public writer for cohort, overrides or developer identity.
 
 Developer-only `GET /api/access/users` (up to 200 names/IDs) and `PUT /api/access/users/:id`
-manage user cohorts/overrides. GET/PUT `/api/access/users/policies` manage cohort defaults.
-Override writes replace the object; `{}` restores defaults. DTOs reject unknown flags.
+manage user cohorts/overrides. GET/PUT `/api/access/users/policies` manage group settings.
+A group has no "default" state the admin cannot see: `GET` returns each cohort's resolved
+`access` map (stored value, else the code fallback above), and the editor shows only
+Enabled/Disabled per feature and saves the full map. The code fallback only matters for a feature
+the admin has not yet saved for that group (for example a newly released flag). An individual
+account may still inherit: its editor offers "Group default (on/off)". Override writes replace the
+object; for a user `{}` restores the group's values. DTOs reject unknown flags.
 Menu → Feature access is the UI. Access checks read current policy, rather than stale JWT roles.
 
 `@RequireModule` and a global guard protect module API controllers. Bank ingest validates

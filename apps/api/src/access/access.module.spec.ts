@@ -120,6 +120,24 @@ describe('developer-only administration', () => {
   });
 });
 
+describe('group policies', () => {
+  it('returns a concrete value for every feature, stored values winning over the fallback', async () => {
+    const f = fixture();
+    f.policies.find.mockReturnValue({
+      lean: jest.fn().mockResolvedValue([
+        { cohort: 'production', overrides: { nutrition: false, social: true } },
+      ]),
+    });
+    const [production, internal] = await f.service.getPolicies(DEV);
+    expect(production.cohort).toBe('production');
+    expect(production.access.nutrition).toBe(false);
+    expect(production.access.social).toBe(true);
+    expect(production.access.money).toBe(false);
+    expect(internal.access.money).toBe(true);
+    expect(internal.access.epam).toBe(false);
+  });
+});
+
 describe('module guard', () => {
   function context(user?: { userId: string }) {
     return {

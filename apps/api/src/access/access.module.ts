@@ -135,9 +135,14 @@ export class AccessService {
   async getPolicies(userId: string): Promise<CohortPolicy[]> {
     this.requireDeveloper(userId);
     const policies = await this.policies.find().lean();
+    // Resolved, so the admin sees and owns a concrete value for every feature. A feature the
+    // admin has never saved for a group shows (and behaves as) the code fallback until saved.
     return COHORTS.map((cohort) => ({
       cohort,
-      overrides: policies.find((p) => p.cohort === cohort)?.overrides ?? {},
+      access: resolveFeatureAccess(
+        cohort,
+        policies.find((p) => p.cohort === cohort)?.overrides,
+      ),
     }));
   }
   async updatePolicy(userId: string, dto: UpdateAccessDto) {

@@ -1291,3 +1291,12 @@ sets, whose fields were validated against the old measure.
 exercise" and "New machine" (form modals) from inside a plain modal; every `Modal` used to wrap its
 body in a form, so those nested one form in another (invalid HTML; React warns and the inner form is
 unreliable). A modal without `onSubmit` never submitted anything, so nothing else changes.
+
+## Group feature access has no "default" option
+
+The access screen offered "Built-in default" for a cohort, which hid the value production users
+actually got behind code in `resolveFeatureAccess`. `GET /api/access/users/policies` now returns
+each cohort's resolved `access` map and the group editor saves the full map, so the admin sees
+and owns every value. The code fallback remains only for a feature never saved for a group (a new
+flag ships with it), and it is shown as a concrete value, not as "default". Individual accounts
+keep "Group default", because inheriting from the group is meaningful there.

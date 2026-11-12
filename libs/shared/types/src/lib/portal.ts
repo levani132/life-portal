@@ -131,9 +131,13 @@ export interface AccessUser {
   overrides: Partial<FeatureAccess>;
 }
 
+/**
+ * A group's concrete settings. `access` is what every account in the group gets unless it has
+ * its own override; there is no "unset" state for a group (the admin owns every value).
+ */
 export interface CohortPolicy {
   cohort: UserCohort;
-  overrides: Partial<FeatureAccess>;
+  access: FeatureAccess;
 }
 
 export const FEATURES: { id: FeatureId; name: string }[] = [
