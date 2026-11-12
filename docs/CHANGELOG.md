@@ -2,6 +2,18 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-12: Training: progress and personal records
+
+- **Exercise history.** Every exercise shows your sessions newest first, with each one's sets,
+  best set, total volume and an estimated one-rep max. Open it from the clock icon on an exercise
+  in your workout, or from the exercise's details.
+- **Personal records.** Heaviest, best estimated 1RM, most reps (at a weight or heavier), longest
+  time and distance, fastest pace. A set that beats your earlier best gets a **PR** badge as you
+  log it. Fix or delete a set and the records follow; warm-ups never count.
+- **Estimates say how they were worked out**: "est. 1RM 116.67 kg · Epley, from 100 kg × 5".
+  Pull-ups and other bodyweight work use your latest weigh-in from Food on or before that day,
+  and say so.
+
 ## 2026-11-12: Feature access shows real values for groups
 
 - **Groups have no hidden defaults.** For All production users and All internal users, every

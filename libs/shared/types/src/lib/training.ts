@@ -155,6 +155,70 @@ export interface ExerciseSnapshot {
   machineBrand?: string;
 }
 
+// ------------------------------------------------------------------ progress (spec 020 US3)
+
+/**
+ * What a personal record is a record of. Which kinds apply depends on the measure; warm-ups never
+ * count. `most_reps` on a loaded exercise means "more reps than ever at this load or heavier".
+ */
+export const RECORD_KINDS = [
+  'heaviest',
+  'best_1rm',
+  'most_reps',
+  'longest_duration',
+  'longest_distance',
+  'fastest_pace',
+] as const;
+export type RecordKind = (typeof RECORD_KINDS)[number];
+
+/**
+ * An estimated one-rep max, always with how it was worked out (principle 6). `weightGrams` is the
+ * load the estimate came from; `bodyWeightDay` is set when that load includes a weigh-in.
+ */
+export interface OneRepMaxEstimate {
+  valueGrams: number;
+  basis: {
+    formula: 'epley';
+    fromSetId: string;
+    weightGrams: number;
+    reps: number;
+    bodyWeightDay?: string;
+  };
+}
+
+/** The current best of one kind, and the set that holds it. */
+export interface RecordEntry {
+  kind: RecordKind;
+  /** Grams, reps, seconds, metres, or seconds per kilometre for pace. */
+  value: number;
+  setId: string;
+  sessionId: string;
+  day: string;
+  /** Set when the value depends on a weigh-in (bodyweight or assisted loads). */
+  bodyWeightDay?: string;
+  /** For `most_reps` on a loaded exercise: the load those reps were done at. */
+  loadGrams?: number;
+}
+
+export interface ExerciseHistorySession {
+  sessionId: string;
+  day: string;
+  sets: WorkoutSet[];
+  /** The session's best working set: highest 1RM, else load, reps, distance or time. */
+  bestSetId?: string;
+  /** Load × reps over working sets with a known load. */
+  volumeGrams?: number;
+  oneRepMax?: OneRepMaxEstimate;
+}
+
+export interface ExerciseHistory {
+  exercise: ExerciseListItem;
+  sessions: ExerciseHistorySession[];
+  /** Over every set of this exercise the caller ever logged, not just this page. */
+  records: RecordEntry[];
+  nextCursor?: string;
+}
+
 export interface WorkoutSet extends SetValues {
   id: string;
   workoutExerciseId: string;
@@ -164,6 +228,8 @@ export interface WorkoutSet extends SetValues {
   rpe?: number;
   restSeconds?: number;
   loggedAt: string;
+  /** Records this set set when it was done (computed on read; empty or absent for most sets). */
+  records?: RecordKind[];
 }
 
 export interface SessionExercise {
@@ -177,6 +243,8 @@ export interface SessionExercise {
   sets: WorkoutSet[];
   /** The caller's sets of this exercise from their most recent earlier session. */
   previous?: { sessionId: string; day: string; sets: WorkoutSet[] };
+  /** The best estimate from this session's sets of the exercise. */
+  oneRepMax?: OneRepMaxEstimate;
 }
 
 export interface SessionListItem {

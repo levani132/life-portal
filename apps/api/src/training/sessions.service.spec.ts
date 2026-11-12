@@ -4,6 +4,7 @@ import { Types } from 'mongoose';
 import { CatalogueService } from './catalogue.service';
 import { FakeModel, fakeMedia } from './fake-model.testing';
 import { MachinesService } from './machines.service';
+import { ProgressService } from './progress.service';
 import { SessionsService } from './sessions.service';
 
 const ME = 'user-me';
@@ -20,12 +21,16 @@ function fixture() {
   const media = fakeMedia();
   const catalogue = new CatalogueService(exercises as never, workoutExercises as never, sets as never, media as never);
   const machines = new MachinesService(machineRows as never, workoutExercises as never, catalogue, media as never);
+  const weighIns: { day: string; weightGrams: number }[] = [];
+  const nutrition = { weighInsUpTo: async (_userId: string, day: string) => weighIns.filter((w) => w.day <= day) };
+  const progress = new ProgressService(sessions as never, workoutExercises as never, sets as never, catalogue, nutrition as never);
   const service = new SessionsService(
     sessions as never,
     workoutExercises as never,
     sets as never,
     catalogue,
     machines,
+    progress,
   );
   const bench = new Types.ObjectId();
   const pullUp = new Types.ObjectId();
@@ -35,7 +40,7 @@ function fixture() {
     { _id: pullUp, name: 'Pullups', searchName: 'pullups', primaryMuscles: ['lats'], secondaryMuscles: [], equipmentType: 'bodyweight', measure: 'bodyweight_reps', seedKey: 'fedb:pullups', archived: false, aliases: [] },
     { _id: secret, userId: OTHER, name: 'Their machine press', searchName: 'their machine press', primaryMuscles: ['chest'], secondaryMuscles: [], equipmentType: 'machine', measure: 'weight_reps', archived: false, aliases: [] },
   );
-  return { service, machines, machineRows, exercises, sessions, workoutExercises, sets, bench: String(bench), pullUp: String(pullUp), secret: String(secret) };
+  return { service, progress, weighIns, machines, machineRows, exercises, sessions, workoutExercises, sets, bench: String(bench), pullUp: String(pullUp), secret: String(secret) };
 }
 
 async function startWithBench(f: ReturnType<typeof fixture>, at = T0) {
@@ -251,5 +256,85 @@ describe('SessionsService: finishing, history and deletion', () => {
     await f.service.reorderExercises(ME, session.id, [pull.id, exercise.id]);
     const detail = await f.service.detail(ME, session.id, min(1));
     expect(detail.exercises.map((e) => e.snapshot.name)).toEqual(['Pullups', 'Barbell Bench Press']);
+  });
+});
+
+describe('ProgressService: records and history', () => {
+  const DAY = 24 * 60 * 60_000;
+
+  async function workout(f: ReturnType<typeof fixture>, day: number, sets: { reps: number; weightGrams: number; type?: 'warmup' }[]) {
+    const at = T0 + day * DAY;
+    const session = await f.service.start(ME, { requestId: randomUUID(), day: new Date(Date.UTC(2026, 10, 12 + day)).toISOString().slice(0, 10) }, at);
+    const exercise = await f.service.addExercise(ME, session.id, { requestId: randomUUID(), exerciseId: f.bench });
+    const results = [];
+    for (const [index, values] of sets.entries()) {
+      results.push(await f.service.addSet(ME, session.id, exercise.id, { requestId: randomUUID(), ...values }, at + index * 60_000));
+    }
+    await f.service.finish(ME, session.id, 'now', at + 3_600_000);
+    return { session, exercise, results };
+  }
+
+  it('marks a record in the set response and in the session, and labels the estimate', async () => {
+    const f = fixture();
+    const first = await workout(f, 0, [{ reps: 5, weightGrams: 100_000 }]);
+    expect(first.results[0].records).toEqual([]);
+    const second = await workout(f, 1, [{ reps: 10, weightGrams: 60_000, type: 'warmup' }, { reps: 5, weightGrams: 105_000 }]);
+    expect(second.results[0].records).toEqual([]);
+    expect(second.results[1].records).toEqual(['heaviest', 'best_1rm']);
+    const detail = await f.service.detail(ME, second.session.id);
+    expect(detail.exercises[0].sets[1].records).toEqual(['heaviest', 'best_1rm']);
+    expect(detail.exercises[0].oneRepMax).toEqual({
+      valueGrams: 122_500,
+      basis: { formula: 'epley', fromSetId: second.results[1].set.id, weightGrams: 105_000, reps: 5 },
+    });
+  });
+
+  it('builds history newest first with best set and working volume, and records over all sets', async () => {
+    const f = fixture();
+    await workout(f, 0, [{ reps: 5, weightGrams: 100_000 }]);
+    const second = await workout(f, 1, [{ reps: 10, weightGrams: 60_000, type: 'warmup' }, { reps: 8, weightGrams: 90_000 }, { reps: 3, weightGrams: 110_000 }]);
+    const history = await f.progress.history(ME, f.bench);
+    expect(history.sessions.map((s) => s.day)).toEqual(['2026-11-13', '2026-11-12']);
+    expect(history.sessions[0].volumeGrams).toBe(90_000 * 8 + 110_000 * 3);
+    expect(history.sessions[0].bestSetId).toBe(second.results[2].set.id); // 121 000 vs 114 000
+    expect(history.records.find((r) => r.kind === 'heaviest')).toMatchObject({ value: 110_000, day: '2026-11-13' });
+    expect(history.nextCursor).toBeUndefined();
+  });
+
+  it('moves the record back when the record set is deleted or lowered', async () => {
+    const f = fixture();
+    await workout(f, 0, [{ reps: 5, weightGrams: 100_000 }]);
+    const second = await workout(f, 1, [{ reps: 5, weightGrams: 120_000 }]);
+    const third = await workout(f, 2, [{ reps: 5, weightGrams: 110_000 }]);
+    expect(third.results[0].records).toEqual([]);
+    const lowered = await f.service.updateSet(ME, second.results[0].set.id, { weightGrams: 101_000 });
+    expect(lowered.records).toContain('heaviest');
+    expect((await f.progress.history(ME, f.bench)).records.find((r) => r.kind === 'heaviest')?.value).toBe(110_000);
+    await f.service.removeSet(ME, second.results[0].set.id);
+    const detail = await f.service.detail(ME, third.session.id);
+    expect(detail.exercises[0].sets[0].records).toContain('heaviest');
+  });
+
+  it('uses the weigh-in on or before the day for bodyweight loads', async () => {
+    const f = fixture();
+    f.weighIns.push({ day: '2026-11-01', weightGrams: 80_000 }, { day: '2026-11-20', weightGrams: 70_000 });
+    const session = await f.service.start(ME, { requestId: randomUUID(), day: '2026-11-12' }, T0);
+    const exercise = await f.service.addExercise(ME, session.id, { requestId: randomUUID(), exerciseId: f.pullUp });
+    await f.service.addSet(ME, session.id, exercise.id, { requestId: randomUUID(), reps: 6, weightGrams: 10_000 }, T0);
+    const history = await f.progress.history(ME, f.pullUp);
+    expect(history.sessions[0].volumeGrams).toBe(90_000 * 6);
+    expect(history.sessions[0].oneRepMax?.basis).toMatchObject({ weightGrams: 90_000, bodyWeightDay: '2026-11-01' });
+  });
+
+  it('pages history 20 sessions at a time and never shows another person’s sets', async () => {
+    const f = fixture();
+    for (let day = 0; day < 21; day++) await workout(f, day, [{ reps: 5, weightGrams: 100_000 + day }]);
+    const page = await f.progress.history(ME, f.bench);
+    expect(page.sessions).toHaveLength(20);
+    const next = await f.progress.history(ME, f.bench, page.nextCursor);
+    expect(next.sessions.map((s) => s.day)).toEqual(['2026-11-12']);
+    expect(next.nextCursor).toBeUndefined();
+    expect((await f.progress.history(OTHER, f.bench)).sessions).toEqual([]);
+    await expect(f.progress.history(ME, f.bench, 'nonsense')).rejects.toBeInstanceOf(BadRequestException);
   });
 });

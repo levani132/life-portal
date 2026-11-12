@@ -4,6 +4,7 @@ import { Types } from 'mongoose';
 import { CatalogueService, rankExercises, searchNameFor } from './catalogue.service';
 import { FakeModel, fakeMedia } from './fake-model.testing';
 import { MachinesService } from './machines.service';
+import { ProgressService } from './progress.service';
 import { SessionsService } from './sessions.service';
 
 const ME = 'user-me';
@@ -21,13 +22,9 @@ function fixture() {
   const media = fakeMedia();
   const catalogue = new CatalogueService(exercises as never, workoutExercises as never, sets as never, media as never);
   const machines = new MachinesService(machineRows as never, workoutExercises as never, catalogue, media as never);
-  const sessions = new SessionsService(
-    new FakeModel([['userId', 'requestId'], ['userId', '?status=open']]) as never,
-    workoutExercises as never,
-    sets as never,
-    catalogue,
-    machines,
-  );
+  const sessionRows = new FakeModel([['userId', 'requestId'], ['userId', '?status=open']]);
+  const progress = new ProgressService(sessionRows as never, workoutExercises as never, sets as never, catalogue, { weighInsUpTo: async () => [] } as never);
+  const sessions = new SessionsService(sessionRows as never, workoutExercises as never, sets as never, catalogue, machines, progress);
   const shared = (name: string, extra: Record<string, unknown> = {}) => {
     const _id = new Types.ObjectId();
     exercises.docs.push({

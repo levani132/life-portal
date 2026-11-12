@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, History as HistoryIcon, Plus, Trash2 } from 'lucide-react';
 import type {
   ExerciseListItem,
   SessionDetail,
@@ -12,6 +12,7 @@ import { formatDay, setFieldsFor } from '@life-portal/shared-domain';
 import { EmptyState, ErrorNote, Modal, Panel, Spinner, Textarea } from '../ui';
 import { api, ApiError } from '../../lib/api';
 import {
+  describeOneRepMax,
   describeSet,
   formatDuration,
   humanise,
@@ -21,6 +22,7 @@ import {
   useWorkoutDay,
 } from '../../lib/training';
 import { clearQueueError, enqueue, useTrainingQueue } from '../../lib/training-queue';
+import { ExerciseHistory } from './exercise-history';
 import { ExerciseSearch, MachineChoice } from './exercise-picker';
 import { RestTimer } from './rest-timer';
 import { SetForm, SetLine, type SetFormValue } from './set-row';
@@ -299,6 +301,8 @@ function ExerciseBlock({
   const measure = exercise.snapshot.measure;
   const [editing, setEditing] = useState<WorkoutSet | null>(null);
   const [choosingMachine, setChoosingMachine] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const estimate = exercise.oneRepMax && describeOneRepMax(exercise.oneRepMax);
   const [machineError, setMachineError] = useState<string | null>(null);
   const machineLabel = [exercise.snapshot.machineName, exercise.snapshot.machineBrand].filter(Boolean).join(' · ');
 
@@ -340,6 +344,9 @@ function ExerciseBlock({
         .join(' · ')}
       actions={
         <>
+          <button type="button" className="text-ink-faint hover:text-ink" onClick={() => setShowHistory(true)} aria-label={`${exercise.snapshot.name} history`}>
+            <HistoryIcon className="h-4 w-4" />
+          </button>
           <button type="button" className="text-ink-faint hover:text-ink disabled:opacity-30" disabled={!canMoveUp || busy} onClick={() => onMove(-1)} aria-label="Move up">
             <ArrowUp className="h-4 w-4" />
           </button>
@@ -368,6 +375,9 @@ function ExerciseBlock({
           onChoose={(machineId) => void setMachine(machineId)}
         />
       </Modal>
+      <Modal open={showHistory} onClose={() => setShowHistory(false)} title={exercise.snapshot.name} wide>
+        <ExerciseHistory exerciseId={exercise.exerciseId} />
+      </Modal>
       {exercise.previous && (
         <p className="mb-2 text-xs text-ink-faint">
           Last time ({formatDay(exercise.previous.day)}):{' '}
@@ -381,6 +391,12 @@ function ExerciseBlock({
         {pending.map((item, index) => (
           <SetLine key={`pending-${index}`} index={exercise.sets.length + index + 1} set={item.value} measure={measure} pending />
         ))}
+        {estimate && (
+          <p className="mt-1 px-2 text-xs">
+            <span className="font-medium">{estimate.value}</span>
+            <span className="text-ink-faint"> · {estimate.basis}</span>
+          </p>
+        )}
       </div>
       <SetForm key={done} measure={measure} initial={initial} submitLabel="Log set" onSubmit={log} />
       {editing && (

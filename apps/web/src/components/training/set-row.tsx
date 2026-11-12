@@ -5,6 +5,7 @@ import { useState } from 'react';
 import {
   SET_TYPES,
   type Measure,
+  type RecordKind,
   type SetType,
   type SetValues,
   type WorkoutSet,
@@ -12,6 +13,7 @@ import {
 import { isValidRpe, setFieldsFor, validateSetValues } from '@life-portal/shared-domain';
 import { Input, Select } from '../ui';
 import {
+  RECORD_LABELS,
   SET_TYPE_LABELS,
   SET_TYPE_SHORT,
   describeSet,
@@ -161,14 +163,18 @@ export function SetLine({
   measure,
   pending,
   onClick,
+  best,
 }: {
   index: number;
-  set: SetValues & { type: SetType; rpe?: number };
+  set: SetValues & { type: SetType; rpe?: number; records?: RecordKind[] };
   measure: Measure;
   pending?: boolean;
   onClick?: () => void;
+  /** Highlights the session's best set in history. */
+  best?: boolean;
 }) {
   const mark = SET_TYPE_SHORT[set.type];
+  const records = set.records ?? [];
   return (
     <button
       type="button"
@@ -183,7 +189,16 @@ export function SetLine({
       <span className={clsx('w-6 shrink-0 text-center text-xs', mark ? 'font-semibold text-amber-400' : 'text-ink-faint')}>
         {mark || index}
       </span>
-      <span className="min-w-0 flex-1 truncate">{describeSet(set, measure)}</span>
+      <span className={clsx('min-w-0 flex-1 truncate', best && 'font-semibold')}>{describeSet(set, measure)}</span>
+      {records.length > 0 && (
+        <span
+          className="shrink-0 rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400"
+          title={`Personal record: ${records.map((kind) => RECORD_LABELS[kind]).join(', ')}`}
+          aria-label={`Personal record: ${records.map((kind) => RECORD_LABELS[kind]).join(', ')}`}
+        >
+          PR
+        </span>
+      )}
       {set.rpe !== undefined && <span className="shrink-0 text-xs text-ink-faint">RPE {set.rpe}</span>}
       {pending && <span className="shrink-0 text-xs text-ink-faint">saving…</span>}
     </button>

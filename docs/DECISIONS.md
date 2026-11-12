@@ -1300,3 +1300,23 @@ each cohort's resolved `access` map and the group editor saves the full map, so 
 and owns every value. The code fallback remains only for a feature never saved for a group (a new
 flag ships with it), and it is shown as a concrete value, not as "default". Individual accounts
 keep "Group default", because inheriting from the group is meaningful there.
+
+## 2026-11-12: When a training set counts as a personal record
+
+Records (spec 020 US3) are computed on read from every set of an exercise, in **done order**
+(session day, session start, set order). `loggedAt` is not used for order: a set added to last
+week's workout today still happened last week.
+
+- **A set is marked only once there is an earlier session to beat.** Otherwise a first workout
+  marks every heavier set as a "PR", which teaches people to ignore the badge. Within a later
+  session, each set that beats everything before it is marked, so a progression of top sets can
+  all be records.
+- **Marks look backwards only.** A set's marks depend only on earlier sets, so a later set never
+  removes an earlier badge, and deleting or lowering a record set hands the record to the true
+  best remaining set with no stored state to clean up.
+- **"Most reps" on weighted exercises is at this load or heavier.** Comparing reps across loads
+  would make light, high-rep sets the only reps records. The current best of the kind is still
+  "most reps in one set", shown with its load.
+- **Bodyweight loads need a weigh-in on or before the day.** Without one there is no load, so no
+  volume, heaviest or 1RM: no figure rather than a guessed one (FR-020). The weigh-in day travels
+  with every figure that used it.

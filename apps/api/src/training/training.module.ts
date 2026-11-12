@@ -25,6 +25,8 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { CatalogueSeeder } from './catalogue.seeder';
 import { CatalogueService } from './catalogue.service';
 import { MachinesService } from './machines.service';
+import { ProgressService } from './progress.service';
+import { NutritionModule } from '../nutrition/nutrition.module';
 import { TrainingProfileService } from './profile.service';
 import { SessionsService } from './sessions.service';
 import {
@@ -81,6 +83,7 @@ export class TrainingController {
     private readonly profiles: TrainingProfileService,
     private readonly sessions: SessionsService,
     private readonly machines: MachinesService,
+    private readonly progress: ProgressService,
   ) {}
 
   // ---------------------------------------------------------------- profile
@@ -112,6 +115,16 @@ export class TrainingController {
   @Get('exercises/:id')
   exercise(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     return this.catalogue.get(userId, id);
+  }
+
+  /** Sessions newest first, 20 a page; records over every set ever. */
+  @Get('exercises/:id/history')
+  exerciseHistory(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Query('before') before?: string,
+  ) {
+    return this.progress.history(userId, id, before || undefined);
   }
 
   @Post('exercises')
@@ -287,6 +300,7 @@ export class TrainingController {
 
 @Module({
   imports: [
+    NutritionModule,
     MongooseModule.forFeature([
       { name: Exercise.name, schema: ExerciseSchema },
       { name: TrainingMachine.name, schema: TrainingMachineSchema },
@@ -297,7 +311,7 @@ export class TrainingController {
     ]),
   ],
   controllers: [TrainingController],
-  providers: [CatalogueSeeder, CatalogueService, MachinesService, TrainingProfileService, SessionsService],
+  providers: [CatalogueSeeder, CatalogueService, MachinesService, ProgressService, TrainingProfileService, SessionsService],
   exports: [SessionsService],
 })
 export class TrainingModule {}

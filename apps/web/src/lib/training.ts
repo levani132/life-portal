@@ -1,8 +1,12 @@
 'use client';
 
 import { mutate } from 'swr';
+import { formatDay } from '@life-portal/shared-domain';
 import type {
   Measure,
+  OneRepMaxEstimate,
+  RecordEntry,
+  RecordKind,
   SessionDetail,
   SetType,
   SetValues,
@@ -85,6 +89,55 @@ export function describeSet(set: SetValues, measure: Measure): string {
     case 'distance_duration':
       return `${formatDistance(set.distanceMeters ?? 0)} in ${formatDuration(set.durationSeconds ?? 0)}`;
   }
+}
+
+/** `280` → `4:40 /km`. */
+export function formatPace(secondsPerKm: number): string {
+  return `${formatDuration(secondsPerKm)} /km`;
+}
+
+export const RECORD_LABELS: Record<RecordKind, string> = {
+  heaviest: 'Heaviest',
+  best_1rm: 'Best est. 1RM',
+  most_reps: 'Most reps',
+  longest_duration: 'Longest time',
+  longest_distance: 'Longest distance',
+  fastest_pace: 'Fastest pace',
+};
+
+/** A record's value, e.g. `120 kg`, `12 reps at 80 kg`, `4:40 /km`. */
+export function formatRecordValue(record: RecordEntry): string {
+  switch (record.kind) {
+    case 'heaviest':
+    case 'best_1rm':
+      return formatWeight(record.value);
+    case 'most_reps':
+      return record.loadGrams !== undefined ? `${record.value} reps at ${formatWeight(record.loadGrams)}` : `${record.value} reps`;
+    case 'longest_duration':
+      return formatDuration(record.value);
+    case 'longest_distance':
+      return formatDistance(record.value);
+    case 'fastest_pace':
+      return formatPace(record.value);
+  }
+}
+
+/** Where a body-weight-based figure came from, e.g. `body weight from weigh-in 1 Nov`. */
+export function bodyWeightNote(day: string | undefined): string {
+  return day ? `body weight from weigh-in ${formatDay(day)}` : '';
+}
+
+/**
+ * An estimate is never shown without its basis (principle 6):
+ * `est. 1RM 116.67 kg`, and `Epley, from 100 kg × 5`.
+ */
+export function describeOneRepMax(estimate: OneRepMaxEstimate): { value: string; basis: string } {
+  const { basis } = estimate;
+  const note = bodyWeightNote(basis.bodyWeightDay);
+  return {
+    value: `est. 1RM ${formatWeight(estimate.valueGrams)}`,
+    basis: `Epley, from ${formatWeight(basis.weightGrams)} × ${basis.reps}${note ? `; ${note}` : ''}`,
+  };
 }
 
 export const SET_TYPE_LABELS: Record<SetType, string> = {

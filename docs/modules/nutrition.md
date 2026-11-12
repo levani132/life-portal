@@ -201,7 +201,11 @@ original food's ID.
   calories eaten, calories left and protein left, and carries `quickAction: { kind: 'log-food' }`
   — the one interactive control a card may have under constitution 1.1.0. `netPositionCents` is
   untouched: food is not money.
-- **Nothing else.** This widget links to no other module. It does not touch cash flow, and a
+- **Training reads weigh-ins.** `NutritionService.weighInsUpTo(userId, day)` returns weigh-ins on
+  or before `day`, ascending, as `{day, weightGrams}` only, in one query. Training uses it for
+  bodyweight and assisted loads and never reads `weigh_ins` itself. Nothing else flows either way:
+  training adds no burned energy to Food.
+- **Nothing else.** Apart from that read, this widget links to no other module. It does not touch cash flow, and a
   grocery expense is a cash-flow concern that deliberately knows nothing about calories.
 
 ## Open Food Facts

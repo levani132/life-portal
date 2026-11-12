@@ -11,13 +11,13 @@ import {
   type EquipmentType,
   type Measure,
   type Muscle,
+  type RecordKind,
   type SessionDetail,
   type SessionExercise,
   type SessionListItem,
   type SessionPage,
   type SetInput,
   type SetPatch,
-  type SetType,
   type WorkoutSet as WorkoutSetDto,
 } from '@life-portal/shared-types';
 import {
@@ -28,11 +28,13 @@ import {
 } from '@life-portal/shared-domain';
 import { CatalogueService } from './catalogue.service';
 import { MachinesService } from './machines.service';
+import { ProgressService } from './progress.service';
+import { toSet, type SetRow } from './set-row';
 import { WorkoutExercise, WorkoutSession, WorkoutSet } from './training.schemas';
 
 type SessionRow = WorkoutSession & { _id: unknown };
+type SetResult = { set: WorkoutSetDto; records: RecordKind[] };
 type ExerciseRow = WorkoutExercise & { _id: unknown };
-type SetRow = WorkoutSet & { _id: unknown };
 
 const PAGE_SIZE = 20;
 
@@ -60,6 +62,7 @@ export class SessionsService {
     @InjectModel(WorkoutSet.name) private readonly sets: Model<WorkoutSet>,
     private readonly catalogue: CatalogueService,
     private readonly machines: MachinesService,
+    private readonly progress: ProgressService,
   ) {}
 
   // ---------------------------------------------------------------- sessions
@@ -343,10 +346,10 @@ export class SessionsService {
     workoutExerciseId: string,
     input: SetInput,
     nowMs = Date.now(),
-  ): Promise<{ set: WorkoutSetDto }> {
+  ): Promise<SetResult> {
     const parent = await this.ownedExercise(userId, sessionId, workoutExerciseId);
     const retried = await this.sets.findOne({ userId, requestId: input.requestId }).lean<SetRow>();
-    if (retried) return { set: toSet(retried) };
+    if (retried) return this.withRecords(userId, parent, retried);
     const values = pickValues(input);
     this.assertValid(parent.snapshot.measure as Measure, values, input.rpe);
     const last = await this.sets
@@ -368,20 +371,31 @@ export class SessionsService {
         ...(input.restSeconds != null ? { restSeconds: input.restSeconds } : {}),
         loggedAt: new Date(nowMs),
       });
-      return { set: toSet(created.toObject() as SetRow) };
+      return this.withRecords(userId, parent, created.toObject() as SetRow);
     } catch (error) {
       if (!isDuplicateKey(error)) throw error;
       const winner = await this.sets.findOne({ userId, requestId: input.requestId }).lean<SetRow>();
       if (!winner) throw error;
-      return { set: toSet(winner) };
+      return this.withRecords(userId, parent, winner);
     }
+  }
+
+  /** A set response with the records it holds (computed on read, contract `{set, records}`). */
+  private async withRecords(userId: string, parent: ExerciseRow, row: SetRow): Promise<SetResult> {
+    const records = await this.progress.recordsForSet(
+      userId,
+      parent.exerciseId,
+      parent.snapshot.measure as Measure,
+      String(row._id),
+    );
+    return { set: { ...toSet(row), records }, records };
   }
 
   /**
    * Corrects a set's own values. `null` clears an optional field. The parent exercise's snapshot
    * decides what is valid, and is never touched.
    */
-  async updateSet(userId: string, setId: string, patch: SetPatch): Promise<{ set: WorkoutSetDto }> {
+  async updateSet(userId: string, setId: string, patch: SetPatch): Promise<SetResult> {
     const row = await this.ownedSet(userId, setId);
     const parent = await this.exercises.findOne({ _id: row.workoutExerciseId, userId }).lean<ExerciseRow>();
     if (!parent) throw new NotFoundException(`Set ${setId} not found`);
@@ -405,7 +419,7 @@ export class SessionsService {
       );
     }
     const updated = await this.sets.findOne({ _id: row._id, userId }).lean<SetRow>();
-    return { set: toSet(updated ?? row) };
+    return this.withRecords(userId, parent, updated ?? row);
   }
 
   async removeSet(userId: string, setId: string): Promise<{ id: string; deleted: true }> {
@@ -453,7 +467,13 @@ export class SessionsService {
       this.exercises.find({ userId, sessionId: id }).sort({ order: 1 }).lean<ExerciseRow[]>(),
       this.sets.find({ userId, sessionId: id }).sort({ order: 1, loggedAt: 1 }).lean<SetRow[]>(),
     ]);
-    const previous = await this.previousSets(userId, id, session.startedAt, exercises);
+    const [previous, progress] = await Promise.all([
+      this.previousSets(userId, id, session.startedAt, exercises),
+      this.progress.load(
+        userId,
+        exercises.map((exercise) => ({ exerciseId: exercise.exerciseId, measure: exercise.snapshot.measure as Measure })),
+      ),
+    ]);
     const lastSetAt = latest(sets.map((set) => set.loggedAt));
     const startedAt = session.startedAt.toISOString();
     const status = session.status as SessionDetail['status'];
@@ -467,13 +487,19 @@ export class SessionsService {
       durationSeconds: sessionDurationSeconds({ startedAt, endedAt: session.endedAt?.toISOString(), lastSetAt }),
       isStale: isStaleSession({ status, startedAt, lastSetAt }, nowMs),
       lastSetAt,
-      exercises: exercises.map((exercise) => ({
-        ...this.toSessionExercise(
+      exercises: exercises.map((exercise) => {
+        const own = progress.get(`${exercise.exerciseId}:${exercise.snapshot.measure}`);
+        const item = this.toSessionExercise(
           exercise,
           sets.filter((set) => set.workoutExerciseId === String(exercise._id)),
-        ),
-        previous: previous.get(exercise.exerciseId),
-      })),
+        );
+        return {
+          ...item,
+          sets: item.sets.map((set) => ({ ...set, records: own?.marks.get(set.id) ?? [] })),
+          previous: previous.get(exercise.exerciseId),
+          oneRepMax: ProgressService.sessionOneRepMax(own, id),
+        };
+      }),
     };
   }
 
@@ -551,23 +577,6 @@ function pickValues(
   return values;
 }
 
-function toSet(row: SetRow): WorkoutSetDto {
-  return {
-    id: String(row._id),
-    workoutExerciseId: row.workoutExerciseId,
-    exerciseId: row.exerciseId,
-    order: row.order,
-    type: row.type as SetType,
-    reps: row.reps,
-    weightGrams: row.weightGrams,
-    assistGrams: row.assistGrams,
-    durationSeconds: row.durationSeconds,
-    distanceMeters: row.distanceMeters,
-    rpe: row.rpe,
-    restSeconds: row.restSeconds,
-    loggedAt: row.loggedAt.toISOString(),
-  };
-}
 
 function latest(dates: Date[]): string | undefined {
   if (!dates.length) return undefined;

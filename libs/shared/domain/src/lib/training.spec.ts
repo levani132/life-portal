@@ -1,4 +1,15 @@
 import {
+  bestOneRepMax,
+  bestSetOf,
+  bodyWeightOn,
+  effectiveLoadGrams,
+  estimateOneRepMax,
+  oneRepMaxFor,
+  paceSecondsPerKm,
+  personalRecords,
+  sessionVolumeGrams,
+  setVolumeGrams,
+  type ProgressSet,
   catalogueEquipment,
   catalogueMeasure,
   catalogueMuscles,
@@ -204,5 +215,172 @@ describe('catalogue mapping', () => {
       'middle_back',
       'lats',
     ]);
+  });
+});
+
+// ------------------------------------------------------------------ progress (US3)
+
+describe('estimateOneRepMax (Epley)', () => {
+  it('is the load itself for a single rep', () => {
+    expect(estimateOneRepMax(100_000, 1)).toBe(100_000);
+  });
+  it('applies load × (1 + reps / 30), rounded once to whole grams', () => {
+    expect(estimateOneRepMax(100_000, 5)).toBe(116_667);
+    expect(estimateOneRepMax(85_000, 6)).toBe(102_000);
+  });
+  it('allows 12 reps and refuses 13, zero reps or no load', () => {
+    expect(estimateOneRepMax(60_000, 12)).toBe(84_000);
+    expect(estimateOneRepMax(60_000, 13)).toBeUndefined();
+    expect(estimateOneRepMax(60_000, 0)).toBeUndefined();
+    expect(estimateOneRepMax(0, 5)).toBeUndefined();
+  });
+});
+
+describe('bodyWeightOn', () => {
+  const weighIns = [
+    { day: '2026-11-01', weightGrams: 80_000 },
+    { day: '2026-11-08', weightGrams: 79_000 },
+  ];
+  it('takes the latest weigh-in on or before the day', () => {
+    expect(bodyWeightOn(weighIns, '2026-11-08')?.weightGrams).toBe(79_000);
+    expect(bodyWeightOn(weighIns, '2026-11-07')?.weightGrams).toBe(80_000);
+  });
+  it('has nothing before the first weigh-in', () => {
+    expect(bodyWeightOn(weighIns, '2026-10-31')).toBeUndefined();
+  });
+});
+
+describe('effectiveLoadGrams', () => {
+  const body = { day: '2026-11-01', weightGrams: 80_000 };
+  it('uses the recorded weight for weight × reps', () => {
+    expect(effectiveLoadGrams('weight_reps', { reps: 5, weightGrams: 100_000 }, body)).toEqual({ grams: 100_000 });
+  });
+  it('adds added load to body weight, and says which weigh-in', () => {
+    expect(effectiveLoadGrams('bodyweight_reps', { reps: 8 }, body)).toEqual({ grams: 80_000, bodyWeightDay: '2026-11-01' });
+    expect(effectiveLoadGrams('bodyweight_reps', { reps: 8, weightGrams: 10_000 }, body)?.grams).toBe(90_000);
+  });
+  it('subtracts assistance, never below zero', () => {
+    expect(effectiveLoadGrams('assisted_reps', { reps: 8, assistGrams: 30_000 }, body)?.grams).toBe(50_000);
+    expect(effectiveLoadGrams('assisted_reps', { reps: 8, assistGrams: 90_000 }, body)?.grams).toBe(0);
+  });
+  it('has no load without a weigh-in, or for timed and distance work', () => {
+    expect(effectiveLoadGrams('bodyweight_reps', { reps: 8 })).toBeUndefined();
+    expect(effectiveLoadGrams('assisted_reps', { reps: 8, assistGrams: 30_000 })).toBeUndefined();
+    expect(effectiveLoadGrams('duration', { durationSeconds: 60, weightGrams: 20_000 }, body)).toBeUndefined();
+    expect(effectiveLoadGrams('distance_duration', { distanceMeters: 1000, durationSeconds: 300 }, body)).toBeUndefined();
+  });
+});
+
+describe('volume and pace', () => {
+  it('is load × reps, and nothing without a load', () => {
+    expect(setVolumeGrams({ grams: 80_000 }, 8)).toBe(640_000);
+    expect(setVolumeGrams(undefined, 8)).toBeUndefined();
+  });
+  it('gives pace in whole seconds per kilometre', () => {
+    expect(paceSecondsPerKm({ distanceMeters: 2000, durationSeconds: 500 })).toBe(250);
+    expect(paceSecondsPerKm({ distanceMeters: 2000 })).toBeUndefined();
+  });
+});
+
+let seq = 0;
+const s = (sessionId: string, values: Partial<ProgressSet> = {}): ProgressSet => ({
+  id: `set-${++seq}`,
+  sessionId,
+  day: `2026-11-${sessionId.padStart(2, '0')}`,
+  type: 'working',
+  ...values,
+});
+
+describe('personalRecords', () => {
+  it('marks nothing in the first workout, then marks sets that beat every earlier one', () => {
+    const sets = [
+      s('1', { reps: 8, weightGrams: 80_000 }),
+      s('1', { reps: 8, weightGrams: 85_000 }),
+      s('2', { reps: 8, weightGrams: 85_000 }),
+      s('2', { reps: 5, weightGrams: 90_000 }),
+    ];
+    const { marks, best } = personalRecords('weight_reps', sets);
+    expect(marks.get(sets[0].id)).toBeUndefined();
+    expect(marks.get(sets[1].id)).toBeUndefined();
+    expect(marks.get(sets[2].id)).toBeUndefined(); // equals, does not beat
+    // 90 × 5: heaviest; Epley 105 000 vs 85 × 8 = 107 667, so not a 1RM record.
+    expect(marks.get(sets[3].id)).toEqual(['heaviest']);
+    expect(best.find((r) => r.kind === 'heaviest')).toMatchObject({ value: 90_000, setId: sets[3].id, day: '2026-11-02' });
+    expect(best.find((r) => r.kind === 'best_1rm')).toMatchObject({ value: 107_667, setId: sets[1].id });
+  });
+
+  it('counts reps only against sets at the same load or heavier', () => {
+    const sets = [
+      s('1', { reps: 12, weightGrams: 60_000 }),
+      s('1', { reps: 8, weightGrams: 80_000 }),
+      s('2', { reps: 10, weightGrams: 80_000 }),
+      s('2', { reps: 11, weightGrams: 60_000 }),
+    ];
+    const { marks, best } = personalRecords('weight_reps', sets);
+    expect(marks.get(sets[2].id)).toContain('most_reps');
+    expect(marks.get(sets[3].id)).toBeUndefined();
+    expect(best.find((r) => r.kind === 'most_reps')).toMatchObject({ value: 12, loadGrams: 60_000 });
+  });
+
+  it('ignores warm-ups', () => {
+    const sets = [
+      s('1', { reps: 5, weightGrams: 100_000 }),
+      s('2', { type: 'warmup', reps: 5, weightGrams: 120_000 }),
+    ];
+    const { marks, best } = personalRecords('weight_reps', sets);
+    expect(marks.size).toBe(0);
+    expect(best.find((r) => r.kind === 'heaviest')?.value).toBe(100_000);
+  });
+
+  it('falls back to the true best when the record set is gone', () => {
+    const sets = [
+      s('1', { reps: 5, weightGrams: 100_000 }),
+      s('2', { reps: 5, weightGrams: 110_000 }),
+      s('3', { reps: 5, weightGrams: 105_000 }),
+    ];
+    const without = personalRecords('weight_reps', sets.filter((set) => set !== sets[1]));
+    expect(without.best.find((r) => r.kind === 'heaviest')).toMatchObject({ value: 105_000, setId: sets[2].id });
+    expect(without.marks.get(sets[2].id)).toContain('heaviest');
+  });
+
+  it('needs a weigh-in for bodyweight loads, and labels them with it', () => {
+    const body = { day: '2026-11-01', weightGrams: 80_000 };
+    const sets = [s('1', { reps: 10 }), s('2', { reps: 12 }), s('3', { reps: 8, weightGrams: 10_000, body })];
+    const { marks, best } = personalRecords('bodyweight_reps', sets);
+    expect(marks.get(sets[1].id)).toEqual(['most_reps']);
+    expect(best.find((r) => r.kind === 'heaviest')).toMatchObject({ value: 90_000, bodyWeightDay: '2026-11-01' });
+    expect(best.find((r) => r.kind === 'most_reps')?.value).toBe(12);
+  });
+
+  it('finds the longest distance and the fastest pace', () => {
+    const sets = [
+      s('1', { distanceMeters: 5000, durationSeconds: 1500 }),
+      s('2', { distanceMeters: 3000, durationSeconds: 840 }),
+    ];
+    const { marks, best } = personalRecords('distance_duration', sets);
+    expect(marks.get(sets[1].id)).toEqual(['fastest_pace']);
+    expect(best.find((r) => r.kind === 'longest_distance')?.value).toBe(5000);
+    expect(best.find((r) => r.kind === 'fastest_pace')?.value).toBe(280);
+  });
+});
+
+describe('session figures', () => {
+  const sets = [
+    s('9', { type: 'warmup', reps: 10, weightGrams: 60_000 }),
+    s('9', { reps: 8, weightGrams: 80_000 }),
+    s('9', { reps: 5, weightGrams: 90_000 }),
+  ];
+  it('picks the set with the best estimate', () => {
+    expect(bestSetOf('weight_reps', sets)).toBe(sets[2].id);
+  });
+  it('sums working volume only', () => {
+    expect(sessionVolumeGrams('weight_reps', sets)).toBe(640_000 + 450_000);
+  });
+  it('labels the session estimate with its formula and set', () => {
+    expect(bestOneRepMax('weight_reps', sets)).toEqual({
+      valueGrams: 105_000,
+      basis: { formula: 'epley', fromSetId: sets[2].id, weightGrams: 90_000, reps: 5 },
+    });
+    expect(oneRepMaxFor('weight_reps', sets[0])).toBeUndefined();
   });
 });

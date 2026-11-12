@@ -10,6 +10,7 @@ import { api, ApiError } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
 import { MEASURE_LABELS, humanise, revalidateTraining } from '../../lib/training';
 import { ExerciseForm } from './exercise-form';
+import { ExerciseHistory } from './exercise-history';
 import { ExerciseSearch } from './exercise-picker';
 import { MachineForm } from './machine-form';
 
@@ -140,6 +141,10 @@ function ExerciseDetail({ id, onClose }: { id: string; onClose: () => void }) {
                 </button>
               </div>
             )}
+            <section className="border-t border-border pt-3">
+              <h4 className="mb-2 text-sm font-semibold">Your history</h4>
+              <ExerciseHistory exerciseId={exercise.id} />
+            </section>
           </div>
         )}
       </Modal>

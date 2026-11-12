@@ -11,8 +11,9 @@ phases and must be computable from what this module records.
 **Spec:** `specs/020-training-logging/` (spec, plan, research R1–R11, data model, API contract)
 
 **Status (2026-11-12):** built: the catalogue, workout logging and history (MVP, T001–T021), and
-search ranking, private exercises and machines (US2, T022–T028). Not built yet: records and 1RM
-(US3), the Home card (US4), kg/lb and bodyweight loads (US5).
+search ranking, private exercises and machines (US2, T022–T028), and progress: per-exercise
+history, personal records and labelled 1RM estimates (US3, T029–T034). Not built yet: the Home
+card (US4), kg/lb display and the "from weigh-in" label on bodyweight set rows (US5).
 
 ## Access
 
@@ -151,6 +152,7 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `GET`/`PUT` | `/profile` | Upserted on first read. |
 | `GET` | `/exercises?q=&muscle=&equipment=&limit=&skip=` | Shared + own, not archived, by name. |
 | `GET` | `/exercises/:id` | Includes attribution on shared rows, signed `image.url` on own ones. |
+| `GET` | `/exercises/:id/history?before=` | Sessions newest first, 20 a page, each with sets (with record marks), best set, volume, 1RM; `records` over every set. |
 | `POST` | `/exercises` | A private exercise. |
 | `PATCH`/`DELETE` | `/exercises/:id` | Own rows only (shared → 404). Measure locked once logged (409). Delete archives a logged one. |
 | `GET` | `/machines?exerciseId=` | Own, not archived. |
@@ -163,8 +165,8 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `POST` | `/sessions/:id/exercises` `{requestId, exerciseId, machineId?}` | Builds the snapshot, with the machine's name and brand. |
 | `POST` | `/sessions/:id/exercises/order` `{ids}` | The complete id array. |
 | `PATCH`/`DELETE` | `/sessions/:id/exercises/:weId` | `{notes?, machineId?}` (`null` clears the machine); delete removes its sets. |
-| `POST` | `/sessions/:id/exercises/:weId/sets` | Validated against the snapshot's measure. |
-| `PATCH`/`DELETE` | `/sets/:setId` | `null` clears an optional field. |
+| `POST` | `/sessions/:id/exercises/:weId/sets` | Validated against the snapshot's measure. Returns `{set, records}`. |
+| `PATCH`/`DELETE` | `/sets/:setId` | `null` clears an optional field. PATCH returns `{set, records}`. |
 
 ## Derived values (computed on read, never stored)
 
@@ -175,6 +177,39 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 - `previous`: per exercise, the person's sets of it from their most recent session that started
   before this one.
 - Set counts and exercise names in the history list.
+
+### Progress and records (US3)
+
+Pure functions in `libs/shared/domain/src/lib/training.ts`; `ProgressService` only gathers rows.
+Nothing is stored, so correcting or deleting a set moves every figure at once.
+
+- **Done order.** An exercise's sets are ordered by session `day`, then session `startedAt`, then
+  set `order`: not by `loggedAt`, because a set added to an old workout later still happened
+  then. Only sets whose workout exercise's snapshot has the exercise's current measure count.
+- **Effective load** (`effectiveLoadGrams`): weight × reps → the weight; bodyweight reps → body
+  weight + added load; assisted → body weight − assistance, floored at 0; none for timed or
+  distance work. Body weight is the weigh-in **on or before** the session's day
+  (`bodyWeightOn`), read from `NutritionService.weighInsUpTo` (Training never reads `weigh_ins`).
+  Without a weigh-in a bodyweight set has no load, so no volume, heaviest or 1RM: no figure
+  rather than a wrong one. Load-based figures carry `bodyWeightDay`.
+- **Estimated 1RM** (`estimateOneRepMax`): Epley, `load × (1 + reps / 30)`, one rep = the load,
+  whole grams rounded once, only from working sets of 1–12 reps. Always returned as
+  `{valueGrams, basis: {formula: 'epley', fromSetId, weightGrams, reps, bodyWeightDay?}}` and
+  shown as "est. 1RM 116.67 kg · Epley, from 100 kg × 5".
+- **Volume**: load × reps over working sets with a known load.
+- **Records** (`personalRecords`), warm-ups never count. Kinds per measure: weight × reps →
+  heaviest, best est. 1RM, most reps; bodyweight and assisted → most reps, heaviest, best 1RM
+  (the last two need a weigh-in); time → longest time; distance → longest distance, longest time,
+  fastest pace (seconds per km, lower is better).
+  - A set is **marked** (`records` on the set) for a kind when it strictly beats every earlier
+    working set, and only once an earlier *session* exists, so a first workout is not a page of
+    "PR"s. Later sets never change an earlier set's marks.
+  - **Most reps** on weight × reps means more reps than any earlier set **at this load or
+    heavier**: 10 × 80 kg after 8 × 80 kg is a record even if 12 × 60 kg came before. The
+    current best of that kind is simply the most reps in one set, with its load.
+  - **Current bests** (`records` in history) are over every set ever, the earliest on a tie.
+- **Session figures**: `bestSetOf` (highest 1RM, else load, reps, distance, time) and
+  `sessionVolumeGrams`; `SessionExercise.oneRepMax` is the best estimate in that session.
 
 ## Day and time
 
@@ -187,8 +222,9 @@ real instants set by the server, because durations need them.
 - **Food / Apple Health:** none in this phase, on purpose. Training produces **no burned-energy
   figure** and never changes Food's targets or activity adjustment, which Apple Health's Active
   Energy owns. Who owns burned energy when Health is not connected is a later decision.
-- **Weigh-ins:** bodyweight loads (US5) will read Nutrition's weigh-ins through an exported
-  method, never a copy.
+- **Weigh-ins:** bodyweight and assisted loads read Nutrition's weigh-ins through
+  `NutritionService.weighInsUpTo(userId, day)` (one query per request; `TrainingModule` imports
+  `NutritionModule`), never a copy, so a corrected weigh-in corrects every figure.
 
 ## Web
 
@@ -214,7 +250,10 @@ reference in storage.
 catalogue mapping), `apps/api/src/training/sessions.service.spec.ts` (one open session including
 the race, retries, snapshots, measure validation, finish rules, history paging, cascades, 404s for
 other users) and `catalogue.seeder.spec.ts` (idempotent seed, user rows untouched, version bumps,
-facts-only file) and `catalogue.service.spec.ts` (ranking tiers, recent use, filters, aliases,
+facts-only file) `catalogue.service.spec.ts` (ranking tiers, recent use, filters, aliases,
 privacy, 404 on shared rows, measure lock, delete-or-archive, photo rollback, machines and the
-machine part of the snapshot). The specs run on `fake-model.testing.ts`, an in-memory stand-in for the query
+machine part of the snapshot). Progress: the domain spec (Epley bounds, loads per measure,
+weigh-in on or before, records per kind, warm-ups, fallback after removal, pace) and the
+`ProgressService` block in `sessions.service.spec.ts` (marks in set responses and detail,
+history paging, deletion and lowering moving records, weigh-in loads, other users). The specs run on `fake-model.testing.ts`, an in-memory stand-in for the query
 shapes these services use. Manual checks: `specs/020-training-logging/quickstart.md`.

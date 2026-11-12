@@ -646,6 +646,20 @@ export class NutritionService {
     return updated.toJSON() as unknown as NutritionProfileDto;
   }
 
+  /**
+   * Weigh-ins on or before `day`, ascending, as `{day, weightGrams}` only. For Training (spec 020),
+   * which needs body weight on the day of a bodyweight or assisted set and never reads `weigh_ins`
+   * itself (one owner per fact). One query.
+   */
+  async weighInsUpTo(userId: string, day: string): Promise<{ day: string; weightGrams: number }[]> {
+    const rows = await this.weighIns
+      .find({ userId, day: { $lte: day } })
+      .sort({ day: 1 })
+      .select('day weightGrams')
+      .lean<{ day: string; weightGrams: number }[]>();
+    return rows.map((row) => ({ day: row.day, weightGrams: row.weightGrams }));
+  }
+
   async listWeighIns(userId: string): Promise<WeighInDto[]> {
     const rows = await this.weighIns.find({ userId }).sort({ day: 1 });
     return rows.map((row) => row.toJSON() as unknown as WeighInDto);

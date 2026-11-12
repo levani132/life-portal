@@ -102,15 +102,15 @@ built and tested without US2 (search ranking and private additions).
 
 ### Tests
 
-- [ ] T029 [P] [US3] Domain tests in `libs/shared/domain/src/lib/training.spec.ts`: Epley (1 rep = weight, 12 reps allowed, 13 → undefined, whole grams), `effectiveLoadGrams` for every measure with and without body weight (assisted floored at 0), `setVolumeGrams`, `bodyWeightOn` (on or before), `personalRecords` per kind with warm-ups excluded and a fallback after the record set is removed, fastest pace for distance
+- [X] T029 [P] [US3] Domain tests in `libs/shared/domain/src/lib/training.spec.ts`: Epley (1 rep = weight, 12 reps allowed, 13 → undefined, whole grams), `effectiveLoadGrams` for every measure with and without body weight (assisted floored at 0), `setVolumeGrams`, `bodyWeightOn` (on or before), `personalRecords` per kind with warm-ups excluded and a fallback after the record set is removed, fastest pace for distance
 
 ### Implementation
 
-- [ ] T030 [US3] Implement those functions in `libs/shared/domain/src/lib/training.ts`, each estimate returning `Estimate` with its basis
-- [ ] T031 [US3] Export `weighInsUpTo(userId, day)` (`{day, weightGrams}` ascending, one query) from `apps/api/src/nutrition/nutrition.service.ts`; document it in `docs/modules/nutrition.md`
-- [ ] T032 [US3] `apps/api/src/training/progress.service.ts`: `history(userId, exerciseId, before?)` (20 sessions a page, best set, volume, 1RM, records over all sets) and per-set `records` for `SessionDetail` and set create/update responses; wire `GET /exercises/:id/history`
-- [ ] T033 [P] [US3] `apps/web/src/components/training/exercise-history.tsx`: sessions newest first, best set, volume, 1RM shown as "est." with "Epley, from 85 kg × 6", records list
-- [ ] T034 [US3] Record badges on set rows in the session (`set-row.tsx`, `workout-session.tsx`)
+- [X] T030 [US3] Implement those functions in `libs/shared/domain/src/lib/training.ts`, each estimate returning `Estimate` with its basis
+- [X] T031 [US3] Export `weighInsUpTo(userId, day)` (`{day, weightGrams}` ascending, one query) from `apps/api/src/nutrition/nutrition.service.ts`; document it in `docs/modules/nutrition.md`
+- [X] T032 [US3] `apps/api/src/training/progress.service.ts`: `history(userId, exerciseId, before?)` (20 sessions a page, best set, volume, 1RM, records over all sets) and per-set `records` for `SessionDetail` and set create/update responses; wire `GET /exercises/:id/history`
+- [X] T033 [P] [US3] `apps/web/src/components/training/exercise-history.tsx`: sessions newest first, best set, volume, 1RM shown as "est." with "Epley, from 85 kg × 6", records list
+- [X] T034 [US3] Record badges on set rows in the session (`set-row.tsx`, `workout-session.tsx`)
 
 **Checkpoint**: history and records match a hand calculation, including after deleting a record set.
 
@@ -165,6 +165,12 @@ built and tested without US2 (search ranking and private additions).
   never is; `Modal` renders a `<form>` only when it has `onSubmit`, so a form opened from the
   picker is not nested in another form. Photos were not checked end to end locally (no R2 here;
   the field hides itself and the API answers 503).
+- 2026-11-12: US3 done (T029–T034). Decisions the tasks left open: sets are ordered by session
+  day, start and set order (not `loggedAt`); a set is marked as a record only once an earlier
+  session exists; "most reps" is "at this load or heavier". The per-set `records` and the
+  session's `oneRepMax` are in `SessionDetail`; set create/update return `{set, records}`;
+  `toSet` moved to `set-row.ts`. The "from weigh-in" label on set rows stays with US5 (T040);
+  history and estimates already carry it.
 
 ## Dependencies and execution order
 
