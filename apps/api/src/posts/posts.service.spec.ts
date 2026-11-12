@@ -82,6 +82,7 @@ function fixture() {
     graph as never,
     media as never,
     { jwtSecret: 'isolated-test-key' } as never,
+    {} as never,
   );
   return { row, posts, reports, access, social, graph, media, nutrition, service };
 }
@@ -436,8 +437,17 @@ describe('For You discovery (spec 018)', () => {
     };
   }
   /** Serves `rows` like Mongo would: filtered by the cursor in the query, batched by `limit`. */
-  function discover(rows: ReturnType<typeof post>[], discoverable?: string[]) {
+  function discover(
+    rows: ReturnType<typeof post>[],
+    discoverable?: string[],
+    feedbackRows: { kind: 'post' | 'author'; targetId: string }[] = [],
+  ) {
     const f = fixture();
+    const feedback = {
+      find: jest.fn(() => ({ select: () => ({ lean: async () => feedbackRows }) })),
+      updateOne: jest.fn(),
+      deleteOne: jest.fn(),
+    };
     const find = jest.fn((filter: { $or?: { createdAt: Date | { $lt: Date }; _id?: { $lt: Types.ObjectId } }[] }) => ({
       sort: () => ({
         limit: (n: number) => ({
@@ -468,8 +478,9 @@ describe('For You discovery (spec 018)', () => {
       f.graph as never,
       f.media as never,
       { jwtSecret: 'isolated-test-key' } as never,
+      feedback as never,
     );
-    return { ...f, find, service };
+    return { ...f, find, feedback, service };
   }
 
   it('asks only for live public originals and never the viewer, blocked or muted authors', async () => {
@@ -545,5 +556,112 @@ describe('For You discovery (spec 018)', () => {
     await expect(f.service.forYou('viewer', { cursor: wall.nextCursor })).rejects.toThrow(
       BadRequestException,
     );
+  });
+});
+
+describe('For You feedback (issue #3, task A)', () => {
+  function rowsFor(...authors: string[]) {
+    return authors.map((userId, i) => ({
+      _id: new Types.ObjectId(),
+      userId,
+      requestId: `fb${i}`,
+      title: `${userId} ${i}`,
+      caption: '',
+      audience: 'public' as const,
+      deleted: false,
+      createdAt: new Date(Date.UTC(2026, 10, 12, 12) - i * 60_000),
+      updatedAt: new Date('2026-11-12T00:00:00Z'),
+    }));
+  }
+  function setup(
+    rows: ReturnType<typeof rowsFor>,
+    feedbackRows: { kind: 'post' | 'author'; targetId: string }[] = [],
+  ) {
+    const f = fixture();
+    // Applies the author exclusion the way Mongo would.
+    const find = jest.fn((filter: { userId: { $nin: string[] } }) => ({
+      sort: () => ({
+        limit: () => ({
+          lean: async () => rows.filter((row) => !filter.userId.$nin.includes(row.userId)),
+        }),
+      }),
+    }));
+    (f.posts as { find?: jest.Mock }).find = find;
+    (f.graph as { hiddenAuthorIds?: jest.Mock }).hiddenAuthorIds = jest.fn().mockResolvedValue([]);
+    (f.social as { discoverableIds?: jest.Mock }).discoverableIds = jest.fn(
+      async (ids: string[]) => new Set(ids),
+    );
+    f.social.postAuthor.mockImplementation(async (userId: string) => ({ userId, displayName: userId, username: userId }));
+    const feedback = {
+      find: jest.fn(() => ({ select: () => ({ lean: async () => feedbackRows }) })),
+      updateOne: jest.fn(),
+      deleteOne: jest.fn(),
+    };
+    const service = new PostsService(
+      f.posts as never,
+      f.reports as never,
+      f.access as never,
+      f.nutrition as never,
+      f.social as never,
+      f.graph as never,
+      f.media as never,
+      { jwtSecret: 'isolated-test-key' } as never,
+      feedback as never,
+    );
+    return { ...f, find, feedback, service };
+  }
+
+  it('leaves out a post marked Not interested and every post by a hidden author', async () => {
+    const rows = rowsFor('ann', 'ann', 'bob', 'cat');
+    const f = setup(rows, [
+      { kind: 'post', targetId: String(rows[0]._id) },
+      { kind: 'author', targetId: 'bob' },
+    ]);
+    const page = await f.service.forYou('viewer', {});
+    expect(page.posts.map((p) => p.title)).toEqual(['ann 1', 'cat 3']);
+    expect(f.find.mock.calls[0][0]).toMatchObject({ userId: { $nin: ['viewer', 'bob'] } });
+  });
+
+  it('stores post and author feedback against a readable post, and undo deletes it', async () => {
+    const f = setup([]);
+    f.posts.findOne.mockReturnValue({
+      lean: jest.fn().mockResolvedValue({ ...f.row, userId: 'ann', audience: 'public' }),
+    });
+    const id = String(f.row._id);
+    await f.service.feedFeedback('viewer', id, 'post', true);
+    expect(f.feedback.updateOne).toHaveBeenLastCalledWith(
+      { userId: 'viewer', kind: 'post', targetId: id },
+      { $setOnInsert: { userId: 'viewer', kind: 'post', targetId: id } },
+      { upsert: true },
+    );
+    await f.service.feedFeedback('viewer', id, 'author', true);
+    expect(f.feedback.updateOne).toHaveBeenLastCalledWith(
+      { userId: 'viewer', kind: 'author', targetId: 'ann' },
+      expect.anything(),
+      { upsert: true },
+    );
+    await f.service.feedFeedback('viewer', id, 'author', false);
+    expect(f.feedback.deleteOne).toHaveBeenCalledWith({ userId: 'viewer', kind: 'author', targetId: 'ann' });
+    expect(f.access.require).toHaveBeenCalledWith('viewer', 'forYou');
+  });
+
+  it('refuses your own post, a post you cannot read, and tolerates a duplicate-key race', async () => {
+    const f = setup([]);
+    const id = String(f.row._id);
+    f.posts.findOne.mockReturnValue({
+      lean: jest.fn().mockResolvedValue({ ...f.row, userId: 'viewer', audience: 'public' }),
+    });
+    await expect(f.service.feedFeedback('viewer', id, 'post', true)).rejects.toThrow(BadRequestException);
+    // Private post by someone else: not readable, so 404 and nothing stored.
+    f.posts.findOne.mockReturnValue({
+      lean: jest.fn().mockResolvedValue({ ...f.row, userId: 'ann', audience: 'private' }),
+    });
+    await expect(f.service.feedFeedback('viewer', id, 'post', true)).rejects.toThrow(NotFoundException);
+    expect(f.feedback.updateOne).not.toHaveBeenCalled();
+    f.posts.findOne.mockReturnValue({
+      lean: jest.fn().mockResolvedValue({ ...f.row, userId: 'ann', audience: 'public' }),
+    });
+    f.feedback.updateOne.mockRejectedValue({ code: 11000 });
+    await expect(f.service.feedFeedback('viewer', id, 'post', true)).resolves.toEqual({ success: true });
   });
 });

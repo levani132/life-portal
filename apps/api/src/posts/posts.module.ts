@@ -35,6 +35,8 @@ import {
   UpdatePostDto,
 } from './posts.dto';
 import {
+  FeedFeedbackRecord,
+  FeedFeedbackSchema,
   FoodPostRecord,
   FoodPostSchema,
   PostReportRecord,
@@ -173,6 +175,31 @@ class PostsController {
   ) {
     return this.posts.import(userId, id, dto);
   }
+  /** For You feedback (issue #3, task A). Undo is the matching DELETE. */
+  @Put(':id/not-interested') notInterested(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.posts.feedFeedback(userId, id, 'post', true);
+  }
+  @Delete(':id/not-interested') undoNotInterested(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.posts.feedFeedback(userId, id, 'post', false);
+  }
+  @Put(':id/hide-author') hideAuthor(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.posts.feedFeedback(userId, id, 'author', true);
+  }
+  @Delete(':id/hide-author') unhideAuthor(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.posts.feedFeedback(userId, id, 'author', false);
+  }
   @Post(':id/report') report(
     @CurrentUser('userId') userId: string,
     @Param('id') id: string,
@@ -204,6 +231,7 @@ class PublicPostsController {
       { name: PostLikeRecord.name, schema: PostLikeSchema },
       { name: PostCommentRecord.name, schema: PostCommentSchema },
       { name: PostReportRecord.name, schema: PostReportSchema },
+      { name: FeedFeedbackRecord.name, schema: FeedFeedbackSchema },
     ]),
   ],
   controllers: [PostsController, PublicPostsController],

@@ -119,6 +119,8 @@ export function PostOptions({
   onDelete,
   onImport,
   onReport,
+  onNotInterested,
+  onHideAuthor,
 }: {
   owner: boolean;
   busy: boolean;
@@ -127,6 +129,10 @@ export function PostOptions({
   /** Absent for a post without food: there is nothing to import. */
   onImport?: () => void;
   onReport: () => void;
+  /** For You only. */
+  onNotInterested?: () => void;
+  /** For You only. */
+  onHideAuthor?: { label: string; run: () => void };
 }) {
   const ref = useRef<HTMLDetailsElement>(null);
   const [open, setOpen] = useState(false);
@@ -161,7 +167,7 @@ export function PostOptions({
       >
         <MoreHorizontal size={20} />
       </summary>
-      <div className="absolute right-0 top-10 z-30 w-44 rounded-xl border border-border bg-surface p-1 shadow-xl">
+      <div className="absolute right-0 top-10 z-30 w-56 rounded-xl border border-border bg-surface p-1 shadow-xl">
         {owner ? (
           <>
             <button
@@ -189,6 +195,26 @@ export function PostOptions({
                 onClick={() => choose(onImport)}
               >
                 Import foods
+              </button>
+            )}
+            {onNotInterested && (
+              <button
+                type="button"
+                disabled={busy}
+                className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-violet-500/10"
+                onClick={() => choose(onNotInterested)}
+              >
+                Not interested
+              </button>
+            )}
+            {onHideAuthor && (
+              <button
+                type="button"
+                disabled={busy}
+                className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-violet-500/10"
+                onClick={() => choose(onHideAuthor.run)}
+              >
+                {onHideAuthor.label}
               </button>
             )}
             <button

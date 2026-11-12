@@ -60,6 +60,9 @@ export function PostsList({
 }) {
   const [cursor, setCursor] = useState<string | undefined>();
   const [history, setHistory] = useState<(string | undefined)[]>([]);
+  // For You: an author hidden from one card disappears from the rest of the page too. Maps the
+  // author to the card that hid them, which stays as the Undo row.
+  const [hiddenAuthors, setHiddenAuthors] = useState<Record<string, string>>({});
   const [scope, setScope] = useState(`${feed}:${authorId ?? ''}:${preview}`);
   const nextScope = `${feed}:${authorId ?? ''}:${preview}`;
   if (scope !== nextScope) {
@@ -89,9 +92,27 @@ export function PostsList({
   return (
     <div className="space-y-5">
       <div className="-mx-4 space-y-0.5 sm:mx-0 sm:space-y-5">
-        {result.data.posts.map((post) => (
-          <PostCard key={post.repost?.id ?? post.id} post={post} />
-        ))}
+        {result.data.posts.map((post) => {
+          const key = post.repost?.id ?? post.id;
+          const hiddenBy = hiddenAuthors[post.author.userId];
+          return (
+            <PostCard
+              key={key}
+              post={post}
+              forYou={
+                feed === 'forYou'
+                  ? {
+                      hiddenByOther: !!hiddenBy && hiddenBy !== key,
+                      onAuthorHidden: (hidden) =>
+                        setHiddenAuthors(({ [post.author.userId]: _, ...rest }) =>
+                          hidden ? { ...rest, [post.author.userId]: key } : rest,
+                        ),
+                    }
+                  : undefined
+              }
+            />
+          );
+        })}
       </div>
       {result.data.posts.length === 0 && history.length === 0 && empty}
       {result.data.posts.length === 0 && !empty && (
@@ -133,10 +154,18 @@ export function PostsList({
 export function PostCard({
   post,
   detail = false,
+  forYou,
 }: {
   post: FoodPost;
   detail?: boolean;
+  /** Present on For You cards: enables Not interested / Hide author (issue #3, task A). */
+  forYou?: {
+    /** Another card on this page hid this post's author. */
+    hiddenByOther: boolean;
+    onAuthorHidden: (hidden: boolean) => void;
+  };
 }) {
+  const [dismissed, setDismissed] = useState<'post' | 'author' | null>(null);
   const [editing, setEditing] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -157,6 +186,41 @@ export function PostCard({
     )
       setRemoved(true);
   }
+  /** Not interested (`post`) or hide the author (`author`) from For You, or undo either. */
+  async function feedback(kind: 'post' | 'author', on: boolean) {
+    const path = `/posts/${post.id}/${kind === 'post' ? 'not-interested' : 'hide-author'}`;
+    const ok = await action.run(
+      () => (on ? api.put(path) : api.delete(path)),
+      { revalidate: false },
+    );
+    if (!ok) return;
+    setDismissed(on ? kind : null);
+    if (kind === 'author') forYou?.onAuthorHidden(on);
+  }
+  if (forYou?.hiddenByOther) return null;
+  if (dismissed)
+    return (
+      <div className="card flex flex-wrap items-center gap-x-3 gap-y-2 p-4 text-sm text-ink-muted">
+        <span className="min-w-0 flex-1">
+          {dismissed === 'post'
+            ? 'Got it. You won’t see this post in For You.'
+            : `You won’t see posts from ${post.author.displayName} in For You.`}
+        </span>
+        <button
+          type="button"
+          className="btn-ghost shrink-0"
+          disabled={action.pending}
+          onClick={() => void feedback(dismissed, false)}
+        >
+          Undo
+        </button>
+        {action.error && (
+          <div className="w-full">
+            <ErrorNote message={action.error} />
+          </div>
+        )}
+      </div>
+    );
   if (removed)
     return (
       <p className="card p-5 text-sm text-ink-muted">
@@ -257,6 +321,17 @@ export function PostCard({
           onDelete={() => void remove()}
           onImport={hasFood ? () => setImporting(true) : undefined}
           onReport={() => setReporting(true)}
+          onNotInterested={
+            forYou ? () => void feedback('post', true) : undefined
+          }
+          onHideAuthor={
+            forYou
+              ? {
+                  label: `Hide ${post.author.displayName} from For You`,
+                  run: () => void feedback('author', true),
+                }
+              : undefined
+          }
         />
       </div>
       {post.title && post.title !== post.contentLabel && (

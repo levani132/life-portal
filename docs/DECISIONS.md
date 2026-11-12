@@ -1227,3 +1227,13 @@ posts per author and skips the rest rather than deferring them, the simplest rul
 prolific poster filling the page until #3 ranks properly. Its cursor is keyed separately from
 Wall's so positions are never interchangeable. The `forYou` flag stays off for production until
 image moderation exists (roadmap launch gate).
+
+## 2026-11-12: For You ranking is on hold; Not interested ships first
+
+Issue #3 asked for signals, an interest profile, topics, ranked paging and metrics at once. The
+owner chose to validate the plain For You feed with real use first: ranking, onboarding
+interests, impression tracking and the TTL feed-session design are on hold, and #3 stays open as
+the umbrella. What shipped is the user control (task A): Not interested and hide an author, in
+`feed_feedback`. Hiding an author excludes them rather than down-weighting, because with no
+ranking there is nothing to weigh; it can become "show fewer" when ranking exists. Recorded rule:
+private nutrition logs, weight, targets and Apple Health never drive recommendations.

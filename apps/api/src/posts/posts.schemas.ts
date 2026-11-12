@@ -59,4 +59,20 @@ export class PostReportRecord {
 }
 export const PostReportSchema = SchemaFactory.createForClass(PostReportRecord);
 PostReportSchema.index({ userId: 1, postId: 1 }, { unique: true });
-
+/**
+ * "Not interested" feedback on For You (issue #3, task A): one row per viewer and post, or per
+ * viewer and author. It only shapes For You; Friends, profiles and direct links are unchanged.
+ */
+export const FEED_FEEDBACK_KINDS = ['post', 'author'] as const;
+export type FeedFeedbackKind = (typeof FEED_FEEDBACK_KINDS)[number];
+@Schema({ ...baseSchemaOptions, collection: 'feed_feedback' })
+export class FeedFeedbackRecord {
+  @Prop({ required: true }) userId!: string;
+  @Prop({ type: String, enum: FEED_FEEDBACK_KINDS, required: true })
+  kind!: FeedFeedbackKind;
+  /** A post id for `post`, a user id for `author`. */
+  @Prop({ required: true }) targetId!: string;
+  createdAt!: Date;
+}
+export const FeedFeedbackSchema = SchemaFactory.createForClass(FeedFeedbackRecord);
+FeedFeedbackSchema.index({ userId: 1, kind: 1, targetId: 1 }, { unique: true });

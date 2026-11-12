@@ -36,7 +36,12 @@ import { NutritionPublicationService } from '../nutrition/nutrition-publication.
 import { SocialService } from '../social/social.module';
 import { SocialGraphService } from '../social-graph/social-graph.module';
 import { MediaService } from '../media/media.service';
-import { FoodPostRecord, PostReportRecord } from './posts.schemas';
+import {
+  FeedFeedbackRecord,
+  FoodPostRecord,
+  PostReportRecord,
+  type FeedFeedbackKind,
+} from './posts.schemas';
 import type {
   CreatePostDto,
   ForYouDto,
@@ -71,6 +76,8 @@ export class PostsService {
     private readonly graph: SocialGraphService,
     private readonly media: MediaService,
     @Inject(CONFIG) private readonly config: AppConfig,
+    @InjectModel(FeedFeedbackRecord.name)
+    private readonly feedback: Model<FeedFeedbackRecord>,
   ) {}
   private id(id: string) {
     if (!isValidObjectId(id)) throw new NotFoundException('Post not found.');
@@ -428,7 +435,18 @@ export class PostsService {
   async forYou(userId: string, query: ForYouDto): Promise<PostPage> {
     await this.requireEnabled(userId);
     await this.access.require(userId, 'forYou');
-    const excluded = [userId, ...(await this.graph.hiddenAuthorIds(userId))];
+    const [graphHidden, feedback] = await Promise.all([
+      this.graph.hiddenAuthorIds(userId),
+      this.feedback.find({ userId }).select('kind targetId').lean(),
+    ]);
+    const notInterested = new Set(
+      feedback.filter((f) => f.kind === 'post').map((f) => f.targetId),
+    );
+    const excluded = [
+      userId,
+      ...graphHidden,
+      ...feedback.filter((f) => f.kind === 'author').map((f) => f.targetId),
+    ];
     let cursor = this.cursor(query.cursor, 'forYou');
     let scanned = 0;
     const visible: FoodPost[] = [];
@@ -461,6 +479,7 @@ export class PostsService {
         scanned++;
         last = row;
         if (!discoverable.has(row.userId)) continue;
+        if (notInterested.has(String(row._id))) continue;
         const count = perAuthor.get(row.userId) ?? 0;
         if (count >= FOR_YOU_AUTHOR_CAP) continue;
         const author = await this.readable(userId, row);
@@ -664,6 +683,37 @@ export class PostsService {
       dto.saveAsMeal,
       dto.mealName?.trim() || row.title || row.publication.label,
     );
+  }
+  /**
+   * "Not interested" (`post`) or "Hide this author from For You" (`author`), and their undo.
+   * Only for another member's post the viewer can read now; it never changes who can read what,
+   * only what For You offers. Repeats are no-ops; undo deletes the row.
+   */
+  async feedFeedback(
+    userId: string,
+    id: string,
+    kind: FeedFeedbackKind,
+    on: boolean,
+  ): Promise<{ success: true }> {
+    await this.access.require(userId, 'forYou');
+    const { row } = await this.read(userId, id);
+    if (row.userId === userId)
+      throw new BadRequestException('This is your own post.');
+    const targetId = kind === 'post' ? id : row.userId;
+    if (!on) {
+      await this.feedback.deleteOne({ userId, kind, targetId });
+      return { success: true };
+    }
+    try {
+      await this.feedback.updateOne(
+        { userId, kind, targetId },
+        { $setOnInsert: { userId, kind, targetId } },
+        { upsert: true },
+      );
+    } catch (error) {
+      if ((error as { code?: number }).code !== 11000) throw error;
+    }
+    return { success: true };
   }
   async report(userId: string, id: string, dto: ReportPostDto) {
     await this.requireEnabled(userId);

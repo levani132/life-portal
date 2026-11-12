@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-12: Not interested, in For You
+
+A post's menu in For You has **Not interested** and **Hide {name} from For You**. The post (or
+everything from that person) leaves For You straight away, with an Undo right there. It changes
+nothing else: they still show in Friends, on their profile and through links.
+
 ## 2026-11-12: For You and Friends on Home (behind a flag)
 
 Where the flag is on, Home's feed has two tabs under the widgets. **For You** opens first and
