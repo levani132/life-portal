@@ -385,7 +385,7 @@ describe('SessionsService: plan workouts (spec 023)', () => {
           name: 'Push',
           exercises: [
             { id: 'pp:push:0', exerciseId: f.bench, restSeconds: 150, targets: [{ type: 'warmup', reps: 10 }, { type: 'working', reps: 6, repsMax: 8 }, { type: 'working', reps: 6, repsMax: 8 }] },
-            { id: 'pp:push:1', exerciseId: f.pullUp, restSeconds: 90, targets: [{ type: 'working', reps: 8 }, { type: 'working', reps: 8 }] },
+            { id: 'pp:push:1', exerciseId: f.pullUp, restSeconds: 90, superset: 'ss1', targets: [{ type: 'working', reps: 8 }, { type: 'working', reps: 8 }] },
           ],
         },
         { id: 'pp:empty', name: 'Empty', exercises: [] },
@@ -402,6 +402,7 @@ describe('SessionsService: plan workouts (spec 023)', () => {
     expect(session.plan).toEqual({ planId: f.planId, planWorkoutId: 'pp:push', planName: 'Push / Pull', workoutName: 'Push' });
     expect(session.exercises.map((e) => e.snapshot.name)).toEqual(['Barbell Bench Press', 'Pullups']);
     expect(session.exercises[0].planned).toEqual({
+      planExerciseId: 'pp:push:0',
       restSeconds: 150,
       targets: [{ type: 'warmup', reps: 10 }, { type: 'working', reps: 6, repsMax: 8 }, { type: 'working', reps: 6, repsMax: 8 }],
     });
@@ -532,6 +533,32 @@ describe('SessionsService: plan workouts (spec 023)', () => {
     expect(done.exercises.map((e) => e.id)).toEqual([session.exercises[0].id, byHand.id]);
     const list = await f.service.list(ME);
     expect(list.sessions[0].plan).toEqual({ planName: 'Push / Pull', workoutName: 'Push' });
+  });
+
+  it('spec 025: copies the superset, and lets rest and superset change for this workout only', async () => {
+    const f = planFixture();
+    const session = await f.start();
+    expect(session.exercises[1].superset).toBe('ss1');
+    expect(session.exercises[0].superset).toBeUndefined();
+    const bench = session.exercises[0];
+    const changed = await f.service.updateExercise(ME, session.id, bench.id, { restSeconds: 45, superset: 'ss1' });
+    expect(changed.restSeconds).toBe(45);
+    expect(changed.superset).toBe('ss1');
+    // The plan's copy is untouched: it is what the plan said.
+    expect(changed.planned?.restSeconds).toBe(150);
+    const cleared = await f.service.updateExercise(ME, session.id, bench.id, { restSeconds: null, superset: null });
+    expect(cleared.restSeconds).toBeUndefined();
+    expect(cleared.superset).toBeUndefined();
+    const plan = f.plansModel.docs[0] as unknown as { workouts: { exercises: { restSeconds?: number }[] }[] };
+    expect(plan.workouts[0].exercises[0].restSeconds).toBe(150);
+  });
+
+  it('spec 025: a swap keeps the rest chosen and the superset', async () => {
+    const f = planFixture();
+    const session = await f.start();
+    await f.service.updateExercise(ME, session.id, session.exercises[1].id, { restSeconds: 30 });
+    const swapped = await f.service.swapExercise(ME, session.id, session.exercises[1].id, { requestId: randomUUID(), exerciseId: f.pullUp });
+    expect(swapped).toMatchObject({ restSeconds: 30, superset: 'ss1' });
   });
 
   it('starting an empty workout is unchanged', async () => {

@@ -142,6 +142,7 @@ export class PlansService {
               : { name: 'Exercise no longer available', measure: 'weight_reps', equipmentType: 'other', archived: true },
             ...(exercise.restSeconds != null ? { restSeconds: exercise.restSeconds } : {}),
             ...(exercise.note ? { note: exercise.note } : {}),
+            ...(exercise.superset ? { superset: exercise.superset } : {}),
             targets: exercise.targets.map(toTarget),
           };
         }),
@@ -212,6 +213,7 @@ export class PlansService {
           exerciseId: exercise.exerciseId,
           ...(exercise.restSeconds != null ? { restSeconds: exercise.restSeconds } : {}),
           ...(exercise.note ? { note: exercise.note } : {}),
+          ...(exercise.superset ? { superset: exercise.superset } : {}),
           targets: exercise.targets.map(toTarget),
         })),
       })),
@@ -295,6 +297,7 @@ export class PlansService {
           exerciseId: exercise.exerciseId,
           ...(exercise.restSeconds != null ? { restSeconds: exercise.restSeconds } : {}),
           ...(exercise.note ? { note: exercise.note } : {}),
+          ...(exercise.superset ? { superset: exercise.superset } : {}),
           targets: exercise.targets,
         })),
       })),

@@ -315,7 +315,7 @@ export class SessionsService {
     userId: string,
     sessionId: string,
     workoutExerciseId: string,
-    patch: { notes?: string; machineId?: string | null; skipped?: boolean },
+    patch: { notes?: string; machineId?: string | null; skipped?: boolean; restSeconds?: number | null; superset?: string | null },
   ): Promise<SessionExercise> {
     const row = await this.ownedExercise(userId, sessionId, workoutExerciseId);
     const set: Record<string, unknown> = {};
@@ -324,6 +324,15 @@ export class SessionsService {
       if (!row.planned) throw new BadRequestException('Only an exercise from a plan can be skipped.');
       if (patch.skipped) set['skipped'] = true;
       else unset['skipped'] = 1;
+    }
+    // Spec 025: what the person chose during this workout; `planned` is never touched.
+    if (patch.restSeconds !== undefined) {
+      if (patch.restSeconds === null) unset['restSeconds'] = 1;
+      else set['restSeconds'] = patch.restSeconds;
+    }
+    if (patch.superset !== undefined) {
+      if (patch.superset === null) unset['superset'] = 1;
+      else set['superset'] = patch.superset;
     }
     if (patch.notes !== undefined) {
       if (patch.notes.trim()) set['notes'] = patch.notes.trim();
@@ -417,6 +426,9 @@ export class SessionsService {
           ...(machine ? { machineId: String(machine._id) } : {}),
           snapshot: snapshotOf(exercise, machine),
           ...(planned ? { planned } : {}),
+          // A swap keeps the exercise's place: its superset and the rest chosen for it.
+          ...(row.restSeconds != null ? { restSeconds: row.restSeconds } : {}),
+          ...(row.superset ? { superset: row.superset } : {}),
         })
       ).toObject() as ExerciseRow;
     } catch (error) {
@@ -554,7 +566,9 @@ export class SessionsService {
   private async addPlanned(
     userId: string,
     session: SessionRow,
-    workout: { exercises: { id: string; exerciseId: string; restSeconds?: number; note?: string; targets: PlanTarget[] }[] },
+    workout: {
+      exercises: { id: string; exerciseId: string; restSeconds?: number; note?: string; superset?: string; targets: PlanTarget[] }[];
+    },
   ) {
     const sessionId = String(session._id);
     const exercises = await Promise.all(
@@ -578,6 +592,8 @@ export class SessionsService {
             ...(planned.note ? { note: planned.note } : {}),
             targets: planned.targets.map(toTarget),
           },
+          // Spec 025: the superset is copied like the targets, but the person may change it.
+          ...(planned.superset ? { superset: planned.superset } : {}),
         });
       } catch (error) {
         if (!isDuplicateKey(error)) throw error;
@@ -728,6 +744,7 @@ export class SessionsService {
   private toSessionExercise(row: ExerciseRow, sets: SetRow[]): SessionExercise {
     const planned: PlannedExercise | undefined = row.planned
       ? {
+          planExerciseId: row.planned.planExerciseId,
           ...(row.planned.restSeconds != null ? { restSeconds: row.planned.restSeconds } : {}),
           ...(row.planned.note ? { note: row.planned.note } : {}),
           targets: row.planned.targets.map(toTarget),
@@ -752,6 +769,8 @@ export class SessionsService {
       ...(planned ? { planned } : {}),
       skipped: Boolean(row.skipped),
       openTargets: openTargets(planned, sets.length, Boolean(row.skipped)),
+      ...(row.restSeconds != null ? { restSeconds: row.restSeconds } : {}),
+      ...(row.superset ? { superset: row.superset } : {}),
     };
   }
 }

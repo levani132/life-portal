@@ -82,6 +82,21 @@ describe('PlansService: own plans', () => {
     expect(f.plans.docs.find((doc) => String(doc._id) === created.id)?.userId).toBe(ME);
   });
 
+  it('spec 025: keeps a superset through create and copy, and refuses a bad key', async () => {
+    const f = fixture();
+    const input = f.input();
+    input.workouts[0].exercises[0].superset = 'pair1';
+    input.workouts[0].exercises[1].superset = 'pair1';
+    const created = await f.service.create(ME, { requestId: randomUUID(), ...input });
+    expect(created.workouts[0].exercises.map((e) => e.superset)).toEqual(['pair1', 'pair1']);
+    const copy = await f.service.copy(ME, created.id, randomUUID());
+    expect(copy.workouts[0].exercises.map((e) => e.superset)).toEqual(['pair1', 'pair1']);
+    const bad = f.input();
+    bad.workouts[0].exercises[0].superset = 'not ok';
+    const response = (await message(f.service.create(ME, { requestId: randomUUID(), ...bad }))) as { problems: { path: string }[] };
+    expect(response.problems.map((p) => p.path)).toEqual(['workouts.0.exercises.0.superset']);
+  });
+
   it('returns the original plan for a retried create', async () => {
     const f = fixture();
     const requestId = randomUUID();

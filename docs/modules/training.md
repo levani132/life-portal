@@ -50,9 +50,9 @@ re-fills its weights from grams so a kg number is never sent as lb.
 | `exercises` | The catalogue. Shared rows have no `userId` and are written only by the seeder; private rows have one. One catalogue for everyone instead of a copy per account. |
 | `training_machines` | Specific machines, private to their creator (US2). The dataset only knows generic equipment. |
 | `training_profiles` | One row per user: `weightUnit`, `defaultRestSeconds`. Upserted on first read, seeding only fields the caller did not send. |
-| `training_plans` | Workout plans (spec 023). One document per plan with `workouts[] → exercises[] → targets[]` embedded, because a plan is read and saved whole. Shared (ready-made) plans have no `userId`, a `seedKey` and `seedVersion`, and are written only by `PlanSeeder`; own plans have a `userId`. Workout and exercise `id`s are stable strings (seed keys like `push-pull-legs:push` for shared plans) because sessions point at them. `archived` marks a shared plan dropped from the seed file. |
+| `training_plans` | Workout plans (spec 023). An exercise may carry `superset` (spec 025). One document per plan with `workouts[] → exercises[] → targets[]` embedded, because a plan is read and saved whole. Shared (ready-made) plans have no `userId`, a `seedKey` and `seedVersion`, and are written only by `PlanSeeder`; own plans have a `userId`. Workout and exercise `id`s are stable strings (seed keys like `push-pull-legs:push` for shared plans) because sessions point at them. `archived` marks a shared plan dropped from the seed file. |
 | `workout_sessions` | One workout: `day`, `status`, `startedAt`, `endedAt?`, `notes?`, `requestId`, and `plan? {planId, planWorkoutId, planName, workoutName}` when started from a plan (frozen). |
-| `workout_exercises` | An exercise within a session, in `order`, with a frozen `snapshot`; from a plan also `planned {planExerciseId, restSeconds?, note?, targets}` (frozen) and `skipped?`. |
+| `workout_exercises` | An exercise within a session, in `order`, with a frozen `snapshot`; from a plan also `planned {planExerciseId, restSeconds?, note?, targets}` (frozen) and `skipped?`. Spec 025: `restSeconds?` (this workout's choice, 0–900) and `superset?` (copied from the plan, then editable). |
 | `workout_sets` | **The event row.** One performed set. Everything about progress derives from these. |
 
 Sessions, exercises and sets are three collections, not one document with arrays, so two devices
@@ -151,6 +151,38 @@ the `{userId, 'plan.planId', day}` index.
   returns it with `resumed: true` and adds nothing. A workout with no exercises answers 400
   `EMPTY_WORKOUT`.
 
+## Workout flow (spec 025)
+
+**Supersets.** A plan exercise and a workout exercise may carry a `superset` key
+(`[A-Za-z0-9_-]{1,40}`, opaque; the web makes 8-character ones). Only **neighbours** with the
+same key form a superset (`supersetRuns`), labelled A, B, … by position and numbered A1, A2. So
+moving an exercise away takes it out without touching the others, and a stray key on a lone
+exercise means nothing. `linkWithNext` and `unlinkFromNext` (domain) compute the new keys; the
+plan editor sends them with the plan, a workout PATCHes each exercise whose key changed
+(`superset: null` clears). Starting from a plan copies the key; swap keeps it. Sets are still
+logged per exercise, so history, records and 1RM are untouched by supersets.
+
+**Rest.** The rest after a set is `workout_exercises.restSeconds` (chosen in this workout), else
+`planned.restSeconds`, else the profile's `defaultRestSeconds`. `planned` is never edited; "Also
+save to plan" in the web PUTs the person's own plan with the new rest. `restAfter` (domain): 0
+mid-way through a superset round (the current exercise is a later member of the last set's
+superset), else the superset's last member's rest, else the exercise's own. The timer's −15 s,
++15 s and Skip change the current rest only, in memory (`useRestControls`, shared with the bar).
+
+**Done and current** (`workoutFocus`, derived on every render, sets still being sent included):
+a planned exercise is done once its planned sets are logged (extra sets keep it done); one added
+by hand is done once it has a set and the last set was in another exercise outside its superset.
+Skipped exercises are neither. Current: in the last set's superset, the next member not done,
+round and round; else the last set's exercise while not done; else the first neither done nor
+skipped. Done exercises collapse to one green line and expand on tap; finished workouts are
+shown expanded.
+
+**The workout bar.** `components/training/workout-bar.tsx`, inside the app header (so
+`--header-offset` counts it and the rest timer still sticks under it), on every page while a
+session is open: current exercise, time, rest countdown. It reads `sessions/current` (revalidated
+on focus) and hides while the Training page's Workout tab shows (`setWorkoutOnScreen`); tapping
+it opens `/training`, or switches the tab there (`OPEN_WORKOUT_EVENT`).
+
 ## Measures
 
 Each exercise has one `measure`, which decides the fields a set carries (`setFieldsFor`, shared
@@ -240,7 +272,7 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `POST` | `/sessions/:id/finish` `{at?: now\|lastSet}` | 409 `EMPTY_SESSION` when it has no sets. |
 | `POST` | `/sessions/:id/exercises` `{requestId, exerciseId, machineId?}` | Builds the snapshot, with the machine's name and brand. |
 | `POST` | `/sessions/:id/exercises/order` `{ids}` | The complete id array. |
-| `PATCH`/`DELETE` | `/sessions/:id/exercises/:weId` | `{notes?, machineId?}` (`null` clears the machine); delete removes its sets. |
+| `PATCH`/`DELETE` | `/sessions/:id/exercises/:weId` | `{notes?, machineId?, restSeconds?, superset?}` (`null` clears the machine, rest or superset; spec 025); delete removes its sets. |
 | `POST` | `/sessions/:id/exercises/:weId/sets` | Validated against the snapshot's measure. Returns `{set, records}`; bodyweight and assisted sets carry `effectiveLoad` when a weigh-in exists. |
 | `PATCH`/`DELETE` | `/sets/:setId` | `null` clears an optional field. PATCH returns `{set, records}`. |
 | `GET` | `/plans` | `{shared, own}`; shared in seed-file order, archived left out (spec 023). |
@@ -371,7 +403,7 @@ left out). History is grouped by Monday-start week with totals summed from the l
 from `lastSetAt` on the client; nothing about it is stored. It is a direct child of the workout's
 list (below the header card, above the exercises), because a `position: sticky` element only
 sticks within its parent, and it is one element that changes position, never a second copy, so
-its countdown and Hide keep their state and there is never a duplicate. It sticks at
+its countdown and controls keep their state and there is never a duplicate. It sticks at
 `--header-offset`, which `ScrollHeader` publishes (its height while shown, `0px` once hidden), on a
 solid `bg-surface` band. With no header showing it pads itself by `--header-band`
 (`var(--top-chrome)`), so it fills the iOS status-bar band instead of leaving it hollow. It

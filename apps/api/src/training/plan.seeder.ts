@@ -20,7 +20,7 @@ export interface SeedPlan {
     /** Becomes the workout's stable id, so progress survives a new version. */
     key: string;
     name: string;
-    exercises: { exercise: string; restSeconds?: number; note?: string; targets: PlanTarget[] }[];
+    exercises: { exercise: string; restSeconds?: number; note?: string; superset?: string; targets: PlanTarget[] }[];
   }[];
 }
 
@@ -88,6 +88,7 @@ export class PlanSeeder {
                       exerciseId: String(bySeedKey.get(exercise.exercise)?._id),
                       ...(exercise.restSeconds != null ? { restSeconds: exercise.restSeconds } : {}),
                       ...(exercise.note ? { note: exercise.note } : {}),
+                      ...(exercise.superset ? { superset: exercise.superset } : {}),
                       targets: exercise.targets,
                     })),
                   })),

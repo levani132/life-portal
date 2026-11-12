@@ -28,3 +28,4 @@ export * from './lib/training';
 export * from './lib/training-format';
 export * from './lib/badges';
 export * from './lib/training-plans';
+export * from './lib/training-workout';

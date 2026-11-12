@@ -2,6 +2,19 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-12: A workout that follows you
+
+- **Duplicate a day.** In the plan editor every workout has a Duplicate button, so Push / Pull /
+  Legs becomes Push, Pull, Push (2), Pull (2), Legs in two taps.
+- **See what's done and what's next.** Finished exercises turn green and fold into one line (tap
+  to open one again and add sets). The exercise you're on has a ring and a "Now" label.
+- **Rest your way.** Each exercise shows its rest; tap it to change it for this workout, and
+  optionally save it to your plan. The timer has −15s, +15s and Skip instead of Hide.
+- **Supersets.** Link exercises with "Superset with next" in a plan or during a workout. After A1
+  you go straight to A2, then rest, then round again.
+- **Your workout everywhere.** While a workout is open, a bar under the header shows the current
+  exercise, the time and the rest countdown on every page. Tap it to get back to the workout.
+
 ## 2026-11-12: The rest timer stays in view
 
 - **The rest countdown follows you down the workout.** While you rest, the timer stays pinned

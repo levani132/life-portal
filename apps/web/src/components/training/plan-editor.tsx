@@ -2,7 +2,7 @@
 
 import clsx from 'clsx';
 import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, ChevronLeft, Plus, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronLeft, CopyPlus, Link2, Plus, Trash2, Unlink, X } from 'lucide-react';
 import {
   PLAN_LIMITS,
   type ExerciseListItem,
@@ -13,7 +13,15 @@ import {
   type PlanTargetType,
   type WeightUnit,
 } from '@life-portal/shared-types';
-import { gramsToDisplay, setFieldsFor, validatePlan, type PlanProblem } from '@life-portal/shared-domain';
+import {
+  gramsToDisplay,
+  linkWithNext,
+  setFieldsFor,
+  supersetRuns,
+  unlinkFromNext,
+  validatePlan,
+  type PlanProblem,
+} from '@life-portal/shared-domain';
 import { ErrorNote, Input, Modal, Panel, Textarea } from '../ui';
 import { api, ApiError } from '../../lib/api';
 import {
@@ -54,6 +62,8 @@ interface DraftExercise {
   archived: boolean;
   rest: string;
   note: string;
+  /** Spec 025: neighbours with the same key are a superset. */
+  superset?: string;
   targets: DraftTarget[];
 }
 
@@ -102,6 +112,7 @@ function fromPlan(plan: PlanDetail, unit: WeightUnit): Draft {
         archived: exercise.exercise.archived,
         rest: exercise.restSeconds != null ? formatDuration(exercise.restSeconds) : '',
         note: exercise.note ?? '',
+        ...(exercise.superset ? { superset: exercise.superset } : {}),
         targets: exercise.targets.map((target) => fromTarget(target, unit)),
       })),
     })),
@@ -164,6 +175,7 @@ function toInput(draft: Draft, unit: WeightUnit): PlanInput {
           exerciseId: exercise.exerciseId,
           ...(rest !== undefined ? { restSeconds: rest } : {}),
           ...(exercise.note.trim() ? { note: exercise.note.trim() } : {}),
+          ...(exercise.superset ? { superset: exercise.superset } : {}),
           targets: exercise.targets.map((target) => toTarget(exercise.measure, target, unit)),
         };
       }),
@@ -182,6 +194,36 @@ function where(draft: Draft, path: string): string {
     exercise && parts[4] === 'targets' && parts[5] !== undefined ? `set ${Number(parts[5]) + 1}` : null,
   ].filter(Boolean);
   return label.length ? label.join(' · ') : path === 'name' ? 'Plan name' : path === 'description' ? 'Description' : 'Plan';
+}
+
+/** A short superset key: it only needs to be unique within one workout. */
+const supersetKey = () => crypto.randomUUID().slice(0, 8);
+
+/** `Push` → `Push (2)`, or the next free number, within the name limit. */
+function copyName(name: string, taken: readonly string[]): string {
+  const base = name.trim().replace(/ \(\d+\)$/, '') || 'Workout';
+  for (let n = 2; ; n++) {
+    const suffix = ` (${n})`;
+    const candidate = `${base.slice(0, PLAN_LIMITS.name - suffix.length)}${suffix}`;
+    if (!taken.includes(candidate)) return candidate;
+  }
+}
+
+/**
+ * Spec 025: a copy of a workout, placed right after it. Everything is copied (exercises, targets,
+ * rest, notes, supersets) but no ids, so the server gives it new ones and past sessions keep
+ * pointing at the original.
+ */
+function duplicateWorkout(workout: DraftWorkout, taken: readonly string[]): DraftWorkout {
+  return {
+    key: key(),
+    name: copyName(workout.name, taken),
+    exercises: workout.exercises.map(({ id: _id, ...exercise }) => ({
+      ...exercise,
+      key: key(),
+      targets: exercise.targets.map((target) => ({ ...target })),
+    })),
+  };
 }
 
 function move<T>(items: T[], index: number, by: -1 | 1): T[] {
@@ -300,6 +342,19 @@ export function PlanEditor({
                 <ArrowDown className="h-4 w-4" />
               </IconButton>
               <IconButton
+                label={`Duplicate ${workout.name || 'workout'}`}
+                disabled={atLimit}
+                onClick={() =>
+                  update((d) => {
+                    const workouts = [...d.workouts];
+                    workouts.splice(w + 1, 0, duplicateWorkout(d.workouts[w], d.workouts.map((item) => item.name.trim())));
+                    return { ...d, workouts };
+                  })
+                }
+              >
+                <CopyPlus className="h-4 w-4" />
+              </IconButton>
+              <IconButton
                 label="Remove workout"
                 onClick={() => {
                   if (workout.exercises.length && !window.confirm(`Remove ${workout.name || 'this workout'} and its exercises?`)) return;
@@ -320,10 +375,31 @@ export function PlanEditor({
             />
           </label>
 
-          <ol className="space-y-3">
-            {workout.exercises.map((exercise, e) => (
-              <li key={exercise.key} className="rounded-lg border border-border p-3">
+          <ol>
+            {workout.exercises.map((exercise, e) => {
+              const runs = supersetRuns(workout.exercises.map((item) => ({ id: item.key, superset: item.superset })));
+              const place = runs.get(exercise.key);
+              const next = workout.exercises[e + 1];
+              const linked = Boolean(place && next && runs.get(next.key)?.ids === place.ids);
+              const keys = workout.exercises.map((item) => item.superset);
+              const setKeys = (changed: (string | undefined)[]) =>
+                updateWorkout(w, (current) => ({
+                  ...current,
+                  exercises: current.exercises.map((item, i) => ({ ...item, superset: changed[i] })),
+                }));
+              return (
+              <li key={exercise.key}>
+              <div className={clsx('rounded-lg border p-3', place ? 'border-train-pull/50 bg-train-pull/5' : 'border-border')}>
                 <div className="mb-2 flex items-start gap-2">
+                  {place && (
+                    <span
+                      className="mt-0.5 shrink-0 rounded-md bg-train-pull-solid px-1.5 py-0.5 text-[11px] font-bold text-white"
+                      title={`Superset ${place.label}, exercise ${place.position} of ${place.size}`}
+                    >
+                      {place.label}
+                      {place.position}
+                    </span>
+                  )}
                   <span className="min-w-0 flex-1 text-sm font-medium">
                     {exercise.name}
                     {exercise.archived && <span className="ml-2 text-xs font-normal text-ink-faint">archived</span>}
@@ -380,8 +456,26 @@ export function PlanEditor({
                     />
                   </label>
                 </div>
+              </div>
+              {next && (
+                <div className="flex justify-center py-1">
+                  <button
+                    type="button"
+                    className={clsx(
+                      'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
+                      linked ? 'text-train-pull hover:bg-train-pull/10' : 'text-ink-faint hover:bg-surface hover:text-ink',
+                    )}
+                    onClick={() => setKeys(linked ? unlinkFromNext(keys, e, supersetKey) : linkWithNext(keys, e, supersetKey))}
+                    aria-label={linked ? `Split the superset after ${exercise.name}` : `Superset ${exercise.name} with ${next.name}`}
+                  >
+                    {linked ? <Unlink className="h-3.5 w-3.5" /> : <Link2 className="h-3.5 w-3.5" />}
+                    {linked ? 'Unlink' : 'Superset with next'}
+                  </button>
+                </div>
+              )}
               </li>
-            ))}
+              );
+            })}
           </ol>
 
           <button

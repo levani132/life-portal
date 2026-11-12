@@ -39,6 +39,7 @@ import {
  * `exerciseId` on a PATCH, or `userId` anywhere: `forbidNonWhitelisted` turns them into 400s.
  */
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const SUPERSET_KEY = /^[A-Za-z0-9_-]+$/;
 
 export class StartSessionDto {
   @IsUUID() requestId!: string;
@@ -70,6 +71,12 @@ export class UpdateSessionExerciseDto {
   @IsOptional() @ValidateIf((_, value) => value !== null) @IsMongoId() machineId?: string | null;
   /** Spec 023: only for an exercise that came from a plan. */
   @IsOptional() @IsBoolean() skipped?: boolean;
+  /** Spec 025: this workout's rest after a set of it; `null` goes back to the plan or default. */
+  @IsOptional() @ValidateIf((_, value) => value !== null) @IsInt() @Min(0) @Max(PLAN_LIMITS.restMax)
+  restSeconds?: number | null;
+  /** Spec 025: the superset key; `null` takes it out of any superset. */
+  @IsOptional() @ValidateIf((_, value) => value !== null) @Matches(SUPERSET_KEY) @MaxLength(PLAN_LIMITS.superset)
+  superset?: string | null;
 }
 
 /** Spec 023: the replacement for an exercise with no sets. There is no field for `planned`. */
@@ -175,6 +182,7 @@ export class PlanExerciseDto {
   @IsMongoId() exerciseId!: string;
   @IsOptional() @IsInt() @Min(0) @Max(PLAN_LIMITS.restMax) restSeconds?: number;
   @IsOptional() @IsString() @MaxLength(PLAN_LIMITS.note) note?: string;
+  @IsOptional() @Matches(SUPERSET_KEY) @MaxLength(PLAN_LIMITS.superset) superset?: string;
   @IsArray() @ArrayMinSize(PLAN_LIMITS.targetsMin) @ArrayMaxSize(PLAN_LIMITS.targetsMax)
   @ValidateNested({ each: true }) @Type(() => PlanTargetDto)
   targets!: PlanTargetDto[];

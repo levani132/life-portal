@@ -5,6 +5,7 @@ import { mutate } from 'swr';
 import { ChevronLeft, ChevronRight, Copy, Pencil, Play, Plus, Trash2 } from 'lucide-react';
 import type { PlanDetail as PlanDetailData, PlanList, PlanListItem, SessionDetail } from '@life-portal/shared-types';
 import clsx from 'clsx';
+import { supersetRuns } from '@life-portal/shared-domain';
 import { EmptyState, ErrorNote, Spinner } from '../ui';
 import { GROUP_STYLES, planGroup, usePlanStyle } from '../../lib/training-colors';
 import { api, ApiError } from '../../lib/api';
@@ -359,16 +360,18 @@ function PlanView({
                 </div>
                 {workout.exercises.length ? (
                   <ol className="mt-3 space-y-2">
-                    {workout.exercises.map((exercise, position) => (
+                    {workout.exercises.map((exercise, position) => {
+                      const place = supersetRuns(workout.exercises).get(exercise.id);
+                      return (
                       <li key={exercise.id} className="flex gap-3 text-sm">
                         <span
                           className={clsx(
                             'grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold',
-                            style.tint,
-                            style.text,
+                            place ? 'bg-train-pull-solid text-white' : clsx(style.tint, style.text),
                           )}
+                          title={place ? `Superset ${place.label}` : undefined}
                         >
-                          {position + 1}
+                          {place ? `${place.label}${place.position}` : position + 1}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block font-medium">
@@ -382,7 +385,8 @@ function PlanView({
                           </span>
                         </span>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ol>
                 ) : (
                   <p className="mt-3 text-sm text-ink-faint">No exercises in this workout yet.</p>

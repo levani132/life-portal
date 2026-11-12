@@ -232,3 +232,17 @@ describe('recentPlanIds', () => {
     expect(recentPlanIds([], '2026-11-12')).toEqual([]);
   });
 });
+
+describe('validatePlan: supersets (spec 025)', () => {
+  const plan = (superset?: string): PlanInput => ({
+    name: 'P',
+    workouts: [{ name: 'A', exercises: [{ exerciseId: 'e', ...(superset !== undefined ? { superset } : {}), targets: [working({ reps: 8 })] }] }],
+  });
+  it('accepts a short url-safe key and no key', () => {
+    expect(validatePlan(plan('ab_1-2'), () => 'weight_reps')).toEqual([]);
+    expect(validatePlan(plan(), () => 'weight_reps')).toEqual([]);
+  });
+  it('refuses any other key, naming the field', () => {
+    expect(validatePlan(plan('a b'), () => 'weight_reps').map((p) => p.path)).toEqual(['workouts.0.exercises.0.superset']);
+  });
+});

@@ -1435,3 +1435,33 @@ to stick, so it fills that band itself, as the chat header does. On Training the
 hides, so today it simply sits under the header. It is the same element made sticky, not a copy
 shown on scroll, so its state can't fork and there is never a duplicate.
 
+## 2026-11-12: Supersets are neighbours with the same key, and logging stays per exercise (spec 025)
+
+**Decision.** A superset is a `superset` key on plan and workout exercises; only adjacent
+exercises with the same key count. Sets are still logged on each exercise. Done, current and
+the rest after a set are derived in the domain lib, never stored.
+
+**Why.** A superset changes the order you do things in and when you rest, not what a set is, so
+history, records and 1RM need no change. Adjacency instead of a group table means reordering can
+never leave a broken group behind: an exercise moved away simply stops belonging. A key rather
+than a "linked to next" flag, because a flag would follow the exercise when it moves and silently
+link it to its new neighbour.
+
+## 2026-11-12: A workout's rest is its own field, not an edit to `planned` (spec 025)
+
+**Decision.** Changing an exercise's rest during a workout sets `workout_exercises.restSeconds`;
+`planned` stays the frozen copy of the plan. Saving it to the plan is a separate, explicit PUT of
+the person's own plan.
+
+**Why.** `planned` is a snapshot (the meal rule): editing it would make it lie about what the plan
+said. The timer's ±15 s and Skip are not stored at all; they are about this one rest.
+
+## 2026-11-12: No live notification for a running workout (spec 025)
+
+**Decision.** The open workout is shown by a bar inside the app, not by an ongoing notification.
+
+**Why.** A PWA cannot make one: iOS Live Activities need a native app (ActivityKit), and the web
+Notification API has no ongoing or chronometer notification on Android; the scheduled-
+notification proposal (Notification Triggers) was abandoned. A rest-over notification through
+the existing web push is possible and is the natural next step.
+

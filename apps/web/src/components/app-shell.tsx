@@ -28,6 +28,7 @@ import { PullToRefresh } from './pull-to-refresh';
 import { ProfileView } from './social';
 import { useBadgeCheckOnStart } from '../lib/badges';
 import { TabHost, type HostTab } from './tab-host';
+import { WorkoutBar } from './training/workout-bar';
 import { ErrorNote } from './ui';
 
 /** Routes that render without the portal: signing in and creating an account. */
@@ -127,6 +128,8 @@ function Portal({ children }: { children: ReactNode }) {
               <ActivityBell access={portal.data.access} />
             </div>
           </div>
+          {/* Spec 025: while a workout is open. Inside the header, so it counts in --header-offset. */}
+          <WorkoutBar enabled={!!portal.data.access.training} />
         </ScrollHeader>
       )}
       <HealthSyncBridge key={user.id} enabled={portal.data.access.nutrition} />

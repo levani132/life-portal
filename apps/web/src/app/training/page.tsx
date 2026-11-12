@@ -1,7 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, ClipboardList, Dumbbell, History as HistoryIcon, Library, type LucideIcon } from 'lucide-react';
 import type { SessionDetail, SessionListItem, SessionPage } from '@life-portal/shared-types';
 import { addDays, diffDays, formatDay, weekdayOf } from '@life-portal/shared-domain';
@@ -15,6 +15,7 @@ import { ErrorNote, Spinner } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
 import { formatDuration, sessionKey, useWorkoutDay } from '../../lib/training';
+import { OPEN_WORKOUT_EVENT, setWorkoutOnScreen } from '../../lib/training-workout';
 
 const TABS: readonly { id: 'workout' | 'plans' | 'history' | 'exercises'; label: string; icon: LucideIcon }[] = [
   { id: 'workout', label: 'Workout', icon: Dumbbell },
@@ -34,6 +35,20 @@ export default function TrainingPage() {
 
 function Training() {
   const [tab, setTab] = useState<Tab>('workout');
+  // Spec 025: the pinned workout bar hides while the workout itself is on screen, and its tap
+  // brings this page back to the Workout tab.
+  useEffect(() => {
+    setWorkoutOnScreen(tab === 'workout');
+    return () => setWorkoutOnScreen(false);
+  }, [tab]);
+  useEffect(() => {
+    const open = () => {
+      setTab('workout');
+      window.scrollTo({ top: 0 });
+    };
+    window.addEventListener(OPEN_WORKOUT_EVENT, open);
+    return () => window.removeEventListener(OPEN_WORKOUT_EVENT, open);
+  }, []);
   return (
     <>
       <PageHeader title="Training" actions={<TrainingSettings />} />

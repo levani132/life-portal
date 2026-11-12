@@ -123,6 +123,8 @@ class PlanExerciseDoc {
   @Prop({ required: true }) exerciseId!: string;
   @Prop(optionalInt(0, 900)) restSeconds?: number;
   @Prop({ trim: true, maxlength: 200 }) note?: string;
+  /** Spec 025: neighbours with the same key are a superset. */
+  @Prop({ maxlength: 40 }) superset?: string;
   @Prop({ type: [PlanTargetSchema], default: [] }) targets!: PlanTargetDoc[];
 }
 const PlanExerciseSchema = SchemaFactory.createForClass(PlanExerciseDoc);
@@ -250,6 +252,13 @@ export class WorkoutExercise {
    */
   @Prop({ type: PlannedDoc }) planned?: PlannedDoc;
   @Prop() skipped?: boolean;
+  /**
+   * Spec 025: the rest after a set, as changed during this workout. Not part of `planned`, which
+   * stays as the plan said; this is what the person chose here.
+   */
+  @Prop(optionalInt(0, 900)) restSeconds?: number;
+  /** Spec 025: neighbours with the same key are a superset. Copied from the plan, then editable. */
+  @Prop({ maxlength: 40 }) superset?: string;
 }
 
 export const WorkoutExerciseSchema = SchemaFactory.createForClass(WorkoutExercise);

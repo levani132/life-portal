@@ -271,6 +271,13 @@ export interface SessionExercise {
   /** Derived: the planned targets not yet used up by logged sets, in order. `[]` when skipped. */
   openTargets: PlanTarget[];
   skipped: boolean;
+  /**
+   * Spec 025: this workout's rest after a set of the exercise, when the person changed it here.
+   * Wins over `planned.restSeconds` and the profile's default.
+   */
+  restSeconds?: number;
+  /** Spec 025: exercises next to each other with the same key are a superset. */
+  superset?: string;
 }
 
 export interface SessionListItem {
@@ -389,6 +396,8 @@ export const PLAN_LIMITS = {
   targetsMax: 20,
   restMax: 900,
   note: 200,
+  /** Spec 025: a superset key, opaque, `[A-Za-z0-9_-]`. */
+  superset: 40,
   ownPlans: 100,
 } as const;
 
@@ -397,6 +406,8 @@ export interface PlanExerciseInput {
   exerciseId: string;
   restSeconds?: number;
   note?: string;
+  /** Spec 025: exercises next to each other with the same key are a superset. */
+  superset?: string;
   targets: PlanTarget[];
 }
 
@@ -430,6 +441,7 @@ export interface PlanExerciseDetail {
   exercise: { name: string; measure: Measure; equipmentType: EquipmentType; archived: boolean };
   restSeconds?: number;
   note?: string;
+  superset?: string;
   targets: PlanTarget[];
 }
 
@@ -466,6 +478,8 @@ export interface SessionPlan {
 
 /** Frozen on a workout exercise that came from a plan. */
 export interface PlannedExercise {
+  /** The plan exercise it was copied from (spec 025: "also save to plan" uses it). */
+  planExerciseId: string;
   restSeconds?: number;
   note?: string;
   targets: PlanTarget[];

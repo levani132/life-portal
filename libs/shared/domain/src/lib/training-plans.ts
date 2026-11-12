@@ -13,6 +13,7 @@ import {
 import { addDays } from './dates';
 import { SET_LIMITS, setFieldsFor } from './training';
 import { formatDistance, formatDuration, formatWeight } from './training-format';
+import { isSupersetKey } from './training-workout';
 
 /**
  * Workout plans (spec 023): checking a plan, describing a target, and what a started plan
@@ -112,6 +113,9 @@ export function validatePlan(
       if (exercise.restSeconds != null && (!isWhole(exercise.restSeconds) || exercise.restSeconds < 0 || exercise.restSeconds > PLAN_LIMITS.restMax)) {
         push(`${ex}.restSeconds`, `Rest is between 0 and ${PLAN_LIMITS.restMax} seconds.`);
       }
+      if (exercise.superset != null && !isSupersetKey(exercise.superset)) {
+        push(`${ex}.superset`, 'A superset key is letters, digits, - and _.');
+      }
       if ((exercise.note?.length ?? 0) > PLAN_LIMITS.note) {
         push(`${ex}.note`, `A note is at most ${PLAN_LIMITS.note} characters.`);
       }
@@ -171,7 +175,7 @@ export function describeTarget(measure: Measure, target: PlanTarget, unit: Weigh
  * logged. Nothing links a set to a target, so deleting a set brings its target back.
  */
 export function openTargets(
-  planned: PlannedExercise | undefined,
+  planned: Pick<PlannedExercise, 'targets'> | undefined,
   loggedSetCount: number,
   skipped = false,
 ): PlanTarget[] {

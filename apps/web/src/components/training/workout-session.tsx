@@ -6,16 +6,20 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
+  ChevronDown,
+  ChevronUp,
   ClipboardList,
   Dumbbell,
   History as HistoryIcon,
   Layers,
+  Link2,
   Play,
   Plus,
   Repeat,
   SkipForward,
   Timer,
   Trash2,
+  Unlink,
 } from 'lucide-react';
 import type {
   ExerciseListItem,
@@ -23,7 +27,13 @@ import type {
   SessionExercise,
   WorkoutSet,
 } from '@life-portal/shared-types';
-import { formatDay, setFieldsFor } from '@life-portal/shared-domain';
+import {
+  formatDay,
+  linkWithNext,
+  setFieldsFor,
+  unlinkFromNext,
+  type SupersetPlace,
+} from '@life-portal/shared-domain';
 import { ErrorNote, Modal, Spinner, Textarea } from '../ui';
 import { api, ApiError } from '../../lib/api';
 import {
@@ -43,6 +53,8 @@ import { ExerciseSearch, MachineChoice } from './exercise-picker';
 import { SuggestedPlans } from './plan-suggestions';
 import { GROUP_STYLES, exerciseGroup, usePlanStyle } from '../../lib/training-colors';
 import { RestTimer } from './rest-timer';
+import { RestEditor } from './rest-editor';
+import { exerciseRest, sessionFocus } from '../../lib/training-workout';
 import { SetForm, SetLine, type SetFormValue } from './set-row';
 import { SuggestionRows, suggestionValue } from './suggestion-row';
 
@@ -216,11 +228,23 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
     void run(() => api.post(`${base}/exercises/order`, { ids }));
   };
 
-  // The rest after a set from a plan is the plan's rest for that exercise (spec 023).
-  const lastSetExercise = session.lastSetAt
-    ? session.exercises.find((exercise) => exercise.sets.some((set) => set.loggedAt === session.lastSetAt))
-    : undefined;
-  const restSeconds = lastSetExercise?.planned?.restSeconds ?? profile.defaultRestSeconds;
+  // Spec 025: which exercise is done and which is current, and the rest after the last set (the
+  // exercise's own rest, 0 mid-way through a superset round). Derived on every render.
+  const focus = sessionFocus(session, pending, profile.defaultRestSeconds);
+  const upNext = focus.current && focus.current.id !== focus.lastId ? focus.current.snapshot.name : undefined;
+
+  /** Spec 025: links or splits a superset; saves only the exercises whose key changed. */
+  const relink = (index: number, link: boolean) => {
+    const keys = session.exercises.map((exercise) => exercise.superset);
+    const makeKey = () => crypto.randomUUID().slice(0, 8);
+    const changed = link ? linkWithNext(keys, index, makeKey) : unlinkFromNext(keys, index, makeKey);
+    void run(async () => {
+      for (const [i, exercise] of session.exercises.entries()) {
+        if (changed[i] === exercise.superset) continue;
+        await api.patch(`${base}/exercises/${exercise.id}`, { superset: changed[i] ?? null });
+      }
+    });
+  };
 
   const elapsed = open
     ? Math.max(0, Math.floor((now - Date.parse(session.startedAt)) / 1000))
@@ -332,13 +356,20 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
       </section>
 
       {/* Outside the card, so it can stick while the exercises scroll (see RestTimer). */}
-      {open && <RestTimer since={session.lastSetAt} seconds={restSeconds} />}
+      {open && <RestTimer since={session.lastSetAt} seconds={focus.restSeconds} next={upNext} />}
 
-      {session.exercises.map((exercise, index) => (
+      {session.exercises.map((exercise, index) => {
+        const place = focus.supersets.get(exercise.id);
+        const next = session.exercises[index + 1];
+        const linked = Boolean(place && next && focus.supersets.get(next.id)?.ids === place.ids);
+        return (
+        <div key={exercise.id}>
         <ExerciseBlock
-          key={exercise.id}
           session={session}
           exercise={exercise}
+          state={!open ? 'idle' : focus.doneIds.has(exercise.id) ? 'done' : focus.currentId === exercise.id ? 'current' : 'idle'}
+          superset={place}
+          defaultRest={profile.defaultRestSeconds}
           pending={pending.filter((item) => item.workoutExerciseId === exercise.id)}
           canMoveUp={index > 0}
           canMoveDown={index < session.exercises.length - 1}
@@ -359,7 +390,32 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
           }
           busy={busy}
         />
-      ))}
+        {next && (open || linked) && (
+          <div className={clsx('flex justify-center', linked ? '-my-1' : 'py-0.5')}>
+            {open ? (
+              <button
+                type="button"
+                className={clsx(
+                  'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50',
+                  linked ? 'text-train-pull hover:bg-train-pull/10' : 'text-ink-faint hover:bg-surface hover:text-ink',
+                )}
+                disabled={busy}
+                onClick={() => relink(index, !linked)}
+                aria-label={linked ? `Split the superset after ${exercise.snapshot.name}` : `Superset ${exercise.snapshot.name} with ${next.snapshot.name}`}
+              >
+                {linked ? <Unlink className="h-3.5 w-3.5" /> : <Link2 className="h-3.5 w-3.5" />}
+                {linked ? `Superset ${place?.label}` : 'Superset with next'}
+              </button>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-train-pull">
+                <Link2 className="h-3.5 w-3.5" /> Superset {place?.label}
+              </span>
+            )}
+          </div>
+        )}
+        </div>
+        );
+      })}
 
       <div className="flex flex-wrap gap-2">
         <button
@@ -399,6 +455,9 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
 function ExerciseBlock({
   session,
   exercise,
+  state,
+  superset,
+  defaultRest,
   pending,
   canMoveUp,
   canMoveDown,
@@ -410,6 +469,10 @@ function ExerciseBlock({
 }: {
   session: SessionDetail;
   exercise: SessionExercise;
+  /** Spec 025: done exercises collapse; the current one is marked. Finished workouts are all idle. */
+  state: 'done' | 'current' | 'idle';
+  superset?: SupersetPlace;
+  defaultRest: number;
   pending: PendingSet[];
   canMoveUp: boolean;
   canMoveDown: boolean;
@@ -424,6 +487,9 @@ function ExerciseBlock({
   const [choosingMachine, setChoosingMachine] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [swapping, setSwapping] = useState(false);
+  const [editingRest, setEditingRest] = useState(false);
+  /** A done exercise opened again, to look at it or add a set. Stays open until closed. */
+  const [expanded, setExpanded] = useState(false);
   const unit = useWeightUnit();
   const estimate = exercise.oneRepMax && describeOneRepMax(exercise.oneRepMax, unit);
   const [machineError, setMachineError] = useState<string | null>(null);
@@ -468,21 +534,66 @@ function ExerciseBlock({
   const targetCount = exercise.planned?.targets.length ?? 0;
   const complete = targetCount > 0 && done >= targetCount;
   const iconButton = 'flex h-9 w-9 items-center justify-center rounded-lg text-ink-faint transition-colors hover:bg-surface hover:text-ink disabled:opacity-30';
+  const isDone = state === 'done';
+  const collapsed = isDone && !expanded;
+  const rest = exerciseRest(exercise);
+  const allSets = [...exercise.sets, ...pending.map((item) => item.value)];
 
   return (
-    <section className={clsx('card border-l-4 p-4', style.edge, exercise.skipped && 'opacity-70')}>
-      <header className="flex items-start gap-3">
-        <span className={clsx('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl shadow-sm', style.solid)} aria-hidden>
-          <GroupIcon className="h-5 w-5" />
+    <section
+      className={clsx(
+        'card border-l-4 p-4 transition-colors',
+        isDone ? 'border-l-emerald-500 bg-emerald-500/[0.06]' : style.edge,
+        state === 'current' && 'ring-2 ring-train-pull/60',
+        exercise.skipped && 'opacity-70',
+        collapsed && 'py-3',
+      )}
+      aria-current={state === 'current' ? 'step' : undefined}
+    >
+      <header
+        className={clsx('flex items-start gap-3', isDone && 'cursor-pointer')}
+        onClick={isDone ? () => setExpanded((value) => !value) : undefined}
+      >
+        <span
+          className={clsx(
+            'flex shrink-0 items-center justify-center rounded-xl shadow-sm',
+            collapsed ? 'h-9 w-9' : 'h-11 w-11',
+            isDone ? 'bg-emerald-500 text-white' : style.solid,
+          )}
+          aria-hidden
+        >
+          {isDone ? <Check className="h-5 w-5" /> : <GroupIcon className="h-5 w-5" />}
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-bold">{exercise.snapshot.name}</h3>
+          <h3 className="flex items-center gap-1.5 text-sm font-bold">
+            {superset && (
+              <span
+                className="shrink-0 rounded-md bg-train-pull-solid px-1.5 py-0.5 text-[11px] font-bold leading-none text-white"
+                title={`Superset ${superset.label}, exercise ${superset.position} of ${superset.size}`}
+              >
+                {superset.label}
+                {superset.position}
+              </span>
+            )}
+            <span className="truncate">{exercise.snapshot.name}</span>
+            {state === 'current' && (
+              <span className="shrink-0 rounded-full bg-train-pull-solid px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                Now
+              </span>
+            )}
+          </h3>
+          {collapsed ? (
+            <p className="truncate text-xs text-ink-muted">
+              {allSets.map((set) => describeSet(set, measure, unit)).join(', ')}
+            </p>
+          ) : (
           <p className="truncate text-xs">
             <span className={clsx('font-semibold', style.text)}>
               {exercise.snapshot.primaryMuscles.map(humanise).join(', ') || style.label}
             </span>
             <span className="text-ink-faint"> · {humanise(exercise.snapshot.equipmentType)}</span>
           </p>
+          )}
         </div>
         {targetCount > 0 && !exercise.skipped && (
           <span
@@ -496,16 +607,39 @@ function ExerciseBlock({
             {Math.min(done, targetCount)}/{targetCount}
           </span>
         )}
+        {isDone && (
+          <span className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center text-ink-faint" aria-hidden>
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </span>
+        )}
       </header>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-1">
-        <button
-          type="button"
-          className="text-xs text-ink-muted underline decoration-dotted underline-offset-2 hover:text-ink"
-          onClick={() => setChoosingMachine(true)}
-          disabled={busy}
-        >
-          {machineLabel ? `Machine: ${machineLabel}` : 'Choose machine'}
+      {isDone && (
+        <button type="button" className="sr-only" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+          {expanded ? `Collapse ${exercise.snapshot.name}` : `Show ${exercise.snapshot.name} and add sets`}
         </button>
+      )}
+      {!collapsed && (
+      <>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          <button
+            type="button"
+            className="text-xs text-ink-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+            onClick={() => setChoosingMachine(true)}
+            disabled={busy}
+          >
+            {machineLabel ? `Machine: ${machineLabel}` : 'Choose machine'}
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 text-xs text-ink-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+            onClick={() => setEditingRest(true)}
+            disabled={busy}
+            aria-label={`Rest after ${exercise.snapshot.name}: ${formatDuration(rest ?? defaultRest)}. Change it`}
+          >
+            <Timer className="h-3.5 w-3.5" /> Rest {formatDuration(rest ?? defaultRest)}
+          </button>
+        </div>
         <div className="-mr-2 flex items-center">
           {canSwap && (
             <button type="button" className={iconButton} disabled={busy} onClick={() => setSwapping(true)} aria-label={`Swap ${exercise.snapshot.name}`} title="Swap for another exercise">
@@ -558,11 +692,13 @@ function ExerciseBlock({
           }}
         />
       </Modal>
+      {editingRest && (
+        <RestEditor session={session} exercise={exercise} defaultSeconds={defaultRest} onClose={() => setEditingRest(false)} />
+      )}
       {exercise.planned && (
         <p className="mb-2 mt-1 text-xs text-ink-faint">
           {[
             `Plan: ${exercise.planned.targets.length} sets`,
-            exercise.planned.restSeconds != null ? `rest ${formatDuration(exercise.planned.restSeconds)}` : '',
             exercise.planned.note ?? '',
           ]
             .filter(Boolean)
@@ -607,6 +743,8 @@ function ExerciseBlock({
           />
           <SetForm key={`${done}:${suggestions.length}`} measure={measure} initial={initial} submitLabel="Log set" onSubmit={log} />
         </>
+      )}
+      </>
       )}
       {editing && (
         <EditSet set={editing} measure={measure} onClose={() => setEditing(null)} />
