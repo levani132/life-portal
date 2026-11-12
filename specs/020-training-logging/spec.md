@@ -300,9 +300,12 @@ Bodyweight exercises use their latest weigh-in from Food where one exists, and a
 
 ## Assumptions
 
-- The seed dataset is chosen during planning after its licence is checked; free-exercise-db
-  (public domain) is preferred, wger (CC-BY-SA, attribution and share-alike) is the alternative.
-  Images are served from the app's own storage, not hot-linked.
+- The seed dataset is free-exercise-db, whose data is public domain (checked 2026-11-12; see
+  research R1). Only its **facts** are imported (names, muscles, equipment, category, level):
+  its images have unknown provenance and an open copyright dispute, and its instruction text has
+  the same unknown source. So in this phase, shared catalogue exercises have **no images or
+  instructions**; private exercises and machines can have both. Licensed pictures and
+  instructions are a later addition.
 - The estimated 1-rep max uses the Epley formula; the formula name is part of the label, so it can
   change later without misleading anyone.
 - The kg/lb preference lives with the training module's preferences, not with the money display
