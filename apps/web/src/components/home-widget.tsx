@@ -20,6 +20,8 @@ import {
   Package,
   Landmark,
   Utensils,
+  Dumbbell,
+  Play,
 } from 'lucide-react';
 import type { NutritionSummary, WidgetCard } from '@life-portal/shared-types';
 import type { SortableState } from './sortable-grid';
@@ -146,6 +148,7 @@ const ICONS = {
   personal: CalendarDays,
   items: Package,
   loans: Landmark,
+  training: Dumbbell,
 };
 
 export function HomeWidget({
@@ -317,11 +320,15 @@ export function HomeWidget({
                 type="button"
                 data-widget-action
                 aria-label={card.quickAction?.label ?? 'Log food'}
-                title="Log food"
+                title={card.quickAction?.label ?? 'Log food'}
                 className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
                 onClick={onQuickAction}
               >
-                <Plus size={19} aria-hidden />
+                {card.quickAction?.kind === 'log-food' || !card.quickAction ? (
+                  <Plus size={19} aria-hidden />
+                ) : (
+                  <Play size={17} aria-hidden />
+                )}
               </button>
             )}
             {menuButton}
@@ -370,7 +377,10 @@ export function HomeWidget({
                       {stat.value}
                       {stat.estimated && <EstimateMark />}
                     </dd>
-                    <dt className="mt-1 truncate text-[10px] leading-tight text-ink-faint sm:text-xs">
+                    <dt
+                      className="mt-1 truncate text-[10px] leading-tight text-ink-faint sm:text-xs"
+                      title={stat.label}
+                    >
                       {stat.label}
                     </dt>
                   </div>

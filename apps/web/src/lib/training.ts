@@ -1,12 +1,10 @@
 'use client';
 
 import { mutate } from 'swr';
-import { formatDay } from '@life-portal/shared-domain';
+import { formatDay, formatDistance, formatDuration, formatWeight } from '@life-portal/shared-domain';
 import type {
   Measure,
   OneRepMaxEstimate,
-  RecordEntry,
-  RecordKind,
   SessionDetail,
   SetType,
   SetValues,
@@ -54,24 +52,15 @@ export function useCurrentSession() {
 
 // ------------------------------------------------------------------ formatting
 
-const trim = (value: number, digits: number) => String(Number(value.toFixed(digits)));
-
-export function formatWeight(grams: number): string {
-  return `${trim(grams / 1000, 2)} kg`;
-}
-
-/** `95` → `1:35`, `3725` → `1:02:05`. */
-export function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return h ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
-}
-
-export function formatDistance(meters: number): string {
-  return meters < 1000 ? `${meters} m` : `${trim(meters / 1000, 2)} km`;
-}
+// Weight, time, distance, pace and record values: pure, shared with the Home card's server side.
+export {
+  RECORD_LABELS,
+  formatDistance,
+  formatDuration,
+  formatPace,
+  formatRecordValue,
+  formatWeight,
+} from '@life-portal/shared-domain';
 
 /** A set in one line, e.g. `80 kg × 8`, `+10 kg × 12`, `−20 kg × 8`, `2 km in 9:30`. */
 export function describeSet(set: SetValues, measure: Measure): string {
@@ -88,37 +77,6 @@ export function describeSet(set: SetValues, measure: Measure): string {
         : formatDuration(set.durationSeconds ?? 0);
     case 'distance_duration':
       return `${formatDistance(set.distanceMeters ?? 0)} in ${formatDuration(set.durationSeconds ?? 0)}`;
-  }
-}
-
-/** `280` → `4:40 /km`. */
-export function formatPace(secondsPerKm: number): string {
-  return `${formatDuration(secondsPerKm)} /km`;
-}
-
-export const RECORD_LABELS: Record<RecordKind, string> = {
-  heaviest: 'Heaviest',
-  best_1rm: 'Best est. 1RM',
-  most_reps: 'Most reps',
-  longest_duration: 'Longest time',
-  longest_distance: 'Longest distance',
-  fastest_pace: 'Fastest pace',
-};
-
-/** A record's value, e.g. `120 kg`, `12 reps at 80 kg`, `4:40 /km`. */
-export function formatRecordValue(record: RecordEntry): string {
-  switch (record.kind) {
-    case 'heaviest':
-    case 'best_1rm':
-      return formatWeight(record.value);
-    case 'most_reps':
-      return record.loadGrams !== undefined ? `${record.value} reps at ${formatWeight(record.loadGrams)}` : `${record.value} reps`;
-    case 'longest_duration':
-      return formatDuration(record.value);
-    case 'longest_distance':
-      return formatDistance(record.value);
-    case 'fastest_pace':
-      return formatPace(record.value);
   }
 }
 
@@ -190,6 +148,8 @@ export function parseDuration(text: string): number | undefined {
   if (parts.some((part) => !Number.isFinite(part) || part < 0) || parts.length > 3) return undefined;
   return Math.round(parts.reduce((total, part) => total * 60 + part, 0));
 }
+
+const trim = (value: number, digits: number) => String(Number(value.toFixed(digits)));
 
 /** The text a field shows for a stored value, so a new set can start from the last one. */
 export function toFields(set: Partial<WorkoutSet> | undefined) {

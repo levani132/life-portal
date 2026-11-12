@@ -122,9 +122,9 @@ built and tested without US2 (search ranking and private additions).
 
 **Independent test**: quickstart scenarios 2 (card) and 8 (flag off).
 
-- [ ] T035 [P] [US4] `weekSummary(sessions, records, today)` in `libs/shared/domain/src/lib/training.ts` (Monday-based week, latest record within 14 days else days since last) with tests in `training.spec.ts`
-- [ ] T036 [US4] `TrainingService.summary` and `GET /summary` in `apps/api/src/training/`; add `training` to the dashboard types in `libs/shared/types/src/lib/dashboard.ts` and call it from `apps/api/src/dashboard/dashboard.service.ts` when the account has the module and selected it
-- [ ] T037 [US4] `apps/web/src/components/training/training-card.tsx` and its registration in `apps/web/src/components/home-widget.tsx` / `home-dashboard.tsx`: three figures, one action (Start workout / Resume workout), card opens `/training`; add Training to `menu-content.tsx`
+- [X] T035 [P] [US4] `weekSummary(sessions, records, today)` in `libs/shared/domain/src/lib/training.ts` (Monday-based week, latest record within 14 days else days since last) with tests in `training.spec.ts`
+- [X] T036 [US4] `TrainingService.summary` and `GET /summary` in `apps/api/src/training/`; add `training` to the dashboard types in `libs/shared/types/src/lib/dashboard.ts` and call it from `apps/api/src/dashboard/dashboard.service.ts` when the account has the module and selected it
+- [X] T037 [US4] `apps/web/src/components/training/training-card.tsx` and its registration in `apps/web/src/components/home-widget.tsx` / `home-dashboard.tsx`: three figures, one action (Start workout / Resume workout), card opens `/training`; add Training to `menu-content.tsx`
 
 **Checkpoint**: Home shows the card for flagged accounts and nothing for others.
 
@@ -171,6 +171,12 @@ built and tested without US2 (search ranking and private additions).
   session's `oneRepMax` are in `SessionDetail`; set create/update return `{set, records}`;
   `toSet` moved to `set-row.ts`. The "from weigh-in" label on set rows stays with US5 (T040);
   history and estimates already carry it.
+- 2026-11-12: US4 done (T035–T037). Differences from the task text: the service is
+  `TrainingSummaryService` (`summary.service.ts`), exported to the dashboard; there is no separate
+  `training-card.tsx`: like Food, the card is built by `DashboardService.trainingCard` and drawn by
+  `HomeWidget` (dumbbell icon, play-icon action); Menu already listed Training. The record
+  formatters moved to `libs/shared/domain/src/lib/training-format.ts` so the server-built card
+  matches the page.
 
 ## Dependencies and execution order
 

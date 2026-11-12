@@ -14,6 +14,7 @@ import {
   formatCentsCompact,
   formatDay,
   formatPct,
+  formatRecordValue,
   relativeDays,
 } from '@life-portal/shared-domain';
 import { BoardsService } from '../boards/boards.service';
@@ -26,6 +27,7 @@ import { FxService } from '../fx/fx.module';
 import { SettingsService } from '../settings/settings.module';
 import { SpendingService } from '../spending/spending.service';
 import { StocksService } from '../stocks/stocks.service';
+import { TrainingSummaryService } from '../training/summary.service';
 
 /** Salary landing within this many days is worth a nudge on the dashboard. */
 const SALARY_SOON_DAYS = 5;
@@ -44,6 +46,7 @@ export class DashboardService {
     private readonly settings: SettingsService,
     private readonly fx: FxService,
     private readonly spending: SpendingService,
+    private readonly training: TrainingSummaryService,
   ) {}
 
   /**
@@ -86,6 +89,7 @@ export class DashboardService {
       personal,
       nutrition,
       spending,
+      training,
     ] = await Promise.all([
       has('loans') ? this.loans.summary(userId, today) : undefined,
       has('money') ? this.cashflow.summary(userId, today) : undefined,
@@ -105,6 +109,7 @@ export class DashboardService {
         : undefined,
       has('nutrition') ? this.nutrition.summary(userId, today) : undefined,
       has('money') ? this.spending.summary(userId, today) : undefined,
+      has('training') ? this.training.summary(userId, today) : undefined,
     ]);
     const boardSummaries = allBoards.filter((board) =>
       board.key === 'epam' ? has('epam') : has('projects'),
@@ -126,6 +131,7 @@ export class DashboardService {
     if (stocks) cards.push(this.stocksCard(stocks, currency));
     if (personal) cards.push(this.personalCard(personal, currency));
     if (nutrition) cards.push(this.nutritionCard(nutrition));
+    if (training) cards.push(this.trainingCard(training));
     if (has('projects')) {
       const projects = boardSummaries.filter((board) => board.key !== 'epam');
       cards.push({
@@ -174,6 +180,7 @@ export class DashboardService {
         boards: boardSummaries,
         personal,
         nutrition,
+        training,
       },
       attention: this.attention({
         loans,
@@ -567,6 +574,55 @@ export class DashboardService {
    * Readable before the profile exists: with no targets there is still a calorie count and an
    * invitation to fill the profile in, rather than three dashes or a misleading zero.
    */
+  /**
+   * Spec 020 US4: two figures for the week, then the newest record within 14 days or how long
+   * since the last workout. One action: resume the open workout, else start one.
+   */
+  private trainingCard(
+    training: NonNullable<DashboardResponse['summaries']['training']>,
+  ): WidgetCard {
+    const minutes = Math.round(training.secondsThisWeek / 60);
+    const time =
+      minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
+    const record = training.latestRecord;
+    const since = training.daysSinceLast;
+    const third: WidgetStat = record
+      ? { label: `PR · ${record.exerciseName}`, value: formatRecordValue(record), tone: 'good' }
+      : {
+          label: 'Last workout',
+          value:
+            since === undefined
+              ? 'none yet'
+              : since === 0
+                ? 'today'
+                : since === 1
+                  ? 'yesterday'
+                  : `${since} days ago`,
+          raw: since,
+          tone: since !== undefined && since > 7 ? 'warn' : 'neutral',
+        };
+    return {
+      key: 'training',
+      id: 'training',
+      title: 'Training',
+      // The labels fit a phone card only when short, so "this week" lives here, once.
+      subtitle: training.openSessionId ? 'this week · workout in progress' : 'this week',
+      href: '/training',
+      icon: 'dumbbell',
+      accent: 'orange',
+      tone: training.openSessionId ? 'good' : 'neutral',
+      stats: [
+        { label: 'Workouts', value: String(training.workoutsThisWeek), raw: training.workoutsThisWeek },
+        { label: 'Time', value: time, raw: training.secondsThisWeek },
+        third,
+      ],
+      quickAction: training.openSessionId
+        ? { kind: 'resume-workout', label: 'Resume workout' }
+        : { kind: 'start-workout', label: 'Start workout' },
+      order: 30,
+    };
+  }
+
   private nutritionCard(
     nutrition: NonNullable<DashboardResponse['summaries']['nutrition']>,
   ): WidgetCard {

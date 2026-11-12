@@ -13,6 +13,7 @@ import { SettingsModule, SettingsService } from '../settings/settings.module';
 import { FxModule } from '../fx/fx.module';
 import { SpendingModule } from '../spending/spending.module';
 import { StocksModule } from '../stocks/stocks.module';
+import { TrainingModule } from '../training/training.module';
 import { DashboardService } from './dashboard.service';
 
 /**
@@ -76,6 +77,7 @@ export class DashboardController {
     BoardsModule,
     PersonalModule,
     NutritionModule,
+    TrainingModule,
     SettingsModule,
   ],
   controllers: [DashboardController],

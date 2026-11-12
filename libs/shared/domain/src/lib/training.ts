@@ -1,3 +1,4 @@
+import { addDays, diffDays, weekdayOf } from './dates';
 import {
   EQUIPMENT_TYPES,
   MUSCLES,
@@ -11,6 +12,7 @@ import {
   type SetType,
   type SetValueField,
   type SetValues,
+  type TrainingSummary,
 } from '@life-portal/shared-types';
 
 /**
@@ -352,6 +354,21 @@ function candidate(kind: RecordKind, measure: Measure, set: ProgressSet): Candid
   }
 }
 
+/** One set's value for a record kind, as a `RecordEntry`; `undefined` if the kind does not apply. */
+export function recordEntryFor(kind: RecordKind, measure: Measure, set: ProgressSet): RecordEntry | undefined {
+  const value = set.type === 'warmup' ? undefined : candidate(kind, measure, set);
+  if (!value) return undefined;
+  return {
+    kind,
+    value: value.value,
+    setId: set.id,
+    sessionId: set.sessionId,
+    day: set.day,
+    ...(value.bodyWeightDay ? { bodyWeightDay: value.bodyWeightDay } : {}),
+    ...(value.loadGrams !== undefined ? { loadGrams: value.loadGrams } : {}),
+  };
+}
+
 const beats = (a: Candidate, b: Candidate) => (a.lowerIsBetter ? a.value < b.value : a.value > b.value);
 
 /**
@@ -448,4 +465,37 @@ export function sessionVolumeGrams(measure: Measure, sets: readonly ProgressSet[
     if (volume !== undefined) total = (total ?? 0) + volume;
   }
   return total;
+}
+
+// ------------------------------------------------------------------ Home card (spec 020 US4)
+
+/** A record counts as "latest" on the card for this many days (research R11). */
+export const RECENT_RECORD_DAYS = 14;
+
+/**
+ * The Training card's figures: workouts and time this Monday-based week (in the person's days,
+ * up to `today`), then the newest record within 14 days, else days since the last workout.
+ * `today` is explicit (principle 5). Sessions after `today` are ignored; durations are already
+ * derived (`sessionDurationSeconds`).
+ */
+export function weekSummary(input: {
+  sessions: readonly { id: string; day: string; status: 'open' | 'finished'; durationSeconds: number }[];
+  records: readonly (RecordEntry & { exerciseName: string })[];
+  today: string;
+}): TrainingSummary {
+  const monday = addDays(input.today, -((weekdayOf(input.today) + 6) % 7));
+  const past = input.sessions.filter((session) => session.day <= input.today);
+  const week = past.filter((session) => session.day >= monday);
+  const since = addDays(input.today, -(RECENT_RECORD_DAYS - 1));
+  const latestRecord = [...input.records]
+    .filter((record) => record.day >= since && record.day <= input.today)
+    .sort((a, b) => b.day.localeCompare(a.day))[0];
+  const lastDay = past.reduce<string | undefined>((max, session) => (!max || session.day > max ? session.day : max), undefined);
+  const open = input.sessions.find((session) => session.status === 'open');
+  return {
+    workoutsThisWeek: week.length,
+    secondsThisWeek: week.reduce((total, session) => total + session.durationSeconds, 0),
+    ...(latestRecord ? { latestRecord } : lastDay ? { daysSinceLast: diffDays(lastDay, input.today) } : {}),
+    ...(open ? { openSessionId: open.id } : {}),
+  };
 }

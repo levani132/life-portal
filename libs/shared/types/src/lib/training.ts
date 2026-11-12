@@ -211,6 +211,19 @@ export interface ExerciseHistorySession {
   oneRepMax?: OneRepMaxEstimate;
 }
 
+/** The Home card's figures (research R11). No energy figure anywhere (FR-025). */
+export interface TrainingSummary {
+  /** Sessions whose day is in this Monday-based week, up to today. */
+  workoutsThisWeek: number;
+  secondsThisWeek: number;
+  /** The newest record set in the last 14 days, if any. */
+  latestRecord?: RecordEntry & { exerciseName: string };
+  /** Days since the last workout's day, when there is no recent record. */
+  daysSinceLast?: number;
+  /** The open workout, if one is in progress: the card then offers Resume. */
+  openSessionId?: string;
+}
+
 export interface ExerciseHistory {
   exercise: ExerciseListItem;
   sessions: ExerciseHistorySession[];

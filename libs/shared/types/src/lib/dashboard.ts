@@ -6,6 +6,7 @@ import type { LoansSummary } from './loans';
 import type { NutritionSummary } from './nutrition';
 import type { PersonalSummary } from './personal';
 import type { StocksSummary } from './stocks';
+import type { TrainingSummary } from './training';
 
 /**
  * The dashboard is a registry of cards. Adding a widget means adding a `WidgetKey` and a
@@ -21,6 +22,7 @@ export const WIDGET_KEYS = [
   'personal',
   'nutrition',
   'projects',
+  'training',
 ] as const;
 export type WidgetKey = (typeof WIDGET_KEYS)[number];
 
@@ -45,7 +47,8 @@ export interface WidgetStat {
  * component, so the card stays declarative.
  */
 export interface WidgetQuickAction {
-  kind: 'log-food';
+  /** `start-workout` starts one, `resume-workout` opens the one in progress. */
+  kind: 'log-food' | 'start-workout' | 'resume-workout';
   label: string;
 }
 
@@ -90,6 +93,7 @@ export interface DashboardResponse {
     boards: BoardSummary[];
     personal: PersonalSummary;
     nutrition: NutritionSummary;
+    training: TrainingSummary;
   }>;
   /** Cross-widget nudges, e.g. "salary lands in 4 days" or "quotes are 6 days stale". */
   attention: { tone: WidgetTone; message: string; href?: string }[];

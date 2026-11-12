@@ -29,6 +29,8 @@ import { ProgressService } from './progress.service';
 import { NutritionModule } from '../nutrition/nutrition.module';
 import { TrainingProfileService } from './profile.service';
 import { SessionsService } from './sessions.service';
+import { TrainingSummaryService } from './summary.service';
+import { Today } from '../common/today';
 import {
   AddSessionExerciseDto,
   CreateExerciseDto,
@@ -84,7 +86,14 @@ export class TrainingController {
     private readonly sessions: SessionsService,
     private readonly machines: MachinesService,
     private readonly progress: ProgressService,
+    private readonly summaries: TrainingSummaryService,
   ) {}
+
+  /** The Home card's figures, for the person's `today` (spec 020 US4). */
+  @Get('summary')
+  summary(@CurrentUser('userId') userId: string, @Today() today: string) {
+    return this.summaries.summary(userId, today);
+  }
 
   // ---------------------------------------------------------------- profile
 
@@ -311,7 +320,7 @@ export class TrainingController {
     ]),
   ],
   controllers: [TrainingController],
-  providers: [CatalogueSeeder, CatalogueService, MachinesService, ProgressService, TrainingProfileService, SessionsService],
-  exports: [SessionsService],
+  providers: [CatalogueSeeder, CatalogueService, MachinesService, ProgressService, TrainingProfileService, SessionsService, TrainingSummaryService],
+  exports: [SessionsService, TrainingSummaryService],
 })
 export class TrainingModule {}

@@ -13,6 +13,8 @@ function fixture(selectedModules: string[]) {
   const personal = summary();
   const nutrition = summary();
   const spending = summary();
+  const training = summary();
+  training.summary.mockResolvedValue({ workoutsThisWeek: 2, secondsThisWeek: 5400, daysSinceLast: 1 });
   nutrition.summary.mockResolvedValue({
     targetsAvailable: false,
     eatenKcal: 0,
@@ -30,7 +32,7 @@ function fixture(selectedModules: string[]) {
     }),
   };
   const fx = { displayFor: jest.fn() };
-  const access = {
+  const access: { forUser: jest.Mock } = {
     forUser: jest.fn().mockResolvedValue({ access: { nutrition: true } }),
   };
   // Mocks intentionally cover service boundaries; no Mongo or finance call should run.
@@ -46,6 +48,7 @@ function fixture(selectedModules: string[]) {
     settings as never,
     fx as never,
     spending as never,
+    training as never,
   );
   return {
     service,
@@ -57,6 +60,8 @@ function fixture(selectedModules: string[]) {
     personal,
     nutrition,
     spending,
+    training,
+    access,
     fx,
   };
 }
@@ -84,5 +89,25 @@ describe('selected dashboard', () => {
     const f = fixture([]);
     expect((await f.service.build('person', '2026-10-22')).cards).toEqual([]);
     expect(f.nutrition.summary).not.toHaveBeenCalled();
+    expect(f.training.summary).not.toHaveBeenCalled();
+  });
+  it('builds the Training card with its week figures and one action (spec 020 US4)', async () => {
+    const f = fixture(['training']);
+    f.access.forUser.mockResolvedValue({ access: { training: true } });
+    const result = await f.service.build('person', '2026-11-12');
+    const card = result.cards.find((item) => item.id === 'training');
+    expect(card?.stats.map((stat) => stat.value)).toEqual(['2', '1 h 30 min', 'yesterday']);
+    expect(card?.quickAction).toEqual({ kind: 'start-workout', label: 'Start workout' });
+    expect(f.training.summary).toHaveBeenCalledWith('person', '2026-11-12');
+
+    f.training.summary.mockResolvedValue({
+      workoutsThisWeek: 1,
+      secondsThisWeek: 600,
+      openSessionId: 's1',
+      latestRecord: { kind: 'heaviest', value: 100000, setId: 'x', sessionId: 's1', day: '2026-11-12', exerciseName: 'Bench press' },
+    });
+    const open = (await f.service.build('person', '2026-11-12')).cards.find((item) => item.id === 'training');
+    expect(open?.stats[2]).toMatchObject({ label: 'PR · Bench press', value: '100 kg' });
+    expect(open?.quickAction?.kind).toBe('resume-workout');
   });
 });

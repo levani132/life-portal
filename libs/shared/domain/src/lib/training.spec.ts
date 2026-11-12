@@ -1,4 +1,5 @@
 import {
+  weekSummary,
   bestOneRepMax,
   bestSetOf,
   bodyWeightOn,
@@ -382,5 +383,47 @@ describe('session figures', () => {
       basis: { formula: 'epley', fromSetId: sets[2].id, weightGrams: 90_000, reps: 5 },
     });
     expect(oneRepMaxFor('weight_reps', sets[0])).toBeUndefined();
+  });
+});
+
+describe('weekSummary', () => {
+  // 2026-11-12 is a Thursday; the week began on Monday 2026-11-09.
+  const sessions = [
+    { id: 'a', day: '2026-11-08', status: 'finished' as const, durationSeconds: 3000 },
+    { id: 'b', day: '2026-11-09', status: 'finished' as const, durationSeconds: 3600 },
+    { id: 'c', day: '2026-11-12', status: 'open' as const, durationSeconds: 600 },
+  ];
+  const record = { kind: 'heaviest' as const, value: 100_000, setId: 's', sessionId: 'b', day: '2026-11-09', exerciseName: 'Bench' };
+
+  it('counts this Monday-based week only, and offers the open session', () => {
+    const summary = weekSummary({ sessions, records: [], today: '2026-11-12' });
+    expect(summary).toMatchObject({ workoutsThisWeek: 2, secondsThisWeek: 4200, openSessionId: 'c', daysSinceLast: 0 });
+  });
+
+  it('shows the newest record within 14 days instead of days since the last workout', () => {
+    const older = { ...record, day: '2026-11-01', setId: 'old' };
+    const summary = weekSummary({ sessions, records: [older, record], today: '2026-11-12' });
+    expect(summary.latestRecord?.setId).toBe('s');
+    expect(summary.daysSinceLast).toBeUndefined();
+  });
+
+  it('drops a record older than 14 days and counts days since the last workout', () => {
+    const summary = weekSummary({
+      sessions: sessions.slice(0, 2),
+      records: [{ ...record, day: '2026-10-29' }],
+      today: '2026-11-12',
+    });
+    expect(summary.latestRecord).toBeUndefined();
+    expect(summary.daysSinceLast).toBe(3);
+    expect(summary.workoutsThisWeek).toBe(1);
+  });
+
+  it('is empty for someone who never trained', () => {
+    expect(weekSummary({ sessions: [], records: [], today: '2026-11-12' })).toEqual({ workoutsThisWeek: 0, secondsThisWeek: 0 });
+  });
+
+  it('starts the week on Monday even when today is Sunday', () => {
+    const summary = weekSummary({ sessions, records: [], today: '2026-11-15' });
+    expect(summary.workoutsThisWeek).toBe(2);
   });
 });

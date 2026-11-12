@@ -12,8 +12,9 @@ phases and must be computable from what this module records.
 
 **Status (2026-11-12):** built: the catalogue, workout logging and history (MVP, T001–T021), and
 search ranking, private exercises and machines (US2, T022–T028), and progress: per-exercise
-history, personal records and labelled 1RM estimates (US3, T029–T034). Not built yet: the Home
-card (US4), kg/lb display and the "from weigh-in" label on bodyweight set rows (US5).
+history, personal records and labelled 1RM estimates (US3, T029–T034), and the Home card (US4,
+T035–T037). Not built yet: kg/lb display and the "from weigh-in" label on bodyweight set rows
+(US5).
 
 ## Access
 
@@ -167,6 +168,7 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `PATCH`/`DELETE` | `/sessions/:id/exercises/:weId` | `{notes?, machineId?}` (`null` clears the machine); delete removes its sets. |
 | `POST` | `/sessions/:id/exercises/:weId/sets` | Validated against the snapshot's measure. Returns `{set, records}`. |
 | `PATCH`/`DELETE` | `/sets/:setId` | `null` clears an optional field. PATCH returns `{set, records}`. |
+| `GET` | `/summary?today=` | The Home card's figures (`TrainingSummary`); also in `GET /api/dashboard`. |
 
 ## Derived values (computed on read, never stored)
 
@@ -210,6 +212,22 @@ Nothing is stored, so correcting or deleting a set moves every figure at once.
   - **Current bests** (`records` in history) are over every set ever, the earliest on a tie.
 - **Session figures**: `bestSetOf` (highest 1RM, else load, reps, distance, time) and
   `sessionVolumeGrams`; `SessionExercise.oneRepMax` is the best estimate in that session.
+
+### The Home card (US4)
+
+`weekSummary` (domain) over what `TrainingSummaryService` gathers; nothing stored.
+
+- **Workouts** and **time** (the subtitle says "this week"): sessions whose `day` is from this Monday to
+  `today`, open ones included, timed with `sessionDurationSeconds`. Weeks start on Monday.
+- **Third figure**: the newest record **set** (a marked set, not a current best) within the last
+  14 days, e.g. "PR · Bench press: 100 kg". When one set holds several, the first in
+  `RECORD_KINDS` order is shown (heaviest before an estimate). With no recent record: days since
+  the last workout ("today", "yesterday", "N days ago"; amber after a week).
+- **One action**: *Resume workout* when a session is open (opens `/training`), else *Start
+  workout* (starts one for the browser's day, then opens `/training`).
+- The dashboard calls the summary only when the account has `training` and selected it. Card
+  `order` 30, icon `dumbbell`. Formatting (`formatRecordValue` and friends) lives in
+  `libs/shared/domain/src/lib/training-format.ts`, so the server-built card reads like the page.
 
 ## Day and time
 

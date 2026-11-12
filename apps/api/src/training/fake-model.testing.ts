@@ -40,6 +40,7 @@ function matchesValue(value: unknown, condition: unknown): boolean {
         case '$ne': return !same(value, arg);
         case '$lt': return value !== undefined && compare(value, arg) < 0;
         case '$gte': return value !== undefined && compare(value, arg) >= 0;
+        case '$lte': return value !== undefined && compare(value, arg) <= 0;
         case '$exists': return (value !== undefined) === arg;
         case '$regex': return typeof value === 'string' && new RegExp(arg as string).test(value);
         default: throw new Error(`fake model: unsupported operator ${op}`);

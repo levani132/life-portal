@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   DashboardResponse,
@@ -29,12 +30,28 @@ import {
 import { api } from '../lib/api';
 import { revalidate, useApi } from '../lib/hooks';
 import { mealContextNow } from '../lib/local-day';
+import { revalidateTraining, useWorkoutDay } from '../lib/training';
 
 
 export function Dashboard() {
   const { data, error, isLoading } = useApi<DashboardResponse>('/dashboard');
   const portal = useApi<PortalState>('/portal');
   const [logging, setLogging] = useState<MealSlot | null>(null);
+  const router = useRouter();
+  const workoutDay = useWorkoutDay();
+  const [workoutError, setWorkoutError] = useState<string | null>(null);
+  // Start, then open the workout. A second tap while the first is in flight is harmless: the
+  // API answers with the session already open (one open session per person).
+  const startWorkout = useCallback(async () => {
+    setWorkoutError(null);
+    try {
+      await api.post('/training/sessions', { requestId: crypto.randomUUID(), day: workoutDay() });
+      await Promise.all([revalidateTraining(), revalidate('/dashboard')]);
+      router.push('/training');
+    } catch (caught) {
+      setWorkoutError(caught instanceof Error ? caught.message : 'Could not start the workout.');
+    }
+  }, [router, workoutDay]);
   // The same key the log modal reads its rings from, so opening it costs one request.
   const { data: food } = useApi<{ foods: FoodWithUsage[] }>(
     logging && data ? `/nutrition?today=${data.today}&day=${data.today}` : null,
@@ -111,9 +128,9 @@ export function Dashboard() {
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="sr-only">Home</h1>
-      {saveError && (
+      {(saveError || workoutError) && (
         <div className="mb-3" role="alert">
-          <ErrorNote message={saveError} />
+          <ErrorNote message={(saveError || workoutError) as string} />
         </div>
       )}
       {cards.length === 0 ? (
@@ -147,7 +164,11 @@ export function Dashboard() {
               onQuickAction={
                 card.quickAction?.kind === 'log-food'
                   ? () => setLogging(mealContextNow().slot)
-                  : undefined
+                  : card.quickAction?.kind === 'start-workout'
+                    ? () => void startWorkout()
+                    : card.quickAction?.kind === 'resume-workout'
+                      ? () => router.push('/training')
+                      : undefined
               }
             />
           )}

@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-12: Training on Home
+
+- **A Training card on Home**: workouts and time this week, then your newest personal record from
+  the last two weeks, or how long since your last workout.
+- **Start or resume from Home.** The card's one button starts a workout and opens it, or takes you
+  back to the one in progress.
+
 ## 2026-11-12: Training: progress and personal records
 
 - **Exercise history.** Every exercise shows your sessions newest first, with each one's sets,
