@@ -26,6 +26,7 @@ import {
 import { clearQueueError, enqueue, useTrainingQueue } from '../../lib/training-queue';
 import { ExerciseHistory } from './exercise-history';
 import { ExerciseSearch, MachineChoice } from './exercise-picker';
+import { SuggestedPlans } from './plan-suggestions';
 import { RestTimer } from './rest-timer';
 import { SetForm, SetLine, type SetFormValue } from './set-row';
 import { SuggestionRows, suggestionValue } from './suggestion-row';
@@ -91,6 +92,7 @@ export function CurrentWorkout({ onBrowsePlans }: { onBrowsePlans?: () => void }
           }
         />
         {startError && <div className="mt-3"><ErrorNote message={startError} /></div>}
+        <SuggestedPlans />
       </Panel>
     );
   }

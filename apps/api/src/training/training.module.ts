@@ -203,6 +203,12 @@ export class TrainingController {
     return this.plans.list(userId);
   }
 
+  /** Before `plans/:id`, or "suggested" would be read as an id. */
+  @Get('plans/suggested')
+  suggestedPlans(@CurrentUser('userId') userId: string, @Today() today: string) {
+    return this.plans.suggested(userId, today);
+  }
+
   @Get('plans/:id')
   plan(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     return this.plans.detail(userId, id);

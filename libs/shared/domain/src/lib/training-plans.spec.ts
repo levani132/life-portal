@@ -2,7 +2,9 @@ import type { Measure, PlanInput, PlanTarget } from '@life-portal/shared-types';
 import {
   describeTarget,
   openTargets,
+  planProgress,
   prefillFor,
+  recentPlanIds,
   validatePlan,
   validatePlanTarget,
 } from './training-plans';
@@ -183,5 +185,50 @@ describe('prefillFor', () => {
   it('keeps only fields the measure allows', () => {
     const previous = [{ reps: 10, weightGrams: 5000, assistGrams: 9000 }];
     expect(prefillFor('assisted_reps', working({ reps: 8 }), previous, 0).values).toEqual({ reps: 10, assistGrams: 9000 });
+  });
+});
+
+describe('planProgress', () => {
+  const ids = ['a', 'b', 'c'];
+  const session = (planWorkoutId: string, day: string, startedAt = 0, planId = 'p') => ({ planId, planWorkoutId, day, startedAt });
+
+  it('suggests the first workout when none was done', () => {
+    expect(planProgress(ids, [])).toEqual({ lastDoneDay: {}, nextWorkoutId: 'a' });
+    expect(planProgress([], [])).toEqual({ lastDoneDay: {} });
+  });
+
+  it('suggests the one after the most recent, by day then start time, and wraps', () => {
+    expect(planProgress(ids, [session('a', '2026-11-01'), session('b', '2026-11-03')])).toEqual({
+      lastDoneDay: { a: '2026-11-01', b: '2026-11-03' },
+      nextWorkoutId: 'c',
+    });
+    expect(planProgress(ids, [session('b', '2026-11-03', 2), session('c', '2026-11-03', 1)]).nextWorkoutId).toBe('c');
+    expect(planProgress(ids, [session('c', '2026-11-05')]).nextWorkoutId).toBe('a');
+  });
+
+  it('keeps the latest day for a workout done twice', () => {
+    expect(planProgress(ids, [session('a', '2026-11-01'), session('a', '2026-11-08')]).lastDoneDay).toEqual({ a: '2026-11-08' });
+  });
+
+  it('passes over sessions for workouts no longer in the plan', () => {
+    expect(planProgress(ids, [session('gone', '2026-11-09')])).toEqual({ lastDoneDay: {}, nextWorkoutId: 'a' });
+    expect(planProgress(ids, [session('a', '2026-11-01'), session('gone', '2026-11-09')]).nextWorkoutId).toBe('b');
+  });
+});
+
+describe('recentPlanIds', () => {
+  const session = (planId: string, day: string, startedAt = 0) => ({ planId, planWorkoutId: 'w', day, startedAt });
+
+  it('lists plans used in the last 28 days, newest first, once each, at most three', () => {
+    const sessions = [
+      session('old', '2026-10-15'),
+      session('edge', '2026-10-16'),
+      session('p1', '2026-11-10'),
+      session('p2', '2026-11-11'),
+      session('p1', '2026-11-12'),
+    ];
+    expect(recentPlanIds(sessions, '2026-11-12')).toEqual(['p1', 'p2', 'edge']);
+    expect(recentPlanIds(sessions, '2026-11-12', 28, 2)).toEqual(['p1', 'p2']);
+    expect(recentPlanIds([], '2026-11-12')).toEqual([]);
   });
 });

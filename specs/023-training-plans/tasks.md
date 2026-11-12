@@ -101,13 +101,13 @@ plan) is testable without US2 (own plans) or US3 (progress).
 
 ### Tests
 
-- [ ] T027 [P] [US3] Add `planProgress(workoutIds, sessions)` and `recentPlanIds(sessions, today, days = 28, max = 3)` to `libs/shared/domain/src/lib/training-plans.ts` (sessions as `{planId, planWorkoutId, day, startedAt}`), with tests in `training-plans.spec.ts`: none done → first is next; most recent by day then `startedAt`; wraps after the last; an open session counts; a session for a workout no longer in the plan does not move `next` past a missing id (falls back to the first); 28-day edge inclusive; at most three, most recent first, one entry per plan
+- [X] T027 [P] [US3] Add `planProgress(workoutIds, sessions)` and `recentPlanIds(sessions, today, days = 28, max = 3)` to `libs/shared/domain/src/lib/training-plans.ts` (sessions as `{planId, planWorkoutId, day, startedAt}`), with tests in `training-plans.spec.ts`: none done → first is next; most recent by day then `startedAt`; wraps after the last; an open session counts; a session for a workout no longer in the plan does not move `next` past a missing id (falls back to the first); 28-day edge inclusive; at most three, most recent first, one entry per plan
 
 ### Implementation
 
-- [ ] T028 [US3] In `apps/api/src/training/plans.service.ts`: load the caller's sessions with `plan` for the listed plan ids (index `{userId, 'plan.planId', day}`, projection of the four fields), fill `PlanListItem.lastDoneDay` and `nextWorkout`, and `PlanDetail` workouts' `lastDoneDay` and `isNext`; add `suggested(userId, today)` (validate `today` as `YYYY-MM-DD`) leaving out archived and deleted plans
-- [ ] T029 [US3] Route `GET /training/plans/suggested?today=` in `apps/api/src/training/training.module.ts`, declared before `plans/:id`; spec cases in `plans.service.spec.ts` for progress on list/detail and for a deleted session no longer counting
-- [ ] T030 [US3] Web: plan detail shows each workout's last done relative to today ("3 days ago", "yesterday", "not yet", using `formatDay`/the local day) and marks the next one; plans list shows the next workout; the Workout tab with no open session (`apps/web/src/components/training/workout-session.tsx` or a new `workout-start.tsx`) shows "Start empty workout" plus up to three "Start <workout> · <plan>" rows from `/training/plans/suggested?today=<local day>`
+- [X] T028 [US3] In `apps/api/src/training/plans.service.ts`: load the caller's sessions with `plan` for the listed plan ids (index `{userId, 'plan.planId', day}`, projection of the four fields), fill `PlanListItem.lastDoneDay` and `nextWorkout`, and `PlanDetail` workouts' `lastDoneDay` and `isNext`; add `suggested(userId, today)` (validate `today` as `YYYY-MM-DD`) leaving out archived and deleted plans
+- [X] T029 [US3] Route `GET /training/plans/suggested?today=` in `apps/api/src/training/training.module.ts`, declared before `plans/:id`; spec cases in `plans.service.spec.ts` for progress on list/detail and for a deleted session no longer counting
+- [X] T030 [US3] Web: plan detail shows each workout's last done relative to today ("3 days ago", "yesterday", "not yet", using `formatDay`/the local day) and marks the next one; plans list shows the next workout; the Workout tab with no open session (`apps/web/src/components/training/workout-session.tsx` or a new `workout-start.tsx`) shows "Start empty workout" plus up to three "Start <workout> · <plan>" rows from `/training/plans/suggested?today=<local day>`
 
 **Checkpoint**: quickstart 9 passes; push to main.
 
@@ -123,6 +123,20 @@ plan) is testable without US2 (own plans) or US3 (progress).
 ---
 
 ## Progress
+
+- 2026-11-12: US3 done (T027–T030); `npm run check` passes (951 tests), and scenario 9 was run
+  against a local Mongo with the web at phone width. Differences from the task text:
+  - `planProgress` takes the plan's workout ids (not the plan) and returns
+    `{lastDoneDay: {[id]: day}, nextWorkoutId?}`; a session for a workout no longer in the plan
+    is passed over entirely, so the next one follows the latest session that still names one.
+  - `suggested` asks `recentPlanIds` for up to ten ids and keeps the first three that still
+    exist, so a deleted plan does not leave the list short.
+  - The Workout tab's suggestions live in `components/training/plan-suggestions.tsx`, under the
+    existing empty state; a plan row shows "Next: Pull · last done 2 days ago" once used.
+  - Checked locally: no suggestions before any plan session; `today=nope` → 400; finishing Push
+    made Pull next and listed the plan; an open Pull session moved next to Legs; deleting it
+    moved it back; a session on 2026-11-10 is suggested on 2026-12-07 and not on 2026-12-08;
+    starting from the Workout tab suggestion opened Pull with its planned sets.
 
 - 2026-11-12: US2 done (T020–T026); `npm run check` passes (933 tests), and the API and the web
   editor were run against a local Mongo at phone width. Differences from the task text:

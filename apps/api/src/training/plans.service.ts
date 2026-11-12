@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, Types, type Model, type QueryFilter } from 'mongoose';
 import {
@@ -11,10 +11,10 @@ import {
   type PlanListItem,
   type PlanTarget,
 } from '@life-portal/shared-types';
-import { validatePlan } from '@life-portal/shared-domain';
+import { addDays, planProgress, recentPlanIds, validatePlan, type PlanSessionRef } from '@life-portal/shared-domain';
 import plansFile from './catalogue/plans.json';
 import type { PlansFile } from './plan.seeder';
-import { Exercise, TrainingPlan } from './training.schemas';
+import { Exercise, TrainingPlan, WorkoutSession } from './training.schemas';
 
 export type PlanRow = TrainingPlan & { _id: unknown; createdAt?: Date; updatedAt?: Date };
 type ExerciseRow = Pick<Exercise, 'name' | 'measure' | 'equipmentType' | 'archived'> & { _id: unknown };
@@ -33,7 +33,58 @@ export class PlansService {
   constructor(
     @InjectModel(TrainingPlan.name) private readonly plans: Model<TrainingPlan>,
     @InjectModel(Exercise.name) private readonly exercises: Model<Exercise>,
+    @Optional() @InjectModel(WorkoutSession.name) private readonly sessions?: Model<WorkoutSession>,
   ) {}
+
+  /**
+   * The caller's sessions started from a plan, as progress reads them (research R8). Open ones
+   * count; deleted ones are simply gone. `filter` narrows by plan or by day.
+   */
+  private async sessionRefs(userId: string, filter: Record<string, unknown>): Promise<PlanSessionRef[]> {
+    if (!this.sessions) return [];
+    const rows = await this.sessions
+      .find({ userId, 'plan.planId': { $exists: true }, ...filter })
+      .select('plan.planId plan.planWorkoutId day startedAt')
+      .lean<{ plan: { planId: string; planWorkoutId: string }; day: string; startedAt?: Date }[]>();
+    return rows.map((row) => ({
+      planId: row.plan.planId,
+      planWorkoutId: row.plan.planWorkoutId,
+      day: row.day,
+      startedAt: row.startedAt ? new Date(row.startedAt).getTime() : 0,
+    }));
+  }
+
+  private async withProgress(userId: string, rows: PlanRow[]): Promise<PlanListItem[]> {
+    const ids = rows.map((row) => String(row._id));
+    const sessions = ids.length ? await this.sessionRefs(userId, { 'plan.planId': { $in: ids } }) : [];
+    return rows.map((row) => {
+      const item = toListItem(row);
+      const id = String(row._id);
+      const progress = planProgress(
+        row.workouts.map((workout) => workout.id),
+        sessions.filter((session) => session.planId === id),
+      );
+      const days = Object.values(progress.lastDoneDay).sort();
+      const next = row.workouts.find((workout) => workout.id === progress.nextWorkoutId);
+      return {
+        ...item,
+        ...(days.length ? { lastDoneDay: days[days.length - 1] } : {}),
+        ...(next ? { nextWorkout: { id: next.id, name: next.name } } : {}),
+      };
+    });
+  }
+
+  /** Up to three plans the caller used in the 28 days up to `today`, most recent first. */
+  async suggested(userId: string, today: string): Promise<PlanListItem[]> {
+    const sessions = await this.sessionRefs(userId, { day: { $gte: addDays(today, -27) } });
+    // Plans deleted or archived since drop out; look at a few more so three can still show.
+    const ids = recentPlanIds(sessions, today, 28, 10).filter(isValidObjectId);
+    if (!ids.length) return [];
+    const rows = await this.plans.find(this.visible(userId, { _id: { $in: ids }, archived: false })).lean<PlanRow[]>();
+    const byId = new Map(rows.map((row) => [String(row._id), row]));
+    const ordered = ids.flatMap((id) => byId.get(id) ?? []).slice(0, 3);
+    return this.withProgress(userId, ordered);
+  }
 
   /** Shared rows, or rows owned by this user. Nothing else is ever readable. */
   private visible(userId: string, extra: Record<string, unknown> = {}): QueryFilter<TrainingPlan> {
@@ -48,7 +99,8 @@ export class PlansService {
     const own = rows
       .filter((row) => row.userId)
       .sort((a, b) => stamp(b) - stamp(a));
-    return { shared: shared.map(toListItem), own: own.map(toListItem) };
+    const [sharedItems, ownItems] = await Promise.all([this.withProgress(userId, shared), this.withProgress(userId, own)]);
+    return { shared: sharedItems, own: ownItems };
   }
 
   async detail(userId: string, id: string): Promise<PlanDetail> {
@@ -59,6 +111,10 @@ export class PlansService {
       .select('name measure equipmentType archived')
       .lean<ExerciseRow[]>();
     const byId = new Map(exercises.map((exercise) => [String(exercise._id), exercise]));
+    const progress = planProgress(
+      row.workouts.map((workout) => workout.id),
+      await this.sessionRefs(userId, { 'plan.planId': String(row._id) }),
+    );
     return {
       id: String(row._id),
       name: row.name,
@@ -69,7 +125,8 @@ export class PlansService {
       workouts: row.workouts.map((workout) => ({
         id: workout.id,
         name: workout.name,
-        isNext: false,
+        ...(progress.lastDoneDay[workout.id] ? { lastDoneDay: progress.lastDoneDay[workout.id] } : {}),
+        isNext: workout.id === progress.nextWorkoutId,
         exercises: workout.exercises.map((exercise) => {
           const found = byId.get(exercise.exerciseId);
           return {

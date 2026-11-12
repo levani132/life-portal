@@ -11,7 +11,8 @@ const OTHER = 'user-other';
 function fixture() {
   const exercises = new FakeModel();
   const plans = new FakeModel([['userId', 'requestId']]);
-  const service = new PlansService(plans as never, exercises as never);
+  const sessions = new FakeModel();
+  const service = new PlansService(plans as never, exercises as never, sessions as never);
   const bench = new Types.ObjectId();
   const plank = new Types.ObjectId();
   const mine = new Types.ObjectId();
@@ -31,6 +32,7 @@ function fixture() {
     archived: false,
     workouts: [
       { id: 'fb:a', name: 'A', exercises: [{ id: 'fb:a:0', exerciseId: String(bench), restSeconds: 120, targets: [{ type: 'working', reps: 8 }] }] },
+      { id: 'fb:b', name: 'B', exercises: [{ id: 'fb:b:0', exerciseId: String(plank), targets: [{ type: 'working', durationSeconds: 30 }] }] },
     ],
   });
   const input = (): PlanInput => ({
@@ -49,6 +51,7 @@ function fixture() {
   return {
     service,
     plans,
+    sessions,
     input,
     bench: String(bench),
     plank: String(plank),
@@ -199,5 +202,60 @@ describe('PlansService: own plans', () => {
     const created = await f.service.create(ME, { requestId: randomUUID(), ...f.input() });
     expect(await f.service.remove(ME, created.id)).toEqual({ id: created.id, deleted: true });
     await expect(f.service.detail(ME, created.id)).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('PlansService: progress', () => {
+  const T = Date.parse('2026-11-12T18:00:00.000Z');
+  const session = (f: ReturnType<typeof fixture>, planId: string, planWorkoutId: string, day: string, userId = ME, status = 'finished') => {
+    const _id = new Types.ObjectId();
+    f.sessions.docs.push({ _id, userId, day, status, startedAt: new Date(T), plan: { planId, planWorkoutId, planName: 'x', workoutName: 'y' } });
+    return _id;
+  };
+
+  it('shows the first workout as next before any session', async () => {
+    const f = fixture();
+    const [item] = (await f.service.list(ME)).shared;
+    expect(item.lastDoneDay).toBeUndefined();
+    expect(item.nextWorkout).toEqual({ id: 'fb:a', name: 'A' });
+    const detail = await f.service.detail(ME, f.shared);
+    expect(detail.workouts.map((w) => [w.lastDoneDay, w.isNext])).toEqual([[undefined, true], [undefined, false]]);
+  });
+
+  it('fills last done and next from the caller’s sessions only, open ones included', async () => {
+    const f = fixture();
+    session(f, f.shared, 'fb:a', '2026-11-10');
+    session(f, f.shared, 'fb:b', '2026-11-11', OTHER);
+    const [item] = (await f.service.list(ME)).shared;
+    expect(item).toMatchObject({ lastDoneDay: '2026-11-10', nextWorkout: { id: 'fb:b', name: 'B' } });
+    session(f, f.shared, 'fb:b', '2026-11-12', ME, 'open');
+    const detail = await f.service.detail(ME, f.shared);
+    expect(detail.workouts.map((w) => [w.lastDoneDay, w.isNext])).toEqual([['2026-11-10', true], ['2026-11-12', false]]);
+  });
+
+  it('stops counting a deleted session', async () => {
+    const f = fixture();
+    session(f, f.shared, 'fb:a', '2026-11-10');
+    const id = session(f, f.shared, 'fb:b', '2026-11-11');
+    expect((await f.service.list(ME)).shared[0].nextWorkout?.id).toBe('fb:a');
+    f.sessions.docs.splice(f.sessions.docs.findIndex((doc) => doc._id === id), 1);
+    expect((await f.service.list(ME)).shared[0].nextWorkout?.id).toBe('fb:b');
+  });
+
+  it('suggests recently used plans, leaving out old, deleted and other people’s', async () => {
+    const f = fixture();
+    expect(await f.service.suggested(ME, '2026-11-12')).toEqual([]);
+    const mine = await f.service.create(ME, { requestId: randomUUID(), ...f.input() });
+    const gone = await f.service.create(ME, { requestId: randomUUID(), name: 'Gone', workouts: [{ name: 'W', exercises: [] }] });
+    session(f, f.shared, 'fb:a', '2026-10-15');
+    session(f, mine.id, mine.workouts[0].id, '2026-11-11');
+    session(f, gone.id, gone.workouts[0].id, '2026-11-12');
+    session(f, f.shared, 'fb:a', '2026-11-12', OTHER);
+    await f.service.remove(ME, gone.id);
+    const suggested = await f.service.suggested(ME, '2026-11-12');
+    expect(suggested.map((p) => p.name)).toEqual(['My plan']);
+    expect(suggested[0].nextWorkout).toEqual({ id: mine.workouts[1].id, name: 'Day 2' });
+    session(f, f.shared, 'fb:b', '2026-10-16');
+    expect((await f.service.suggested(ME, '2026-11-12')).map((p) => p.name)).toEqual(['My plan', 'Full body']);
   });
 });

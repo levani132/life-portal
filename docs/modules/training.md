@@ -122,6 +122,18 @@ and distance or time for `distance_duration`; weight is optional (the person fil
 `validatePlan` checks `PLAN_LIMITS` (name 80, description 1000, 14 workouts, 30 exercises a
 workout, 1–20 targets, rest 0–900 s). Both live in `libs/shared/domain/src/lib/training-plans.ts`.
 
+**Progress** (US3) is derived on every read from the caller's sessions that carry `plan`, open
+ones included, and never stored, so deleting a session simply stops it counting
+(`planProgress` in `training-plans.ts`). Each workout's `lastDoneDay` is the latest `day` of a
+session for it; the next workout is the one after the most recent session from that plan (by
+`day`, then `startedAt`), wrapping, or the first when none was done or the latest one names a
+workout no longer in the plan. `PlanListItem` carries `lastDoneDay` (the plan's latest) and
+`nextWorkout {id, name}`; `PlanDetail` workouts carry `lastDoneDay` and `isNext`.
+`GET /plans/suggested?today=` lists up to three plans with a session in the 28 days up to and
+including `today` (`recentPlanIds`), most recent first, leaving out deleted and archived plans;
+the Workout tab shows them, with nothing open, as "Start <next workout> · <plan>". Queries use
+the `{userId, 'plan.planId', day}` index.
+
 **Suggestions** in a started workout are derived, never stored as sets:
 - `openTargets(planned, loggedSetCount, skipped)` = `targets.slice(loggedSetCount)`: logged sets
   use targets up in order, whatever their values; deleting a set brings its target back.
@@ -232,6 +244,7 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `POST` | `/sessions/:id/exercises/:weId/sets` | Validated against the snapshot's measure. Returns `{set, records}`; bodyweight and assisted sets carry `effectiveLoad` when a weigh-in exists. |
 | `PATCH`/`DELETE` | `/sets/:setId` | `null` clears an optional field. PATCH returns `{set, records}`. |
 | `GET` | `/plans` | `{shared, own}`; shared in seed-file order, archived left out (spec 023). |
+| `GET` | `/plans/suggested` | `?today=YYYY-MM-DD` (400 otherwise): up to 3 `PlanListItem`s used in the 28 days to `today`, most recent first. Declared before `/plans/:id`. |
 | `GET` | `/plans/:id` | Workouts with each exercise's name, measure and targets. Archived shared plans still readable. |
 | `POST` | `/plans` | `{requestId, name, description?, workouts}` → the new own plan; a retried `requestId` returns it. 409 `PLAN_LIMIT` at 100. |
 | `PUT` | `/plans/:id` | Replaces an own plan whole, keeping sent ids (see Plans). Shared or someone else's → 404. |

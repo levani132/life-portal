@@ -17,6 +17,7 @@ import {
   useWorkoutDay,
 } from '../../lib/training';
 import { PlanEditor } from './plan-editor';
+import { lastDoneLabel } from './plan-suggestions';
 
 type View = { kind: 'list' } | { kind: 'plan'; id: string } | { kind: 'edit'; id?: string };
 
@@ -86,6 +87,7 @@ function PlansList({ onOpen, onNew }: { onOpen: (id: string) => void; onNew: () 
 }
 
 function PlanRows({ plans, onOpen }: { plans: PlanListItem[]; onOpen: (id: string) => void }) {
+  const today = useWorkoutDay()();
   return (
     <ul className="divide-y divide-border">
       {plans.map((plan) => (
@@ -94,8 +96,10 @@ function PlanRows({ plans, onOpen }: { plans: PlanListItem[]; onOpen: (id: strin
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-medium">{plan.name}</span>
               <span className="block truncate text-xs text-ink-faint">
-                {plan.workoutCount} {plan.workoutCount === 1 ? 'workout' : 'workouts'} · {plan.exerciseCount} exercises
-                {plan.description ? ` · ${plan.description}` : ''}
+                {plan.lastDoneDay && plan.nextWorkout
+                  ? `Next: ${plan.nextWorkout.name} · `
+                  : `${plan.workoutCount} ${plan.workoutCount === 1 ? 'workout' : 'workouts'} · ${plan.exerciseCount} exercises`}
+                {plan.lastDoneDay ? lastDoneLabel(plan.lastDoneDay, today) : plan.description ? ` · ${plan.description}` : ''}
               </span>
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-ink-faint" />
@@ -239,8 +243,12 @@ function PlanView({
             <Panel
               key={workout.id}
               title={workout.name}
-              description={`${workout.exercises.length} exercises`}
+              description={`${workout.exercises.length} exercises · ${lastDoneLabel(workout.lastDoneDay, workoutDay())}`}
               actions={
+                <>
+                {workout.isNext && data.workouts.length > 1 && (
+                  <span className="rounded-full border border-accent/50 px-2 py-0.5 text-xs text-accent">Next</span>
+                )}
                 <button
                   type="button"
                   className="btn-primary"
@@ -250,6 +258,7 @@ function PlanView({
                 >
                   <Play className="h-4 w-4" /> {starting === workout.id ? 'Starting…' : 'Start'}
                 </button>
+                </>
               }
             >
               {workout.exercises.length ? (

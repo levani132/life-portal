@@ -16,6 +16,9 @@ User-visible changes. Newest first.
   it: rename it, add, remove and reorder workouts and exercises, and set each planned set's reps
   (or a range like 8-12), weight, time or distance, rest and a note. Problems are pointed out
   before saving. Deleting a plan leaves the workouts you did from it in History.
+- **What's next.** A plan shows when you last did each workout and marks the next one in order.
+  With no workout open, the Workout tab offers the next workout of each plan you used in the last
+  four weeks, one tap to start.
 
 ## 2026-11-12: Badges on your profile
 

@@ -10,6 +10,7 @@ import {
   type SetValues,
   type WeightUnit,
 } from '@life-portal/shared-types';
+import { addDays } from './dates';
 import { SET_LIMITS, setFieldsFor } from './training';
 import { formatDistance, formatDuration, formatWeight } from './training-format';
 
@@ -209,4 +210,63 @@ export function prefillFor(
   const before = previousSets?.length ? (previousSets[position] ?? previousSets[previousSets.length - 1]) : undefined;
   if (before) return { type: target.type, values: pick(before), source: 'last_time' };
   return { type: target.type, values: pick(target), source: 'plan' };
+}
+
+// ------------------------------------------------------------------ progress (research R8)
+
+/** The part of a session that progress reads. Open sessions count: you are doing it now. */
+export interface PlanSessionRef {
+  planId: string;
+  planWorkoutId: string;
+  day: string;
+  /** Orders two sessions on one day. */
+  startedAt: number;
+}
+
+export interface PlanProgress {
+  /** The latest day each workout was done, by workout id. Workouts never done are absent. */
+  lastDoneDay: Record<string, string>;
+  /** The workout after the most recently done one, wrapping; the first when none was done. */
+  nextWorkoutId?: string;
+}
+
+const newestFirst = (a: PlanSessionRef, b: PlanSessionRef) =>
+  a.day === b.day ? b.startedAt - a.startedAt : a.day < b.day ? 1 : -1;
+
+/**
+ * Derived on every read from the plan's sessions, never stored (principle III), so a deleted
+ * session simply stops counting. A session for a workout no longer in the plan sets no last-done
+ * day and is passed over when choosing the next workout.
+ */
+export function planProgress(workoutIds: readonly string[], sessions: readonly PlanSessionRef[]): PlanProgress {
+  const lastDoneDay: Record<string, string> = {};
+  const known = new Set(workoutIds);
+  const ordered = [...sessions].filter((session) => known.has(session.planWorkoutId)).sort(newestFirst);
+  for (const session of ordered) lastDoneDay[session.planWorkoutId] ??= session.day;
+  if (!workoutIds.length) return { lastDoneDay };
+  const latest = ordered[0];
+  const nextWorkoutId = latest
+    ? workoutIds[(workoutIds.indexOf(latest.planWorkoutId) + 1) % workoutIds.length]
+    : workoutIds[0];
+  return { lastDoneDay, nextWorkoutId };
+}
+
+/**
+ * Plans with a session in the `days` up to and including `today`, newest first, one entry per
+ * plan, at most `max`. Sessions after `today` (another time zone's tomorrow) still count.
+ */
+export function recentPlanIds(
+  sessions: readonly PlanSessionRef[],
+  today: string,
+  days = 28,
+  max = 3,
+): string[] {
+  const from = addDays(today, -(days - 1));
+  const ids: string[] = [];
+  for (const session of [...sessions].sort(newestFirst)) {
+    if (session.day < from) break;
+    if (!ids.includes(session.planId)) ids.push(session.planId);
+    if (ids.length === max) break;
+  }
+  return ids;
 }
