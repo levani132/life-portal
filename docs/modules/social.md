@@ -8,7 +8,7 @@ controls can override the flag by cohort or user without changing their module c
 ## Data ownership
 
 `social_profiles` holds only publishable identity: unique userId/username, displayName, bio and
-opt-in `discoverable` (false by default). Keeping it separate from users prevents email, roles,
+opt-in `discoverable` (false by default), which governs being found by strangers: people search and, since 018, the For You feed (only discoverable authors' public posts are candidates). Keeping it separate from users prevents email, roles,
 password/refresh-token hashes or other account fields entering social responses. Default handles
 use `user-<id>`; handles matching that pattern are reserved to their own account. A known profile
 link works even when search is off; audiences still apply. No anonymous/open-internet routes.

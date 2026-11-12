@@ -45,6 +45,9 @@ export const FoodPostSchema = SchemaFactory.createForClass(FoodPostRecord);
 FoodPostSchema.index({ userId: 1, requestId: 1 }, { unique: true });
 FoodPostSchema.index({ userId: 1, createdAt: -1, _id: -1 });
 FoodPostSchema.index({ repostOf: 1, createdAt: -1 }, { sparse: true });
+// For You (spec 018): public posts newest first. Reposts are filtered after the index (Mongo
+// cannot build a partial index on a field being absent).
+FoodPostSchema.index({ audience: 1, deleted: 1, createdAt: -1, _id: -1 });
 @Schema({ ...baseSchemaOptions, collection: 'post_reports' })
 export class PostReportRecord {
   @Prop({ required: true, index: true }) userId!: string;

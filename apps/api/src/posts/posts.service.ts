@@ -39,6 +39,7 @@ import { MediaService } from '../media/media.service';
 import { FoodPostRecord, PostReportRecord } from './posts.schemas';
 import type {
   CreatePostDto,
+  ForYouDto,
   ImportPostDto,
   PostListDto,
   PreviewPostDto,
@@ -50,6 +51,12 @@ import type {
 const ORIGINAL = { repostOf: { $exists: false } };
 const repostRequest = (postId: string) => `repost:${postId}`;
 type PostRow = FoodPostRecord & { _id: Types.ObjectId };
+type Feed = 'wall' | 'forYou';
+/** For You shows at most this many posts by one author on a page; the rest are skipped. */
+export const FOR_YOU_AUTHOR_CAP = 2;
+const PAGE_SIZE = 10;
+const SCAN_BATCH = 25;
+const SCAN_LIMIT = 100;
 
 @Injectable()
 export class PostsService {
@@ -300,19 +307,20 @@ export class PostsService {
       .lean();
     return new Map(rows.map((row) => [String(row._id), row.title]));
   }
-  private cursorKey() {
+  /** Each feed has its own key, so one feed's cursor is never accepted by another. */
+  private cursorKey(feed: Feed) {
     return createHash('sha256')
       .update(this.config.jwtSecret)
-      .update('food-post-feed-cursor')
+      .update(feed === 'wall' ? 'food-post-feed-cursor' : 'for-you-feed-cursor')
       .digest();
   }
-  private cursor(value?: string) {
+  private cursor(value?: string, feed: Feed = 'wall') {
     if (!value) return undefined;
     try {
       const bytes = Buffer.from(value, 'base64url');
       const cipher = createDecipheriv(
         'aes-256-gcm',
-        this.cursorKey(),
+        this.cursorKey(feed),
         bytes.subarray(0, 12),
       );
       cipher.setAuthTag(bytes.subarray(12, 28));
@@ -333,9 +341,12 @@ export class PostsService {
       throw new BadRequestException('Invalid feed cursor.');
     }
   }
-  private encode(row: { createdAt: Date; _id: Types.ObjectId }) {
+  private encode(
+    row: { createdAt: Date; _id: Types.ObjectId },
+    feed: Feed = 'wall',
+  ) {
     const iv = randomBytes(12);
-    const cipher = createCipheriv('aes-256-gcm', this.cursorKey(), iv);
+    const cipher = createCipheriv('aes-256-gcm', this.cursorKey(feed), iv);
     const encrypted = Buffer.concat([
       cipher.update(
         JSON.stringify({
@@ -404,6 +415,71 @@ export class PostsService {
     return {
       posts: visible,
       ...(last ? { nextCursor: this.encode(last) } : {}),
+    };
+  }
+  /**
+   * For You (spec 018): live, original, public posts from across Life Portal, newest first.
+   * Only authors who opted in to being found (`discoverable`) appear, never the viewer, anyone
+   * blocked either way or anyone the viewer muted. Every row still passes `readable()`, so
+   * audience, blocks, author access, reports and deletion are checked now, not when posted.
+   * Reposts are left out: the original is the candidate. A page holds at most
+   * FOR_YOU_AUTHOR_CAP posts per author; extras are skipped (they stay on the profile).
+   */
+  async forYou(userId: string, query: ForYouDto): Promise<PostPage> {
+    await this.requireEnabled(userId);
+    await this.access.require(userId, 'forYou');
+    const excluded = [userId, ...(await this.graph.hiddenAuthorIds(userId))];
+    let cursor = this.cursor(query.cursor, 'forYou');
+    let scanned = 0;
+    const visible: FoodPost[] = [];
+    const perAuthor = new Map<string, number>();
+    let last: PostRow | undefined;
+    let visibleCursor: PostRow | undefined;
+    while (scanned < SCAN_LIMIT) {
+      const rows: PostRow[] = await this.posts
+        .find({
+          audience: 'public',
+          deleted: { $ne: true },
+          ...ORIGINAL,
+          userId: { $nin: excluded },
+          ...(cursor
+            ? {
+                $or: [
+                  { createdAt: { $lt: cursor.date } },
+                  { createdAt: cursor.date, _id: { $lt: cursor.id } },
+                ],
+              }
+            : {}),
+        })
+        .sort({ createdAt: -1, _id: -1 })
+        .limit(SCAN_BATCH)
+        .lean();
+      const discoverable = await this.social.discoverableIds([
+        ...new Set(rows.map((row) => row.userId)),
+      ]);
+      for (const row of rows) {
+        scanned++;
+        last = row;
+        if (!discoverable.has(row.userId)) continue;
+        const count = perAuthor.get(row.userId) ?? 0;
+        if (count >= FOR_YOU_AUTHOR_CAP) continue;
+        const author = await this.readable(userId, row);
+        if (!author) continue;
+        if (visible.length === PAGE_SIZE && visibleCursor)
+          return {
+            posts: visible,
+            nextCursor: this.encode(visibleCursor, 'forYou'),
+          };
+        visible.push(await this.dto(row, author, userId, true));
+        perAuthor.set(row.userId, count + 1);
+        visibleCursor = row;
+      }
+      if (rows.length < SCAN_BATCH || !last) return { posts: visible };
+      cursor = { date: last.createdAt, id: last._id };
+    }
+    return {
+      posts: visible,
+      ...(last ? { nextCursor: this.encode(last, 'forYou') } : {}),
     };
   }
   /**

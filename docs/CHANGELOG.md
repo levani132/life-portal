@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-12: For You feed API (behind a flag)
+
+A new feed source finds public posts from people across Life Portal, newest first, for the
+coming For You tab. Only people who turned on "Let people find me" appear in it, and never
+anyone you blocked, who blocked you, or whom you muted. It is off for everyone outside the
+internal cohort while image moderation does not exist. Nothing on screen changes yet.
+
 ## 2026-11-07: Your foods as cards
 
 The Foods tab shows your foods as a grid of cards instead of lines of text: a large photo (or, for

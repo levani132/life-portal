@@ -42,7 +42,8 @@ search, connection actions and money widget sharing have their own tests.
 - **Real-device checks** of push, messages and swiping on an iPhone.
 - **Tier 0 limits:** Atlas M0 has 512 MB; Vercel Hobby does not allow commercial use, and Render
   free is kept awake by a cron job.
-- **Image moderation** (automated scanning) before public photos reach strangers at scale.
+- **Image moderation** (automated scanning) before public photos reach strangers at scale. The
+  For You feed (018) does exactly that, so its `forYou` flag stays off for production until then.
 - **Camera video plays only where the recording browser's codec does** (no transcoding yet).
 - **The money modules are built for one person** (the seeded loan, ESPP plan and EPAM boards).
   Decide whether they stay owner-only behind a flag or become a product for everyone, before

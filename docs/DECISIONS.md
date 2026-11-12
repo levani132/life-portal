@@ -1215,3 +1215,15 @@ context across questions and answers; the cost is that the Mac must stay awake. 
 public, so it acts only on issues the owner labelled and comments the owner wrote, and marks its
 own comments (they post under the owner's account) with `🤖 **Claude watcher**`. Finished work
 goes straight to `main` because the project is a test environment; revisit both when it launches.
+
+## 2026-11-12: For You shows only discoverable authors, and only originals
+
+Spec 018 (issue #2). Public has always meant "any signed-in member", but until now a stranger
+reached someone's public posts only by opening their profile. A feed pushes them to everyone, so
+an author who switched off "Let people find me" would be surprised to be broadcast; For You
+therefore takes candidates only from `discoverable` profiles. Reposts are not candidates, so the
+same original never appears twice; reposts become a ranking signal in #3. A page shows at most two
+posts per author and skips the rest rather than deferring them, the simplest rule that stops one
+prolific poster filling the page until #3 ranks properly. Its cursor is keyed separately from
+Wall's so positions are never interchangeable. The `forYou` flag stays off for production until
+image moderation exists (roadmap launch gate).

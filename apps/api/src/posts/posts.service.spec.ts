@@ -416,3 +416,134 @@ describe('public link previews (spec 017)', () => {
     expect((await f.service.publicPreview(String(f.row._id))).photoUrl).toBe('https://r2/still');
   });
 });
+
+describe('For You discovery (spec 018)', () => {
+  let seq = 0;
+  function post(userId: string, extra: Record<string, unknown> = {}) {
+    seq++;
+    return {
+      _id: new Types.ObjectId(),
+      userId,
+      requestId: `r${seq}`,
+      title: `Post ${seq}`,
+      caption: '',
+      audience: 'public' as const,
+      deleted: false,
+      // Newest first, as the index returns them.
+      createdAt: new Date(Date.UTC(2026, 10, 12, 12, 0, 0) - seq * 60_000),
+      updatedAt: new Date('2026-11-12T00:00:00Z'),
+      ...extra,
+    };
+  }
+  /** Serves `rows` like Mongo would: filtered by the cursor in the query, batched by `limit`. */
+  function discover(rows: ReturnType<typeof post>[], discoverable?: string[]) {
+    const f = fixture();
+    const find = jest.fn((filter: { $or?: { createdAt: Date | { $lt: Date }; _id?: { $lt: Types.ObjectId } }[] }) => ({
+      sort: () => ({
+        limit: (n: number) => ({
+          lean: jest.fn().mockImplementation(async () => {
+            const after = filter.$or
+              ? rows.filter((row) => {
+                  const lt = (filter.$or![0].createdAt as { $lt: Date }).$lt;
+                  return row.createdAt < lt || (+row.createdAt === +lt && row._id < filter.$or![1]._id!.$lt);
+                })
+              : rows;
+            return after.slice(0, n);
+          }),
+        }),
+      }),
+    }));
+    (f.posts as { find?: jest.Mock }).find = find;
+    (f.graph as { hiddenAuthorIds?: jest.Mock }).hiddenAuthorIds = jest.fn().mockResolvedValue(['blocked']);
+    (f.social as { discoverableIds?: jest.Mock }).discoverableIds = jest.fn(
+      async (ids: string[]) => new Set(ids.filter((id) => !discoverable || discoverable.includes(id))),
+    );
+    f.social.postAuthor.mockImplementation(async (userId: string) => ({ userId, displayName: userId, username: userId }));
+    const service = new PostsService(
+      f.posts as never,
+      f.reports as never,
+      f.access as never,
+      f.nutrition as never,
+      f.social as never,
+      f.graph as never,
+      f.media as never,
+      { jwtSecret: 'isolated-test-key' } as never,
+    );
+    return { ...f, find, service };
+  }
+
+  it('asks only for live public originals and never the viewer, blocked or muted authors', async () => {
+    const f = discover([]);
+    expect(await f.service.forYou('viewer', {})).toEqual({ posts: [] });
+    expect(f.access.require).toHaveBeenCalledWith('viewer', 'forYou');
+    expect(f.find.mock.calls[0][0]).toEqual({
+      audience: 'public',
+      deleted: { $ne: true },
+      repostOf: { $exists: false },
+      userId: { $nin: ['viewer', 'blocked'] },
+    });
+  });
+
+  it('is refused when the forYou flag is off', async () => {
+    const f = discover([]);
+    f.access.require.mockImplementation(async (_user: string, id: string) => {
+      if (id === 'forYou') throw new NotFoundException();
+    });
+    await expect(f.service.forYou('viewer', {})).rejects.toThrow(NotFoundException);
+    expect(f.find).not.toHaveBeenCalled();
+  });
+
+  it('shows strangers’ posts only from people who chose to be found', async () => {
+    const a = post('ann');
+    const b = post('bob');
+    const f = discover([a, b], ['bob']);
+    const page = await f.service.forYou('viewer', {});
+    expect(page.posts.map((p) => p.id)).toEqual([String(b._id)]);
+  });
+
+  it('still runs the live read check: a reported post or an author without posting is hidden', async () => {
+    const reported = post('ann');
+    const disabled = post('cat');
+    const fine = post('dan');
+    const f = discover([reported, disabled, fine]);
+    f.reports.exists.mockImplementation(async ({ postId }: { postId: string }) =>
+      postId === String(reported._id) ? { _id: 'report' } : null,
+    );
+    f.access.forUser.mockImplementation(async (userId: string) => ({
+      access: { social: true, nutrition: true, foodPosts: userId !== 'cat' },
+    }));
+    const page = await f.service.forYou('viewer', {});
+    expect(page.posts.map((p) => p.id)).toEqual([String(fine._id)]);
+  });
+
+  it('shows at most two posts per author on a page', async () => {
+    const rows = [post('ann'), post('ann'), post('ann'), post('bob')];
+    const f = discover(rows);
+    const page = await f.service.forYou('viewer', {});
+    expect(page.posts.map((p) => p.author.userId)).toEqual(['ann', 'ann', 'bob']);
+  });
+
+  it('pages with its own cursor and never repeats a post', async () => {
+    const authors = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'];
+    const rows = authors.map((author) => post(author));
+    const f = discover(rows);
+    const first = await f.service.forYou('viewer', {});
+    expect(first.posts).toHaveLength(10);
+    expect(first.nextCursor).toBeDefined();
+    const second = await f.service.forYou('viewer', { cursor: first.nextCursor });
+    expect(second.nextCursor).toBeUndefined();
+    const ids = [...first.posts, ...second.posts].map((p) => p.id);
+    expect(ids).toEqual(rows.map((row) => String(row._id)));
+  });
+
+  it('rejects a Wall cursor, so one feed’s position never leaks into the other', async () => {
+    const rows = Array.from({ length: 12 }, (_, i) => post(`w${i}`));
+    const f = discover(rows);
+    (f.graph as { wallAuthorIds?: jest.Mock }).wallAuthorIds = jest.fn().mockResolvedValue([]);
+    const wall = await f.service.list('viewer', { preview: 'normal' } as never);
+    expect(wall.nextCursor).toBeDefined();
+    await expect(f.service.forYou('viewer', { cursor: wall.nextCursor })).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+});

@@ -116,7 +116,7 @@ function ProfileEditor({ profile }: { profile: SocialProfile }) {
             <span>
               <span className="block font-medium">Let people find me</span>
               <span className="mt-1 block text-xs text-ink-muted">
-                Appear in name and username search. Your email is never shown.
+                Appear in name and username search, and let your public posts show in For You. Your email is never shown.
                 Profile links work even when this is off.
               </span>
             </span>

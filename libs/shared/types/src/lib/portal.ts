@@ -19,6 +19,7 @@ export const FEATURE_IDS = [
   'push',
   'messages',
   'postMedia',
+  'forYou',
 ] as const;
 export type FeatureId = (typeof FEATURE_IDS)[number];
 export type FeatureAccess = Record<FeatureId, boolean>;
@@ -127,4 +128,5 @@ export const FEATURES: { id: FeatureId; name: string }[] = [
   { id: 'push', name: 'Push notifications' },
   { id: 'messages', name: 'Direct messages' },
   { id: 'postMedia', name: 'Photos and video in posts' },
+  { id: 'forYou', name: 'For You feed' },
 ];

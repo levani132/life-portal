@@ -83,6 +83,12 @@ export class UpdatePostDto {
   @IsString() @MaxLength(1000) caption!: string;
   @IsIn(AUDIENCES) audience!: Audience;
 }
+export class ForYouDto {
+  @ValidateIf((_, v: unknown) => v !== undefined)
+  @IsString()
+  @MaxLength(256)
+  cursor?: string;
+}
 export class PostListDto {
   @ValidateIf((_, v: unknown) => v !== undefined)
   @Matches(/^\d{4}-\d{2}-\d{2}$/)

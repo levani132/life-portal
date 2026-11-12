@@ -227,6 +227,15 @@ export class SocialService implements OnModuleInit {
     }
     return (await this.profiles.findOne({ userId }).lean())!;
   }
+  /** Which of these people opted in to being found by strangers (search and For You). */
+  async discoverableIds(userIds: string[]): Promise<Set<string>> {
+    if (!userIds.length) return new Set();
+    const rows = await this.profiles
+      .find({ userId: { $in: userIds }, discoverable: true })
+      .select('userId')
+      .lean();
+    return new Set(rows.map((row) => row.userId));
+  }
   async postAuthor(userId: string) {
     const profile = await this.profiles.findOne({ userId }).lean();
     return profile

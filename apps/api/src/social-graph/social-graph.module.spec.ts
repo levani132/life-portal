@@ -65,3 +65,23 @@ describe('change reporting for notifications', () => {
     expect(unfriendUpdate.$unset).toHaveProperty('acceptedAt');
   });
 });
+describe('authors hidden from For You (spec 018)', () => {
+  it('returns the other side of blocked pairs in either direction and of pairs the viewer muted', async () => {
+    const find = jest.fn(() => ({
+      select: () => ({
+        lean: async () => [
+          { lowId: 'a', highId: 'me' },
+          { lowId: 'me', highId: 'z' },
+        ],
+      }),
+    }));
+    const graph = new SocialGraphService({ find } as never);
+    expect(await graph.hiddenAuthorIds('me')).toEqual(['a', 'z']);
+    expect(find).toHaveBeenCalledWith({
+      $and: [
+        { $or: [{ lowId: 'me' }, { highId: 'me' }] },
+        { $or: [{ 'blockedBy.0': { $exists: true } }, { mutedBy: 'me' }] },
+      ],
+    });
+  });
+});

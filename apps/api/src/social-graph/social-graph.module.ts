@@ -55,6 +55,22 @@ export class SocialGraphService {
       .lean();
     return rows.map((row) => (row.lowId === userId ? row.highId : row.lowId));
   }
+  /**
+   * Authors a viewer never sees in For You: anyone blocked in either direction, and anyone the
+   * viewer muted.
+   */
+  async hiddenAuthorIds(userId: string): Promise<string[]> {
+    const rows = await this.connections
+      .find({
+        $and: [
+          { $or: [{ lowId: userId }, { highId: userId }] },
+          { $or: [{ 'blockedBy.0': { $exists: true } }, { mutedBy: userId }] },
+        ],
+      })
+      .select('lowId highId')
+      .lean();
+    return rows.map((row) => (row.lowId === userId ? row.highId : row.lowId));
+  }
   async isBlocked(a: string, b: string) {
     return !!(await this.between(a, b))?.blockedBy.length;
   }

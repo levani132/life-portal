@@ -27,6 +27,7 @@ import {
   CreatePostDto,
   AddPostCommentDto,
   UpdatePostAudienceDto,
+  ForYouDto,
   ImportPostDto,
   PostListDto,
   PreviewPostDto,
@@ -65,6 +66,13 @@ class PostsController {
     @Query() query: PostListDto,
   ) {
     return this.posts.list(userId, query);
+  }
+  /** Declared before `:id` so "for-you" is never read as a post id. */
+  @Get('for-you') forYou(
+    @CurrentUser('userId') userId: string,
+    @Query() query: ForYouDto,
+  ) {
+    return this.posts.forYou(userId, query);
   }
   @Get('reports') reports(@CurrentUser('userId') userId: string) {
     return this.posts.reportQueue(userId);
