@@ -271,6 +271,7 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `GET` | `/exercises?q=&muscle=&equipment=&limit=&skip=` | Shared + own, not archived, by name. |
 | `GET` | `/exercises/:id` | Includes attribution on shared rows, signed `image.url` on own ones. |
 | `GET` | `/exercises/:id/history?before=` | Sessions newest first, 20 a page, each with sets (with record marks), best set, volume, 1RM; `records` over every set. |
+| `GET` | `/exercises/:id/progress?range=3m\|1y\|all&today=` | The statistics view (issue #6): one point per session in the range, up to `today`, thinned to 200; `metrics`, `sessionsInRange`, `totalSessions`, `lastDay`, `trend`, `nextRecord`, `records`. Range defaults to `3m`; anything else is a 400. |
 | `POST` | `/exercises` | A private exercise. |
 | `PATCH`/`DELETE` | `/exercises/:id` | Own rows only (shared → 404). Measure locked once logged (409). Delete archives a logged one. |
 | `GET` | `/machines?exerciseId=` | Own, not archived. |
@@ -344,6 +345,30 @@ Nothing is stored, so correcting or deleting a set moves every figure at once.
   only the reps show. Weight × reps sets never carry it (their load is their weight).
 - **Session figures**: `bestSetOf` (highest 1RM, else load, reps, distance, time) and
   `sessionVolumeGrams`; `SessionExercise.oneRepMax` is the best estimate in that session.
+
+### Exercise statistics (issue #6)
+
+Pure functions in `libs/shared/domain/src/lib/exercise-progress.ts`, served by
+`ProgressService.progressView` and shown by `components/training/exercise-history.tsx` in both the
+workout's history modal and the library's exercise sheet.
+
+- **Metrics per measure**, primary first: weight × reps → est. 1RM, heaviest, volume;
+  bodyweight and assisted → most reps, volume (when a weigh-in gives a load); duration → longest;
+  distance + time → distance, pace, duration.
+- **One point per session**: the best working set's value for each metric (warm-ups never count;
+  a session of only warm-ups has no point). Pace keeps the lowest; the chart flips its axis so up
+  is still better.
+- **Range** `3m` / `1y` / `all` counts back from `today` with `addMonths(-3)` / `addYears(-1)`;
+  sessions after `today` are left out. Over 200 points are thinned evenly, always keeping the first,
+  the last and the session holding the best of the primary metric.
+- **Trend**: the best of the primary metric in the last 28 days (today inclusive) against the 28
+  before. Absent unless both windows have a session, so a gap never reads as a fall.
+- **Next record**: for weight × reps, the fewest reps (up to 10) at the last session's heaviest
+  working weight whose Epley estimate beats the best 1RM, going up in plate steps (2.5 kg, or 5 lb
+  for a pound profile) when 10 reps would not do it. Labelled an estimate. Otherwise one more rep,
+  5 more seconds or 100 more metres than the record.
+- No level, rank or placeholder appears here yet: levels (#5a) are account-wide and strength ranks
+  (#5b) are not designed. Issue #6 stays open for them.
 
 ### Training levels (issue #5a)
 

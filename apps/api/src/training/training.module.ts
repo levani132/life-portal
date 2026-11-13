@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   type CallHandler,
   Controller,
@@ -19,7 +20,7 @@ import {
 } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import type { Response } from 'express';
-import type { SetInput, SetPatch } from '@life-portal/shared-types';
+import { PROGRESS_RANGES, type ProgressRange, type SetInput, type SetPatch } from '@life-portal/shared-types';
 import { RequireModule } from '../access/access.module';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { CatalogueSeeder } from './catalogue.seeder';
@@ -154,6 +155,20 @@ export class TrainingController {
     @Query('before') before?: string,
   ) {
     return this.progress.history(userId, id, before || undefined);
+  }
+
+  /** The statistics view: per-session points in a range, trend, next record (issue #6). */
+  @Get('exercises/:id/progress')
+  exerciseProgress(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Today() today: string,
+    @Query('range') range?: string,
+  ) {
+    if (range !== undefined && !(PROGRESS_RANGES as readonly string[]).includes(range)) {
+      throw new BadRequestException(`range must be one of ${PROGRESS_RANGES.join(', ')}.`);
+    }
+    return this.progress.progressView(userId, id, (range as ProgressRange | undefined) ?? '3m', today);
   }
 
   @Post('exercises')

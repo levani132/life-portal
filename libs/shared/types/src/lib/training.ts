@@ -513,3 +513,52 @@ export interface TrainingLevel {
   countedWorkouts: number;
 }
 
+/** Issue #6: an exercise's progress over time, for the statistics view. All derived on read. */
+export const PROGRESS_RANGES = ['3m', '1y', 'all'] as const;
+export type ProgressRange = (typeof PROGRESS_RANGES)[number];
+
+/**
+ * A per-session figure that can be charted. Weights are grams, `reps` a count, `duration`
+ * seconds, `distance` metres, `pace` seconds per km (lower is better), `volume` load × reps grams.
+ */
+export type ProgressMetric = 'one_rep_max' | 'heaviest' | 'reps' | 'duration' | 'distance' | 'pace' | 'volume';
+
+export interface ProgressPoint {
+  day: string;
+  sessionId: string;
+  /** The session's best for each metric that applies; absent where it cannot be known. */
+  values: Partial<Record<ProgressMetric, number>>;
+}
+
+/** The best of `metric` in the last 28 days against the 28 days before. */
+export interface ProgressTrend {
+  metric: ProgressMetric;
+  current: number;
+  previous: number;
+}
+
+/** The record to beat next, and for a weighted lift one set that would beat it (Epley). */
+export interface NextRecord {
+  kind: RecordKind;
+  current: number;
+  target: number;
+  suggestion?: { loadGrams: number; reps: number };
+}
+
+export interface ExerciseProgressView {
+  exercise: ExerciseListItem;
+  range: ProgressRange;
+  /** What can be charted for this measure, the primary one first. */
+  metrics: ProgressMetric[];
+  /** Oldest first, at most `MAX_PROGRESS_POINTS`, evenly thinned when there are more. */
+  points: ProgressPoint[];
+  /** Sessions in the range before thinning. */
+  sessionsInRange: number;
+  /** Every session with this exercise, ever. */
+  totalSessions: number;
+  lastDay?: string;
+  trend?: ProgressTrend;
+  nextRecord?: NextRecord;
+  records: RecordEntry[];
+}
+

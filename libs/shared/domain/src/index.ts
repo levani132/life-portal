@@ -31,3 +31,4 @@ export * from './lib/training-plans';
 export * from './lib/training-workout';
 export * from './lib/post-topics';
 export * from './lib/training-levels';
+export * from './lib/exercise-progress';

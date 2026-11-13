@@ -355,6 +355,21 @@ describe('ProgressService: records and history', () => {
     expect((await f.progress.history(OTHER, f.bench)).sessions).toEqual([]);
     await expect(f.progress.history(ME, f.bench, 'nonsense')).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it('charts one point per session in the range, up to today, with the next record (issue #6)', async () => {
+    const f = fixture();
+    await workout(f, -120, [{ reps: 5, weightGrams: 70_000 }]);
+    await workout(f, 0, [{ reps: 10, weightGrams: 40_000, type: 'warmup' }, { reps: 5, weightGrams: 100_000 }]);
+    await workout(f, 1, [{ reps: 5, weightGrams: 90_000 }]);
+    const view = await f.progress.progressView(ME, f.bench, '3m', '2026-11-12');
+    expect(view.metrics[0]).toBe('one_rep_max');
+    expect(view.points.map((p) => p.day)).toEqual(['2026-11-12']); // the 13th is after today; July is out of range
+    expect(view.points[0].values).toMatchObject({ heaviest: 100_000, one_rep_max: 116_667, volume: 500_000 });
+    expect(view).toMatchObject({ sessionsInRange: 1, totalSessions: 2, lastDay: '2026-11-12' });
+    expect(view.nextRecord).toEqual({ kind: 'best_1rm', current: 116_667, target: 120_000, suggestion: { loadGrams: 100_000, reps: 6 } });
+    expect((await f.progress.progressView(ME, f.bench, 'all', '2026-11-13')).points).toHaveLength(3);
+    expect((await f.progress.progressView(OTHER, f.bench, 'all', '2026-11-13')).points).toEqual([]);
+  });
 });
 
 // ------------------------------------------------------------------ spec 023: starting from a plan

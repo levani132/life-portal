@@ -2,6 +2,15 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-13: Exercise statistics
+
+- **See how an exercise is going.** An exercise's history, from a workout or the exercise library,
+  now opens with your best, how many sessions you've done, when you last did it and how the last
+  four weeks compare with the four before. A chart shows the best of each session over 3 months, a
+  year or all time, for est. 1RM, heaviest or volume (reps, time, distance or pace for other kinds of
+  exercise). A *next record* card says what would beat your best and, for weighted lifts, one set
+  that would do it. Your sessions follow, as before. Pounds work everywhere.
+
 ## 2026-11-13: Training levels
 
 - **A level for how much you train.** Training's header shows your level and the XP to the next.

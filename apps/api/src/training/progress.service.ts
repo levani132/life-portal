@@ -1,11 +1,14 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import type {
   ExerciseHistory,
   ExerciseHistorySession,
+  ExerciseListItem,
+  ExerciseProgressView,
   Measure,
   OneRepMaxEstimate,
+  ProgressRange,
   RecordKind,
   SetType,
 } from '@life-portal/shared-types';
@@ -15,12 +18,19 @@ import {
   bodyWeightOn,
   effectiveLoadGrams,
   personalRecords,
+  nextRecord,
+  pointsInRange,
+  progressMetricsFor,
+  progressPoints,
+  progressTrend,
   sessionVolumeGrams,
+  thinPoints,
   type BodyWeight,
   type ProgressSet,
 } from '@life-portal/shared-domain';
 import { NutritionService } from '../nutrition/nutrition.service';
 import { CatalogueService } from './catalogue.service';
+import { TrainingProfileService } from './profile.service';
 import { toSet, type SetRow } from './set-row';
 import { WorkoutExercise, WorkoutSession, WorkoutSet } from './training.schemas';
 
@@ -61,6 +71,7 @@ export class ProgressService {
     @InjectModel(WorkoutSet.name) private readonly sets: Model<WorkoutSet>,
     private readonly catalogue: CatalogueService,
     private readonly nutrition: NutritionService,
+    @Optional() private readonly profiles?: TrainingProfileService,
   ) {}
 
   /**
@@ -205,14 +216,7 @@ export class ProgressService {
     }));
     const last = page[page.length - 1];
     return {
-      exercise: {
-        id: exercise.id,
-        name: exercise.name,
-        primaryMuscles: exercise.primaryMuscles,
-        equipmentType: exercise.equipmentType,
-        measure: exercise.measure,
-        isOwn: exercise.isOwn,
-      },
+      exercise: listItem(exercise),
       sessions,
       records: best,
       nextCursor:
@@ -221,6 +225,48 @@ export class ProgressService {
           : undefined,
     };
   }
+
+  /**
+   * The statistics view (issue #6): one point per session in `range` up to `today`, thinned to
+   * at most 200, a 4-week trend of the primary metric, the next record to aim for, and records
+   * over every set ever. Derived on read, like everything here.
+   */
+  async progressView(userId: string, exerciseId: string, range: ProgressRange, today: string): Promise<ExerciseProgressView> {
+    const exercise = await this.catalogue.get(userId, exerciseId);
+    const measure = exercise.measure;
+    const [loaded, profile] = await Promise.all([
+      this.load(userId, [{ exerciseId: exercise.id, measure }]),
+      this.profiles?.read(userId),
+    ]);
+    const sets = (loaded.get(`${exercise.id}:${measure}`)?.sets ?? []).filter((set) => set.day <= today);
+    const all = progressPoints(measure, sets);
+    const inRange = pointsInRange(all, range, today);
+    const metrics = progressMetricsFor(measure);
+    const records = personalRecords(measure, sets).best;
+    return {
+      exercise: listItem(exercise),
+      range,
+      metrics,
+      points: thinPoints(inRange, metrics[0]),
+      sessionsInRange: inRange.length,
+      totalSessions: all.length,
+      lastDay: all[all.length - 1]?.day,
+      trend: progressTrend(all, metrics[0], today),
+      nextRecord: nextRecord(measure, records, sets, profile?.weightUnit ?? 'kg'),
+      records,
+    };
+  }
+}
+
+function listItem(exercise: ExerciseListItem): ExerciseListItem {
+  return {
+    id: exercise.id,
+    name: exercise.name,
+    primaryMuscles: exercise.primaryMuscles,
+    equipmentType: exercise.equipmentType,
+    measure: exercise.measure,
+    isOwn: exercise.isOwn,
+  };
 }
 
 interface Cursor {
