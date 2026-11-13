@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import type { Measure, RecordEntry, TrainingSummary } from '@life-portal/shared-types';
@@ -9,6 +9,7 @@ import {
   sessionDurationSeconds,
   weekSummary,
 } from '@life-portal/shared-domain';
+import { PlansService } from './plans.service';
 import { TrainingProfileService } from './profile.service';
 import { ProgressService } from './progress.service';
 import { WorkoutExercise, WorkoutSession, WorkoutSet } from './training.schemas';
@@ -31,6 +32,7 @@ export class TrainingSummaryService {
     @InjectModel(WorkoutSet.name) private readonly sets: Model<WorkoutSet>,
     private readonly progress: ProgressService,
     private readonly profiles: TrainingProfileService,
+    @Optional() private readonly plans?: PlansService,
   ) {}
 
   async summary(userId: string, today: string): Promise<TrainingSummary> {
@@ -72,8 +74,16 @@ export class TrainingSummaryService {
         }),
       };
     });
-    const records = await this.recentRecords(userId, exerciseRows, since, today);
-    return { ...weekSummary({ sessions, records, today }), weightUnit: profile.weightUnit };
+    // With a workout open, Play resumes it, so the plan's next workout is not needed.
+    const [records, nextPlanWorkout] = await Promise.all([
+      this.recentRecords(userId, exerciseRows, since, today),
+      open ? undefined : this.plans?.nextUp(userId, today),
+    ]);
+    return {
+      ...weekSummary({ sessions, records, today }),
+      weightUnit: profile.weightUnit,
+      ...(nextPlanWorkout ? { nextPlanWorkout } : {}),
+    };
   }
 
   /**

@@ -50,6 +50,11 @@ export interface WidgetQuickAction {
   /** `start-workout` starts one, `resume-workout` opens the one in progress. */
   kind: 'log-food' | 'start-workout' | 'resume-workout';
   label: string;
+  /**
+   * `start-workout` only: the plan workout to start (issue #7). Without it, an empty workout. The
+   * ids are data the button sends to `POST /training/sessions`, not a URL or a handler.
+   */
+  plan?: { planId: string; planWorkoutId: string };
 }
 
 export interface WidgetCard {

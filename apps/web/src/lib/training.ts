@@ -1,5 +1,7 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
+import { useCallback, useRef, useState } from 'react';
 import { mutate } from 'swr';
 import {
   displayToGrams,
@@ -19,7 +21,8 @@ import type {
   WeightUnit,
   WorkoutSet,
 } from '@life-portal/shared-types';
-import { useApi } from './hooks';
+import { ApiError, api } from './api';
+import { revalidate, useApi } from './hooks';
 import { todayLocal } from './local-day';
 
 /**
@@ -185,4 +188,55 @@ export function toFields(set: Partial<WorkoutSet> | undefined, unit: WeightUnit 
     duration: set?.durationSeconds !== undefined ? formatDuration(set.durationSeconds) : '',
     distance: set?.distanceMeters !== undefined ? String(set.distanceMeters) : '',
   };
+}
+
+/**
+ * Home's Play (issue #7): start the plan workout the card names, or an empty one. If the plan
+ * start is refused because the plan or its workout is gone, or the workout has no exercises
+ * (404 / 400, e.g. the plan was deleted after Home loaded), it falls back to an empty workout,
+ * as Play did before. Starting is already idempotent server-side: with a workout open, the API
+ * answers with that one (`resumed: true`) instead of a second.
+ */
+export async function startWorkoutFrom(
+  plan: { planId: string; planWorkoutId: string } | undefined,
+  day: string,
+): Promise<void> {
+  if (plan) {
+    try {
+      await api.post('/training/sessions', { requestId: crypto.randomUUID(), day, ...plan });
+      return;
+    } catch (caught) {
+      if (!(caught instanceof ApiError) || (caught.status !== 404 && caught.status !== 400)) throw caught;
+    }
+  }
+  await api.post('/training/sessions', { requestId: crypto.randomUUID(), day });
+}
+
+/**
+ * Home's Play: start (the plan workout, or empty), refresh Training and Home, then open Training.
+ * Taps while a start is in flight are ignored, so a double tap sends one request.
+ */
+export function useStartWorkout() {
+  const router = useRouter();
+  const workoutDay = useWorkoutDay();
+  const [error, setError] = useState<string | null>(null);
+  const starting = useRef(false);
+  const start = useCallback(
+    async (plan?: { planId: string; planWorkoutId: string }) => {
+      if (starting.current) return;
+      starting.current = true;
+      setError(null);
+      try {
+        await startWorkoutFrom(plan, workoutDay());
+        await Promise.all([revalidateTraining(), revalidate('/dashboard')]);
+        router.push('/training');
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : 'Could not start the workout.');
+      } finally {
+        starting.current = false;
+      }
+    },
+    [router, workoutDay],
+  );
+  return { start, error };
 }

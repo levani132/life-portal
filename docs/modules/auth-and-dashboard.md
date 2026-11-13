@@ -88,7 +88,9 @@ Projects share one overview card. The developer-only EPAM board retains a separa
 
 Quick actions (`WidgetQuickAction.kind`): `log-food` (Food: opens the log modal),
 `start-workout` and `resume-workout` (Training: start one for the browser's day, or open the one
-in progress). The API names the kind; `home-dashboard.tsx` maps it to behaviour.
+in progress). `start-workout` may carry `plan {planId, planWorkoutId}`, the plan workout to start
+(issue #7, see `training.md`); without it the workout is empty. The API names the kind;
+`home-dashboard.tsx` maps it to behaviour.
 
 ## The card order is the user's
 

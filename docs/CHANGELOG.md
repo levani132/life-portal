@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-13: Play starts your plan's next workout
+
+- **Home's training Play button follows your plan.** If you trained from a plan in the last four
+  weeks, Play starts that plan's next workout with its exercises and targets filled in, and its
+  label says which one ("Start Workout B · Full body"). With no recent plan it starts an empty
+  workout as before, and a workout in progress is still resumed, never doubled.
+
 ## 2026-11-12: Rest over, on your lock screen
 
 - **A notification when your rest is over.** With notifications on, your phone tells you when

@@ -111,4 +111,20 @@ describe('selected dashboard', () => {
     expect(open?.stats[2]).toMatchObject({ label: 'PR · Bench press', value: '220.46 lb' });
     expect(open?.quickAction?.kind).toBe('resume-workout');
   });
+  it('makes Play start the plan’s next workout when there is one (issue #7)', async () => {
+    const f = fixture(['training']);
+    f.access.forUser.mockResolvedValue({ access: { training: true } });
+    f.training.summary.mockResolvedValue({
+      workoutsThisWeek: 1,
+      secondsThisWeek: 600,
+      weightUnit: 'kg',
+      nextPlanWorkout: { planId: 'p1', planName: 'Full body', planWorkoutId: 'fb:b', workoutName: 'Workout B' },
+    });
+    const card = (await f.service.build('person', '2026-11-12')).cards.find((item) => item.id === 'training');
+    expect(card?.quickAction).toEqual({
+      kind: 'start-workout',
+      label: 'Start Workout B · Full body',
+      plan: { planId: 'p1', planWorkoutId: 'fb:b' },
+    });
+  });
 });

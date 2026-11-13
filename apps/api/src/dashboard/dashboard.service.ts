@@ -618,7 +618,14 @@ export class DashboardService {
       ],
       quickAction: training.openSessionId
         ? { kind: 'resume-workout', label: 'Resume workout' }
-        : { kind: 'start-workout', label: 'Start workout' },
+        : training.nextPlanWorkout
+          ? {
+              // Issue #7: Play starts the plan's next workout, prefilled; empty when there is none.
+              kind: 'start-workout',
+              label: `Start ${training.nextPlanWorkout.workoutName} · ${training.nextPlanWorkout.planName}`,
+              plan: { planId: training.nextPlanWorkout.planId, planWorkoutId: training.nextPlanWorkout.planWorkoutId },
+            }
+          : { kind: 'start-workout', label: 'Start workout' },
       order: 30,
     };
   }

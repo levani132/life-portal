@@ -10,6 +10,7 @@ import {
   type PlanList,
   type PlanListItem,
   type PlanTarget,
+  type NextPlanWorkout,
 } from '@life-portal/shared-types';
 import { addDays, planProgress, recentPlanIds, validatePlan, type PlanSessionRef } from '@life-portal/shared-domain';
 import plansFile from './catalogue/plans.json';
@@ -84,6 +85,16 @@ export class PlansService {
     const byId = new Map(rows.map((row) => [String(row._id), row]));
     const ordered = ids.flatMap((id) => byId.get(id) ?? []).slice(0, 3);
     return this.withProgress(userId, ordered);
+  }
+
+  /**
+   * The workout Home's Play starts (issue #7): the next workout of the most recently used plan
+   * among `suggested()`, or undefined when none was used in the last 28 days.
+   */
+  async nextUp(userId: string, today: string): Promise<NextPlanWorkout | undefined> {
+    const [plan] = await this.suggested(userId, today);
+    if (!plan?.nextWorkout) return undefined;
+    return { planId: plan.id, planName: plan.name, planWorkoutId: plan.nextWorkout.id, workoutName: plan.nextWorkout.name };
   }
 
   /** Shared rows, or rows owned by this user. Nothing else is ever readable. */

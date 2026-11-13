@@ -224,6 +224,18 @@ export interface TrainingSummary {
   weightUnit: WeightUnit;
   /** The open workout, if one is in progress: the card then offers Resume. */
   openSessionId?: string;
+  /**
+   * With nothing open: the next workout of the plan used most recently in the last 28 days (the
+   * first `GET /plans/suggested` entry), so Home's Play starts it (issue #7). Absent otherwise.
+   */
+  nextPlanWorkout?: NextPlanWorkout;
+}
+
+export interface NextPlanWorkout {
+  planId: string;
+  planName: string;
+  planWorkoutId: string;
+  workoutName: string;
 }
 
 export interface ExerciseHistory {

@@ -273,4 +273,29 @@ describe('PlansService: progress', () => {
     session(f, f.shared, 'fb:b', '2026-10-16');
     expect((await f.service.suggested(ME, '2026-11-12')).map((p) => p.name)).toEqual(['My plan', 'Full body']);
   });
+
+  it('names the next workout of the most recently used plan for Home’s Play (issue #7)', async () => {
+    const f = fixture();
+    // Nothing used, or only more than 28 days ago: Play starts an empty workout.
+    expect(await f.service.nextUp(ME, '2026-11-12')).toBeUndefined();
+    session(f, f.shared, 'fb:a', '2026-10-15');
+    expect(await f.service.nextUp(ME, '2026-11-12')).toBeUndefined();
+
+    const mine = await f.service.create(ME, { requestId: randomUUID(), ...f.input() });
+    session(f, mine.id, mine.workouts[0].id, '2026-11-10');
+    expect(await f.service.nextUp(ME, '2026-11-12')).toEqual({
+      planId: mine.id,
+      planName: 'My plan',
+      planWorkoutId: mine.workouts[1].id,
+      workoutName: 'Day 2',
+    });
+    // The cycle wraps: after the last workout comes the first again.
+    session(f, mine.id, mine.workouts[1].id, '2026-11-11');
+    expect((await f.service.nextUp(ME, '2026-11-12'))?.planWorkoutId).toBe(mine.workouts[0].id);
+
+    // A deleted plan drops out; the next most recent one is used instead.
+    session(f, f.shared, 'fb:a', '2026-11-01');
+    await f.service.remove(ME, mine.id);
+    expect(await f.service.nextUp(ME, '2026-11-12')).toMatchObject({ planId: f.shared, planWorkoutId: 'fb:b' });
+  });
 });

@@ -25,12 +25,15 @@ function fixture() {
   const progress = new ProgressService(sessions as never, workoutExercises as never, sets as never, catalogue, nutrition as never);
   const service = new SessionsService(sessions as never, workoutExercises as never, sets as never, catalogue, machines, progress);
   const profileRows = new FakeModel();
+  // The plan pick itself is `PlansService.nextUp`, tested in plans.service.spec.ts.
+  const plans = { nextUp: jest.fn().mockResolvedValue(undefined) };
   const summary = new TrainingSummaryService(
     sessions as never,
     workoutExercises as never,
     sets as never,
     progress,
     new TrainingProfileService(profileRows as never),
+    plans as never,
   );
   const bench = new Types.ObjectId();
   exercises.docs.push({
@@ -47,7 +50,7 @@ function fixture() {
     if (!open) await service.finish(ME, session.id, 'now', at(day, 18, 30));
     return session.id;
   };
-  return { summary, workout, profileRows };
+  return { summary, workout, profileRows, plans };
 }
 
 describe('TrainingSummaryService (spec 020 US4)', () => {
@@ -55,6 +58,21 @@ describe('TrainingSummaryService (spec 020 US4)', () => {
     const f = fixture();
     expect(await f.summary.summary(ME, TODAY)).toEqual({ workoutsThisWeek: 0, secondsThisWeek: 0, weightUnit: 'kg' });
     expect(f.profileRows.docs).toHaveLength(0); // reading the unit creates no profile
+  });
+
+  it('names the plan’s next workout for Play, only while nothing is open (issue #7)', async () => {
+    const f = fixture();
+    const next = { planId: 'p1', planName: 'Full body', planWorkoutId: 'fb:b', workoutName: 'Workout B' };
+    f.plans.nextUp.mockResolvedValue(next);
+    expect((await f.summary.summary(ME, TODAY)).nextPlanWorkout).toEqual(next);
+    expect(f.plans.nextUp).toHaveBeenCalledWith(ME, TODAY);
+
+    f.plans.nextUp.mockClear();
+    await f.workout(TODAY, [60_000], true);
+    const open = await f.summary.summary(ME, TODAY);
+    expect(open.openSessionId).toBeDefined();
+    expect(open.nextPlanWorkout).toBeUndefined();
+    expect(f.plans.nextUp).not.toHaveBeenCalled();
   });
 
   it('carries the person’s weight unit for the card', async () => {

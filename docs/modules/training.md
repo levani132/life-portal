@@ -357,6 +357,17 @@ Nothing is stored, so correcting or deleting a set moves every figure at once.
   the last workout ("today", "yesterday", "N days ago"; amber after a week).
 - **One action**: *Resume workout* when a session is open (opens `/training`), else *Start
   workout* (starts one for the browser's day, then opens `/training`).
+- **Play starts your plan (issue #7).** With nothing open, `TrainingSummary.nextPlanWorkout` is
+  `PlansService.nextUp`: the next workout (the usual `planProgress` rule, wrapping the cycle) of
+  the first `suggested()` plan, i.e. the plan used most recently in the last 28 days, deleted and
+  archived ones left out. There is no stored "active program"; the plan you train from is the
+  active one. The card's action is then `start-workout` with `plan {planId, planWorkoutId}` and
+  the label "Start <workout> · <plan>", and Play sends both to `POST /sessions`, which copies the
+  exercises and targets. With no such plan the action has no `plan` and Play starts an empty
+  workout, as before. If the plan start answers 404 or 400 (deleted after Home loaded, or a
+  workout with no exercises), `startWorkoutFrom` (`lib/training.ts`) starts an empty one with a
+  fresh `requestId`; any other error is shown. `useStartWorkout` ignores taps while a start is in
+  flight, and the API already answers a second start with the open session.
 - The dashboard calls the summary only when the account has `training` and selected it. Card
   `order` 30, icon `dumbbell`. Formatting (`formatRecordValue` and friends) lives in
   `libs/shared/domain/src/lib/training-format.ts`, so the server-built card reads like the page.

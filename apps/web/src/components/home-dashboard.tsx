@@ -30,7 +30,7 @@ import {
 import { api } from '../lib/api';
 import { revalidate, useApi } from '../lib/hooks';
 import { mealContextNow } from '../lib/local-day';
-import { revalidateTraining, useWorkoutDay } from '../lib/training';
+import { useStartWorkout } from '../lib/training';
 
 
 export function Dashboard() {
@@ -38,20 +38,8 @@ export function Dashboard() {
   const portal = useApi<PortalState>('/portal');
   const [logging, setLogging] = useState<MealSlot | null>(null);
   const router = useRouter();
-  const workoutDay = useWorkoutDay();
-  const [workoutError, setWorkoutError] = useState<string | null>(null);
-  // Start, then open the workout. A second tap while the first is in flight is harmless: the
-  // API answers with the session already open (one open session per person).
-  const startWorkout = useCallback(async () => {
-    setWorkoutError(null);
-    try {
-      await api.post('/training/sessions', { requestId: crypto.randomUUID(), day: workoutDay() });
-      await Promise.all([revalidateTraining(), revalidate('/dashboard')]);
-      router.push('/training');
-    } catch (caught) {
-      setWorkoutError(caught instanceof Error ? caught.message : 'Could not start the workout.');
-    }
-  }, [router, workoutDay]);
+  // Play starts the plan's next workout the card names (issue #7), or an empty one.
+  const { start: startWorkout, error: startError } = useStartWorkout();
   // The same key the log modal reads its rings from, so opening it costs one request.
   const { data: food } = useApi<{ foods: FoodWithUsage[] }>(
     logging && data ? `/nutrition?today=${data.today}&day=${data.today}` : null,
@@ -128,9 +116,9 @@ export function Dashboard() {
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="sr-only">Home</h1>
-      {(saveError || workoutError) && (
+      {(saveError || startError) && (
         <div className="mb-3" role="alert">
-          <ErrorNote message={(saveError || workoutError) as string} />
+          <ErrorNote message={(saveError || startError) as string} />
         </div>
       )}
       {cards.length === 0 ? (
@@ -165,7 +153,7 @@ export function Dashboard() {
                 card.quickAction?.kind === 'log-food'
                   ? () => setLogging(mealContextNow().slot)
                   : card.quickAction?.kind === 'start-workout'
-                    ? () => void startWorkout()
+                    ? () => void startWorkout(card.quickAction?.plan)
                     : card.quickAction?.kind === 'resume-workout'
                       ? () => router.push('/training')
                       : undefined
