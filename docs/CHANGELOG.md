@@ -2,6 +2,15 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-13: Training levels
+
+- **A level for how much you train.** Training's header shows your level and the XP to the next.
+  Every finished workout with at least three working sets and ten minutes earns XP, with a little
+  extra for more sets. The fifth and sixth workout of a week earn half, and a second workout in a
+  day earns half, so steady training is what counts. Rest days never cost anything, and there's no
+  top level: about five years of three workouts a week reaches level 100. Behind the new Training
+  levels feature (internal and developer accounts for now).
+
 ## 2026-11-13: Diet tags on food posts
 
 - **Posts say what kind of food they are.** A food post shows small tags such as *High protein*,

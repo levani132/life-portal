@@ -345,6 +345,39 @@ Nothing is stored, so correcting or deleting a set moves every figure at once.
 - **Session figures**: `bestSetOf` (highest 1RM, else load, reps, distance, time) and
   `sessionVolumeGrams`; `SessionExercise.oneRepMax` is the best estimate in that session.
 
+### Training levels (issue #5a)
+
+An uncapped level for how much you have trained, not how strong you are (strength ranks are #5b,
+blocked pending owner decisions; see `docs/ROADMAP.md`). `GET /training/level?today=` returns
+`TrainingLevel {level, xp, xpIntoLevel, xpForLevel, countedWorkouts}`. The route needs `training`
+(as every route here does) and the **`trainingLevels`** flag (on for internal and developer, off
+for production). `TrainingLevelService` reads the caller's finished sessions up to `today` and one
+grouped count of their non-warm-up sets per session; `trainingLevel()` in
+`libs/shared/domain/src/lib/training-levels.ts` does the rest. **Nothing is stored:** editing,
+deleting or backfilling a workout changes the result on the next read, and history is recalculated
+every time under the current rules.
+
+- **Meaningful workout:** finished, ≥ 3 non-warm-up sets (working, drop, failure), ≥ 10 minutes
+  (`sessionDurationSeconds`), dated on or before `today`. Open workouts don't count until finished.
+- **XP per workout:** 100, plus 2 for each non-warm-up set beyond 3, at most +20 (13 sets). Effort
+  counts a little. Kilograms don't, because they would favour heavy lifters and units over
+  consistency.
+- **Diminishing returns**, by position among workouts that earned XP:
+  - Weekly (Monday-start): the first 4 earn full XP, the 5th and 6th half, any more nothing.
+  - Daily: a second workout on one day earns half, a third nothing.
+  - A workout that earns nothing doesn't use up a weekly slot.
+  - No hard daily or weekly cap on training itself, and no incentive to do more than about six a week.
+- **Rest is never penalised.** There's no decay, streak or missed-week cost; deloads and breaks
+  simply earn nothing.
+- **Curve:** going from level L to L+1 needs `17 × L` XP, so reaching L takes `17 × L(L−1)/2`. A
+  first workout is about level 4, a month at three a week about level 12, a year about 45. 780
+  workouts (five years at three a week, 8 sets each, 110 XP) give about level 100, ten years about
+  142. There is no maximum. `TRAINING_LEVEL_CONFIG` holds every constant, and the tests pin the
+  calibration (95–105 at 780 workouts).
+- **Shown** in Training's header (`training-hero.tsx`) as "Level N" with XP to the next level and
+  a progress bar, own view only. Not on profiles or in leaderboards yet. #6's exercise statistics
+  will link to it, never show it as an exercise metric.
+
 ### The Home card (US4)
 
 `weekSummary` (domain) over what `TrainingSummaryService` gathers; nothing stored.

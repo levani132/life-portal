@@ -1,7 +1,7 @@
 'use client';
 
-import { Clock, Flame, Trophy, Zap } from 'lucide-react';
-import type { TrainingSummary } from '@life-portal/shared-types';
+import { Clock, Flame, Star, Trophy, Zap } from 'lucide-react';
+import type { PortalState, TrainingLevel, TrainingSummary } from '@life-portal/shared-types';
 import { formatRecordValue } from '@life-portal/shared-domain';
 import { useApi } from '../../lib/hooks';
 import { useWorkoutDay } from '../../lib/training';
@@ -62,8 +62,47 @@ export function TrainingHero({ hideWhileTraining = false }: { hideWhileTraining?
             <Stat icon={<Zap className="h-4 w-4" />} value={data?.openSessionId ? 'Now' : lastLabel(data?.daysSinceLast)} label="last workout" />
           )}
         </dl>
+        <LevelBar today={today} />
       </div>
     </section>
+  );
+}
+
+/**
+ * The uncapped training level (issue #5a), with the `trainingLevels` flag: a measure of how much
+ * you have trained, not how strong you are, so it never sits next to a strength figure. Hidden
+ * until it loads, and when the flag is off.
+ */
+function LevelBar({ today }: { today: string }) {
+  const portal = useApi<PortalState>('/portal');
+  const enabled = !!portal.data?.access.trainingLevels;
+  const { data } = useApi<TrainingLevel>(enabled ? `/training/level?today=${today}` : null);
+  if (!enabled || !data) return null;
+  const toNext = data.xpForLevel - data.xpIntoLevel;
+  return (
+    <div className="mt-3 rounded-xl bg-white/15 px-3 py-2 backdrop-blur-sm">
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <span className="flex items-center gap-1.5 font-bold">
+          <Star className="h-4 w-4 text-white/80" aria-hidden /> Level {data.level}
+        </span>
+        <span className="truncate text-[11px] tabular-nums text-white/80">
+          {toNext} XP to level {data.level + 1}
+        </span>
+      </div>
+      <div
+        className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/25"
+        role="progressbar"
+        aria-label={`Training level ${data.level}: ${data.xpIntoLevel} of ${data.xpForLevel} XP`}
+        aria-valuemin={0}
+        aria-valuemax={data.xpForLevel}
+        aria-valuenow={data.xpIntoLevel}
+      >
+        <div
+          className="h-full rounded-full bg-white transition-[width] duration-500 motion-reduce:transition-none"
+          style={{ width: `${Math.round((data.xpIntoLevel / data.xpForLevel) * 100)}%` }}
+        />
+      </div>
+    </div>
   );
 }
 

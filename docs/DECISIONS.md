@@ -1479,3 +1479,23 @@ lasts minutes: losing a pending alarm on a restart costs one missed reminder, an
 would persist something derived. **Cost:** with more than one API instance, an alarm lives on
 whichever instance received the last update; it still fires once.
 
+## 2026-11-13: Training levels are computed on read, from your own finished workouts (issue #5a)
+
+**Decision.** An uncapped level from XP for meaningful finished workouts:
+- 100 XP each, plus up to +20 for extra sets.
+- Weekly and daily diminishing returns: 4 full a week, then 2 half; a second workout in a day earns half.
+- A quadratic curve: `17 × L` XP from level L to L+1.
+- Computed by a pure function on every read; nothing about it is stored.
+
+**Why.**
+- **Deriving it** (principle III) means edits, deletions and backfilled history need no special
+  handling and the rules can change without a migration.
+- **Sets rather than kilograms** for the bonus, because XP measures participation, not strength.
+- **Diminishing returns rather than a cap**, so farming earns little, nobody is pushed past about
+  six sessions a week, and rest is never penalised.
+- **The quadratic curve** gives quick early levels and about level 100 after five years at three a
+  week (the owner's calibration target), with no maximum.
+
+**Also decided.** Strength ranks (#5b) are not built: using other members' private training data,
+the cohort threshold and the reference data need explicit owner approval first.
+

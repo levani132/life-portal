@@ -31,6 +31,7 @@ import { ProgressService } from './progress.service';
 import { NutritionModule } from '../nutrition/nutrition.module';
 import { TrainingProfileService } from './profile.service';
 import { SessionsService } from './sessions.service';
+import { TrainingLevelService } from './level.service';
 import { TrainingSummaryService } from './summary.service';
 import { RestAlarmService } from './rest-alarm.service';
 import { Today } from '../common/today';
@@ -99,12 +100,19 @@ export class TrainingController {
     private readonly summaries: TrainingSummaryService,
     private readonly plans: PlansService,
     private readonly alarms: RestAlarmService,
+    private readonly levels: TrainingLevelService,
   ) {}
 
   /** The Home card's figures, for the person's `today` (spec 020 US4). */
   @Get('summary')
   summary(@CurrentUser('userId') userId: string, @Today() today: string) {
     return this.summaries.summary(userId, today);
+  }
+
+  /** The caller's uncapped training level (issue #5a); 403 without `trainingLevels`. */
+  @Get('level')
+  level(@CurrentUser('userId') userId: string, @Today() today: string) {
+    return this.levels.level(userId, today);
   }
 
   // ---------------------------------------------------------------- profile
@@ -397,7 +405,7 @@ export class TrainingController {
     ]),
   ],
   controllers: [TrainingController],
-  providers: [CatalogueSeeder, PlanSeeder, PlansService, CatalogueService, MachinesService, ProgressService, TrainingProfileService, SessionsService, TrainingSummaryService, RestAlarmService],
+  providers: [CatalogueSeeder, PlanSeeder, PlansService, CatalogueService, MachinesService, ProgressService, TrainingProfileService, SessionsService, TrainingSummaryService, RestAlarmService, TrainingLevelService],
   exports: [SessionsService, TrainingSummaryService],
 })
 export class TrainingModule {}

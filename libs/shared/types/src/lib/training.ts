@@ -496,3 +496,20 @@ export interface PlannedExercise {
   note?: string;
   targets: PlanTarget[];
 }
+
+/**
+ * The member's training level (issue #5a): uncapped, from meaningful finished workouts, computed
+ * on read by `trainingLevel` in the domain lib. Never stored. Own view only; not a strength rank.
+ */
+export interface TrainingLevel {
+  level: number;
+  /** All XP earned, ever. */
+  xp: number;
+  /** XP earned since reaching `level`. */
+  xpIntoLevel: number;
+  /** XP this level needs in all, to reach `level + 1`. */
+  xpForLevel: number;
+  /** Finished workouts that earned XP (meaningful and within the weekly and daily limits). */
+  countedWorkouts: number;
+}
+

@@ -72,7 +72,15 @@ search, connection actions and money widget sharing have their own tests.
    (spec 023, complete 2026-11-12), 3 training UI overhaul: colour by muscle group and plan, a weekly
    header, progress in the open workout, History by week (spec 024, complete 2026-11-12), workout flow: duplicate days, done/current
    exercises, rest per exercise, supersets, a pinned workout bar (spec 025, complete 2026-11-12),
-   4 strength ranks and levels,
+   4 strength ranks and levels: **levels done** (#5a, `trainingLevels` flag); **strength ranks
+   (#5b) blocked** on owner decisions about using other members' private workout data
+   (opt-in or not, minimum cohort size), the cold-start reference (OpenPowerlifting covers only
+   squat, bench and deadlift for competitive lifters; proprietary standards can't be copied), and
+   whether to require sex and a recent weigh-in for body-weight normalisation (options in #5).
+   *Later, not built:* ranks and levels may become a modest credibility signal for creators'
+   training content in For You, with relevance and quality staying primary, no suppression of
+   beginners, imported ("verified") workouts weighted over self-reported ones, and resistance to
+   gamed logs.
    5 workout posts and friend leaderboards, then programs, with paid programs last.
 6. **Video through a service.** 014 records 30-second clips in the app and stores them as-is.
    Next: transcoding through Mux or Cloudflare Stream so every clip plays everywhere, library
