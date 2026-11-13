@@ -465,7 +465,7 @@ weigh-in. A set more than 1.5× where Legend starts is taken as a logging error 
 (`excluded.implausible`). Only the exact catalogue rows below (by `seedKey`) are ranked; own
 exercises and everything else say so (`no_benchmark`). Units don't matter: everything is grams.
 
-**Coverage and thresholds (v1-rc1).** 287 catalogue exercises, each with its load convention
+**Coverage and thresholds (v1).** 287 catalogue exercises, each with its load convention
 and evidence label. Isolation, dumbbell, kettlebell, machine, cable and endurance standards are
 **provisional**: ratios to a main lift, not tables of their own, and the UI says so. The full table
 and the reasons for each excluded group are in [rank-standards.md](rank-standards.md). The main
@@ -574,10 +574,11 @@ lost by changing the data it came from, never by a benchmark change.
 **Benchmarks and versions.** `RANK_BENCHMARKS` lists every version with the day it starts
 applying. Stable by default: a version that is not a draft is never edited; any recalibration is a
 new version with a later `from`, reviewed and manual, and earlier sets keep the version of their
-day. **v1 is a draft** (`v1-rc1`, release candidate 1, applies to all history; it replaced `v1-draft-3`, `v1-draft-2` and `v1-draft`): the thresholds are the app's
-proposal for owner review, not measured from LifePortal members and not competition records, and
-the UI says so. Draft values may change before v1 is fixed, and ranks shown under the draft
-change with them; this is the one exception to the stability rule and ends when v1 is frozen.
+day. **v1 is frozen** (`draft: false`, applies to all history): release candidate `v1-rc1` promoted
+unchanged on the owner's approval (#5, 2026-11-13), after `v1-draft`, `v1-draft-2` and
+`v1-draft-3`. A test pins v1's fingerprint, so an edit fails the build. The thresholds are not
+measured from LifePortal members and are not competition records, and the UI says they are fixed
+standards. `v1-rc1` resolves to `v1` (`canonicalRankVersion`).
 
 **Tournaments (#12, in progress):** opt-in **monthly** tournaments among members with a similar
 current rank, in separate men's and women's categories, behind the `tournaments` flag. Entries,

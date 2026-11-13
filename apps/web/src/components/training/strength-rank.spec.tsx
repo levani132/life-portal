@@ -122,3 +122,11 @@ it('says plainly that a machine rank is a personal benchmark, not comparable acr
   expect(screen.getByText('Machine rank: a rough personal benchmark, not comparable across gyms.')).toBeTruthy();
   expect(screen.getByText(/stack ratios, cams/)).toBeTruthy();
 });
+
+it('says fixed standards are fixed, and drops the draft warning', () => {
+  responses['/portal'] = access(true);
+  responses[RANK_URL] = view({ benchmark: { ...benchmark, version: 'v1', draft: false } });
+  render(<StrengthRank exerciseId="e1" today="2026-11-13" />);
+  expect(screen.getByText(/Standards v1 are fixed/)).toBeTruthy();
+  expect(screen.queryByText(/may still change before they are fixed/)).toBeNull();
+});

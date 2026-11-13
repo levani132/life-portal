@@ -73,10 +73,10 @@ search, connection actions and money widget sharing have their own tests.
    header, progress in the open workout, History by week (spec 024, complete 2026-11-12), workout flow: duplicate days, done/current
    exercises, rest per exercise, supersets, a pinned workout bar (spec 025, complete 2026-11-12),
    4 strength ranks and levels: **levels done** (#5a, `trainingLevels` flag); **strength ranks
-   built with draft standards** (#5b, `trainingRanks` flag, off for production; 287 exercises in
-   `v1-rc1`, release candidate 1, ratio-based ones labelled provisional): personal,
+   built** (#5b, `trainingRanks` flag, off for production; 287 exercises in frozen standards
+   `v1`, ratio-based ones labelled provisional): personal,
    per exercise, against fixed versioned standards, never other members' data; current (90 days)
-   and highest-ever ranks. Freezing v1 thresholds waits on owner review. *In progress (#12):*
+   and highest-ever ranks. v1 frozen 2026-11-13; production rollout waits on a separate go-ahead. *In progress (#12):*
    opt-in **monthly** tournaments (calendar-month seasons) among similarly ranked members. Built
    behind `tournaments`: UTC calendar, men's and women's categories with explicit consent,
    lock-time snapshot and groups, scoring (owner formula), live standings and frozen results,

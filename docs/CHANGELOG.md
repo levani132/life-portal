@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-13: Strength standards v1 are fixed
+
+- **The rank standards are final for v1.** A future change will come as a new version and never
+  takes away a rank you have reached. The rank details say so instead of "draft".
+- Ranks are still behind a flag.
+
 ## 2026-11-13: Weighted pull-ups and dips count your body weight
 
 - **Weighted pull-ups, bar and ring dips, suspended rows and similar** now count your body weight

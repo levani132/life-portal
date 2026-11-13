@@ -168,6 +168,12 @@ function Ranked({ view, unit, onChangeStandards }: { view: ExerciseRankView; uni
           </p>
           <p>{benchmark.basis}</p>
           {benchmark.draft && <p className="text-amber-600 dark:text-amber-400">Draft standards ({benchmark.version}): they may still change before they are fixed.</p>}
+          {!benchmark.draft && (
+            <p>
+              Standards {benchmark.version} are fixed. A later change comes as a new version, and never takes away a rank
+              you have reached.
+            </p>
+          )}
           {(view.excluded.implausible > 0 || view.excluded.machine > 0) && (
             <p>
               Not counted: {[view.excluded.machine && `${view.excluded.machine} set(s) with a machine attached (this standard is for the free-weight lift)`, view.excluded.implausible && `${view.excluded.implausible} set(s) beyond a plausible range`].filter(Boolean).join(', ')}.

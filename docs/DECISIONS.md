@@ -1722,3 +1722,18 @@ public evidence and propose a named release candidate, without enabling producti
   of the bench. The bent-over low-pulley lateral was dropped: its divisions are about 1 kg apart,
   finer than stack plates.
 - **v1-rc1** is the name for review. Still `draft: true`; freezing it is the owner's go/no-go.
+
+## 2026-11-13: Strength standards v1 frozen (issue #5)
+
+The owner approved promoting `v1-rc1` to official `v1`. It is the same definition: 287 standards
+with the same thresholds, mappings, load notes and labels. A test checks a sha256 fingerprint of
+the content, taken from `v1-rc1` before the promotion.
+
+- **Why a fingerprint test.** Nothing else stops an innocent-looking ratio edit from moving every
+  rank. A failing fingerprint says plainly that a frozen version was touched; the fix is a new
+  version, not a new fingerprint.
+- **Why an alias instead of keeping the old name.** "rc1" in the UI and API would read as
+  unfinished. `v1-rc1` → `v1` keeps any record made under the old name (a tournament entry's
+  `lockedVersion`) resolving to the same standard, so it is not treated as a replaced draft.
+- **What freezing does not do.** `trainingRanks` stays off in production, and weight-only sets
+  logged before catalogue v2 stay as logged.

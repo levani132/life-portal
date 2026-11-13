@@ -1,6 +1,8 @@
+import { createHash } from 'node:crypto';
 import { RANK_TIERS } from '@life-portal/shared-types';
 import {
   RANK_BENCHMARKS,
+  canonicalRankVersion,
   exerciseRank as rankWith,
   milestoneStarts,
   rankLabel,
@@ -191,7 +193,7 @@ describe('strength ranks (#5b)', () => {
   });
 });
 
-describe('published standards: stress profiles (v1-rc1)', () => {
+describe('published standards: stress profiles (v1)', () => {
   const v = RANK_BENCHMARKS[RANK_BENCHMARKS.length - 1];
   const tierOf = (seedKey: string, standards: 'men' | 'women', weightKg: number, reps: number, bodyKg: number) => {
     const standard = v.exercises[seedKey];
@@ -280,7 +282,7 @@ describe('published standards: stress profiles (v1-rc1)', () => {
   });
 });
 
-describe('catalogue coverage (v1-rc1)', () => {
+describe('catalogue coverage (v1)', () => {
   const v = RANK_BENCHMARKS[RANK_BENCHMARKS.length - 1];
   const published = (input: Parameters<typeof rankWith>[0]) => rankWith(input, RANK_BENCHMARKS);
 
@@ -450,5 +452,39 @@ describe('plausibility grid (#5 release candidate)', () => {
       expect([key, sex, 'intermediate', Math.abs(tier(intermediate) - T('Achiever')) <= 1]).toEqual([key, sex, 'intermediate', true]);
       if (elite) expect([key, sex, 'elite', Math.abs(tier(elite) - T('Elite')) <= 1]).toEqual([key, sex, 'elite', true]);
     }
+  });
+});
+
+describe('frozen v1 (owner approval, #5)', () => {
+  /** JSON with keys sorted at every level, so the fingerprint depends on content only. */
+  const stable = (value: unknown): string =>
+    Array.isArray(value)
+      ? `[${value.map(stable).join(',')}]`
+      : value && typeof value === 'object'
+        ? `{${Object.keys(value)
+            .sort()
+            .map((key) => `${JSON.stringify(key)}:${stable((value as Record<string, unknown>)[key])}`)
+            .join(',')}}`
+        : JSON.stringify(value);
+
+  it('is v1, not a draft, from the start of time', () => {
+    expect(RANK_BENCHMARKS).toHaveLength(1);
+    expect(RANK_BENCHMARKS[0]).toMatchObject({ version: 'v1', draft: false, from: '0000-01-01' });
+  });
+
+  it('is exactly v1-rc1: 287 standards, thresholds, mappings, notes and labels unchanged', () => {
+    // Fingerprint of v1-rc1 (commit 1e5a70f), taken before the promotion. v1 must never change:
+    // a failure here means a frozen version was edited. Publish a new version instead.
+    const v1 = RANK_BENCHMARKS.find((version) => version.version === 'v1');
+    expect(Object.keys(v1?.exercises ?? {})).toHaveLength(287);
+    expect(createHash('sha256').update(stable(v1?.exercises)).digest('hex')).toBe(
+      'a1374d9ffd4f4d2351ab36f95ffea939720b725bf66161f8afd8a3649e3b77b1',
+    );
+  });
+
+  it('resolves the release-candidate name to v1', () => {
+    expect(canonicalRankVersion('v1-rc1')).toBe('v1');
+    expect(canonicalRankVersion('v1')).toBe('v1');
+    expect(canonicalRankVersion('v2')).toBe('v2');
   });
 });

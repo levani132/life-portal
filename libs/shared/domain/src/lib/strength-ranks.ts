@@ -163,7 +163,7 @@ const PULL_UP = bw(0, 0.85, 1.05, 1.2, 1.35, 1.55, 1.75, 1.95);
 /** Bar dips: a few more reps than pull-ups at each level, so slightly higher multiples. */
 const DIP = bw(0, 0.85, 1.15, 1.4, 1.65, 1.9, 2.1, 2.3);
 
-const STANDARDS_V1_RC1: Record<string, ExerciseStandard> = {
+const STANDARDS_V1: Record<string, ExerciseStandard> = {
   // Squat and hinge
   'fedb:Barbell_Squat': lift(BACK_SQUAT, 'legs', { note: BAR }),
   'fedb:Barbell_Full_Squat': lift(BACK_SQUAT, 'legs', { note: BAR }),
@@ -488,24 +488,35 @@ const STANDARDS_V1_RC1: Record<string, ExerciseStandard> = {
 };
 
 /**
- * Every published benchmark, oldest first. A version is never edited once it is no longer a
- * draft: a change is a new version with a later `from`, so ranks earned under an older one stand.
- * Drafts are replaced in place until the owner freezes v1 (docs/modules/training.md).
+ * Every published benchmark, oldest first. **v1 is frozen** (owner approval on #5, 2026-11-13):
+ * it is `v1-rc1` promoted unchanged, and `strength-ranks.spec.ts` pins its fingerprint. A version
+ * that is not a draft is never edited. Any change is a new, separately named version with a later
+ * `from` and a documented migration: highest-ever ranks keep the version of their day, and a
+ * tournament season keeps the standard copied at its lock.
  */
 export const RANK_BENCHMARKS: readonly BenchmarkVersion[] = [
   {
-    version: 'v1-rc1',
-    draft: true,
+    version: 'v1',
+    draft: false,
     from: '0000-01-01',
     basis:
-      'Release candidate 1, still a draft until the owner freezes it. Informed by published coaching ' +
-      'standards and app-user tables, ' +
+      'Strength standards v1, informed by published coaching standards and app-user tables, ' +
       'with the top tier kept below world-record lifts. Your estimated one-rep max is scaled to an 80 kg ' +
       '(men) or 60 kg (women) body weight with a 2/3 exponent. Not measured from LifePortal members, ' +
       'and not percentiles of anyone.',
-    exercises: STANDARDS_V1_RC1,
+    exercises: STANDARDS_V1,
   },
 ];
+
+/**
+ * Names a version was published under before it was renamed without any change to its content.
+ * `v1-rc1` was promoted to `v1` unchanged, so anything recorded under `v1-rc1` (a tournament entry's
+ * `lockedVersion`) resolves to `v1`.
+ */
+export const RANK_VERSION_ALIASES: Readonly<Record<string, string>> = { 'v1-rc1': 'v1' };
+
+/** A version name with its alias resolved. */
+export const canonicalRankVersion = (version: string) => RANK_VERSION_ALIASES[version] ?? version;
 
 /**
  * How load is entered for a shared catalogue exercise under the newest standards ("The weight of

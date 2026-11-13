@@ -87,10 +87,10 @@ tournamentScore  = best × (1 + improvementBonus)
   `lockedStandard` (version, method, measure, both categories' tier starts, machine) next to
   `lockedVersion`; every entry of a lock gets the same version, because they all rank on the day
   before the season. The baseline and every later score use that copy (`tournamentStandard`), and
-  sets are read under its measure, so a new release candidate, a replaced draft or a catalogue
-  measure change never switches a season mid-way. Only an entry locked before copies were kept
-  (none exist: the flag has been off) falls back to its version name; if that draft is gone, the
-  current version scores and the bonus is **withheld** (`bonusWithheld: 'standards_changed'`).
+  sets are read under its measure, so a new version or a catalogue measure change never switches a
+  season mid-way. Only an entry locked before copies were kept (none exist: the flag has been off)
+  falls back to its version name, with `v1-rc1` read as `v1`; if that version is gone, the current
+  one scores and the bonus is **withheld** (`bonusWithheld: 'standards_changed'`).
 - **Places.** Descending tournament score within the group (`placeStandings`). Exactly equal
   scores share a place (1, 1, 3), with no tie-break by volume or workouts. A member without a
   valid set this season has no score and no place, and is listed last.

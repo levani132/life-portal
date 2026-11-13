@@ -1,10 +1,16 @@
-# Rank standards (v1-rc1)
+# Rank standards (v1)
 
-Every exercise strength ranks cover, from `STANDARDS_V1_RC1` in
+Every exercise strength ranks cover, from `STANDARDS_V1` in
 `libs/shared/domain/src/lib/strength-ranks.ts`; the rules are in [training](training.md),
-"Strength ranks". **Release candidate 1 for owner review (#5): still a draft, not frozen, and the
-`trainingRanks` flag stays off in production.** Regenerate the thresholds table when the
-standards change. `rank-standards.catalogue.spec.ts` checks every row against the catalogue.
+"Strength ranks". **v1 is frozen** (owner approval on #5, 2026-11-13): it is release candidate
+`v1-rc1` promoted unchanged, and a test pins its fingerprint. The `trainingRanks` flag stays off
+in production; freezing the standards is not approval to roll out.
+
+**Changing standards after v1.** Never edit v1. Publish a new, separately named version with a
+later `from`, a regenerated table and a documented migration. Highest-ever ranks keep the version
+of their day, and tournament seasons keep the standard copied at their lock. `v1-rc1` remains an
+alias of `v1` (`RANK_VERSION_ALIASES`), so anything recorded under that name resolves to the same
+standard. `rank-standards.catalogue.spec.ts` checks every row against the catalogue.
 
 The figures are standards, not percentiles: no LifePortal data went into them, and no tier
 claims a share of lifters.
@@ -115,7 +121,7 @@ Automated checks (`strength-ranks.spec.ts`, "plausibility grid"):
 5. **Machines** are never cross-gym comparable (disclosed). Fixing that needs per-machine
    calibration, which the app does not have.
 
-No exception blocks a release candidate; each is disclosed or labelled.
+None blocked freezing v1; each is disclosed or labelled.
 
 ## How load is entered
 
@@ -128,7 +134,7 @@ shown wherever the weight is typed.
 ## Tournaments
 
 A tournament season copies its scoring standard (thresholds, method, measure) onto each entry at
-the lock (`lockedStandard`) and is scored under that copy to the end. A new release candidate,
+the lock (`lockedStandard`) and is scored under that copy to the end. A new version,
 a replaced draft or a catalogue measure change never switches a season already under way. See
 [tournaments](tournaments.md).
 

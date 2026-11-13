@@ -4,6 +4,7 @@ import {
   RANK_BENCHMARKS,
   RANK_WINDOW_DAYS,
   benchmarkFor,
+  canonicalRankVersion,
   sessionResults,
   type BenchmarkVersion,
   type ExerciseStandard,
@@ -101,12 +102,13 @@ export function tournamentStandard(
     const { version, ...standard } = locked;
     return { standard, version, changed: false };
   }
-  const lockedVersion = locked;
-  const named = lockedVersion ? versions.find((version) => version.version === lockedVersion) : undefined;
+  const lockedVersion = typeof locked === 'string' ? locked : undefined;
+  const wanted = lockedVersion ? canonicalRankVersion(lockedVersion) : undefined;
+  const named = wanted ? versions.find((version) => version.version === wanted) : undefined;
   const chosen = named ?? benchmarkFor(today, versions);
   const standard = chosen.exercises[seedKey];
   if (!standard || standard.measure !== measure) return undefined;
-  return { standard, version: chosen.version, changed: !!lockedVersion && chosen.version !== lockedVersion };
+  return { standard, version: chosen.version, changed: !!wanted && chosen.version !== wanted };
 }
 
 /** The days a season's baseline and its competition are measured over. */

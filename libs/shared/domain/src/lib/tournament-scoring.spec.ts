@@ -108,6 +108,11 @@ describe('scoring windows and standards', () => {
     expect(tournamentStandard(undefined, 'weight_reps', 'a', '2026-12-20', versions)).toBeUndefined();
   });
 
+  it('treats an entry locked under v1-rc1 as v1: same standard, bonus kept', () => {
+    const v1: BenchmarkVersion = { version: 'v1', draft: false, from: '0000-01-01', basis: '', exercises: { bench: STANDARD } };
+    expect(tournamentStandard('bench', 'weight_reps', 'v1-rc1', '2026-12-20', [v1])).toMatchObject({ version: 'v1', changed: false, standard: STANDARD });
+  });
+
   it('scores a season under its copy from the lock, unchanged by any later version or measure (#5)', () => {
     const frozen = freezeStandard('a', { ...STANDARD, note: 'not scoring', provisional: true });
     expect(frozen).toEqual({ version: 'a', method: STANDARD.method, measure: STANDARD.measure, starts: STANDARD.starts });

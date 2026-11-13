@@ -64,7 +64,7 @@ describe('TrainingRankService (issue #5b)', () => {
       status: 'ranked',
       current: { tier: 'Achiever', division: 'II', score: 1250, basis: { bodyWeightGrams: 80_000, bodyWeightDay: '2026-11-01' } },
       excluded: { machine: 1 },
-      benchmark: { version: 'v1-rc1', draft: true, standards: 'men' },
+      benchmark: { version: 'v1', draft: false, standards: 'men' },
     });
   });
 
