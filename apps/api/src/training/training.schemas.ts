@@ -8,6 +8,7 @@ import {
   PLAN_TARGET_TYPES,
   SET_TYPES,
   WEIGHT_UNITS,
+  RANK_STANDARDS,
   type PlanTargetType,
 } from '@life-portal/shared-types';
 import { baseSchemaOptions, requiredDayField } from '../common/mongoose';
@@ -97,6 +98,8 @@ export class TrainingProfile {
   @Prop({ required: true, enum: WEIGHT_UNITS, default: 'kg' }) weightUnit!: string;
   @Prop({ required: true, min: 0, max: 900, default: 90, validate: integerValidator })
   defaultRestSeconds!: number;
+  /** Strength-rank standards (issue #5b), the member's own choice; absent until chosen. */
+  @Prop({ enum: RANK_STANDARDS }) rankStandards?: string;
 }
 
 export const TrainingProfileSchema = SchemaFactory.createForClass(TrainingProfile);

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
-import type { TrainingProfile as TrainingProfileDto, WeightUnit } from '@life-portal/shared-types';
+import type { RankStandards, TrainingProfile as TrainingProfileDto, WeightUnit } from '@life-portal/shared-types';
 import { TrainingProfile } from './training.schemas';
 
 const DEFAULTS: TrainingProfileDto = { weightUnit: 'kg', defaultRestSeconds: 90 };
@@ -20,11 +20,7 @@ export class TrainingProfileService {
 
   /** The profile without creating a row, for reads elsewhere (the Home card). */
   async read(userId: string): Promise<TrainingProfileDto> {
-    const row = await this.profiles.findOne({ userId }).lean();
-    return {
-      weightUnit: (row?.weightUnit ?? DEFAULTS.weightUnit) as WeightUnit,
-      defaultRestSeconds: row?.defaultRestSeconds ?? DEFAULTS.defaultRestSeconds,
-    };
+    return toDto(await this.profiles.findOne({ userId }).lean());
   }
 
   get(userId: string): Promise<TrainingProfileDto> {
@@ -42,8 +38,9 @@ export class TrainingProfileService {
     const set: Partial<TrainingProfileDto> = {};
     if (patch.weightUnit !== undefined) set.weightUnit = patch.weightUnit;
     if (patch.defaultRestSeconds !== undefined) set.defaultRestSeconds = patch.defaultRestSeconds;
+    if (patch.rankStandards !== undefined) set.rankStandards = patch.rankStandards;
     const onInsert: Record<string, unknown> = { userId };
-    for (const [key, value] of Object.entries(DEFAULTS)) {
+    for (const [key, value] of Object.entries(DEFAULTS) as [string, unknown][]) {
       if (!(key in set)) onInsert[key] = value;
     }
     const row = await this.profiles
@@ -53,9 +50,14 @@ export class TrainingProfileService {
         { upsert: true, new: true, runValidators: true },
       )
       .lean();
-    return {
-      weightUnit: (row?.weightUnit ?? DEFAULTS.weightUnit) as WeightUnit,
-      defaultRestSeconds: row?.defaultRestSeconds ?? DEFAULTS.defaultRestSeconds,
-    };
+    return toDto(row);
   }
+}
+
+function toDto(row: { weightUnit?: string; defaultRestSeconds?: number; rankStandards?: string } | null): TrainingProfileDto {
+  return {
+    weightUnit: (row?.weightUnit ?? DEFAULTS.weightUnit) as WeightUnit,
+    defaultRestSeconds: row?.defaultRestSeconds ?? DEFAULTS.defaultRestSeconds,
+    ...(row?.rankStandards ? { rankStandards: row.rankStandards as RankStandards } : {}),
+  };
 }

@@ -1549,3 +1549,26 @@ deletes the account's keys. The metrics never feed ranking.
 
 **Not met / open.** A post with one known viewer still shows a count of one to the developer.
 There is no per-IP or bot defence beyond per-account limits. Rollout needs a separate decision.
+
+## 2026-11-13: Strength ranks are personal, fixed-standard and derived (issue #5b)
+
+**Decision.** Rank each standard lift against **fixed, versioned published standards** (an
+allometrically scaled Epley one-rep max, or reps for push-ups), never against other members.
+Show a **current** rank (best valid set in 90 days; none → inactive, never lower) and a
+**highest-ever** rank (each set judged by the benchmark version of its day). **Store nothing:**
+both are recomputed from the member's own sets and weigh-ins on every read. Standards (men's or
+women's) are the member's own explicit choice in the training profile.
+
+**Why.**
+- **Owner decision**: fixed benchmarks replaced live population percentiles, so no cross-member
+  data is collected and workouts stay private.
+- **Derived, not persisted**: edits, deletions, backfills and corrected weigh-ins need no special
+  handling, and "never lost to a later benchmark" holds because old versions stay in code with their
+  date ranges. Persisting achievements would have kept ranks earned from data later found wrong.
+- **2/3 exponent** rather than load ÷ body weight, which over-rewards light lifters; no height or
+  age, which would need evidence and data we don't have.
+- **An explicit standards choice** rather than reading `sex` from the Food profile: a training rank
+  should not quietly depend on a nutrition field, and the member can see and change it.
+
+**Open, for the owner.** The v1 thresholds are a draft (`v1-draft`) until reviewed; whether two
+standards sets (and these references, 80 kg and 60 kg) are the right categories; the exercise list.

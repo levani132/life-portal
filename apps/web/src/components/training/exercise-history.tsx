@@ -30,6 +30,7 @@ import {
   useWorkoutDay,
 } from '../../lib/training';
 import { SetLine } from './set-row';
+import { StrengthRank, TrainingLevelLink } from './strength-rank';
 
 /**
  * One exercise's statistics (issue #6), shared by the workout and the library: key figures, a
@@ -86,10 +87,12 @@ export function ExerciseHistory({ exerciseId }: { exerciseId: string }) {
   return (
     <div className="space-y-4">
       <KeyFigures view={view} unit={unit} />
+      <StrengthRank exerciseId={exerciseId} today={today} />
       <ProgressChart view={view} unit={unit} range={range} onRange={setRange} loading={progress.isValidating} />
       {view.nextRecord && <NextRecordCard next={view.nextRecord} unit={unit} />}
       {view.records.length > 0 && <Records records={view.records} unit={unit} />}
       <Sessions exerciseId={exerciseId} measure={view.exercise.measure} />
+      <TrainingLevelLink today={today} />
     </div>
   );
 }

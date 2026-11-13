@@ -73,10 +73,10 @@ search, connection actions and money widget sharing have their own tests.
    header, progress in the open workout, History by week (spec 024, complete 2026-11-12), workout flow: duplicate days, done/current
    exercises, rest per exercise, supersets, a pinned workout bar (spec 025, complete 2026-11-12),
    4 strength ranks and levels: **levels done** (#5a, `trainingLevels` flag); **strength ranks
-   (#5b) blocked** on owner decisions about using other members' private workout data
-   (opt-in or not, minimum cohort size), the cold-start reference (OpenPowerlifting covers only
-   squat, bench and deadlift for competitive lifters; proprietary standards can't be copied), and
-   whether to require sex and a recent weigh-in for body-weight normalisation (options in #5).
+   built with draft standards** (#5b, `trainingRanks` flag, off for production): personal,
+   per exercise, against fixed versioned standards, never other members' data; current (90 days)
+   and highest-ever ranks. Freezing v1 thresholds waits on owner review. *Later, separate scope:*
+   opt-in **monthly** tournaments (calendar-month seasons) among similarly ranked members.
    *Later, not built:* ranks and levels may become a modest credibility signal for creators'
    training content in For You, with relevance and quality staying primary, no suppression of
    beginners, imported ("verified") workouts weighted over self-reported ones, and resistance to

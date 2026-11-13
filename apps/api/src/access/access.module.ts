@@ -64,6 +64,7 @@ class FeatureOverridesDto {
   @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() trainingLevels?: boolean;
   @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() forYouRanking?: boolean;
   @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() forYouMetrics?: boolean;
+  @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() trainingRanks?: boolean;
   @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() training?: boolean;
   @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() social?: boolean;
   @ValidateIf((_, value: unknown) => value !== undefined)

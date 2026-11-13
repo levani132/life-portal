@@ -139,6 +139,8 @@ export interface Machine {
 export interface TrainingProfile {
   weightUnit: WeightUnit;
   defaultRestSeconds: number;
+  /** Strength-rank standards (issue #5b); absent until the member chooses. */
+  rankStandards?: RankStandards;
 }
 
 // ------------------------------------------------------------------ sessions
@@ -562,3 +564,89 @@ export interface ExerciseProgressView {
   records: RecordEntry[];
 }
 
+
+// ------------------------------------------------------------------ strength ranks (issue #5b)
+
+/** Eight tiers, lowest first, each in three divisions III → II → I: 24 milestones. */
+export const RANK_TIERS = ['Initiate', 'Explorer', 'Challenger', 'Achiever', 'Veteran', 'Elite', 'Master', 'Legend'] as const;
+export type RankTier = (typeof RANK_TIERS)[number];
+export const RANK_DIVISIONS = ['III', 'II', 'I'] as const;
+export type RankDivision = (typeof RANK_DIVISIONS)[number];
+
+/**
+ * Which published standards a member's lifts are compared with. Their own private choice in the
+ * training profile, never inferred from anything else; without it nothing is ranked.
+ */
+export const RANK_STANDARDS = ['men', 'women'] as const;
+export type RankStandards = (typeof RANK_STANDARDS)[number];
+
+/**
+ * How an exercise is scored. `e1rm`: the best estimated one-rep max (Epley, 1–12 reps), body
+ * weight included for bodyweight lifts, scaled to the standards' reference body weight with a 2/3
+ * exponent; the score is that as thousandths of the reference body weight. `reps`: the most reps
+ * in one set (push-ups), which already moves your own body.
+ */
+export const RANK_METHODS = ['e1rm', 'reps'] as const;
+export type RankMethod = (typeof RANK_METHODS)[number];
+
+/** Why an exercise has no rank. */
+export const RANK_UNAVAILABLE = ['no_benchmark', 'needs_standards', 'needs_body_weight', 'no_valid_sets'] as const;
+export type RankUnavailable = (typeof RANK_UNAVAILABLE)[number];
+
+/** The set a rank comes from, with everything its score was worked out from. */
+export interface RankBasis {
+  setId: string;
+  sessionId: string;
+  day: string;
+  reps: number;
+  /** `e1rm`: the load moved, body weight included where it counts. */
+  loadGrams?: number;
+  oneRepMaxGrams?: number;
+  bodyWeightGrams?: number;
+  bodyWeightDay?: string;
+}
+
+export interface RankPosition {
+  /** 0 (Initiate III) to 23 (Legend I). */
+  milestone: number;
+  tier: RankTier;
+  division: RankDivision;
+  /** `e1rm`: thousandths of the reference body weight (1250 = 1.25×). `reps`: reps. */
+  score: number;
+  /** The score where the next division starts; absent at Legend I. */
+  nextScore?: number;
+  /** Per mille of the way from this division's start to the next. */
+  progress: number;
+  basis: RankBasis;
+}
+
+export interface RankBenchmark {
+  version: string;
+  /** Not reviewed by the owner yet: values may still change, and so may ranks earned under it. */
+  draft: boolean;
+  method: RankMethod;
+  standards: RankStandards;
+  /** `e1rm` only. */
+  referenceBodyWeightGrams?: number;
+  /** Where each tier starts, in score units, Initiate first. */
+  tierStarts: number[];
+  basis: string;
+}
+
+/** `GET /training/exercises/:id/rank`. Derived on every read; nothing about it is stored. */
+export interface ExerciseRankView {
+  exerciseId: string;
+  /** `ranked`: a valid set in the last `windowDays`. `inactive`: ranked before, not lately. */
+  status: 'ranked' | 'inactive' | 'unranked';
+  reason?: RankUnavailable;
+  benchmark?: RankBenchmark;
+  /** The best valid set in the last `windowDays`, under the current benchmark. */
+  current?: RankPosition;
+  /** The best ever, under whichever benchmark version applied when each set was done. */
+  highest?: RankPosition & { version: string };
+  windowDays: number;
+  /** Last day `current` holds without a new valid set. */
+  currentUntil?: string;
+  /** Sets left out, and why. */
+  excluded: { implausible: number; noBodyWeight: number; machine: number };
+}

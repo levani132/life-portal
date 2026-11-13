@@ -2,6 +2,17 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-13: Strength ranks for standard lifts (draft standards)
+
+- **See your rank on a lift.** An exercise's statistics now show a strength rank for the standard
+  barbell lifts, pull-ups, chin-ups, dips and push-ups: eight tiers from Initiate to Legend, each
+  in three divisions, with how close you are to the next one and exactly which set it came from.
+- **Current and highest ever.** Your current rank is your best set of the last 90 days; after 90
+  days without one the lift shows as inactive rather than dropping. Your highest rank stays.
+- It's personal: compared with published standards (men's or women's, your choice), never with
+  other members. The standards are a draft for now and the app says so.
+- The statistics view also links your account-wide training level.
+
 ## 2026-11-13: For You measurement, built and switched off
 
 - **Settings → For You → Measurement** says plainly whether For You viewing is counted for you (it

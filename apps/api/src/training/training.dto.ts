@@ -28,6 +28,7 @@ import {
   PLAN_TARGET_TYPES,
   SET_TYPES,
   WEIGHT_UNITS,
+  RANK_STANDARDS,
   type EquipmentType,
   type Measure,
   type Muscle,
@@ -166,6 +167,7 @@ export class CreateSetDto extends UpdateSetDto {
 export class UpdateTrainingProfileDto {
   @IsOptional() @IsIn(WEIGHT_UNITS) weightUnit?: (typeof WEIGHT_UNITS)[number];
   @IsOptional() @IsInt() @Min(0) @Max(900) defaultRestSeconds?: number;
+  @IsOptional() @IsIn(RANK_STANDARDS) rankStandards?: (typeof RANK_STANDARDS)[number];
 }
 
 // ------------------------------------------------------------------ plans (spec 023)

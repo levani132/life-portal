@@ -33,6 +33,7 @@ import { NutritionModule } from '../nutrition/nutrition.module';
 import { TrainingProfileService } from './profile.service';
 import { SessionsService } from './sessions.service';
 import { TrainingLevelService } from './level.service';
+import { TrainingRankService } from './rank.service';
 import { TrainingSummaryService } from './summary.service';
 import { RestAlarmService } from './rest-alarm.service';
 import { Today } from '../common/today';
@@ -102,6 +103,7 @@ export class TrainingController {
     private readonly plans: PlansService,
     private readonly alarms: RestAlarmService,
     private readonly levels: TrainingLevelService,
+    private readonly ranks: TrainingRankService,
   ) {}
 
   /** The Home card's figures, for the person's `today` (spec 020 US4). */
@@ -169,6 +171,12 @@ export class TrainingController {
       throw new BadRequestException(`range must be one of ${PROGRESS_RANGES.join(', ')}.`);
     }
     return this.progress.progressView(userId, id, (range as ProgressRange | undefined) ?? '3m', today);
+  }
+
+  /** Current and highest-ever strength rank (issue #5b); 403 without `trainingRanks`. */
+  @Get('exercises/:id/rank')
+  exerciseRank(@CurrentUser('userId') userId: string, @Param('id') id: string, @Today() today: string) {
+    return this.ranks.rank(userId, id, today);
   }
 
   @Post('exercises')
@@ -420,7 +428,7 @@ export class TrainingController {
     ]),
   ],
   controllers: [TrainingController],
-  providers: [CatalogueSeeder, PlanSeeder, PlansService, CatalogueService, MachinesService, ProgressService, TrainingProfileService, SessionsService, TrainingSummaryService, RestAlarmService, TrainingLevelService],
+  providers: [CatalogueSeeder, PlanSeeder, PlansService, CatalogueService, MachinesService, ProgressService, TrainingProfileService, SessionsService, TrainingSummaryService, RestAlarmService, TrainingLevelService, TrainingRankService],
   exports: [SessionsService, TrainingSummaryService],
 })
 export class TrainingModule {}

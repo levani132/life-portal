@@ -297,6 +297,7 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `PATCH` | `/sessions/:id/exercises/:weId` `{skipped}` | Only for an exercise with `planned` (400 otherwise). |
 | `POST` | `/sessions/:id/exercises/:weId/swap` `{requestId, exerciseId, machineId?}` | 409 `HAS_SETS` once a set is logged. |
 | `PUT` | `/sessions/:id/rest-alarm` `{at: ISO \| null}` | Spec 025: 204. Sets, moves or cancels the person's rest-over push (in memory). |
+| `GET` | `/exercises/:id/rank?today=` | Issue #5b, needs `trainingRanks` (403 otherwise): `ExerciseRankView`, current and highest-ever strength rank. See Strength ranks. |
 | `GET` | `/summary?today=` | The Home card's figures (`TrainingSummary`, with `weightUnit`, read without creating a profile); also in `GET /api/dashboard`. |
 
 ## Derived values (computed on read, never stored)
@@ -367,13 +368,16 @@ workout's history modal and the library's exercise sheet.
   working weight whose Epley estimate beats the best 1RM, going up in plate steps (2.5 kg, or 5 lb
   for a pound profile) when 10 reps would not do it. Labelled an estimate. Otherwise one more rep,
   5 more seconds or 100 more metres than the record.
-- No level, rank or placeholder appears here yet: levels (#5a) are account-wide and strength ranks
-  (#5b) are not designed. Issue #6 stays open for them.
+- **Strength rank** (#5b, with `trainingRanks`): `StrengthRank` in `strength-rank.tsx` under the
+  key figures shows the current rank, the highest ever and progress to the next division, with what
+  the score came from. See Strength ranks.
+- **Training level** (#5a, with `trainingLevels`): one line at the bottom links to Training, marked
+  account-wide, so it never reads as a figure of this exercise.
 
 ### Training levels (issue #5a)
 
 An uncapped level for how much you have trained, not how strong you are (strength ranks are #5b,
-blocked pending owner decisions; see `docs/ROADMAP.md`). `GET /training/level?today=` returns
+below). `GET /training/level?today=` returns
 `TrainingLevel {level, xp, xpIntoLevel, xpForLevel, countedWorkouts}`. The route needs `training`
 (as every route here does) and the **`trainingLevels`** flag (on for internal and developer, off
 for production). `TrainingLevelService` reads the caller's finished sessions up to `today` and one
@@ -402,6 +406,82 @@ every time under the current rules.
 - **Shown** in Training's header (`training-hero.tsx`) as "Level N" with XP to the next level and
   a progress bar, own view only. Not on profiles or in leaderboards yet. #6's exercise statistics
   will link to it, never show it as an exercise metric.
+
+### Strength ranks (issue #5b)
+
+Personal, per exercise, against **fixed, versioned published standards**: never against other
+members, and no other member's data is read (owner decision on #5, 2026-11-13, which replaced the
+earlier live-percentile idea). `GET /training/exercises/:id/rank?today=` needs `training` and
+**`trainingRanks`** (on for internal and developer, off for production pending review).
+`TrainingRankService` reads the caller's own sets of that exercise in finished sessions up to
+`today`, their weigh-ins (Nutrition's `weighInsUpTo`) and their chosen standards;
+`exerciseRank()` in `libs/shared/domain/src/lib/strength-ranks.ts` does the rest.
+
+**Tiers.** Initiate, Explorer, Challenger, Achiever, Veteran, Elite, Master, Legend, each in
+divisions III → II → I: 24 milestones. Each tier's score range is split into thirds; Legend is as
+wide as Master, and Legend I is the top. Shown as a hexagon in the tier's colours with 1–3 pips,
+always next to the name as text.
+
+**Score.**
+- `e1rm` method (barbell bench, back and full squat, front squat, deadlift, standing military
+  press, bent-over row, pull-ups, chin-ups, triceps dips): the set's Epley estimate (1–12 reps;
+  `estimateOneRepMax`), with body weight in the load for bodyweight lifts (`effectiveLoadGrams`),
+  scaled to the reference body weight with a 2/3 exponent:
+  `score = round(1000 × e1RM × (ref ÷ bw)^(2/3) ÷ ref)`, so 1250 means 1.25× the reference. The
+  exponent is the allometric scaling of strength with mass, so a heavier lifter needs more load
+  but not proportionally more (twice the body weight → about 1.59× the load), which plain
+  load ÷ body weight would get wrong for both light and heavy lifters. Reference: 80 kg (men's
+  standards), 60 kg (women's).
+- `reps` method (push-ups): the most reps in one set; the lift already moves your own body.
+- **Height and age are not used.** Height is a poor proxy for limb lengths and leverage, and age
+  standards would need data we don't have; neither is asked for.
+- **No work-capacity component.** Volume is already rewarded by the training level (#5a), and
+  adding it would make the score harder to explain without a defensible weight.
+
+**Which sets count.** Working, drop and failure sets (not warm-ups) of 1–12 reps for `e1rm`, any
+reps for `reps`; in finished sessions on or before `today`; logged under the measure the standard
+assumes; **without a specific machine attached** (`workout_exercises.machineId`), because a
+machine is not the free-weight lift the standard describes. For `e1rm`, a **weigh-in on or before
+the set's day and at most 90 days older** (`RANK_BODY_WEIGHT_MAX_AGE_DAYS`); without one the set is
+not ranked and the view asks for a weigh-in. A score more than 1.5× where Legend starts is taken as
+a logging error and left out (counted in `excluded.implausible`). Only these exact catalogue rows
+(by `seedKey`) are ranked: variants (dumbbell bench, assisted machines, deficit pulls), own
+exercises, unilateral and timed work have no benchmark and say so (`no_benchmark`). Units don't
+matter: everything is grams.
+
+**Standards choice.** `training_profiles.rankStandards` (`men` / `women`), the member's own private
+choice, asked for in the rank panel the first time and changeable there; never inferred from the
+Food profile or anything else. Without it nothing is ranked (`needs_standards`). It exists because
+the standards differ substantially; a member who prefers not to choose is not ranked.
+
+**Current and highest ever.**
+- **Current**: the best valid set in the last 90 days (`RANK_WINDOW_DAYS`, today inclusive) under
+  today's benchmark. With none, the exercise is **inactive**: no current rank, never a lower one.
+  A new valid set ranks it again from that set. `currentUntil` is the last day the current rank
+  holds without a new set.
+- **Highest ever**: the best milestone any valid set reached **under the benchmark version that
+  applied on that set's day** (`benchmarkFor`), so a later, stricter version never takes it away,
+  and inactivity never does.
+
+**Nothing is stored.** Both ranks are recomputed on every read (principle 3), which is also the
+answer to edits, deletions, backfills and corrections: an edited set, a deleted workout or a
+corrected weigh-in changes the rank on the next read; a backfilled workout counts on the day it is
+dated (and, if within 90 days, for current). Wrong or fraudulent data is corrected by fixing or
+deleting the set; nothing earned from a set survives the set. A legitimate achievement can only be
+lost by changing the data it came from, never by a benchmark change.
+
+**Benchmarks and versions.** `RANK_BENCHMARKS` lists every version with the day it starts
+applying. Stable by default: a version that is not a draft is never edited; any recalibration is a
+new version with a later `from`, reviewed and manual, and earlier sets keep the version of their
+day. **v1 is a draft** (`v1-draft`, applies to all history): the thresholds are the app's
+proposal for owner review, not measured from LifePortal members and not competition records, and
+the UI says so. Draft values may change before v1 is fixed, and ranks shown under the draft
+change with them; this is the one exception to the stability rule and ends when v1 is frozen.
+
+**Future, not built:** opt-in **monthly** tournaments (calendar-month seasons; exact boundaries and
+time zone decided when designed) among members with a similar current rank, up to about 100, no
+fake opponents, explicit opt-in for anything shown publicly, with anti-cheating and fairness rules.
+Population-based calibration is optional future research. Neither is part of #5b.
 
 ### The Home card (US4)
 
@@ -493,7 +573,7 @@ renders nothing when there is no rest to show, so no empty bar stays pinned.
 
 There is no account deletion feature yet (as for messages and notifications). When one is added,
 it must remove the user's `workout_sessions`, `workout_exercises`, `workout_sets`,
-`training_profiles`, own `training_plans`, private `exercises` and `training_machines`, and the photos those two
+`training_profiles` (including the rank standards choice), own `training_plans`, private `exercises` and `training_machines`, and the photos those two
 reference in storage. Shared catalogue rows and ready-made plans have no `userId` and stay.
 
 ## Verification
