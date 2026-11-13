@@ -594,9 +594,10 @@ change with them; this is the one exception to the stability rule and ends when 
 
 **Tournaments (#12, in progress):** opt-in **monthly** tournaments among members with a similar
 current rank, in separate men's and women's categories, behind the `tournaments` flag. Entries,
-the lock snapshot, groups and reminders are built; scoring waits on the owner. See
+the lock snapshot, groups, scoring (strength without the work-capacity bonus, plus up to 5% for
+improvement) and reminders are built. See
 [tournaments](tournaments.md). The lock uses `TrainingRankService.rankFor`, which computes a rank
-for any standards and only from sets saved before a given instant. Population-based calibration is optional future research.
+for any standards and only from sets saved before a given instant; scoring uses `strengthBest`. Population-based calibration is optional future research.
 
 ### The Home card (US4)
 

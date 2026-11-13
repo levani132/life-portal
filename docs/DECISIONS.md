@@ -1623,8 +1623,7 @@ analysis needs its own privacy and consent decision.
 
 ## 2026-11-13: Tournaments run on UTC, in separate categories chosen with consent (issue #12)
 
-Owner decisions on #12. Scoring is deliberately not built: the owner has not approved a formula,
-ordering or tie-break, so nothing computes a score or a position.
+Owner decisions on #12. Scoring followed later the same day (next entry).
 
 - **UTC is canonical.** Every boundary is a UTC instant; the web shows it in local time. It
   replaces the proposed Tbilisi clock: one instant for everyone, with no zone the app has to
@@ -1643,6 +1642,27 @@ ordering or tie-break, so nothing computes a score or a position.
   logged later cannot change the group.
 - **Retention by TTL.** Every row expires 12 months after the season finalises, so retention
   needs no job. Withdrawal deletes the entry at once rather than marking it.
-- **Group lists are not standings.** Members are listed self first, then by name, and the page
-  says nothing is a ranking, so no order can be read as a result before scoring exists.
 
+## 2026-11-13: Tournament scoring: absolute strength with a capped improvement bonus (issue #12)
+
+Owner-approved formula: `best × (1 + min(5%, improvement / 15% × 5%))`. The choices made in
+building it:
+
+- **Strength alone.** `best` and the baseline strip the rank's work-capacity bonus
+  (`basis.strengthScore`). Otherwise extra sets would buy a higher score, which the owner ruled
+  out.
+- **The baseline is frozen at the lock, from sets saved before it.** A post-lock edit, deletion
+  or backdated set can't move it. Season sets must be dated in the month and saved before
+  `finalizesAt`.
+- **Rounding never grants a bonus.** Improvement and bonus are whole basis points rounded down;
+  the score is rounded to a whole unit. Exact ties are therefore exact integer equality, and
+  they share the place.
+- **A replaced draft withholds the bonus.** Ranks are still drafts that can be replaced in place.
+  If the version frozen at the lock is gone, the season is scored on the current standards with
+  no bonus, because a baseline under other standards would invent or hide improvement. Flagged
+  to the owner.
+- **Live, then frozen once.** Standings are derived on read during the season. Results are
+  written once at `finalizesAt` by a conditional update, so the results reminder goes out once.
+  Places are derived from frozen scores and current members, so leaving still takes effect.
+- **Others see place and score only.** The breakdown (best, baseline, improvement, bonus, day)
+  goes to the viewer alone, matching the owner's privacy limits.

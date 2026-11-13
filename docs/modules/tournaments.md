@@ -4,10 +4,8 @@ Opt-in monthly competitions on one exercise, among members at a similar **curren
 ([training](training.md), "Strength ranks"). Spec, owner decisions and open questions:
 [specs/026-strength-tournaments](../../specs/026-strength-tournaments/spec.md).
 
-**Scoring is not built.** The owner has not approved how members are scored, ordered or tied
-(#12, 2026-11-13). Nothing in this module computes a score, a position, a result or a tie-break,
-and the results reminder is registered but never sent. A group lists who is in it and says
-standings come later.
+Scoring is the owner's approved formula (#12, 2026-11-13T11:53Z): absolute strength first, with
+an improvement bonus of at most 5%. Production stays off and #12 stays open until review.
 
 ## Gates
 
@@ -61,6 +59,50 @@ each other's names.
   variants and machines are never compared with each other. A machine exercise with its own
   standard can have its own tournament.
 
+## Scoring (owner-approved)
+
+`libs/shared/domain/src/lib/tournament-scoring.ts`, pure and tested:
+
+```
+improvement      = max(0, best / baseline − 1)
+improvementBonus = min(5%, improvement / 15% × 5%)     linear to +15%, then capped
+tournamentScore  = best × (1 + improvementBonus)
+```
+
+- **`best`.** The season's best valid **strength** score (`bestStrength`): the rank's normalised
+  one-rep-max score (or reps for a reps standard) of the best workout. It never includes the
+  rank's work-capacity bonus, and there are no points for workouts, sets or volume.
+  - **Which sets count.** Sets dated in the season's month, in finished workouts, saved before
+    `finalizesAt`. They are scored by the rank rules: no warm-ups, no machine sets on a
+    free-weight standard, a fresh weigh-in, and implausible sets left out.
+- **`baseline`.** The same measure over the 90 days before the lock (`scoringWindows`), counting
+  only sets saved before the lock instant. It is frozen into `lockedBaseline` at the lock. A
+  current rank implies a baseline; without both the entry is `not_ranked`, and no improvement is
+  ever invented.
+- **Rounding and examples.** Improvement and bonus are whole basis points, rounded **down**, so
+  rounding never grants a bonus. The score is rounded to a whole rank-score unit (0.001× body
+  weight). Examples: +3% gives +1%; +15% or more gives +5%; getting weaker gives no penalty and no
+  bonus.
+- **Standards.** Scores use the benchmark version frozen at the lock (`lockedVersion`). If that
+  draft was replaced, the current version scores the season and the bonus is **withheld**
+  (`bonusWithheld: 'standards_changed'`): a baseline under other standards can't be compared
+  fairly.
+- **Places.** Descending tournament score within the group (`placeStandings`). Exactly equal
+  scores share a place (1, 1, 3), with no tie-break by volume or workouts. A member without a
+  valid set this season has no score and no place, and is listed last.
+- **Live, then frozen.** During the month and grace, standings are computed on read. At
+  `finalizesAt` the group's `results` are written once, by a conditional update from the first
+  read or the hourly job, and members get "results ready". Places are always derived from the
+  stored scores of the members still in the group, so a withdrawal or voiding after the results
+  still takes effect.
+- **Edits and deletions.**
+  - Before the lock, they shape the baseline.
+  - After the lock, they never move it: it is frozen, and a backdated set saved later is outside
+    both windows.
+  - During the season and grace, editing or deleting a season set changes the live score.
+  - After `finalizesAt`, nothing changes.
+  - Tested in `tournaments.service.spec.ts`.
+
 ## Categories and consent
 
 - **Separate competitions.** Men's and women's competitions are separate, matching the separate
@@ -73,6 +115,7 @@ each other's names.
   - what they never see;
   - the lock, month and grace times in local time;
   - the 12-month retention and withdrawal;
+  - how the score is worked out;
   - that logs are self-reported;
   - that there are no prizes.
 - **Recorded consent.** The entry records `consentVersion` (`TOURNAMENT_CONSENT_VERSION`). A
@@ -81,48 +124,48 @@ each other's names.
 ## Privacy
 
 - **What a group member sees of another:** display name, username, photo, the group's rank range,
-  the category, and later the place and tournament score. Never kilograms, reps, body weight,
-  standards beyond the category, dates or workouts. The API response carries nothing else
-  (tested by key set).
+  the category, the place and the tournament score. Never kilograms, reps, body weight, the
+  baseline or the improvement, dates or workouts. The API response carries nothing else (tested
+  by key set). Only the viewer gets their own breakdown (`own`).
 - **Only the group.** Only members of the group see it. Anyone else, including a withdrawn or
   voided member, gets a 404. Nothing is public or on a profile.
 - **Blocks hide identity.** A pair who blocked one another, in either direction, see each other
   only as "A member".
-- **No implied order.** Members are listed self first, then by name, so no order looks like a
-  standing.
+- **Order.** By place; equal places, and members without a score, are in name order.
 - **No caching.** Responses are `private, no-store`.
 
 ## Collections
 
 | Collection | Holds |
 |---|---|
-| `tournament_entries` | userId, exerciseId, season, category, consentVersion; at the lock `outcome` (`grouped`/`no_tournament`/`not_ranked`), `groupId` and the frozen rank; `voidedAt`/`voidReason`. Unique per user, exercise and season |
-| `tournament_groups` | season, exercise, category, index, milestone range, `memberIds` |
+| `tournament_entries` | userId, exerciseId, season, category, consentVersion; at the lock `outcome` (`grouped`/`no_tournament`/`not_ranked`), `groupId`, the frozen rank and `lockedBaseline`; `voidedAt`/`voidReason`. Unique per user, exercise and season |
+| `tournament_groups` | season, exercise, category, index, milestone range, `memberIds`; after grace `finalizedAt` and `results` (each member's frozen score breakdown) |
 | `tournament_locks` | who is forming one exercise-and-category's groups, and when it finished |
 
 **Retention.** Every row carries `expireAt`: 12 months after the season's `finalizesAt`. A TTL
 index deletes it.
 
-**Why stored.** Entries are the member's own choice. Groups and the frozen rank are a deliberate
-snapshot, the second exception to "derived never persisted" after `meal_entries.facts`: a
-finished or running competition must not be rewritten by a later edit or benchmark change.
+**Why stored.** Entries are the member's own choice. Groups, the frozen rank and baseline, and the
+final results are deliberate snapshots, the second exception to "derived never persisted" after
+`meal_entries.facts`: a finished or running competition must not be rewritten by a later edit or
+benchmark change. Live standings are not stored.
 
 ## API (`/api/tournaments`, `private, no-store`)
 
 | Route | Notes |
 |---|---|
-| `GET /` | The month open for enrolment (if any) and the member's own entries with their status. Forms due groups lazily |
+| `GET /` | The month open for enrolment (if any) and the member's own entries with their status, and `result` (place of size) once final. Forms due groups and freezes due results lazily |
 | `POST /entries` | `{exerciseId, season, category, consentVersion}`. 400 outside enrolment, on an old consent version, a category that doesn't match the rank's standards, no social profile, no benchmark or no current rank. 409 if already entered |
 | `DELETE /entries/:id` | Withdraw, own entry only, any time: the entry is deleted and the member leaves the group at once |
 | `POST /entries/:id/void` | Developer only, `{reason}`. The member sees the reason; the group no longer shows them |
-| `GET /groups/:id` | Own group only, otherwise 404. `standings` is always `null` |
+| `GET /groups/:id` | Own group only, otherwise 404. `standings` (identity, place, score), `final`, `method`, and `own` (the viewer's breakdown) |
 
 ## Integrity
 
 - **Which sets count.** The rank rules decide: valid sets only, implausible sets excluded,
   machine sets only for machine standards, and a fresh weigh-in.
-- **Frozen at the deadline.** Sets saved after grace never count, and results will be frozen at
-  `finalizesAt`. That freezing is part of scoring, so it is not built.
+- **Frozen at the deadline.** Sets saved after grace never count, and results are frozen at
+  `finalizesAt`.
 - **Logs are self-reported,** and the join screen says so.
 - **Voiding.** The developer can void an entry with a reason. In v1 an appeal is a message to the
   owner.
@@ -137,7 +180,7 @@ preferences. The lock-screen text is generic.
 |---|---|
 | `tournamentEnrollmentOpen` | 00:10 UTC on the 20th, to members with any entry still within retention |
 | `tournamentGroupAssigned` | When groups are formed, to members who got a group |
-| `tournamentResultsReady` | Registered, **never sent** until scoring exists |
+| `tournamentResultsReady` | When a group's results are frozen, to its members, once |
 
 No per-set, rank-change or position notifications exist.
 
@@ -145,11 +188,10 @@ No per-set, rank-change or position notifications exist.
 
 There is no account-deletion feature yet. When one is added, it must delete the member's
 `tournament_entries` and remove them from `tournament_groups.memberIds`, exactly as withdrawal
-does. Deleting a workout changes nothing here before the lock. After the lock the frozen rank
-stands; how deleted sets affect scoring will be decided with scoring.
+does. Deleting workouts is covered under Scoring, "Edits and deletions".
 
-## Not built (waiting on the owner)
+## Open (flagged to the owner on #12)
 
-- **Scoring:** the score, positions, tie-breaks, final results, the results reminder and
-  results history. The frozen `lockedScore` keeps an improvement-based option open.
-- **Production rollout.**
+- **Machines.** Different machines logged against one machine exercise are compared in one
+  tournament.
+- **Production rollout.** It stays off until review.

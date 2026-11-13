@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import type { ExerciseRankView, Measure, RankStandards, SetType } from '@life-portal/shared-types';
-import { bodyWeightOn, exerciseRank, type RankSet } from '@life-portal/shared-domain';
+import { bestStrength, bodyWeightOn, exerciseRank, tournamentStandard, type RankSet, type StrengthBest } from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
 import { NutritionService } from '../nutrition/nutrition.service';
 import { CatalogueService } from './catalogue.service';
@@ -66,6 +66,30 @@ export class TrainingRankService {
     const seedKey = exercise.userId ? undefined : exercise.seedKey;
     const sets = await this.load(userId, exerciseId, measure, today, savedBefore);
     return { view: exerciseRank({ exerciseId, seedKey, measure, standards, sets, today }), name: exercise.name, seedKey };
+  }
+
+  /**
+   * For tournament scoring (#12): the best valid strength score (no work-capacity bonus) among a
+   * member's sets dated `from`–`to` and saved before `savedBefore`, under the benchmark version
+   * frozen at the lock (`version`), or today's when that version no longer exists (`changed`).
+   * No feature check, as for `rankFor`.
+   */
+  async strengthBest(
+    userId: string,
+    exerciseId: string,
+    standards: RankStandards,
+    window: { from: string; to: string },
+    savedBefore: Date,
+    version: string | undefined,
+    today: string,
+  ): Promise<{ best?: StrengthBest; version?: string; changed: boolean }> {
+    const exercise = await this.catalogue.readable(userId, exerciseId, { includeArchived: true });
+    const measure = exercise.measure as Measure;
+    const scoring = tournamentStandard(exercise.userId ? undefined : exercise.seedKey, measure, version, today);
+    if (!scoring) return { changed: false };
+    const sets = await this.load(userId, exerciseId, measure, window.to, savedBefore);
+    const best = bestStrength(scoring.standard, standards, sets, window.from, window.to);
+    return { ...(best ? { best } : {}), version: scoring.version, changed: scoring.changed };
   }
 
   /** The caller's sets of one exercise under its current measure, in finished sessions up to today. */

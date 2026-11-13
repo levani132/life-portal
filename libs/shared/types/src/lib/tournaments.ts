@@ -1,9 +1,9 @@
-import type { RankDivision, RankTier } from './training';
+import type { RankDivision, RankMethod, RankTier } from './training';
 
 /**
- * Monthly strength tournaments (issue #12), behind `tournaments`. Contracts only. Scoring is not
- * decided yet, so nothing here carries a score, position or result: the group view lists who is
- * in it and says standings come later.
+ * Monthly strength tournaments (issue #12), behind `tournaments`. Contracts only. Scoring follows
+ * the owner's formula (docs/modules/tournaments.md): the season's best strength score, raised by
+ * an improvement bonus of at most 5% over a baseline frozen at the lock.
  */
 
 /** Separate men's and women's competitions, matching the separate rank standards. */
@@ -53,6 +53,8 @@ export interface TournamentEntry {
   groupId?: string;
   voidReason?: string;
   joinedAt: string;
+  /** Once the season's results are final: the member's place (absent with no valid set) of `of`. */
+  result?: { place?: number; of: number; score?: number };
 }
 
 /** `GET /tournaments`: what can be joined now, and the member's own entries. */
@@ -64,17 +66,38 @@ export interface TournamentOverview {
   retentionMonths: number;
 }
 
-/** One member as the rest of their group sees them: public identity only. */
-export interface TournamentGroupMember {
+/** One member as the rest of their group sees them: public identity, place and score only. */
+export interface TournamentStanding {
   /** Absent when the viewer and this member have blocked one another: shown as "A member". */
   userId?: string;
   displayName?: string;
   username?: string;
   avatarUrl?: string;
   self: boolean;
+  /** Shared by exact ties; absent with no valid set this season. */
+  place?: number;
+  /** The tournament score, in rank-score units (see `method`). */
+  score?: number;
 }
 
-/** `GET /tournaments/groups/:id`: members of the viewer's own group only. */
+/** How the viewer's own score was worked out. Never shown for anyone else. */
+export interface TournamentScoreView {
+  score: number;
+  /** The season's best valid strength score, without the rank's work-capacity bonus. */
+  strengthScore: number;
+  /** The best strength score of the 90 days before the lock, frozen then. */
+  baseline: number;
+  /** Basis points, never negative. */
+  improvementBp: number;
+  /** Basis points, 0–500. */
+  bonusBp: number;
+  /** The bonus was withheld because the standards changed after the lock. */
+  bonusWithheld?: 'standards_changed';
+  /** The day of the workout the best set came from. */
+  day: string;
+}
+
+/** `GET /tournaments/groups/:id`: the viewer's own group only. */
 export interface TournamentGroupView {
   id: string;
   exerciseId: string;
@@ -83,9 +106,13 @@ export interface TournamentGroupView {
   category: TournamentCategory;
   /** e.g. "Veteran II" or "Achiever III – Veteran I". */
   rankRange: string;
-  members: TournamentGroupMember[];
-  /** Always null until scoring is approved; the UI says standings come later. */
-  standings: null;
+  /** How scores read: × body weight (`e1rm`) or reps. */
+  method: RankMethod;
+  /** Live until grace ends, then frozen. Ordered by place; members without a score last. */
+  standings: TournamentStanding[];
+  final: boolean;
+  /** The viewer's own breakdown, when they have a valid set this season. */
+  own?: TournamentScoreView;
 }
 
 /** `POST /tournaments/entries`. */

@@ -53,7 +53,7 @@ class TournamentsController {
   }
 }
 
-/** Hourly lock and the enrolment reminder on the 20th. Off with `DISABLE_SCHEDULES`. */
+/** Hourly lock and results freeze, and the enrolment reminder on the 20th. Off with `DISABLE_SCHEDULES`. */
 @Injectable()
 class TournamentJobs {
   private readonly logger = new Logger(TournamentJobs.name);
@@ -64,6 +64,8 @@ class TournamentJobs {
     if (this.tournaments.schedulesDisabled) return;
     const formed = await this.tournaments.lockDue();
     if (formed) this.logger.log(`Formed tournament groups for ${formed} exercise(s)`);
+    const finalized = await this.tournaments.finalizeDue();
+    if (finalized) this.logger.log(`Froze results for ${finalized} tournament group(s)`);
   }
 
   @Cron('0 10 0 * * *', { name: 'tournament-enrolment-reminder', timeZone: 'UTC' })

@@ -13,11 +13,14 @@ jest.mock('../../lib/hooks', () => ({
       season,
       category: 'women',
       rankRange: 'Achiever III – Veteran I',
-      members: [
-        { userId: 'me', displayName: 'Me', username: 'me', self: true },
-        { self: false },
+      method: 'e1rm',
+      final: false,
+      standings: [
+        { self: false, place: 1, score: 1370 },
+        { userId: 'me', displayName: 'Me', username: 'me', self: true, place: 2, score: 1137 },
+        { userId: 'z', displayName: 'Zed', username: 'z', self: false },
       ],
-      standings: null,
+      own: { score: 1137, strengthScore: 1100, baseline: 1000, improvementBp: 1000, bonusBp: 333, day: '2026-12-03' },
     },
   }),
 }));
@@ -52,12 +55,18 @@ it('asks for an explicit category and agreement after showing what joining share
   expect(api.post).toHaveBeenCalledWith('/tournaments/entries', { exerciseId: 'x', season: '2026-12', category: 'women', consentVersion: 1 });
 });
 
-it('lists a group without any standing, and hides a blocked member’s identity', () => {
+it('shows places and scores, hides a blocked member’s identity, and explains only the viewer’s own score', () => {
   render(<GroupList groupId="g" />);
-  expect(screen.getByText('Me')).toBeTruthy();
   expect(screen.getByText('A member')).toBeTruthy();
-  expect(screen.getByText(/Nothing here is a ranking/)).toBeTruthy();
-  expect(screen.queryByText(/kg|score/i)).toBeNull();
+  expect(screen.getByText('1st')).toBeTruthy();
+  expect(screen.getByText('1.37× body weight')).toBeTruthy();
+  expect(screen.getByText('no valid set yet')).toBeTruthy();
+  const own = screen.getByLabelText('How your score is worked out');
+  expect(own.textContent).toContain('Your score: 1.14× body weight');
+  expect(own.textContent).toContain('Improvement 10.00% → bonus +3.33%');
+  expect(own.textContent).toContain('1.10× body weight × 1.0333 = 1.14× body weight');
+  // Nobody else's breakdown, load or body weight appears.
+  expect(screen.queryByText(/kg/)).toBeNull();
 });
 
 it('explains sparse, unranked and voided entries honestly', () => {
@@ -67,4 +76,6 @@ it('explains sparse, unranked and voided entries honestly', () => {
   expect(entryStatusText(entry('no_tournament'))).toMatch(/Fewer than 3 .* Nobody is invented/);
   expect(entryStatusText(entry('not_ranked'))).toMatch(/no current rank/);
   expect(entryStatusText(entry('voided', { voidReason: 'Impossible set' }))).toBe('Removed from this tournament: Impossible set');
+  expect(entryStatusText(entry('grouped', { result: { place: 2, of: 7, score: 1137 } }))).toBe('Final result: 2nd of 7.');
+  expect(entryStatusText(entry('grouped', { result: { of: 7 } }))).toMatch(/no valid set this month, so no place/);
 });

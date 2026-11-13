@@ -20,8 +20,9 @@ import {
   type TournamentCategory,
   type TournamentEntry,
   type TournamentEntryStatus,
-  type TournamentGroupMember,
   type TournamentGroupView,
+  type TournamentScoreView,
+  type TournamentStanding,
   type TournamentOverview,
 } from '@life-portal/shared-types';
 import {
@@ -29,9 +30,12 @@ import {
   enrollableSeason,
   groupRangeLabel,
   matchEntrants,
+  placeStandings,
+  scoringWindows,
   season as seasonOf,
   seasonDayAt,
   seasonPhase,
+  tournamentScore,
   type Season,
   type TournamentEntrant,
 } from '@life-portal/shared-domain';
@@ -42,7 +46,7 @@ import { SocialGraphService } from '../social-graph/social-graph.module';
 import { SocialService } from '../social/social.module';
 import { TrainingProfileService } from '../training/profile.service';
 import { TrainingRankService } from '../training/rank.service';
-import { TournamentEntryRecord, TournamentGroupRecord, TournamentLockRecord } from './tournaments.schemas';
+import { TournamentEntryRecord, TournamentGroupRecord, TournamentLockRecord, type FrozenResult } from './tournaments.schemas';
 
 type EntryRow = TournamentEntryRecord & { _id: unknown; createdAt?: Date };
 type GroupRow = TournamentGroupRecord & { _id: unknown };
@@ -73,11 +77,9 @@ export function expiryFor(target: Season): Date {
 
 /**
  * Monthly strength tournaments (#12), behind `tournaments`. Enrolment with explicit category
- * consent, groups formed once at the lock from a snapshot of each entrant's rank, a group view
- * that shows public identity only, withdrawal, developer voiding and three reminders.
- *
- * **Scoring is not implemented** (owner, 2026-11-13): no score, position, result or tie-break
- * exists anywhere here, and the results reminder is registered but never sent.
+ * consent, groups formed once at the lock from a snapshot of each entrant's rank and baseline,
+ * live standings during the season, results frozen once grace ends, withdrawal, developer voiding
+ * and three reminders. Scoring is the owner's formula (`tournamentScore` in the domain lib).
  */
 @Injectable()
 export class TournamentsService implements OnModuleInit {
@@ -151,6 +153,16 @@ export class TournamentsService implements OnModuleInit {
       .rankFor(userId, row.exerciseId, seasonDayAt(now), row.category as TournamentCategory)
       .then((r) => r.name)
       .catch(() => 'Exercise');
+    let result: TournamentEntry['result'];
+    if (current.groupId && !current.voidedAt && now >= target.finalizesAt) {
+      const group = await this.groups.findOne({ _id: current.groupId }).lean<GroupRow>();
+      const finalGroup = group && (await this.ensureFinalized(group, now));
+      if (finalGroup?.finalizedAt) {
+        const placed = placeStandings(this.activeResults(finalGroup));
+        const mine = placed.find((row) => row.userId === userId);
+        if (mine) result = { of: placed.length, ...(mine.place ? { place: mine.place } : {}), ...(mine.score !== undefined ? { score: mine.score } : {}) };
+      }
+    }
     const status: TournamentEntryStatus = current.voidedAt
       ? 'voided'
       : ((current.outcome as TournamentEntryStatus | undefined) ?? (now >= target.locksAt ? 'forming' : 'entered'));
@@ -167,23 +179,27 @@ export class TournamentsService implements OnModuleInit {
       ...(current.groupId && !current.voidedAt ? { groupId: current.groupId } : {}),
       ...(current.voidReason ? { voidReason: current.voidReason } : {}),
       joinedAt: (row.createdAt ?? now).toISOString(),
+      ...(result ? { result } : {}),
     };
   }
 
   /**
    * The viewer's own group. Anyone not in it (or withdrawn, or voided) gets a 404, never a hint
-   * that the group exists. Members are public identity only; blocked pairs see "A member".
-   * Ordered by name, self first: there is no score, so no order may look like a standing.
+   * that the group exists. Each member shows public identity, place and tournament score only;
+   * blocked pairs see "A member". Live until grace ends, then the frozen results. Only the viewer
+   * gets their own breakdown.
    */
   async group(userId: string, groupId: string): Promise<TournamentGroupView> {
     await this.gate(userId);
     if (!isValidObjectId(groupId)) throw new NotFoundException('Group not found.');
-    const [group, own] = await Promise.all([
+    const [found, own] = await Promise.all([
       this.groups.findOne({ _id: groupId }).lean<GroupRow>(),
       this.entries.findOne({ userId, groupId, voidedAt: { $exists: false } }).lean<EntryRow>(),
     ]);
-    if (!group || !own || !group.memberIds.includes(userId)) throw new NotFoundException('Group not found.');
+    if (!found || !own || !found.memberIds.includes(userId)) throw new NotFoundException('Group not found.');
     const now = this.now();
+    const group = await this.ensureFinalized(found, now);
+    const target = seasonOf(group.season);
     const [blocked, voided] = await Promise.all([
       this.graph.blockedUserIds(userId),
       this.entries.find({ groupId, voidedAt: { $exists: true } }).select('userId').lean<EntryRow[]>(),
@@ -191,26 +207,90 @@ export class TournamentsService implements OnModuleInit {
     const hidden = new Set(blocked);
     const gone = new Set(voided.map((row) => row.userId));
     const visible = group.memberIds.filter((id) => !gone.has(id));
+    const results = group.finalizedAt ? this.activeResults(group) : await this.liveResults(group, target, now);
+    const byUser = new Map(results.map((row) => [row.userId, row]));
     const identities = await this.social.authors(visible.filter((id) => !hidden.has(id)));
-    const members: TournamentGroupMember[] = visible.map((id) => {
+    const rows = visible.map((id) => {
       const identity = hidden.has(id) ? undefined : identities.get(id);
-      return identity ? { ...identity, self: id === userId } : { self: id === userId };
+      const score = byUser.get(id)?.score;
+      return { id, ...(identity ?? {}), self: id === userId, ...(score !== undefined ? { score } : {}) };
     });
-    members.sort((a, b) => Number(b.self) - Number(a.self) || (a.displayName ?? '￿').localeCompare(b.displayName ?? '￿'));
-    const name = await this.ranks
+    // Name order first, so equal places list alphabetically, never by volume or workouts.
+    rows.sort((a, b) => ('displayName' in a ? (a.displayName as string) : '￿').localeCompare('displayName' in b ? (b.displayName as string) : '￿'));
+    const standings: TournamentStanding[] = placeStandings(rows).map(({ id: _id, ...row }) => row);
+    const mine = byUser.get(userId);
+    const ranked = await this.ranks
       .rankFor(userId, group.exerciseId, seasonDayAt(now), group.category as TournamentCategory)
-      .then((r) => r.name)
-      .catch(() => 'Exercise');
+      .catch(() => undefined);
     return {
       id: String(group._id),
       exerciseId: group.exerciseId,
-      exerciseName: name,
-      season: seasonView(seasonOf(group.season), now),
+      exerciseName: ranked?.name ?? 'Exercise',
+      season: seasonView(target, now),
       category: group.category as TournamentCategory,
       rankRange: groupRangeLabel(group),
-      members,
-      standings: null,
+      method: ranked?.view.benchmark?.method ?? 'e1rm',
+      standings,
+      final: !!group.finalizedAt,
+      ...(mine?.score !== undefined ? { own: ownScore(mine) } : {}),
     };
+  }
+
+  /** The frozen results of members still in the group (withdrawn or voided members drop out). */
+  private activeResults(group: GroupRow): FrozenResult[] {
+    const members = new Set(group.memberIds);
+    return (group.results ?? []).filter((row) => members.has(row.userId));
+  }
+
+  /** Every current member's score, computed now. */
+  private async liveResults(group: GroupRow, target: Season, now: Date): Promise<FrozenResult[]> {
+    const rows = await this.entries
+      .find({ groupId: String(group._id), voidedAt: { $exists: false }, userId: { $in: group.memberIds } })
+      .lean<EntryRow[]>();
+    return Promise.all(rows.map((row) => this.scoreOf(row, target, now)));
+  }
+
+  /**
+   * One entrant's score: the best valid strength score of sets dated in the season and saved
+   * before grace ended, under the benchmark version frozen at the lock, against the frozen
+   * baseline. No valid set: no score. A replaced benchmark version withholds the bonus.
+   */
+  private async scoreOf(row: EntryRow, target: Season, now: Date): Promise<FrozenResult> {
+    const windows = scoringWindows(target);
+    const found = await this.ranks
+      .strengthBest(
+        row.userId,
+        row.exerciseId,
+        row.category as TournamentCategory,
+        { from: windows.seasonFrom, to: windows.seasonTo },
+        target.finalizesAt,
+        row.lockedVersion,
+        seasonDayAt(now),
+      )
+      .catch(() => undefined);
+    if (!found?.best) return { userId: row.userId };
+    return { userId: row.userId, ...tournamentScore(found.best.score, row.lockedBaseline ?? 0, found.changed), day: found.best.basis.day };
+  }
+
+  /**
+   * Freezes a group's results once grace has ended: written once (a conditional update, so two
+   * readers never both send the reminder), then never recomputed. Sets saved later never count,
+   * and editing or deleting history afterwards changes nothing.
+   */
+  private async ensureFinalized(group: GroupRow, now: Date): Promise<GroupRow> {
+    const target = seasonOf(group.season);
+    if (group.finalizedAt || now < target.finalizesAt) return group;
+    const results = await this.liveResults(group, target, now);
+    const written = await this.groups.updateOne(
+      { _id: group._id, finalizedAt: { $exists: false } },
+      { $set: { results, finalizedAt: now } },
+    );
+    if (written.matchedCount === 1) {
+      for (const row of results) {
+        void this.notifications.remind({ type: 'tournamentResultsReady', recipientId: row.userId, targetId: String(group._id) });
+      }
+    }
+    return (await this.groups.findOne({ _id: group._id }).lean<GroupRow>()) ?? group;
   }
 
   // ── Writes ────────────────────────────────────────────────────────────────
@@ -311,18 +391,28 @@ export class TournamentsService implements OnModuleInit {
     const lockDay = addDays(target.firstDay, -1);
     const entrants: TournamentEntrant[] = [];
     const notRanked: EntryRow[] = [];
-    const locked = new Map<string, { milestone: number; score: number; version: string }>();
+    const locked = new Map<string, { milestone: number; score: number; version: string; baseline: number }>();
+    const windows = scoringWindows(target);
     for (const row of rows) {
       const result = await this.ranks
         .rankFor(row.userId, exerciseId, lockDay, category, target.locksAt)
         .catch(() => undefined);
       const current = result?.view.current;
-      if (!current || !result?.view.benchmark) {
+      const version = result?.view.benchmark?.version;
+      // The baseline: the best strength score (no work-capacity bonus) of the same 90 days, from
+      // the same sets. A current rank implies one; without either there is no entry to score.
+      const baseline =
+        current && version
+          ? await this.ranks
+              .strengthBest(row.userId, exerciseId, category, { from: windows.baselineFrom, to: windows.baselineTo }, target.locksAt, version, lockDay)
+              .catch(() => undefined)
+          : undefined;
+      if (!current || !version || !baseline?.best) {
         notRanked.push(row);
         continue;
       }
       entrants.push({ userId: row.userId, milestone: current.milestone, score: current.score });
-      locked.set(row.userId, { milestone: current.milestone, score: current.score, version: result.view.benchmark.version });
+      locked.set(row.userId, { milestone: current.milestone, score: current.score, version, baseline: baseline.best.score });
     }
     const { groups, unmatched } = matchEntrants(entrants);
     // A retaken claim starts over, so a half-finished earlier attempt leaves nothing behind.
@@ -342,7 +432,9 @@ export class TournamentsService implements OnModuleInit {
     }
     const snapshot = (userId: string) => {
       const rank = locked.get(userId);
-      return rank ? { lockedMilestone: rank.milestone, lockedScore: rank.score, lockedVersion: rank.version } : {};
+      return rank
+        ? { lockedMilestone: rank.milestone, lockedScore: rank.score, lockedVersion: rank.version, lockedBaseline: rank.baseline }
+        : {};
     };
     for (const { userId, groupId } of assigned) {
       await this.entries.updateOne({ ...key, userId }, { $set: { outcome: 'grouped', groupId, ...snapshot(userId) } });
@@ -394,6 +486,20 @@ export class TournamentsService implements OnModuleInit {
     return keys.size;
   }
 
+  /** Hourly: freeze the results of every group whose grace period has ended. */
+  async finalizeDue(): Promise<number> {
+    const now = this.now();
+    const open = await this.groups.find({ finalizedAt: { $exists: false } }).lean<GroupRow[]>();
+    let done = 0;
+    for (const group of open) {
+      if (now < seasonOf(group.season).finalizesAt) continue;
+      await this.ensureFinalized(group, now)
+        .then(() => done++)
+        .catch((error: unknown) => this.logger.warn(`Finalizing results failed: ${error instanceof Error ? error.message : 'unknown error'}`));
+    }
+    return done;
+  }
+
   /**
    * On the 20th: remind members who have entered before (and still have entries within the
    * retention period) that next month is open. Nobody else is ever sent one.
@@ -412,4 +518,17 @@ export class TournamentsService implements OnModuleInit {
   get schedulesDisabled() {
     return this.config.disableSchedules;
   }
+}
+
+/** The viewer's own breakdown from a scored result. */
+function ownScore(row: FrozenResult): TournamentScoreView {
+  return {
+    score: row.score as number,
+    strengthScore: row.strengthScore as number,
+    baseline: row.baseline ?? 0,
+    improvementBp: row.improvementBp ?? 0,
+    bonusBp: row.bonusBp ?? 0,
+    ...(row.bonusWithheld === 'standards_changed' ? { bonusWithheld: 'standards_changed' as const } : {}),
+    day: row.day ?? '',
+  };
 }

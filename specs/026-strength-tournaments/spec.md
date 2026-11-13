@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-13
 
-**Status**: Approved except scoring (owner, #12, 2026-11-13T11:44Z). Scoring and the production rollout are still open.
+**Status**: Approved, scoring included (owner, #12, 2026-11-13T11:44Z and 11:53Z). Built behind `tournaments`; production rollout waits on review.
 
 **Input**: Issue #12, "Build opt-in monthly Journey strength tournaments" (owner-approved
 direction), built on the exercise strength ranks of #5b (`docs/modules/training.md`,
@@ -13,12 +13,9 @@ direction), built on the exercise strength ranks of #5b (`docs/modules/training.
 ## Status of this spec
 
 Built behind the `tournaments` flag (internal on, production off): the UTC season calendar,
-matchmaking, entries with category and consent, the lock snapshot and groups, the group member
-list, withdrawal, developer voiding, retention and the enrolment-open and group-assigned
-reminders. See `docs/modules/tournaments.md`.
-
-**Not built, waiting on the owner:** scoring, positions, tie-breaks, final results, the
-results-ready reminder and results history (Q3), and the production rollout.
+matchmaking, entries with category and consent, the lock snapshot (rank and baseline) and groups,
+scoring, live standings, results frozen after grace, withdrawal, developer voiding, retention and
+the three reminders. See `docs/modules/tournaments.md`. Production rollout waits on review.
 
 ## User Scenarios & Testing
 
@@ -79,7 +76,8 @@ past results for 12 months.
 - **Who can enter.** You need a current rank to join; someone unranked can establish one during
   enrolment. At lock the rank is recomputed from sets saved before the lock; no current rank
   then means `not_ranked`, with an explanation.
-- **Snapshot at lock.** Your entry snapshots your milestone and rank score at lock. Ranking up
+- **Snapshot at lock.** Your entry snapshots your milestone, rank score, scoring baseline and
+  benchmark version at lock. Ranking up
   during the season never moves you.
 - **Grouping** (`matchEntrants`):
   - Each division starts as its own bracket.
@@ -95,20 +93,20 @@ past results for 12 months.
   the standards their rank uses, so the private setting is never disclosed silently.
 - **Fewer than 3.** No tournament, and the member is told why.
 
-### Scoring (proposed, not built — Q3)
-- **Baseline.** The rank score at lock: the best valid set in the 90 days before.
-- **Score.** The improvement of the best valid in-season set over the baseline, as a
-  percentage, capped at +15%.
-- **Tie-break.** Weeks of the month with at least one valid set of that exercise (at most 4).
-  If still tied, the place is shared.
+### Scoring (owner-approved, built)
+- **Score.** `best × (1 + min(5%, improvement / 15% × 5%))`, with
+  `improvement = max(0, best / baseline − 1)`. `best` is the season's best valid strength score,
+  without the work-capacity bonus.
+- **Baseline.** The best valid strength score of the 90 days before the lock, frozen then.
+- **Ties.** Exact ties share the place; there is no tie-break.
 - **Not scored.** No points for total weight, sets or workouts.
-- **Which sets are valid.** The same rules as ranks: no warm-ups, no machine sets, a fresh
-  weigh-in, and the implausibility cap.
+- **Which sets are valid.** The same rules as ranks: no warm-ups, no machine sets on a
+  free-weight standard, a fresh weigh-in, and the implausibility cap.
 
 ### Visibility and privacy (approved, built)
 - **What group members see of you:**
   - display name, username and avatar;
-  - your place and score (once scoring exists);
+  - your place and score;
   - the group's rank range and the category.
 
   Nothing else: no loads, reps, body weight, standards, dates or workouts. Nothing is public or
@@ -134,7 +132,7 @@ past results for 12 months.
     at lock;
   - `tournament_groups`;
   - `tournament_locks`: makes group formation happen once;
-  - results storage: waits on scoring.
+  - results: frozen on the group (`results`, `finalizedAt`) once grace ends.
 - **A deliberate exception to "derived never persisted".** The snapshots exist so that a
   finished competition is never rewritten by a later edit or a benchmark change. The same
   reasoning applies as for `meal_entries.facts`.
@@ -143,6 +141,8 @@ past results for 12 months.
 ## Open questions (issue #12)
 Answered by the owner on 2026-11-13: calendar (UTC), matching, privacy and categories,
 withdrawal and retention, integrity, notifications (enrolment open, group assigned, results
-ready, opted-in members only). Still open:
-1. Scoring: the score formula, its ceiling, final ordering and tie-breaking (Q3).
-2. Production rollout.
+ready, opted-in members only), and scoring (absolute strength with a capped 5% improvement
+bonus, shared ties). Still open:
+1. Production rollout.
+2. Flagged with the scoring build: different machines on one machine exercise share a
+   tournament.

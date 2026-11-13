@@ -121,7 +121,7 @@ Current types:
 | `restOver` | RestAlarmService (`personal`, sent with `remind()`) | none | session | `/training` |
 | `tournamentEnrollmentOpen` | TournamentsService (`personal`, `remind()`) | none | season | `/training` |
 | `tournamentGroupAssigned` | TournamentsService (`personal`, `remind()`) | none | group | `/training` |
-| `tournamentResultsReady` | TournamentsService (`personal`), registered, never sent until scoring exists | none | season | `/training` |
+| `tournamentResultsReady` | TournamentsService (`personal`, `remind()`), once per group when results freeze | none | group | `/training` |
 
 ## Personal reminders: `remind()` (spec 025)
 

@@ -2,7 +2,7 @@
 
 User-visible changes. Newest first.
 
-## 2026-11-13: Monthly strength tournaments (internal only, no scoring yet)
+## 2026-11-13: Monthly strength tournaments (internal only)
 
 - **Join a lift's monthly tournament** from its statistics, from the 20th of the month before.
   You choose the men's or women's category and see exactly what your group will see, the
@@ -11,9 +11,13 @@ User-visible changes. Newest first.
 - **Groups of 3 to 100 at a similar rank** are set when enrolment closes on the 1st (00:00 UTC).
   Your group shows names and photos only; blocked members appear as "A member".
 - **Withdraw any time**, and you leave the group at once.
+- **Scored on strength, with a little credit for improving.** Your best valid set of the month
+  counts, raised by up to 5% for beating your best of the 90 days before. More sets or workouts
+  add nothing, and exact ties share a place. Your group sees places and scores; only you see how
+  yours was worked out.
+- **Live standings, then final results** three days after the month ends, with a notification.
 - Notifications when enrolment opens and when you get a group.
-- Scoring, standings and results are not built yet. Behind the `tournaments` flag; off in
-  production.
+- Behind the `tournaments` flag; off in production.
 
 ## 2026-11-13: Strength ranks for more lifts, machines included (draft standards, revised)
 

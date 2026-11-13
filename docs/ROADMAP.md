@@ -78,8 +78,8 @@ search, connection actions and money widget sharing have their own tests.
    and highest-ever ranks. Freezing v1 thresholds waits on owner review. *In progress (#12):*
    opt-in **monthly** tournaments (calendar-month seasons) among similarly ranked members. Built
    behind `tournaments`: UTC calendar, men's and women's categories with explicit consent,
-   lock-time snapshot and groups, private group lists, withdrawal, voiding, retention and
-   reminders. Scoring, results and production rollout wait on the owner
+   lock-time snapshot and groups, scoring (owner formula), live standings and frozen results,
+   withdrawal, voiding, retention and reminders. Production rollout waits on review
    (`docs/modules/tournaments.md`).
    *Later, not built:* ranks and levels may become a modest credibility signal for creators'
    training content in For You, with relevance and quality staying primary, no suppression of

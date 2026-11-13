@@ -9,16 +9,20 @@ import type {
   TournamentEntry,
   TournamentGroupView,
   TournamentOverview,
+  TournamentScoreView,
 } from '@life-portal/shared-types';
+import { formatDay } from '@life-portal/shared-domain';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
 import { ErrorNote, Spinner } from '../ui';
+import { formatRankScore } from './strength-rank';
 
 /**
  * Monthly strength tournaments (#12) for one exercise, inside its statistics view. Behind
  * `tournaments`. Joining is an explicit opt-in: the member picks the category themselves and sees
  * exactly what joining shares, for how long, and that there are no prizes, before agreeing.
- * Scoring is not decided yet, so a group lists who is in it and nothing more.
+ * A group ranks by tournament score (the owner's formula); only the viewer sees how their own
+ * score was worked out.
  */
 
 export const TOURNAMENTS_KEY = '/tournaments';
@@ -33,6 +37,16 @@ export function localTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+/** 1st, 2nd, 3rd, 4th, 11th, 21st… */
+export function ordinal(n: number) {
+  const tens = n % 100;
+  const suffix = tens >= 11 && tens <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';
+  return `${n}${suffix}`;
+}
+
+/** Basis points as a percentage, e.g. 333 → "3.33%". */
+export const percent = (bp: number) => `${(bp / 100).toFixed(2)}%`;
+
 const CATEGORY_LABEL: Record<TournamentCategory, string> = { men: 'Men’s', women: 'Women’s' };
 
 export function entryStatusText(entry: TournamentEntry): string {
@@ -42,7 +56,10 @@ export function entryStatusText(entry: TournamentEntry): string {
     case 'forming':
       return 'Enrolment has closed; your group is being set.';
     case 'grouped':
-      return 'You’re in a group.';
+      if (!entry.result) return 'You’re in a group.';
+      return entry.result.place
+        ? `Final result: ${ordinal(entry.result.place)} of ${entry.result.of}.`
+        : `Final result: no valid set this month, so no place (${entry.result.of} in the group).`;
     case 'no_tournament':
       return 'Fewer than 3 people entered this exercise in your category, so there is no competition this month. Nobody is invented to fill a group.';
     case 'not_ranked':
@@ -161,26 +178,60 @@ export function GroupList({ groupId }: { groupId: string }) {
   const { data, error } = useApi<TournamentGroupView>(`${TOURNAMENTS_KEY}/groups/${groupId}`);
   if (error) return <ErrorNote message={(error as Error).message} />;
   if (!data) return <Spinner />;
+  const format = (score: number) => formatRankScore(score, data);
   return (
     <div className="mt-2 rounded-lg bg-surface-raised p-2">
       <p className="text-xs text-ink-muted">
-        {data.rankRange} · {data.members.length} {data.members.length === 1 ? 'member' : 'members'} · runs {data.season.firstDay} to {data.season.lastDay} (UTC); workouts saved until {localTime(data.season.finalizesAt)} count.
+        {data.rankRange} · {data.standings.length} {data.standings.length === 1 ? 'member' : 'members'} ·{' '}
+        {data.final
+          ? 'final results'
+          : `live until ${localTime(data.season.finalizesAt)}; workouts dated ${data.season.firstDay} to ${data.season.lastDay} (UTC month) and saved by then count`}
       </p>
-      <ul className="mt-2 space-y-1" aria-label="Group members">
-        {data.members.map((member, i) => (
-          <li key={member.userId ?? `hidden-${i}`} className="flex items-center gap-2">
-            {member.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={member.avatarUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
+      <ol className="mt-2 space-y-1" aria-label={data.final ? 'Final standings' : 'Live standings'}>
+        {data.standings.map((row, i) => (
+          <li key={row.userId ?? `hidden-${i}`} className="flex items-center gap-2">
+            <span className="w-8 shrink-0 text-right tabular-nums text-ink-muted">{row.place ? ordinal(row.place) : '–'}</span>
+            {row.avatarUrl ? (
+              <img src={row.avatarUrl} alt="" className="h-6 w-6 shrink-0 rounded-full object-cover" />
             ) : (
-              <span aria-hidden className="h-6 w-6 rounded-full bg-border" />
+              <span aria-hidden className="h-6 w-6 shrink-0 rounded-full bg-border" />
             )}
-            <span>{member.displayName ?? 'A member'}</span>
-            {member.self && <span className="text-xs text-ink-muted">(you)</span>}
+            <span className="truncate">{row.displayName ?? 'A member'}</span>
+            {row.self && <span className="text-xs text-ink-muted">(you)</span>}
+            <span className="ml-auto shrink-0 tabular-nums text-xs">{row.score !== undefined ? format(row.score) : 'no valid set yet'}</span>
           </li>
         ))}
+      </ol>
+      {data.own && <OwnScore own={data.own} format={format} />}
+      <p className="mt-2 text-xs text-ink-faint">
+        Ranked by tournament score: your best valid set dated this month, on strength alone (extra sets, workouts and volume add
+        nothing), raised by up to 5% for improving on your baseline. Exact ties share a place. Logs are self-reported.
+      </p>
+    </div>
+  );
+}
+
+/** How the viewer's own score was worked out. Only ever the viewer's. */
+export function OwnScore({ own, format }: { own: TournamentScoreView; format: (score: number) => string }) {
+  return (
+    <div className="mt-2 border-t border-border pt-2 text-xs" aria-label="How your score is worked out">
+      <p className="font-medium text-ink">Your score: {format(own.score)}</p>
+      <ul className="mt-1 space-y-0.5 text-ink-muted">
+        <li>
+          Best this month: {format(own.strengthScore)}{own.day ? `, ${formatDay(own.day)}` : ''}
+        </li>
+        <li>Baseline, frozen when enrolment closed (your best in the 90 days before): {format(own.baseline)}</li>
+        <li>
+          Improvement {percent(own.improvementBp)} → bonus +{percent(own.bonusBp)}
+          {own.bonusWithheld ? '' : ' (a third of the improvement, at most +5%, reached at +15%)'}
+        </li>
+        {own.bonusWithheld === 'standards_changed' && (
+          <li>The rank standards changed after enrolment closed, so the improvement can’t be compared fairly and no bonus applies.</li>
+        )}
+        <li>
+          {format(own.strengthScore)} × {(1 + own.bonusBp / 10_000).toFixed(4)} = {format(own.score)}
+        </li>
       </ul>
-      <p className="mt-2 text-xs text-ink-faint">Standings appear once tournament scoring is decided. Nothing here is a ranking.</p>
     </div>
   );
 }
@@ -253,7 +304,11 @@ export function JoinConsent({
           </li>
           <li>Results are kept for {retentionMonths} months, then deleted. You can withdraw at any time; you leave the group at once.</li>
           <li>Logs are self-reported. Impossible entries are left out, and an entry can be removed with a reason.</li>
-          <li>There are no prizes. How scoring works is still being decided.</li>
+          <li>
+            Your score is your best valid set dated this month, on strength alone, raised by up to 5% for improving on your best of the 90
+            days before enrolment closes. More sets or workouts add nothing. Exact ties share a place.
+          </li>
+          <li>There are no prizes.</li>
         </ul>
       </div>
       <label className="flex items-start gap-2">
