@@ -136,6 +136,9 @@ function Ranked({ view, unit, onChangeStandards }: { view: ExerciseRankView; uni
         <summary className="cursor-pointer text-ink">How this is worked out</summary>
         <div className="mt-2 space-y-1.5">
           {current && <p>From: {describeBasis(current, benchmark, unit)}.</p>}
+          {current && workCapacityLine(current, benchmark) && <p>{workCapacityLine(current, benchmark)}</p>}
+          {benchmark.note && <p>{benchmark.note}</p>}
+          {benchmark.machine && <p>Machine standards are rougher: the same weight feels different on different machines.</p>}
           <p>
             {benchmark.method === 'e1rm'
               ? `Score: your Epley estimated one-rep max, scaled to a ${(benchmark.referenceBodyWeightGrams ?? 0) / 1000} kg body weight (×(reference ÷ your weight)^⅔), as a multiple of that weight.`
@@ -146,7 +149,7 @@ function Ranked({ view, unit, onChangeStandards }: { view: ExerciseRankView; uni
           {benchmark.draft && <p className="text-amber-600 dark:text-amber-400">Draft standards ({benchmark.version}): they may still change before they are fixed.</p>}
           {(view.excluded.implausible > 0 || view.excluded.machine > 0) && (
             <p>
-              Not counted: {[view.excluded.machine && `${view.excluded.machine} set(s) on a machine`, view.excluded.implausible && `${view.excluded.implausible} set(s) beyond a plausible range`].filter(Boolean).join(', ')}.
+              Not counted: {[view.excluded.machine && `${view.excluded.machine} set(s) with a machine attached (this standard is for the free-weight lift)`, view.excluded.implausible && `${view.excluded.implausible} set(s) beyond a plausible range`].filter(Boolean).join(', ')}.
             </p>
           )}
           <p>
@@ -163,6 +166,14 @@ function Ranked({ view, unit, onChangeStandards }: { view: ExerciseRankView; uni
       </details>
     </div>
   );
+}
+
+/** "Includes +3% for 4 hard sets in that workout (at most +5%)." */
+export function workCapacityLine(position: RankPosition, benchmark: RankBenchmark): string | undefined {
+  const { strengthScore, hardSets, bonusPercent } = position.basis;
+  if (benchmark.method !== 'e1rm' || strengthScore === undefined || hardSets === undefined || bonusPercent === undefined) return undefined;
+  if (bonusPercent === 0) return 'Work capacity: hard sets after the first in a workout add 1% each, up to +5%.';
+  return `Includes +${bonusPercent}% work capacity for ${hardSets} hard sets in that workout (strength alone: ${formatRankScore(strengthScore, benchmark)}; at most +5%).`;
 }
 
 function Progress({ position, benchmark }: { position: RankPosition; benchmark: RankBenchmark }) {

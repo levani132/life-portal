@@ -604,6 +604,14 @@ export interface RankBasis {
   oneRepMaxGrams?: number;
   bodyWeightGrams?: number;
   bodyWeightDay?: string;
+  /**
+   * `e1rm` only: the work-capacity part. The score is `strengthScore` raised by `bonusPercent`, one
+   * percent per hard set after the first in the same workout (a hard set reaches at least 75% of
+   * that workout's best), at most `RANK_WORK_CAPACITY_MAX_PERCENT`. Tier starts are strength alone.
+   */
+  strengthScore?: number;
+  hardSets?: number;
+  bonusPercent?: number;
 }
 
 export interface RankPosition {
@@ -631,6 +639,10 @@ export interface RankBenchmark {
   /** Where each tier starts, in score units, Initiate first. */
   tierStarts: number[];
   basis: string;
+  /** How load is read for this exercise, e.g. "The weight of one dumbbell." */
+  note?: string;
+  /** A machine or cable standard: loads differ between machines, so it is rougher. */
+  machine?: boolean;
 }
 
 /** `GET /training/exercises/:id/rank`. Derived on every read; nothing about it is stored. */

@@ -423,31 +423,145 @@ wide as Master, and Legend I is the top. Shown as a hexagon in the tier's colour
 always next to the name as text.
 
 **Score.**
-- `e1rm` method (barbell bench, back and full squat, front squat, deadlift, standing military
-  press, bent-over row, pull-ups, chin-ups, triceps dips): the set's Epley estimate (1–12 reps;
-  `estimateOneRepMax`), with body weight in the load for bodyweight lifts (`effectiveLoadGrams`),
-  scaled to the reference body weight with a 2/3 exponent:
-  `score = round(1000 × e1RM × (ref ÷ bw)^(2/3) ÷ ref)`, so 1250 means 1.25× the reference. The
-  exponent is the allometric scaling of strength with mass, so a heavier lifter needs more load
-  but not proportionally more (twice the body weight → about 1.59× the load), which plain
-  load ÷ body weight would get wrong for both light and heavy lifters. Reference: 80 kg (men's
-  standards), 60 kg (women's).
-- `reps` method (push-ups): the most reps in one set; the lift already moves your own body.
+- `e1rm` method (every load lift and pull-ups, chin-ups and dips): the set's Epley estimate (1–12
+  reps; `estimateOneRepMax`), with body weight in the load for bodyweight lifts
+  (`effectiveLoadGrams`), scaled to the reference body weight with a 2/3 exponent:
+  `strength = round(1000 × e1RM × (ref ÷ bw)^(2/3) ÷ ref)`, so 1250 means 1.25× the reference.
+  Reference: 80 kg (men's standards), 60 kg (women's). Twice the body weight needs about 1.59× the
+  load, not 2×; plain load ÷ body weight would get both light and heavy lifters wrong.
+- **Work capacity (owner direction, 2026-11-13).** Scored per *workout*: the workout's best set,
+  raised by 1% for every further hard set in that workout (at least 75% of the best set's
+  strength, `RANK_HARD_SET_FRACTION`), at most +5% (`RANK_WORK_CAPACITY_MAX_PERCENT`). Sets past
+  the cap, light sets and sets in other workouts add nothing, so volume cannot dominate; at most
+  it moves a rank about one division (tested). Tier starts are strength alone; the basis carries
+  `strengthScore`, `hardSets` and `bonusPercent`, and the panel explains it.
+- `reps` method (push-ups): the most reps in one set; no work-capacity part.
 - **Height and age are not used.** Height is a poor proxy for limb lengths and leverage, and age
   standards would need data we don't have; neither is asked for.
-- **No work-capacity component.** Volume is already rewarded by the training level (#5a), and
-  adding it would make the score harder to explain without a defensible weight.
 
 **Which sets count.** Working, drop and failure sets (not warm-ups) of 1–12 reps for `e1rm`, any
 reps for `reps`; in finished sessions on or before `today`; logged under the measure the standard
-assumes; **without a specific machine attached** (`workout_exercises.machineId`), because a
-machine is not the free-weight lift the standard describes. For `e1rm`, a **weigh-in on or before
-the set's day and at most 90 days older** (`RANK_BODY_WEIGHT_MAX_AGE_DAYS`); without one the set is
-not ranked and the view asks for a weigh-in. A score more than 1.5× where Legend starts is taken as
-a logging error and left out (counted in `excluded.implausible`). Only these exact catalogue rows
-(by `seedKey`) are ranked: variants (dumbbell bench, assisted machines, deficit pulls), own
-exercises, unilateral and timed work have no benchmark and say so (`no_benchmark`). Units don't
-matter: everything is grams.
+assumes. A **free-weight** standard does not count sets with a specific machine attached
+(`workout_exercises.machineId`); a **machine or cable** standard does (`machine: true`), since
+that is the exercise. For `e1rm`, a **weigh-in on or before the set's day and at most 90 days
+older** (`RANK_BODY_WEIGHT_MAX_AGE_DAYS`); without one the set is not ranked and the view asks for a
+weigh-in. A set more than 1.5× where Legend starts is taken as a logging error and left out
+(`excluded.implausible`). Only the exact catalogue rows below (by `seedKey`) are ranked; own
+exercises and everything else say so (`no_benchmark`). Units don't matter: everything is grams.
+
+**Coverage and thresholds (v1-draft-2).** Body-weight multiples at the reference weight where each
+tier starts (Initiate starts at 0), push-ups in reps:
+
+| Exercise | Men (Explorer → Legend) | Women |
+|---|---|---|
+| Barbell Squat | 0.75 · 1.10 · 1.50 · 1.85 · 2.20 · 2.50 · 2.85 | 0.59 · 0.86 · 1.17 · 1.44 · 1.72 · 1.95 · 2.22 |
+| Barbell Full Squat | 0.75 · 1.10 · 1.50 · 1.85 · 2.20 · 2.50 · 2.85 | 0.59 · 0.86 · 1.17 · 1.44 · 1.72 · 1.95 · 2.22 |
+| Front Barbell Squat | 0.60 · 0.88 · 1.20 · 1.48 · 1.76 · 2.00 · 2.28 | 0.47 · 0.69 · 0.94 · 1.15 · 1.37 · 1.56 · 1.78 |
+| Front Squat Clean Grip | 0.60 · 0.88 · 1.20 · 1.48 · 1.76 · 2.00 · 2.28 | 0.47 · 0.69 · 0.94 · 1.15 · 1.37 · 1.56 · 1.78 |
+| Barbell Deadlift | 0.90 · 1.30 · 1.75 · 2.15 · 2.55 · 2.90 · 3.25 | 0.70 · 1.01 · 1.37 · 1.68 · 1.99 · 2.26 · 2.54 |
+| Sumo Deadlift | 0.90 · 1.30 · 1.75 · 2.15 · 2.55 · 2.90 · 3.25 | 0.70 · 1.01 · 1.37 · 1.68 · 1.99 · 2.26 · 2.54 |
+| Romanian Deadlift | 0.68 · 0.98 · 1.31 · 1.61 · 1.91 · 2.18 · 2.44 | 0.53 · 0.76 · 1.02 · 1.26 · 1.49 · 1.70 · 1.90 |
+| Stiff-Legged Barbell Deadlift | 0.68 · 0.98 · 1.31 · 1.61 · 1.91 · 2.18 · 2.44 | 0.53 · 0.76 · 1.02 · 1.26 · 1.49 · 1.70 · 1.90 |
+| Barbell Hip Thrust | 0.98 · 1.43 · 1.95 · 2.41 · 2.86 · 3.25 · 3.71 | 0.78 · 1.14 · 1.56 · 1.93 · 2.29 · 2.60 · 2.97 |
+| Barbell Bench Press - Medium Grip | 0.55 · 0.85 · 1.10 · 1.40 · 1.65 · 1.90 · 2.15 | 0.39 · 0.60 · 0.77 · 0.98 · 1.16 · 1.33 · 1.51 |
+| Wide-Grip Barbell Bench Press | 0.55 · 0.85 · 1.10 · 1.40 · 1.65 · 1.90 · 2.15 | 0.39 · 0.60 · 0.77 · 0.98 · 1.16 · 1.33 · 1.51 |
+| Bench Press - Powerlifting | 0.55 · 0.85 · 1.10 · 1.40 · 1.65 · 1.90 · 2.15 | 0.39 · 0.60 · 0.77 · 0.98 · 1.16 · 1.33 · 1.51 |
+| Decline Barbell Bench Press | 0.55 · 0.85 · 1.10 · 1.40 · 1.65 · 1.90 · 2.15 | 0.39 · 0.60 · 0.77 · 0.98 · 1.16 · 1.33 · 1.51 |
+| Close-Grip Barbell Bench Press | 0.50 · 0.77 · 0.99 · 1.26 · 1.49 · 1.71 · 1.94 | 0.35 · 0.54 · 0.69 · 0.88 · 1.04 · 1.20 · 1.36 |
+| Barbell Incline Bench Press - Medium Grip | 0.44 · 0.68 · 0.88 · 1.12 · 1.32 · 1.52 · 1.72 | 0.31 · 0.48 · 0.62 · 0.78 · 0.92 · 1.06 · 1.20 |
+| Standing Military Press | 0.36 · 0.55 · 0.72 · 0.91 · 1.07 · 1.24 · 1.40 | 0.25 · 0.39 · 0.50 · 0.64 · 0.75 · 0.87 · 0.98 |
+| Barbell Shoulder Press | 0.36 · 0.55 · 0.72 · 0.91 · 1.07 · 1.24 · 1.40 | 0.25 · 0.39 · 0.50 · 0.64 · 0.75 · 0.87 · 0.98 |
+| Seated Barbell Military Press | 0.36 · 0.55 · 0.72 · 0.91 · 1.07 · 1.24 · 1.40 | 0.25 · 0.39 · 0.50 · 0.64 · 0.75 · 0.87 · 0.98 |
+| Dumbbell Bench Press (per dumbbell) | 0.22 · 0.34 · 0.44 · 0.56 · 0.66 · 0.76 · 0.86 | 0.15 · 0.24 · 0.31 · 0.39 · 0.46 · 0.53 · 0.60 |
+| Incline Dumbbell Press (per dumbbell) | 0.19 · 0.29 · 0.37 · 0.48 · 0.56 · 0.65 · 0.73 | 0.13 · 0.20 · 0.26 · 0.34 · 0.39 · 0.45 · 0.51 |
+| Dumbbell Shoulder Press (per dumbbell) | 0.18 · 0.27 · 0.35 · 0.45 · 0.53 · 0.61 · 0.69 | 0.13 · 0.19 · 0.24 · 0.32 · 0.37 · 0.43 · 0.48 |
+| Seated Dumbbell Press (per dumbbell) | 0.18 · 0.27 · 0.35 · 0.45 · 0.53 · 0.61 · 0.69 | 0.13 · 0.19 · 0.24 · 0.32 · 0.37 · 0.43 · 0.48 |
+| Bent Over Barbell Row | 0.47 · 0.72 · 0.94 · 1.19 · 1.40 · 1.62 · 1.83 | 0.34 · 0.52 · 0.68 · 0.86 · 1.01 · 1.17 · 1.32 |
+| One-Arm Dumbbell Row (per dumbbell) | 0.25 · 0.38 · 0.50 · 0.63 · 0.74 · 0.86 · 0.97 | 0.18 · 0.27 · 0.36 · 0.45 · 0.53 · 0.62 · 0.70 |
+| Pullups | 0.85 · 1.05 · 1.20 · 1.35 · 1.55 · 1.75 · 1.95 | 0.72 · 0.89 · 1.02 · 1.15 · 1.32 · 1.49 · 1.66 |
+| Chin-Up | 0.88 · 1.08 · 1.24 · 1.39 · 1.60 · 1.80 · 2.01 | 0.75 · 0.92 · 1.05 · 1.18 · 1.36 · 1.53 · 1.71 |
+| Dips - Triceps Version | 0.85 · 1.15 · 1.40 · 1.65 · 1.90 · 2.10 · 2.30 | 0.72 · 0.98 · 1.19 · 1.40 · 1.62 · 1.79 · 1.96 |
+| Pushups | 5 · 12 · 22 · 30 · 40 · 55 · 75 | 2 · 6 · 12 · 18 · 25 · 35 · 45 |
+| Leg Press (machine) | 1.31 · 1.93 · 2.63 · 3.24 · 3.85 · 4.38 · 4.99 | 1.02 · 1.51 · 2.05 · 2.53 · 3.00 · 3.42 · 3.89 |
+| Leg Extensions (machine) | 0.59 · 0.86 · 1.17 · 1.44 · 1.72 · 1.95 · 2.22 | 0.46 · 0.67 · 0.91 · 1.12 · 1.34 · 1.52 · 1.73 |
+| Seated Leg Curl (machine) | 0.47 · 0.69 · 0.95 · 1.17 · 1.39 · 1.58 · 1.80 | 0.37 · 0.54 · 0.74 · 0.91 · 1.08 · 1.23 · 1.40 |
+| Wide-Grip Lat Pulldown (machine) | 0.47 · 0.73 · 0.95 · 1.20 · 1.42 · 1.63 · 1.85 | 0.34 · 0.53 · 0.68 · 0.86 · 1.02 · 1.17 · 1.33 |
+| Close-Grip Front Lat Pulldown (machine) | 0.47 · 0.73 · 0.95 · 1.20 · 1.42 · 1.63 · 1.85 | 0.34 · 0.53 · 0.68 · 0.86 · 1.02 · 1.17 · 1.33 |
+| Seated Cable Rows (machine) | 0.49 · 0.76 · 0.98 · 1.25 · 1.47 · 1.69 · 1.91 | 0.35 · 0.55 · 0.71 · 0.90 · 1.06 · 1.22 · 1.38 |
+| Leverage Chest Press (machine) | 0.50 · 0.77 · 0.99 · 1.26 · 1.49 · 1.71 · 1.94 | 0.35 · 0.54 · 0.69 · 0.88 · 1.04 · 1.20 · 1.36 |
+| Machine Bench Press (machine) | 0.50 · 0.77 · 0.99 · 1.26 · 1.49 · 1.71 · 1.94 | 0.35 · 0.54 · 0.69 · 0.88 · 1.04 · 1.20 · 1.36 |
+
+**Not ranked yet**, for lack of usable data: hack squat and Smith-machine lifts (counterweights
+and sled weights vary), machine shoulder press, lying leg curl, T-bar row, Olympic lifts and
+other technique-limited work, curls and other arm isolation, kettlebell work, lunges and split
+squats, and assisted pull-ups/dips.
+
+**How v1-draft-2 was set** (research report, 2026-11-13). Evidence is labelled (R) research, (C)
+coaching standards, (E) elite competition, (S) self-reported app users:
+- **Exponent 2/3**: theory and lab data support 0.67 (R: Jaric 2002; Markovic & Jaric 2004).
+  Elite lifting data often fit lower (0.47–0.60, R/E: Batterham & George 1997; Dooman & Vanderburgh
+  2000), i.e. 2/3 slightly favours lighter lifters and penalises heavier ones, mostly above about
+  100 kg; between 60 and 100 kg the effect is within a few percent. Competition formulas (Wilks,
+  DOTS, IPF GL) are curves fitted to elite totals, not suited to gym users.
+- **Men's base lifts** (back squat, deadlift, bench, pull-up, dips) are rounded from the levels of
+  a coaching standards model (C: Symmetric Strength) and checked against app-user percentiles
+  (S: Strength Level, self-selected, inflated, used as a sanity check only) and a measured norm
+  (R: Cooper Institute bench ratio for ages 20–29, median ≈ 1.06× body weight). Explorer ≈ an
+  untrained adult who can do the lift; Achiever ≈ 1–2 years of training; Master ≈ a top few
+  percent of gym-goers; Legend is kept at about 65–80% of IPF raw world records scaled to the
+  reference weight (E: OpenIPF, 2025–26), and a test asserts it stays under 85%.
+- **Variants** are a base lift times a ratio from the literature or coaching consensus: front
+  squat 0.80 of back squat (R, small sample: ≈0.78), incline 0.80 of bench (R: ≈0.78 at 30°),
+  close-grip 0.90, decline = bench (no data), overhead press 0.65 of bench (C/S), barbell row 0.85
+  of bench (C/S), Romanian and stiff-legged deadlift 0.75 of deadlift (C 0.60–0.70, S ≈0.8), hip
+  thrust 1.3× back squat (poorly established), dumbbell bench **per dumbbell** 0.40 of bench
+  (S/C), incline dumbbell 0.34, dumbbell shoulder press 0.32, one-arm dumbbell row 0.45 (C).
+- **Machines** (S only; no cross-machine study exists): leg press 1.75× back squat, leg extension
+  0.78×, seated leg curl 0.63×, lat pulldown 0.86× bench, seated cable row 0.89×, chest press 0.90×.
+  Sled weight, cams and friction differ between brands, so a machine rank is rough and the panel
+  says so.
+- **Women's standards** are the men's times a factor per movement family
+  (`RANK_WOMEN_FACTORS`), each at its own reference weight: pressing 0.70, rowing and pulldowns
+  0.72, squat and hinge 0.78, hip thrust 0.80, pull-ups/chin-ups/dips 0.85. Research puts women at
+  50–60% of men's upper-body and 60–70% of lower-body strength in absolute terms (R: Miller 1993;
+  Nuzzo 2023), closer after scaling for size; the tables give women/men ratios of about 0.63–0.86
+  (S, C) and the records 0.77–0.90 (E). Bodyweight pulls are higher because the women's reference
+  body is lighter and the lift moves it.
+- **Push-ups**: men from fitness-test norms (R/C: Canadian/ACSM, ages 20–29, "good" ≈ 22–28,
+  "excellent" ≥ 36, tables conflict); women's full push-up norms don't exist (tests use knee
+  push-ups), so women's thresholds are coaching judgement.
+
+**Stress profiles** (from the code; the test file asserts the invariants):
+
+| Lifter | Lift | Set | Score | Rank |
+|---|---|---|---|---|
+| Man 60 kg, 1× BW | Barbell Bench Press - Medium Grip | 60 kg × 1 | 0.91 | Challenger III |
+| Man 80 kg, 1× BW | Barbell Bench Press - Medium Grip | 80 kg × 1 | 1.00 | Challenger II |
+| Man 100 kg, 1× BW | Barbell Bench Press - Medium Grip | 100 kg × 1 | 1.08 | Challenger I |
+| Man 130 kg, 1× BW | Barbell Bench Press - Medium Grip | 130 kg × 1 | 1.18 | Achiever III |
+| Woman 50 kg, 1× BW | Barbell Squat | 50 kg × 1 | 0.94 | Challenger III |
+| Woman 60 kg, 1× BW | Barbell Squat | 60 kg × 1 | 1.00 | Challenger II |
+| Woman 90 kg, 1× BW | Barbell Squat | 90 kg × 1 | 1.15 | Challenger I |
+| Untrained man 80 kg | Barbell Bench Press - Medium Grip | 50 kg × 5 | 0.73 | Explorer II |
+| 1–2 yr man 80 kg | Barbell Squat | 120 kg × 5 | 1.75 | Achiever I |
+| Advanced man 90 kg | Barbell Squat | 180 kg × 3 | 2.29 | Elite III |
+| Advanced man 90 kg | Barbell Deadlift | 220 kg × 3 | 2.80 | Elite I |
+| Beginner woman 60 kg | Barbell Squat | 40 kg × 8 | 0.84 | Explorer I |
+| Intermediate woman 65 kg | Barbell Bench Press - Medium Grip | 45 kg × 5 | 0.83 | Achiever III |
+| Intermediate woman 65 kg | Barbell Deadlift | 85 kg × 3 | 1.48 | Achiever II |
+| Man 75 kg | Pullups | body weight × 8 | 1.24 | Achiever III |
+| Man 75 kg | Pullups | 20 kg × 5 | 1.45 | Veteran II |
+| Woman 60 kg | Pullups | body weight × 3 | 1.10 | Achiever II |
+| Man 80 kg | Dumbbell Bench Press | 32 kg × 8 | 0.51 | Achiever II |
+| Woman 60 kg | Leg Press | 100 kg × 10 | 2.22 | Achiever II |
+| Man 85 kg | Wide-Grip Lat Pulldown | 70 kg × 8 | 1.06 | Achiever II |
+
+
+**Known limits.** No percentile is claimed for anyone. The 2/3 exponent's bias for very heavy
+lifters remains (a 1× body-weight bench is Challenger III at 60 kg and Achiever III at 130 kg).
+Dumbbell weight is read per dumbbell, but the set logger doesn't say so; a member logging the pair
+would rank too high. Machine ranks are rough. Hip thrust, RDL and all women's push-up thresholds
+rest on the weakest evidence. Epley is less accurate near 12 reps.
 
 **Standards choice.** `training_profiles.rankStandards` (`men` / `women`), the member's own private
 choice, asked for in the rank panel the first time and changeable there; never inferred from the
@@ -473,7 +587,7 @@ lost by changing the data it came from, never by a benchmark change.
 **Benchmarks and versions.** `RANK_BENCHMARKS` lists every version with the day it starts
 applying. Stable by default: a version that is not a draft is never edited; any recalibration is a
 new version with a later `from`, reviewed and manual, and earlier sets keep the version of their
-day. **v1 is a draft** (`v1-draft`, applies to all history): the thresholds are the app's
+day. **v1 is a draft** (`v1-draft-2`, applies to all history; it replaced `v1-draft`): the thresholds are the app's
 proposal for owner review, not measured from LifePortal members and not competition records, and
 the UI says so. Draft values may change before v1 is fixed, and ranks shown under the draft
 change with them; this is the one exception to the stability rule and ends when v1 is frozen.

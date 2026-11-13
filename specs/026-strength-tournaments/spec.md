@@ -70,6 +70,9 @@ past results for 12 months.
   (`countsForSeason`). A backfill after the fact never changes final standings.
 
 ### Matchmaking (built)
+- **Exercises.** Tournaments may start with only the popular, best-evidenced lifts: back squat,
+  bench, deadlift, overhead press, pull-ups. They should not start with machine lifts, whose
+  ranks are rough (owner, #5, 2026-11-13).
 - **Who can enter.** You need a current rank on that exercise at lock, which means a valid set
   in the last 90 days.
 - **Snapshot at lock.** Your entry snapshots your milestone and rank score at lock. Ranking up

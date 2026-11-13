@@ -28,13 +28,24 @@ export const RANK_IMPLAUSIBLE_FACTOR = 1.5;
 export const RANK_REFERENCE_BODY_WEIGHT_GRAMS: Record<RankStandards, number> = { men: 80_000, women: 60_000 };
 /** Allometric exponent: strength grows with about body mass^(2/3), not in proportion to it. */
 export const RANK_ALLOMETRIC_EXPONENT = 2 / 3;
+/** The most the work-capacity part can add to a workout's score, in percent. */
+export const RANK_WORK_CAPACITY_MAX_PERCENT = 5;
+/** A hard set reaches at least this share of the workout's best set. */
+export const RANK_HARD_SET_FRACTION = 0.75;
 
-interface ExerciseStandard {
+export interface ExerciseStandard {
   method: RankMethod;
   /** The measure the standard assumes; a set logged under another one is not comparable. */
   measure: Measure;
   /** Where each of the 8 tiers starts, in score units, for each standards set. */
   starts: Record<RankStandards, number[]>;
+  /**
+   * A machine or cable exercise. Its sets count with a specific machine attached; a free-weight
+   * standard's sets do not, because a machine is not the lift the standard describes.
+   */
+  machine?: boolean;
+  /** How load is read, shown with the rank (e.g. "The weight of one dumbbell."). */
+  note?: string;
 }
 
 export interface BenchmarkVersion {
@@ -47,42 +58,114 @@ export interface BenchmarkVersion {
   exercises: Record<string, ExerciseStandard>;
 }
 
-const e1rm = (men: number[], women: number[], measure: Measure = 'weight_reps'): ExerciseStandard => ({
+/** Thousandths of body weight, from multiples: `bw(1.1)` → 1100. */
+const bw = (...multiples: number[]) => multiples.map((m) => Math.round(m * 1000));
+/** Rounds score units to hundredths of body weight. */
+const r10 = (value: number) => Math.round(value / 10) * 10;
+
+/**
+ * Women's thresholds as a share of men's, by movement family, after each is scaled to its own
+ * reference body weight. From the sex-difference research (women ≈ 50–60% of men's upper-body and
+ * 60–70% of lower-body strength in absolute terms; closer once body size is scaled out) and the
+ * per-lift women/men ratios of the standards tables. See docs/modules/training.md.
+ */
+export const RANK_WOMEN_FACTORS = { press: 0.7, pull: 0.72, bodyweightPull: 0.85, legs: 0.78, hipThrust: 0.8 } as const;
+
+type Family = keyof typeof RANK_WOMEN_FACTORS;
+
+interface LiftOptions {
+  measure?: Measure;
+  machine?: boolean;
+  note?: string;
+}
+
+/** A load standard: men's tier starts as body-weight multiples, women's derived by family. */
+const lift = (men: number[], family: Family, options: LiftOptions = {}): ExerciseStandard => ({
   method: 'e1rm',
-  measure,
-  starts: { men, women },
+  measure: options.measure ?? 'weight_reps',
+  starts: { men, women: men.map((value) => r10(value * RANK_WOMEN_FACTORS[family])) },
+  ...(options.machine ? { machine: true } : {}),
+  ...(options.note ? { note: options.note } : {}),
 });
+
+/** A variant: another lift's men's standard times a ratio (e.g. incline ≈ 0.80 × flat bench). */
+const variant = (base: number[], ratio: number, family: Family, options: LiftOptions = {}) =>
+  lift(base.map((value) => r10(value * ratio)), family, options);
+
+const PER_DUMBBELL = 'The weight of one dumbbell.';
+const STACK = 'The weight on the stack or the plates loaded; machines differ, so compare like with like.';
+
+// Base lifts, men, Explorer → Legend (Initiate starts at 0).
+const BACK_SQUAT = bw(0, 0.75, 1.1, 1.5, 1.85, 2.2, 2.5, 2.85);
+const DEADLIFT = bw(0, 0.9, 1.3, 1.75, 2.15, 2.55, 2.9, 3.25);
+const BENCH = bw(0, 0.55, 0.85, 1.1, 1.4, 1.65, 1.9, 2.15);
+/** Explorer ≈ one strict rep: scaled, one pull-up at 55 kg scores 0.88 and at 110 kg 1.11. */
+const PULL_UP = bw(0, 0.85, 1.05, 1.2, 1.35, 1.55, 1.75, 1.95);
+
+const STANDARDS_V1_DRAFT_2: Record<string, ExerciseStandard> = {
+  // Squat and hinge
+  'fedb:Barbell_Squat': lift(BACK_SQUAT, 'legs'),
+  'fedb:Barbell_Full_Squat': lift(BACK_SQUAT, 'legs'),
+  'fedb:Front_Barbell_Squat': variant(BACK_SQUAT, 0.8, 'legs'),
+  'fedb:Front_Squat_Clean_Grip': variant(BACK_SQUAT, 0.8, 'legs'),
+  'fedb:Barbell_Deadlift': lift(DEADLIFT, 'legs'),
+  'fedb:Sumo_Deadlift': lift(DEADLIFT, 'legs'),
+  'fedb:Romanian_Deadlift': variant(DEADLIFT, 0.75, 'legs'),
+  'fedb:Stiff-Legged_Barbell_Deadlift': variant(DEADLIFT, 0.75, 'legs'),
+  'fedb:Barbell_Hip_Thrust': variant(BACK_SQUAT, 1.3, 'hipThrust'),
+  // Press
+  'fedb:Barbell_Bench_Press_-_Medium_Grip': lift(BENCH, 'press'),
+  'fedb:Wide-Grip_Barbell_Bench_Press': lift(BENCH, 'press'),
+  'fedb:Bench_Press_-_Powerlifting': lift(BENCH, 'press'),
+  'fedb:Decline_Barbell_Bench_Press': lift(BENCH, 'press'),
+  'fedb:Close-Grip_Barbell_Bench_Press': variant(BENCH, 0.9, 'press'),
+  'fedb:Barbell_Incline_Bench_Press_-_Medium_Grip': variant(BENCH, 0.8, 'press'),
+  'fedb:Standing_Military_Press': variant(BENCH, 0.65, 'press'),
+  'fedb:Barbell_Shoulder_Press': variant(BENCH, 0.65, 'press'),
+  'fedb:Seated_Barbell_Military_Press': variant(BENCH, 0.65, 'press'),
+  'fedb:Dumbbell_Bench_Press': variant(BENCH, 0.4, 'press', { note: PER_DUMBBELL }),
+  'fedb:Incline_Dumbbell_Press': variant(BENCH, 0.34, 'press', { note: PER_DUMBBELL }),
+  'fedb:Dumbbell_Shoulder_Press': variant(BENCH, 0.32, 'press', { note: PER_DUMBBELL }),
+  'fedb:Seated_Dumbbell_Press': variant(BENCH, 0.32, 'press', { note: PER_DUMBBELL }),
+  // Pull
+  'fedb:Bent_Over_Barbell_Row': variant(BENCH, 0.85, 'pull'),
+  'fedb:One-Arm_Dumbbell_Row': variant(BENCH, 0.45, 'pull', { note: 'The weight of the dumbbell, one arm at a time.' }),
+  // Bodyweight: body weight plus any added load.
+  'fedb:Pullups': lift(PULL_UP, 'bodyweightPull', { measure: 'bodyweight_reps' }),
+  'fedb:Chin-Up': variant(PULL_UP, 1.03, 'bodyweightPull', { measure: 'bodyweight_reps' }),
+  'fedb:Dips_-_Triceps_Version': lift(bw(0, 0.85, 1.15, 1.4, 1.65, 1.9, 2.1, 2.3), 'bodyweightPull', { measure: 'bodyweight_reps' }),
+  'fedb:Pushups': {
+    method: 'reps',
+    measure: 'bodyweight_reps',
+    starts: { men: [0, 5, 12, 22, 30, 40, 55, 75], women: [0, 2, 6, 12, 18, 25, 35, 45] },
+  },
+  // Machines and cables: rougher, because loads differ between machines.
+  'fedb:Leg_Press': variant(BACK_SQUAT, 1.75, 'legs', { machine: true, note: STACK }),
+  'fedb:Leg_Extensions': variant(BACK_SQUAT, 0.78, 'legs', { machine: true, note: STACK }),
+  'fedb:Seated_Leg_Curl': variant(BACK_SQUAT, 0.63, 'legs', { machine: true, note: STACK }),
+  'fedb:Wide-Grip_Lat_Pulldown': variant(BENCH, 0.86, 'pull', { machine: true, note: STACK }),
+  'fedb:Close-Grip_Front_Lat_Pulldown': variant(BENCH, 0.86, 'pull', { machine: true, note: STACK }),
+  'fedb:Seated_Cable_Rows': variant(BENCH, 0.89, 'pull', { machine: true, note: STACK }),
+  'fedb:Leverage_Chest_Press': variant(BENCH, 0.9, 'press', { machine: true, note: STACK }),
+  'fedb:Machine_Bench_Press': variant(BENCH, 0.9, 'press', { machine: true, note: STACK }),
+};
 
 /**
  * Every published benchmark, oldest first. A version is never edited once it is no longer a
  * draft: a change is a new version with a later `from`, so ranks earned under an older one stand.
+ * Drafts are replaced in place until the owner freezes v1 (docs/modules/training.md).
  */
 export const RANK_BENCHMARKS: readonly BenchmarkVersion[] = [
   {
-    version: 'v1-draft',
+    version: 'v1-draft-2',
     draft: true,
     from: '0000-01-01',
     basis:
-      'Draft standards set by the app for review: an estimated one-rep max scaled to an 80 kg (men) ' +
-      'or 60 kg (women) body weight with a 2/3 exponent, against coaching-style milestones. Not measured ' +
-      'from LifePortal members, and not competition records.',
-    exercises: {
-      'fedb:Barbell_Bench_Press_-_Medium_Grip': e1rm([0, 500, 750, 1000, 1250, 1500, 1750, 2000], [0, 300, 450, 600, 750, 900, 1050, 1200]),
-      'fedb:Barbell_Squat': e1rm([0, 750, 1000, 1250, 1500, 1850, 2200, 2600], [0, 550, 750, 950, 1150, 1400, 1650, 1950]),
-      'fedb:Barbell_Full_Squat': e1rm([0, 750, 1000, 1250, 1500, 1850, 2200, 2600], [0, 550, 750, 950, 1150, 1400, 1650, 1950]),
-      'fedb:Front_Barbell_Squat': e1rm([0, 600, 800, 1000, 1200, 1500, 1750, 2100], [0, 450, 600, 750, 900, 1100, 1300, 1550]),
-      'fedb:Barbell_Deadlift': e1rm([0, 1000, 1250, 1500, 1850, 2200, 2600, 3000], [0, 750, 950, 1150, 1400, 1650, 1950, 2250]),
-      'fedb:Standing_Military_Press': e1rm([0, 350, 500, 650, 800, 950, 1100, 1300], [0, 220, 320, 420, 520, 620, 720, 850]),
-      'fedb:Bent_Over_Barbell_Row': e1rm([0, 500, 650, 800, 1000, 1200, 1400, 1600], [0, 350, 450, 550, 700, 850, 1000, 1150]),
-      'fedb:Pullups': e1rm([0, 800, 1000, 1150, 1300, 1450, 1650, 1900], [0, 600, 800, 950, 1080, 1200, 1350, 1550], 'bodyweight_reps'),
-      'fedb:Chin-Up': e1rm([0, 800, 1000, 1150, 1300, 1450, 1650, 1900], [0, 600, 800, 950, 1080, 1200, 1350, 1550], 'bodyweight_reps'),
-      'fedb:Dips_-_Triceps_Version': e1rm([0, 900, 1100, 1250, 1400, 1600, 1850, 2100], [0, 650, 850, 1000, 1150, 1300, 1500, 1750], 'bodyweight_reps'),
-      'fedb:Pushups': {
-        method: 'reps',
-        measure: 'bodyweight_reps',
-        starts: { men: [0, 5, 10, 20, 30, 40, 55, 70], women: [0, 2, 5, 10, 18, 26, 36, 48] },
-      },
-    },
+      'Draft standards for review, informed by published coaching standards and app-user percentiles, ' +
+      'with the top tier kept below world-record lifts. Your estimated one-rep max is scaled to an 80 kg ' +
+      '(men) or 60 kg (women) body weight with a 2/3 exponent. Not measured from LifePortal members, ' +
+      'and not percentiles of anyone.',
+    exercises: STANDARDS_V1_DRAFT_2,
   },
 ];
 
@@ -137,7 +220,7 @@ type Scored = { score: number; basis: RankBasis } | { skip: 'noBodyWeight' | 'ma
 /** One set's score under a standard, or why it has none. */
 export function scoreSet(standard: ExerciseStandard, standards: RankStandards, set: RankSet): Scored {
   if (set.type === 'warmup' || !set.reps || set.reps < 1) return { skip: 'invalid' };
-  if (set.machine) return { skip: 'machine' };
+  if (set.machine && !standard.machine) return { skip: 'machine' };
   const base = { setId: set.id, sessionId: set.sessionId, day: set.day, reps: set.reps };
   if (standard.method === 'reps') return { score: set.reps, basis: base };
   const body = freshBodyWeight(set.body, set.day);
@@ -170,19 +253,73 @@ export interface RankInput {
   today: string;
 }
 
+interface SessionResult {
+  score: number;
+  basis: RankBasis;
+}
+
+type Excluded = ExerciseRankView['excluded'];
+
 /**
- * An exercise's current and highest-ever rank. Current: the best valid set in the last 90 days
+ * Each workout's score under one standard: its best valid set, raised for `e1rm` by one percent per
+ * further hard set in that workout (at least `RANK_HARD_SET_FRACTION` of the best), at most
+ * `RANK_WORK_CAPACITY_MAX_PERCENT`. Sets past the cap add nothing, so volume cannot dominate.
+ * Implausible sets are left out first; `excluded`, when given, counts what was left out and why.
+ */
+export function sessionResults(
+  standard: ExerciseStandard,
+  standards: RankStandards,
+  sets: readonly RankSet[],
+  excluded?: Excluded,
+): SessionResult[] {
+  const ceiling = standard.starts[standards][7] * RANK_IMPLAUSIBLE_FACTOR;
+  const bySession = new Map<string, { score: number; basis: RankBasis }[]>();
+  for (const set of sets) {
+    const scored = scoreSet(standard, standards, set);
+    if ('skip' in scored) {
+      if (excluded && scored.skip !== 'invalid') excluded[scored.skip]++;
+      continue;
+    }
+    if (scored.score > ceiling) {
+      if (excluded) excluded.implausible++;
+      continue;
+    }
+    const list = bySession.get(set.sessionId) ?? [];
+    list.push(scored);
+    bySession.set(set.sessionId, list);
+  }
+  const results: SessionResult[] = [];
+  for (const scored of bySession.values()) {
+    const top = scored.reduce((best, item) => (item.score > best.score ? item : best));
+    if (standard.method !== 'e1rm') {
+      results.push(top);
+      continue;
+    }
+    const hardSets = scored.filter((item) => item.score >= top.score * RANK_HARD_SET_FRACTION).length;
+    const bonusPercent = Math.min(RANK_WORK_CAPACITY_MAX_PERCENT, hardSets - 1);
+    results.push({
+      score: Math.round((top.score * (100 + bonusPercent)) / 100),
+      basis: { ...top.basis, strengthScore: top.score, hardSets, bonusPercent },
+    });
+  }
+  return results;
+}
+
+/**
+ * An exercise's current and highest-ever rank. Current: the best workout in the last 90 days
  * under today's benchmark; none → `inactive` (never a lower rank). Highest: the best milestone any
- * valid set reached under the benchmark that applied on its day, so a later version never takes
- * one away. Sets after `today` are ignored; an implausible score is excluded and counted.
+ * workout reached under the benchmark that applied on its day, so a later version never takes one
+ * away. Sets after `today` are ignored; an implausible set is excluded and counted.
  */
 export function exerciseRank(input: RankInput, versions: readonly BenchmarkVersion[] = RANK_BENCHMARKS): ExerciseRankView {
-  const excluded = { implausible: 0, noBodyWeight: 0, machine: 0 };
+  const excluded: Excluded = { implausible: 0, noBodyWeight: 0, machine: 0 };
   const base = { exerciseId: input.exerciseId, windowDays: RANK_WINDOW_DAYS, excluded };
   const todayVersion = benchmarkFor(input.today, versions);
   const standard = input.seedKey ? todayVersion.exercises[input.seedKey] : undefined;
   if (!standard || standard.measure !== input.measure) return { ...base, status: 'unranked', reason: 'no_benchmark' };
-  const benchmarkView = (standards: RankStandards): RankBenchmark => ({
+  if (!input.standards) return { ...base, status: 'unranked', reason: 'needs_standards' };
+  const standards = input.standards;
+  const benchmark: RankBenchmark = {
     version: todayVersion.version,
     draft: todayVersion.draft,
     method: standard.method,
@@ -190,36 +327,40 @@ export function exerciseRank(input: RankInput, versions: readonly BenchmarkVersi
     ...(standard.method === 'e1rm' ? { referenceBodyWeightGrams: RANK_REFERENCE_BODY_WEIGHT_GRAMS[standards] } : {}),
     tierStarts: standard.starts[standards],
     basis: todayVersion.basis,
-  });
-  if (!input.standards) return { ...base, status: 'unranked', reason: 'needs_standards' };
-  const standards = input.standards;
-  const benchmark = benchmarkView(standards);
-  const windowStart = addDays(input.today, -(RANK_WINDOW_DAYS - 1));
+    ...(standard.note ? { note: standard.note } : {}),
+    ...(standard.machine ? { machine: true } : {}),
+  };
+  const sets = input.sets.filter((set) => set.day <= input.today);
 
-  let current: RankPosition | undefined;
+  // Highest ever: each set under the version of its own day.
   let highest: (RankPosition & { version: string }) | undefined;
-  for (const set of input.sets) {
-    if (set.day > input.today) continue;
+  const byVersion = new Map<BenchmarkVersion, RankSet[]>();
+  for (const set of sets) {
     const version = benchmarkFor(set.day, versions);
+    byVersion.set(version, [...(byVersion.get(version) ?? []), set]);
+  }
+  for (const [version, versionSets] of byVersion) {
     const own = version.exercises[input.seedKey as string];
-    if (own && own.measure === input.measure) {
-      const scored = scoreSet(own, standards, set);
-      if ('skip' in scored) {
-        if (scored.skip !== 'invalid') excluded[scored.skip]++;
-      } else if (scored.score > own.starts[standards][7] * RANK_IMPLAUSIBLE_FACTOR) {
-        excluded.implausible++;
-      } else {
-        const position = rankPosition(scored.score, own.starts[standards], scored.basis);
-        if (!highest || position.milestone > highest.milestone || (position.milestone === highest.milestone && version.version === highest.version && position.score > highest.score)) {
-          highest = { ...position, version: version.version };
-        }
+    if (!own || own.measure !== input.measure) continue;
+    for (const result of sessionResults(own, standards, versionSets, excluded)) {
+      const position = rankPosition(result.score, own.starts[standards], result.basis);
+      if (
+        !highest ||
+        position.milestone > highest.milestone ||
+        (position.milestone === highest.milestone && version.version === highest.version && position.score > highest.score)
+      ) {
+        highest = { ...position, version: version.version };
       }
     }
-    if (set.day < windowStart) continue;
-    const now = scoreSet(standard, standards, set);
-    if ('skip' in now || now.score > standard.starts[standards][7] * RANK_IMPLAUSIBLE_FACTOR) continue;
-    if (!current || now.score > current.score) current = rankPosition(now.score, standard.starts[standards], now.basis);
   }
+
+  // Current: the window's workouts under today's version.
+  const windowStart = addDays(input.today, -(RANK_WINDOW_DAYS - 1));
+  let current: RankPosition | undefined;
+  for (const result of sessionResults(standard, standards, sets.filter((set) => set.day >= windowStart))) {
+    if (!current || result.score > current.score) current = rankPosition(result.score, standard.starts[standards], result.basis);
+  }
+
   if (current) {
     return {
       ...base,

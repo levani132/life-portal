@@ -53,7 +53,7 @@ describe('TrainingRankService (issue #5b)', () => {
 
   it('ranks from the caller’s own finished sets, their weigh-in and chosen standards', async () => {
     const f = fixture({ standards: 'men' });
-    f.workout('2026-11-10', 100, 1); // 1.25× at 80 kg → Veteran III
+    f.workout('2026-11-10', 100, 1); // 1.25× at 80 kg → Achiever II
     f.workout('2026-11-12', 140, 1, { status: 'open' }); // not finished
     f.workout('2026-11-12', 150, 1, { userId: 'someone-else' });
     f.workout('2026-11-12', 130, 1, { machineId: 'm1' });
@@ -62,9 +62,9 @@ describe('TrainingRankService (issue #5b)', () => {
     expect(f.access.require).toHaveBeenCalledWith(ME, 'trainingRanks');
     expect(view).toMatchObject({
       status: 'ranked',
-      current: { tier: 'Veteran', division: 'III', score: 1250, basis: { bodyWeightGrams: 80_000, bodyWeightDay: '2026-11-01' } },
+      current: { tier: 'Achiever', division: 'II', score: 1250, basis: { bodyWeightGrams: 80_000, bodyWeightDay: '2026-11-01' } },
       excluded: { machine: 1 },
-      benchmark: { version: 'v1-draft', draft: true, standards: 'men' },
+      benchmark: { version: 'v1-draft-2', draft: true, standards: 'men' },
     });
   });
 

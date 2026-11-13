@@ -2,6 +2,16 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-13: Strength ranks for more lifts, machines included (draft standards, revised)
+
+- **Ranks for about 35 lifts**, up from 11: squat, deadlift and bench variants, Romanian deadlift,
+  hip thrust, dumbbell presses and rows, and the common machine and cable lifts (leg press,
+  pulldown, cable row, chest press, leg extension and curl). Machine ranks are marked as rougher.
+- **Thresholds revised from published research and coaching standards**, still a draft for review.
+  Ranks you already see may move.
+- **Hard sets in one workout add a little**: +1% for each one after the first, up to +5%. The rank
+  explains how much.
+
 ## 2026-11-13: Strength ranks for standard lifts (draft standards)
 
 - **See your rank on a lift.** An exercise's statistics now show a strength rank for the standard

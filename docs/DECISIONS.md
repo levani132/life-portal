@@ -1593,3 +1593,30 @@ standards sets (and these references, 80 kg and 60 kg) are the right categories;
   frozen at finalisation. This is a deliberate exception to "derived never persisted", for the
   same reason as `meal_entries.facts`: a later edit or benchmark change must not rewrite a
   finished competition. Not built yet.
+
+## 2026-11-13: Rank standards v1-draft-2: researched, more exercises, machines, capped work capacity (issue #5)
+
+**Owner direction (2026-11-13):** fixed, stable, research-informed thresholds per exercise;
+separate variants including machines; separate men's and women's standards; a modest, capped
+work-capacity part; no invented percentiles; no automatic calibration; any later population
+analysis needs its own privacy and consent decision.
+
+- **Derived from a few base lifts, by ratios.** Men's back squat, deadlift, bench, pull-up and dip
+  thresholds are set directly. Variants are a base times a ratio from the research (front squat
+  0.80, incline 0.80, overhead press 0.65, …). Women's thresholds are the men's times a factor
+  per movement family. Each threshold is therefore explainable in one line, and a later
+  correction changes one number rather than forty. The full evidence and its strength are in
+  `docs/modules/training.md`.
+- **Legend stays below world records.** It is held at about 65–80% of IPF raw records at the
+  reference weight, and a test fails if it passes 85%.
+- **Machines get their own, rougher standards** instead of being excluded. A free-weight lift
+  still does not count a set with a specific machine attached, because that is not the lift.
+  No research compares machines, so the panel says machine ranks are rough.
+- **Work capacity is scored per workout and capped.** +1% for each hard set (≥ 75% of the
+  workout's best) after the first, up to +5%. It is per workout so that spreading sets across the
+  week, or logging dozens of light sets, earns nothing. It is capped so that it moves a rank by
+  about one division at most. Tier starts stay pure strength. This replaces the earlier "no
+  work-capacity component" decision, on the owner's direction.
+- **Still a draft.** The version is `v1-draft-2`, which replaces `v1-draft` in place (drafts may
+  change). v1 is frozen only after the owner reviews it. After that, changes are new versions,
+  and highest-ever ranks are kept under the version of their day.

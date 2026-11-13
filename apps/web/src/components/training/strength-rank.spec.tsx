@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ExerciseRankView, RankPosition } from '@life-portal/shared-types';
-import { StrengthRank, TrainingLevelLink, formatRankScore } from './strength-rank';
+import { StrengthRank, TrainingLevelLink, formatRankScore, workCapacityLine } from './strength-rank';
 import { api } from '../../lib/api';
 
 jest.mock('next/link', () => ({ __esModule: true, default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }));
@@ -56,7 +56,7 @@ it('shows current and highest ranks as text, progress to the next division and t
   expect(screen.getByText(/100 kg × 5 on/)).toBeTruthy();
   expect(screen.getByText(/body weight 82 kg/)).toBeTruthy();
   expect(screen.getByText(/Draft standards \(v1-draft\)/)).toBeTruthy();
-  expect(screen.getByText(/1 set\(s\) on a machine/)).toBeTruthy();
+  expect(screen.getByText(/1 set\(s\) with a machine attached/)).toBeTruthy();
   expect(screen.getByText(/never with other members/)).toBeTruthy();
 });
 
@@ -96,4 +96,12 @@ it('formats scores and links the account-wide level separately', () => {
   render(<TrainingLevelLink today="2026-11-13" />);
   expect(screen.getByRole('link', { name: 'Training level 12' }).getAttribute('href')).toBe('/training');
   expect(screen.getByText(/account-wide/)).toBeTruthy();
+});
+
+it('explains the work-capacity part, and says nothing for push-ups', () => {
+  const at = (bonusPercent: number, hardSets: number) =>
+    position({ score: 1288, basis: { setId: 's', sessionId: 'w', day: '2026-11-13', reps: 1, strengthScore: 1250, hardSets, bonusPercent } });
+  expect(workCapacityLine(at(3, 4), benchmark)).toBe('Includes +3% work capacity for 4 hard sets in that workout (strength alone: 1.25× body weight; at most +5%).');
+  expect(workCapacityLine(at(0, 1), benchmark)).toMatch(/add 1% each, up to \+5%/);
+  expect(workCapacityLine(at(3, 4), { ...benchmark, method: 'reps' })).toBeUndefined();
 });
