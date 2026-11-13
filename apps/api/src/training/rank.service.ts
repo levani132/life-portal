@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
-import type { ExerciseRankView, Measure, SetType } from '@life-portal/shared-types';
+import type { ExerciseRankView, Measure, RankStandards, SetType } from '@life-portal/shared-types';
 import { bodyWeightOn, exerciseRank, type RankSet } from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
 import { NutritionService } from '../nutrition/nutrition.service';
@@ -48,10 +48,30 @@ export class TrainingRankService {
     });
   }
 
+  /**
+   * For tournaments (#12): a member's rank on a catalogue exercise under the given standards (their
+   * competition category), counting only sets logged before `savedBefore` when given, so a set
+   * saved after a lock or a deadline never changes what was frozen. No feature check: the caller
+   * has already decided this member may be ranked here. Also returns the exercise's name.
+   */
+  async rankFor(
+    userId: string,
+    exerciseId: string,
+    today: string,
+    standards: RankStandards,
+    savedBefore?: Date,
+  ): Promise<{ view: ExerciseRankView; name: string; seedKey?: string }> {
+    const exercise = await this.catalogue.readable(userId, exerciseId, { includeArchived: true });
+    const measure = exercise.measure as Measure;
+    const seedKey = exercise.userId ? undefined : exercise.seedKey;
+    const sets = await this.load(userId, exerciseId, measure, today, savedBefore);
+    return { view: exerciseRank({ exerciseId, seedKey, measure, standards, sets, today }), name: exercise.name, seedKey };
+  }
+
   /** The caller's sets of one exercise under its current measure, in finished sessions up to today. */
-  private async load(userId: string, exerciseId: string, measure: Measure, today: string): Promise<RankSet[]> {
+  private async load(userId: string, exerciseId: string, measure: Measure, today: string, savedBefore?: Date): Promise<RankSet[]> {
     const [rows, exercises] = await Promise.all([
-      this.sets.find({ userId, exerciseId }).lean<SetRow[]>(),
+      this.sets.find({ userId, exerciseId, ...(savedBefore ? { loggedAt: { $lt: savedBefore } } : {}) }).lean<SetRow[]>(),
       this.workoutExercises.find({ userId, exerciseId }).select('_id machineId snapshot.measure').lean<ExerciseRow[]>(),
     ]);
     if (!rows.length) return [];

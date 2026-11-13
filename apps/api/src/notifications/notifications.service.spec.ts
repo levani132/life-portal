@@ -318,6 +318,9 @@ describe('NotificationsService preferences and activity', () => {
       message: true,
       badgeEarned: true,
       restOver: true,
+      tournamentEnrollmentOpen: true,
+      tournamentGroupAssigned: true,
+      tournamentResultsReady: true,
     });
     expect(prefs.showCommentPreviews).toBe(false);
     expect(prefs.offerHiddenUntil).toBe('2026-11-15T12:00:00.000Z');

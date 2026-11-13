@@ -332,3 +332,13 @@ describe('shouldRemind (spec 025)', () => {
     });
   });
 });
+
+describe('tournament reminders (#12)', () => {
+  it('keep lock-screen text generic: no exercise, rank, group or member', () => {
+    for (const type of ['tournamentEnrollmentOpen', 'tournamentGroupAssigned', 'tournamentResultsReady'] as const) {
+      const text = notificationText({ type, actorName: '' }, { showCommentPreviews: false });
+      expect(text.title).toBe('Tournaments');
+      expect(text.body).not.toMatch(/kg|rank|bench|squat/i);
+    }
+  });
+});

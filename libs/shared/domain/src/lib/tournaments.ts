@@ -3,14 +3,12 @@ import { addDays, addMonths, daysInMonth, makeDay, toDay } from './dates';
 
 /**
  * Monthly strength tournaments (issue #12): the season calendar and matchmaking. Pure; "now" is
- * always an argument. Scoring, visibility and storage are not here yet: they wait for the owner's
- * answers on #12. See specs/026-strength-tournaments/spec.md.
+ * always an argument. Scoring is not here: it waits for the owner's decision on #12. See
+ * specs/026-strength-tournaments/spec.md and docs/modules/tournaments.md.
  *
- * All constants are the proposed defaults from that spec. Changing one is a constant edit.
+ * Owner decisions (2026-11-13): seasons are calendar months in **UTC**; times are shown in the
+ * member's own time zone, but every boundary is a UTC instant.
  */
-
-/** Seasons follow the wall clock in Tbilisi: UTC+4 all year (Georgia has no daylight saving). */
-export const SEASON_UTC_OFFSET_HOURS = 4;
 /** Enrolment for a season opens at 00:00 on this day of the month before. */
 export const SEASON_ENROL_OPENS_DAY = 20;
 /** Days after the month's last day during which late-logged workouts still count. */
@@ -33,7 +31,10 @@ export interface Season {
   locksAt: Date;
   /** 00:00 after the month's last day: the month is over, the grace period starts. */
   endsAt: Date;
-  /** The end of the grace period: from here on the standings are final. */
+  /**
+   * The end of the grace period, 00:00 UTC on the 4th of the next month: a set saved before this
+   * instant counts, one saved at or after it never does, and from here on results are frozen.
+   */
   finalizesAt: Date;
 }
 
@@ -41,10 +42,10 @@ export type SeasonPhase = 'upcoming' | 'enrolling' | 'running' | 'grace' | 'fina
 
 const SEASON_PATTERN = /^(\d{4})-(0[1-9]|1[0-2])$/;
 
-/** 00:00 on `day` on the season clock, as an instant. */
+/** 00:00 UTC on `day`, as an instant. */
 function seasonMidnight(day: string): Date {
   const [y, m, d] = toDay(day).split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d, -SEASON_UTC_OFFSET_HOURS));
+  return new Date(Date.UTC(y, m - 1, d));
 }
 
 /** The season a workout day belongs to. */
@@ -80,9 +81,9 @@ export function seasonPhase(target: Season, now: Date): SeasonPhase {
   return 'final';
 }
 
-/** The day on the season clock at `now`. */
+/** The UTC day at `now`: the season clock. */
 export function seasonDayAt(now: Date): string {
-  return toDay(new Date(now.getTime() + SEASON_UTC_OFFSET_HOURS * 3_600_000));
+  return toDay(now);
 }
 
 /**

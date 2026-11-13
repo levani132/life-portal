@@ -593,12 +593,10 @@ the UI says so. Draft values may change before v1 is fixed, and ranks shown unde
 change with them; this is the one exception to the stability rule and ends when v1 is frozen.
 
 **Tournaments (#12, in progress):** opt-in **monthly** tournaments among members with a similar
-current rank, up to about 100, no fake opponents. Only the season calendar and matchmaking are
-built so far, as pure domain functions (`libs/shared/domain/src/lib/tournaments.ts`): Tbilisi-time
-calendar months, enrolment from the 20th of the month before, a lock at 00:00 on the 1st, 3 days of
-grace, and groups by current division, widened upward below 3 entrants and split above 100. Nothing
-is stored, scored or shown yet; the proposed rules and open questions are in
-`specs/026-strength-tournaments/spec.md`. Population-based calibration is optional future research.
+current rank, in separate men's and women's categories, behind the `tournaments` flag. Entries,
+the lock snapshot, groups and reminders are built; scoring waits on the owner. See
+[tournaments](tournaments.md). The lock uses `TrainingRankService.rankFor`, which computes a rank
+for any standards and only from sets saved before a given instant. Population-based calibration is optional future research.
 
 ### The Home card (US4)
 

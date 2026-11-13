@@ -1575,7 +1575,7 @@ standards sets (and these references, 80 kg and 60 kg) are the right categories;
 
 ## 2026-11-13: Tournament seasons run on Tbilisi time and group by division, mixing standards (issue #12, proposed)
 
-**Status: proposed defaults, awaiting owner review on #12.** Built only as pure domain functions.
+**Status: superseded** by "Tournaments run on UTC, in separate categories chosen with consent" below: the owner chose UTC and separate men's and women's categories.
 
 - **One clock for everyone.** A tournament needs a single lock and finish instant for every
   entrant, unlike meals and payments, whose day belongs to one person. Asia/Tbilisi is UTC+4 all
@@ -1620,3 +1620,29 @@ analysis needs its own privacy and consent decision.
 - **Still a draft.** The version is `v1-draft-2`, which replaces `v1-draft` in place (drafts may
   change). v1 is frozen only after the owner reviews it. After that, changes are new versions,
   and highest-ever ranks are kept under the version of their day.
+
+## 2026-11-13: Tournaments run on UTC, in separate categories chosen with consent (issue #12)
+
+Owner decisions on #12. Scoring is deliberately not built: the owner has not approved a formula,
+ordering or tie-break, so nothing computes a score or a position.
+
+- **UTC is canonical.** Every boundary is a UTC instant; the web shows it in local time. It
+  replaces the proposed Tbilisi clock: one instant for everyone, with no zone the app has to
+  explain.
+- **Separate categories, chosen explicitly.** Men's and women's tournaments are separate,
+  matching the separate standards. The member picks the category, told that group members will
+  see it, and it must match the standards their rank uses. The join is refused rather than
+  silently converted, so the private standards setting is only ever disclosed by the member's
+  own choice. The recorded `consentVersion` makes a later change to what is disclosed require
+  fresh consent.
+- **The lock is a snapshot, formed lazily or hourly.** Groups and each entrant's frozen rank are
+  written once, at the first read or hourly job after the lock. They are the second exception to
+  "derived never persisted", for the same reason as `meal_entries.facts`. A unique
+  `tournament_locks` row makes formation happen once across instances; a stale claim is taken
+  over. The rank at the lock counts only sets saved before the lock instant, so a backdated set
+  logged later cannot change the group.
+- **Retention by TTL.** Every row expires 12 months after the season finalises, so retention
+  needs no job. Withdrawal deletes the entry at once rather than marking it.
+- **Group lists are not standings.** Members are listed self first, then by name, and the page
+  says nothing is a ranking, so no order can be read as a result before scoring exists.
+

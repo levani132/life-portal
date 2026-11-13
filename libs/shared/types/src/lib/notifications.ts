@@ -12,6 +12,9 @@ export const NOTIFICATION_TYPES = [
   'message',
   'badgeEarned',
   'restOver',
+  'tournamentEnrollmentOpen',
+  'tournamentGroupAssigned',
+  'tournamentResultsReady',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

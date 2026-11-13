@@ -13,19 +13,19 @@ import {
 const at = (iso: string) => new Date(iso);
 
 describe('season calendar', () => {
-  it('runs a calendar month on Tbilisi time, with enrolment from the 20th and three days of grace', () => {
+  it('runs a calendar month in UTC, with enrolment from the 20th and three days of grace', () => {
     const s = season('2026-12');
     expect(s.firstDay).toBe('2026-12-01');
     expect(s.lastDay).toBe('2026-12-31');
-    expect(s.enrolOpensAt.toISOString()).toBe('2026-11-19T20:00:00.000Z');
-    expect(s.locksAt.toISOString()).toBe('2026-11-30T20:00:00.000Z');
-    expect(s.endsAt.toISOString()).toBe('2026-12-31T20:00:00.000Z');
-    expect(s.finalizesAt.toISOString()).toBe('2027-01-03T20:00:00.000Z');
+    expect(s.enrolOpensAt.toISOString()).toBe('2026-11-20T00:00:00.000Z');
+    expect(s.locksAt.toISOString()).toBe('2026-12-01T00:00:00.000Z');
+    expect(s.endsAt.toISOString()).toBe('2027-01-01T00:00:00.000Z');
+    expect(s.finalizesAt.toISOString()).toBe('2027-01-04T00:00:00.000Z');
   });
 
   it('handles February in a leap year and the year boundary for enrolment', () => {
     expect(season('2028-02').lastDay).toBe('2028-02-29');
-    expect(season('2027-01').enrolOpensAt.toISOString()).toBe('2026-12-19T20:00:00.000Z');
+    expect(season('2027-01').enrolOpensAt.toISOString()).toBe('2026-12-20T00:00:00.000Z');
   });
 
   it('rejects anything that is not YYYY-MM', () => {
@@ -33,34 +33,37 @@ describe('season calendar', () => {
     expect(() => season('2026-1')).toThrow();
   });
 
-  it('moves through its phases at exactly the boundary instants', () => {
+  it('moves through its phases at exactly the UTC boundary instants', () => {
     const s = season('2026-12');
-    expect(seasonPhase(s, at('2026-11-19T19:59:59Z'))).toBe('upcoming');
-    expect(seasonPhase(s, at('2026-11-19T20:00:00Z'))).toBe('enrolling');
-    expect(seasonPhase(s, at('2026-11-30T19:59:59Z'))).toBe('enrolling');
-    expect(seasonPhase(s, at('2026-11-30T20:00:00Z'))).toBe('running');
-    expect(seasonPhase(s, at('2026-12-31T19:59:59Z'))).toBe('running');
-    expect(seasonPhase(s, at('2026-12-31T20:00:00Z'))).toBe('grace');
-    expect(seasonPhase(s, at('2027-01-03T20:00:00Z'))).toBe('final');
+    expect(seasonPhase(s, at('2026-11-19T23:59:59Z'))).toBe('upcoming');
+    expect(seasonPhase(s, at('2026-11-20T00:00:00Z'))).toBe('enrolling');
+    expect(seasonPhase(s, at('2026-11-30T23:59:59Z'))).toBe('enrolling');
+    expect(seasonPhase(s, at('2026-12-01T00:00:00Z'))).toBe('running');
+    expect(seasonPhase(s, at('2026-12-31T23:59:59Z'))).toBe('running');
+    expect(seasonPhase(s, at('2027-01-01T00:00:00Z'))).toBe('grace');
+    expect(seasonPhase(s, at('2027-01-03T23:59:59Z'))).toBe('grace');
+    expect(seasonPhase(s, at('2027-01-04T00:00:00Z'))).toBe('final');
   });
 
-  it('reads the day on the season clock, not UTC', () => {
-    expect(seasonDayAt(at('2026-11-30T21:00:00Z'))).toBe('2026-12-01');
+  it('reads the day in UTC, whatever the member’s own time zone', () => {
+    // 1 December 01:00 in Tbilisi is still 30 November in UTC: December has not locked yet.
+    expect(seasonDayAt(at('2026-11-30T21:00:00Z'))).toBe('2026-11-30');
+    expect(seasonDayAt(at('2026-12-01T00:00:00Z'))).toBe('2026-12-01');
     expect(seasonIdOf('2026-12-31')).toBe('2026-12');
   });
 
   it('offers next month only while its enrolment is open; no late entries', () => {
     expect(enrollableSeason(at('2026-11-25T10:00:00Z'))?.id).toBe('2026-12');
-    // 1 December in Tbilisi (still 30 November in UTC): December has locked; January is not open.
-    expect(enrollableSeason(at('2026-11-30T21:00:00Z'))).toBeUndefined();
+    expect(enrollableSeason(at('2026-11-30T23:59:59Z'))?.id).toBe('2026-12');
+    expect(enrollableSeason(at('2026-12-01T00:00:00Z'))).toBeUndefined();
     expect(enrollableSeason(at('2026-12-10T10:00:00Z'))).toBeUndefined();
-    expect(enrollableSeason(at('2026-12-19T20:00:00Z'))?.id).toBe('2027-01');
+    expect(enrollableSeason(at('2026-12-20T00:00:00Z'))?.id).toBe('2027-01');
   });
 
   it('counts a set dated in the month only if it was saved before the standings were final', () => {
     const s = season('2026-12');
-    expect(countsForSeason(s, { day: '2026-12-31', savedAt: at('2027-01-02T09:00:00Z') })).toBe(true);
-    expect(countsForSeason(s, { day: '2026-12-15', savedAt: at('2027-01-03T20:00:00Z') })).toBe(false);
+    expect(countsForSeason(s, { day: '2026-12-31', savedAt: at('2027-01-03T23:59:59Z') })).toBe(true);
+    expect(countsForSeason(s, { day: '2026-12-15', savedAt: at('2027-01-04T00:00:00Z') })).toBe(false);
     expect(countsForSeason(s, { day: '2026-11-30', savedAt: at('2026-12-01T09:00:00Z') })).toBe(false);
     expect(countsForSeason(s, { day: '2027-01-01', savedAt: at('2027-01-01T09:00:00Z') })).toBe(false);
   });

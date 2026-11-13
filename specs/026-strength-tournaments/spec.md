@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-13
 
-**Status**: Draft — proposed rules awaiting owner review on issue #12
+**Status**: Approved except scoring (owner, #12, 2026-11-13T11:44Z). Scoring and the production rollout are still open.
 
 **Input**: Issue #12, "Build opt-in monthly Journey strength tournaments" (owner-approved
 direction), built on the exercise strength ranks of #5b (`docs/modules/training.md`,
@@ -12,11 +12,13 @@ direction), built on the exercise strength ranks of #5b (`docs/modules/training.
 
 ## Status of this spec
 
-Only the **season calendar** and **matchmaking** are built
-(`libs/shared/domain/src/lib/tournaments.ts`, pure and tested). They depend only on the defaults
-in Q1–Q2. Everything stored, scored or shown to another member waits for the owner's answers to
-the questions on #12, mirrored in "Open questions" below. All rollout is behind a `tournaments`
-feature flag (internal on, production off), added with the first API slice.
+Built behind the `tournaments` flag (internal on, production off): the UTC season calendar,
+matchmaking, entries with category and consent, the lock snapshot and groups, the group member
+list, withdrawal, developer voiding, retention and the enrolment-open and group-assigned
+reminders. See `docs/modules/tournaments.md`.
+
+**Not built, waiting on the owner:** scoring, positions, tie-breaks, final results, the
+results-ready reminder and results history (Q3), and the production rollout.
 
 ## User Scenarios & Testing
 
@@ -28,7 +30,7 @@ and they can withdraw any time.
 
 **Acceptance Scenarios**:
 1. **Given** a current rank on bench press and December enrolment open (20 Nov 00:00 – 1 Dec
-   00:00, Tbilisi), **When** they join, **Then** they are entered for December with their rank and
+   00:00 UTC), **When** they join, **Then** they are entered for December with their rank and
    baseline snapshotted at the 1 December lock.
 2. **Given** an inactive or unranked exercise, **Then** joining is unavailable, with the reason.
 3. **Given** it is 5 December, **Then** the only offer is January, from 20 December.
@@ -54,15 +56,16 @@ past results for 12 months.
 ## Rules
 
 ### Season lifecycle (built)
-- **Clock.** Asia/Tbilisi, UTC+4, with no daylight saving (`SEASON_UTC_OFFSET_HOURS`). A season
-  is a calendar month, `YYYY-MM`.
+- **Clock.** UTC is canonical (owner). Every boundary is a UTC instant, shown to the member in
+  their local time. A season is a calendar month, `YYYY-MM`.
 - **Which sets belong to a season.** A set belongs to the season its workout's `day` falls in.
   That day is the member's own, decided in the browser as for every workout.
 - **Phases.**
   - `upcoming`;
   - `enrolling`: from 00:00 on the 20th of the month before;
   - `running`: from 00:00 on the 1st, when enrolment locks;
-  - `grace`: from 00:00 after the last day, for 3 days (`SEASON_GRACE_DAYS`);
+  - `grace`: from 00:00 after the last day, for 3 days (`SEASON_GRACE_DAYS`), ending exactly at
+    00:00:00 UTC on the 4th of the next month;
   - `final`.
 - **No late entries.** Between the 1st and the 20th there is nothing to join
   (`enrollableSeason`).
@@ -70,11 +73,12 @@ past results for 12 months.
   (`countsForSeason`). A backfill after the fact never changes final standings.
 
 ### Matchmaking (built)
-- **Exercises.** Tournaments may start with only the popular, best-evidenced lifts: back squat,
-  bench, deadlift, overhead press, pull-ups. They should not start with machine lifts, whose
-  ranks are rough (owner, #5, 2026-11-13).
-- **Who can enter.** You need a current rank on that exercise at lock, which means a valid set
-  in the last 90 days.
+- **Exercises.** Any exercise with a benchmark, machines included when they have their own
+  standards (owner, #12). One tournament is one catalogue exercise, so incompatible variants are
+  never compared.
+- **Who can enter.** You need a current rank to join; someone unranked can establish one during
+  enrolment. At lock the rank is recomputed from sets saved before the lock; no current rank
+  then means `not_ranked`, with an explanation.
 - **Snapshot at lock.** Your entry snapshots your milestone and rank score at lock. Ranking up
   during the season never moves you.
 - **Grouping** (`matchEntrants`):
@@ -86,8 +90,10 @@ past results for 12 months.
     equal groups.
   - An exercise with fewer than 3 entrants in total runs no tournament that month.
   - The result is deterministic.
-- **Mixed standards.** Groups mix men's and women's standards. A milestone is already normalised
-  to each member's own standards, and splitting would disclose the choice to the whole group.
+- **Categories (owner).** Men's and women's tournaments are separate. The member selects the
+  category explicitly when joining, after being told group members will see it. It must match
+  the standards their rank uses, so the private setting is never disclosed silently.
+- **Fewer than 3.** No tournament, and the member is told why.
 
 ### Scoring (proposed, not built — Q3)
 - **Baseline.** The rank score at lock: the best valid set in the 90 days before.
@@ -99,46 +105,44 @@ past results for 12 months.
 - **Which sets are valid.** The same rules as ranks: no warm-ups, no machine sets, a fresh
   weigh-in, and the implausibility cap.
 
-### Visibility and privacy (proposed, not built — Q4, Q5)
+### Visibility and privacy (approved, built)
 - **What group members see of you:**
   - display name, username and avatar;
-  - your place and score;
-  - the group's rank range.
+  - your place and score (once scoring exists);
+  - the group's rank range and the category.
 
   Nothing else: no loads, reps, body weight, standards, dates or workouts. Nothing is public or
   on your profile.
 - **Joining is narrow consent.** It is consent to exactly that, for that season, and to nothing
   else (no model training, no other use).
-- **Withdrawal.** Allowed any time: you leave the board at once and places are recomputed.
-  Deleting training history or the account removes your entries.
-- **Retention.** Final standings are kept 12 months.
+- **Blocks.** Two members who blocked one another see each other only as "A member".
+- **Withdrawal.** Immediate, any time: the entry is deleted and you leave the group at once.
+  Account deletion removes your rows (there is no account deletion yet; see the module doc).
+- **Retention.** At most 12 months after the season finalises, by TTL; the rules are shown
+  before opt-in.
 
-### Integrity (proposed — Q6)
+### Integrity (approved)
 - Rank rules apply to every set.
 - Edits and deletions count until grace ends; after that, results are frozen.
-- The developer can void an entry with a reason, and places are recomputed.
-- No appeals flow in v1.
+- The developer can void an entry with a reason; the member sees it.
+- Self-report limits are stated before joining. No appeals flow in v1.
 - No prizes are offered or implied.
 
-### Storage (proposed)
+### Storage (built, except results)
 - Three new collections:
-  - `tournament_entries`: user, exercise, season, and the snapshot at lock;
+  - `tournament_entries`: user, exercise, season, category, consent version, and the snapshot
+    at lock;
   - `tournament_groups`;
-  - `tournament_results`: standings frozen at finalisation.
+  - `tournament_locks`: makes group formation happen once;
+  - results storage: waits on scoring.
 - **A deliberate exception to "derived never persisted".** The snapshots exist so that a
   finished competition is never rewritten by a later edit or a benchmark change. The same
   reasoning applies as for `meal_entries.facts`.
 - Live standings during a season are derived on read.
 
 ## Open questions (issue #12)
-1. Calendar, time zone, enrolment window, grace.
-2. Matching rules: minimum 3, widening, no late entries.
-3. Scoring: improvement % capped at 15%, or absolute score within the group.
-4. Visible fields, blocks, and whether a social profile is required.
-5. Withdrawal, deletion and the 12-month retention.
-6. Integrity and voiding.
-7. Notifications: enrolment open, group set, results in.
-
-## Out of scope
-Prizes or rewards of any kind; public leaderboards; population calibration of ranks; weekly
-contests.
+Answered by the owner on 2026-11-13: calendar (UTC), matching, privacy and categories,
+withdrawal and retention, integrity, notifications (enrolment open, group assigned, results
+ready, opted-in members only). Still open:
+1. Scoring: the score formula, its ceiling, final ordering and tie-breaking (Q3).
+2. Production rollout.

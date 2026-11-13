@@ -144,6 +144,13 @@ export function notificationText(
     case 'restOver':
       // Lock-screen text stays generic: no exercise, weight or plan reaches it.
       return { title: 'Rest over', body: 'Time for your next set.' };
+    // Tournaments (#12): generic too. No exercise, rank, group or other member reaches the lock screen.
+    case 'tournamentEnrollmentOpen':
+      return { title: 'Tournaments', body: 'Next month’s tournaments are open to join.' };
+    case 'tournamentGroupAssigned':
+      return { title: 'Tournaments', body: 'Your tournament groups are set.' };
+    case 'tournamentResultsReady':
+      return { title: 'Tournaments', body: 'Tournament results are in.' };
     case 'postLike':
       return {
         title,

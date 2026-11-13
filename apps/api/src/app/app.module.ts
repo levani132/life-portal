@@ -23,6 +23,7 @@ import { McpModule } from '../mcp/mcp.module';
 import { NutritionModule } from '../nutrition/nutrition.module';
 import { TrainingModule } from '../training/training.module';
 import { BadgesModule } from '../badges/badges.module';
+import { TournamentsModule } from '../tournaments/tournaments.module';
 import { PersonalModule } from '../personal/personal.module';
 import { SettingsModule } from '../settings/settings.module';
 import { SpendingModule } from '../spending/spending.module';
@@ -62,6 +63,7 @@ import { MediaModule } from '../media/media.module';
     NutritionModule,
     TrainingModule,
     BadgesModule,
+    TournamentsModule,
     SpendingModule,
     DashboardModule,
     McpModule,

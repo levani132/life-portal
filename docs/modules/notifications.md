@@ -119,11 +119,14 @@ Current types:
 | `message` | MessagesService | none (replaces per conversation) | conversation | `/messages/:id` |
 | `badgeEarned` | BadgesService (`selfAllowed`) | none (one per evaluation) | recipient | `/profile?badge=:id` |
 | `restOver` | RestAlarmService (`personal`, sent with `remind()`) | none | session | `/training` |
+| `tournamentEnrollmentOpen` | TournamentsService (`personal`, `remind()`) | none | season | `/training` |
+| `tournamentGroupAssigned` | TournamentsService (`personal`, `remind()`) | none | group | `/training` |
+| `tournamentResultsReady` | TournamentsService (`personal`), registered, never sent until scoring exists | none | season | `/training` |
 
 ## Personal reminders: `remind()` (spec 025)
 
-A reminder from the app itself, not something another member did: today only `restOver`, the
-end of a rest between sets. Its type is registered with `personal: true` and sent only with
+A reminder from the app itself, not something another member did: `restOver`, the
+end of a rest between sets, and the tournament reminders ([tournaments](tournaments.md)). Its type is registered with `personal: true` and sent only with
 `remind({type, recipientId, targetId})`; `notify()` refuses a personal type and `remind()`
 refuses any other. There is no actor, so the self, block, mute and actor-feature rules do not
 apply (`shouldRemind`): only the recipient's main switch, the type's switch, `push` and the
