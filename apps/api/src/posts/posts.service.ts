@@ -30,6 +30,7 @@ import {
   postHasContent,
   publicationCalories,
   publicationMacros,
+  postTopics,
 } from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
 import { NutritionPublicationService } from '../nutrition/nutrition-publication.service';
@@ -140,6 +141,8 @@ export class PostsService {
       updatedAt: row.updatedAt.toISOString(),
       version: 1 as const,
       media: await this.media.sign(row.media),
+      // From the whole publication, never the feed teaser, and from published content only.
+      topics: postTopics({ caption: row.caption, publication: p }),
       isOwner: row.userId === viewerId,
     };
     // A post without food: text and/or photos only.

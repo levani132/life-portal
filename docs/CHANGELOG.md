@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-13: Diet tags on food posts
+
+- **Posts say what kind of food they are.** A food post shows small tags such as *High protein*,
+  *Low carb*, *Low fat*, *Low calorie*, *Low sugar* or *High fibre*. They're worked out from the
+  nutrition facts it publishes, using the EU nutrition-claim definitions, and the rule shows when
+  you hover or use a screen reader. A tag only appears when every number it needs is there.
+  Hashtags in captions are recognised too, ready for For You and, later, Explore.
+
 ## 2026-11-13: Play starts your plan's next workout
 
 - **Home's training Play button follows your plan.** If you trained from a plan in the last four

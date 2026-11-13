@@ -63,6 +63,32 @@ Read authorization always checks audience, the current friendship, blocks in eit
 
 `publicationCalories` derives portion calories only when every amount exists; catalogue collections do not invent a calorie total. `canonicalPublication` includes exact presentation, nutrition, portions and attribution. Imported-food identity ignores local ordinal/slot/portion so the same food eaten twice becomes one catalogue copy; a saved meal adds its amounts. Optional unknown nutrients remain unknown. Open Food Facts attribution survives sharing/importing; ordinary copies credit the post author. Repeated imports never overwrite a recipient's subsequent edits. Concurrent food/saved-meal upserts use unique indexes and tolerate duplicate-key races.
 
+### Topics (#8, For You task B)
+
+Every post the API returns carries `topics: PostTopic[]` (`{id, kind: 'diet' | 'hashtag', label, basis}`), computed on read by `postTopics()` (`libs/shared/domain/src/lib/post-topics.ts`) from the **whole** publication (never the 3-item feed teaser) and the caption. Nothing is stored and nothing is edited by hand. Ids are stable (`diet:high-protein`, `tag:pasta`) for ranking (#C) and interests (#D). The public link-preview route is unchanged and does not carry them.
+
+**Only published content is read**, meaning the publication and the caption: never meal logs, weigh-ins, targets, Apple Health or any other private tracking.
+
+Diet tags use EU nutrition-claim definitions (Regulation 1924/2006) where one exists:
+
+| Id | Rule |
+| --- | --- |
+| `diet:high-protein` | ≥ 20 % of energy from protein (EU "high protein") |
+| `diet:low-carb` | < 26 % of energy from carbohydrate (common definition; no EU claim) |
+| `diet:low-fat` | ≤ 3 g fat / 100 g, ≤ 1.5 g / 100 ml (EU "low fat") |
+| `diet:low-calorie` | ≤ 40 kcal / 100 g, ≤ 20 kcal / 100 ml (EU "low energy") |
+| `diet:low-sugar` | ≤ 5 g sugar / 100 g, ≤ 2.5 g / 100 ml (EU "low sugar") |
+| `diet:high-fibre` | ≥ 6 g fibre / 100 g, or ≥ 3 g / 100 kcal (EU "high fibre") |
+
+- Energy shares come from the summed macros with `macroShares()` (4/4/9 kcal per gram). Items are weighed by `amount`. A lone item without an amount (food and collection-of-one posts) uses its per-100 values. A post with several items where any lacks an amount gets **no** diet tags.
+- Per-100 rules need one unit across all items, because grams and millilitres are never converted. They don't apply to `day` posts (a whole day "per 100 g" means nothing), which can still be high protein or low carb.
+- Sugar and fibre tags need the value on **every** item: a missing nutrient means no tag, never a guess.
+- **Plant-based is not offered:** no published fact says it. It needs a real ingredient or category field first.
+
+Hashtags: a `#` at the start or after anything but a letter, digit, `_`, `/`, `&` or `#` (so not inside words, URLs or entities). Then 1–50 Unicode letters, marks, digits or `_` with at least one letter. NFC-normalised, lower-cased, deduplicated in order of first appearance, at most 10 per post (`MAX_POST_HASHTAGS`). Any interest is allowed, not only food.
+
+The card shows diet tags as small chips under the nutrition summary, each with its basis on hover and for screen readers (`DietTopicChips` in `posts.tsx`). Hashtags are not repeated as chips because they are already in the caption; they become links once Explore exists.
+
 ## Media storage
 
 Files live in a private Cloudflare R2 bucket (S3 API), configured by `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`: all four or none (none hides photos and video; a partial set refuses to boot). `StorageService` (`apps/api/src/storage`) signs links with `aws4fetch` and never proxies a file. The bucket needs a CORS rule allowing `PUT` and `GET` with the `content-type` header from the web origins, or browsers cannot upload. R2's free tier (10 GB, free egress) covers Tier 0.

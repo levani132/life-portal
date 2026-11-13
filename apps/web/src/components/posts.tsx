@@ -152,6 +152,30 @@ export function PostsList({
     </div>
   );
 }
+/**
+ * The post's diet tags (issue #8), computed by the API from the published facts. Each states its
+ * basis on hover and to screen readers (principle VI). Hashtags are not repeated as chips: they
+ * are already in the caption.
+ */
+function DietTopicChips({ topics }: { topics?: FoodPost['topics'] }) {
+  const diet = (topics ?? []).filter((topic) => topic.kind === 'diet');
+  if (!diet.length) return null;
+  return (
+    <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Diet tags">
+      {diet.map((topic) => (
+        <li
+          key={topic.id}
+          title={topic.basis}
+          className="rounded-full border border-border bg-surface-raised px-2 py-0.5 text-[11px] font-medium text-ink-muted"
+        >
+          {topic.label}
+          <span className="sr-only">: {topic.basis}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function PostCard({
   post,
   detail = false,
@@ -408,6 +432,7 @@ export function PostCard({
             diary={post.kind === 'day'}
           />
         )}
+        <DietTopicChips topics={post.topics} />
         <ul
           className={`mt-3 divide-y divide-border/70 ${detail ? 'max-h-[32rem] overflow-y-auto' : ''}`}
         >

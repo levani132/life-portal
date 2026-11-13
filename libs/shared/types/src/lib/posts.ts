@@ -61,6 +61,27 @@ export interface PostAuthor {
   /** A signed, short-lived link to the author's profile photo. */
   avatarUrl?: string;
 }
+/** Diet topics a post can carry (issue #8). Computed from published facts, never stored. */
+export const DIET_TOPICS = [
+  'high-protein',
+  'low-carb',
+  'low-fat',
+  'low-calorie',
+  'low-sugar',
+  'high-fibre',
+] as const;
+export type DietTopic = (typeof DIET_TOPICS)[number];
+/**
+ * An explainable topic of a post, computed on read from what it publishes (`postTopics` in the
+ * domain lib): `diet:<DietTopic>` from its food facts, or `tag:<name>` from a caption hashtag.
+ * The id is stable, so ranking and interests can refer to it; `basis` says why it applies.
+ */
+export interface PostTopic {
+  id: string;
+  kind: 'diet' | 'hashtag';
+  label: string;
+  basis: string;
+}
 export interface FoodPost {
   id: string;
   author: PostAuthor;
@@ -83,6 +104,8 @@ export interface FoodPost {
   targets?: Partial<PublishedMacros>;
   /** Photos and videos, in order. Links are signed per read and expire within 2 hours. */
   media: PostMedia[];
+  /** Diet tags and caption hashtags, computed on read from the whole publication (issue #8). */
+  topics: PostTopic[];
   isOwner: boolean;
   /**
    * Set when this card is someone's repost: the post itself is always the original (its id,

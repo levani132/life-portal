@@ -95,6 +95,17 @@ describe('post read authorization and publish retries', () => {
     });
     expect(f.graph.between).not.toHaveBeenCalled();
   });
+  it('computes topics on read from the whole publication and the caption (issue #8)', async () => {
+    const f = fixture();
+    f.row.caption = 'Breakfast #Oats #oats';
+    const post = await f.service.detail('owner', String(f.row._id));
+    // Oats: 14 g protein of 65 g carbs, 8 g fat: neither high protein nor low carb, nor low fat.
+    expect(post.topics).toEqual([
+      { id: 'tag:oats', kind: 'hashtag', label: '#oats', basis: 'Hashtag in the caption' },
+    ]);
+    f.row.caption = '';
+    expect((await f.service.detail('owner', String(f.row._id))).topics).toEqual([]);
+  });
   it.each(['stranger', 'developer'])(
     'does not expose private posts to %s',
     async (viewer) => {

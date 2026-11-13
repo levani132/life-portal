@@ -59,7 +59,7 @@ search, connection actions and money widget sharing have their own tests.
    feature; the MCP connectors remain the free alternative.
 3. **Explore and search built around food.** Filter posts by macros ("600 kcal dinners, 40g+
    protein"). Diet tags (vegan, keto, high-protein) are computed from the facts, never stored
-   by hand. Image moderation (CSAM scanning, nudity) must exist before public images.
+   by hand (the first six, high-protein to high-fibre, exist since #8: `postTopics()`). Image moderation (CSAM scanning, nudity) must exist before public images.
 4. **Groups and challenges.** Streaks, protein-target days, logging streaks, staying within
    calories. A challenge sees only a computed score, never the diary. Group chat reuses the
    messages module (conversations already have a members shape).
