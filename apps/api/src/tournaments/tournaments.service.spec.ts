@@ -13,7 +13,7 @@ const ranked = (milestone: number): ExerciseRankView => ({
   status: 'ranked',
   windowDays: 90,
   excluded: { implausible: 0, noBodyWeight: 0, machine: 0 },
-  benchmark: { version: 'v1-draft-2', draft: true, method: 'e1rm', standards: 'men', tierStarts: [0, 1, 2, 3, 4, 5, 6, 7], basis: '' },
+  benchmark: { version: 'v1', draft: false, method: 'e1rm', standards: 'men', tierStarts: [0, 1, 2, 3, 4, 5, 6, 7], basis: '' },
   current: { milestone, tier: 'Achiever', division: 'III', score: 1000 + milestone, progress: 0, basis: { setId: 's', sessionId: 'w', day: '2026-11-25', reps: 1 } },
 });
 const unranked = (reason: ExerciseRankView['reason']): ExerciseRankView => ({
@@ -28,6 +28,9 @@ function setup(options: { now?: string; access?: Partial<FeatureAccess> } = {}) 
   const entries = new FakeModel([['userId', 'exerciseId', 'season']]);
   const groups = new FakeModel([['season', 'exerciseId', 'category', 'index']]);
   const locks = new FakeModel([['season', 'exerciseId', 'category']]);
+  const reminderRows = new FakeModel([['season']]);
+  /** The published standard is a machine standard (only reachable for a pre-existing entry). */
+  const machineStandard = { value: false };
   const rankOf = new Map<string, ExerciseRankView>();
   const standards = new Map<string, RankStandards>();
   const profiles = new Set<string>();
@@ -48,6 +51,7 @@ function setup(options: { now?: string; access?: Partial<FeatureAccess> } = {}) 
     entries as never,
     groups as never,
     locks as never,
+    reminderRows as never,
     {
       rankFor: async (...args: unknown[]) => {
         rankCalls.push(args);
@@ -67,7 +71,9 @@ function setup(options: { now?: string; access?: Partial<FeatureAccess> } = {}) 
         const frozen = typeof locked === 'object';
         const version = frozen ? locked.version : locked;
         const changed = frozen ? false : standardsChanged.value;
-        const standard = frozen ? locked : { version, method: 'e1rm', measure: 'weight_reps', starts: { men: [0, 1], women: [0, 1] } };
+        const standard = frozen
+          ? locked
+          : { version, method: 'e1rm', measure: 'weight_reps', starts: { men: [0, 1], women: [0, 1] }, ...(machineStandard.value ? { machine: true } : {}) };
         const sets = (history.get(userId) ?? []).filter((set) => set.day >= window.from && set.day <= window.to && set.savedAt < savedBefore);
         if (!sets.length) return { standard, changed };
         const best = sets.reduce((a, b) => (b.score > a.score ? b : a));
@@ -102,6 +108,8 @@ function setup(options: { now?: string; access?: Partial<FeatureAccess> } = {}) 
     entries,
     groups,
     locks,
+    reminderRows,
+    machineStandard,
     rankOf,
     standards,
     profiles,
@@ -200,7 +208,7 @@ describe('TournamentsService (#12)', () => {
       await t.service.ensureLocked('2026-12', EX, 'women');
       expect(t.groups.docs.map((g) => [g['category'], g['memberIds']])).toEqual([['men', ['m1', 'm2', 'm3', 'm4']]]);
       const byUser = Object.fromEntries(t.entries.docs.map((e) => [e['userId'], e]));
-      expect(byUser['m1']).toMatchObject({ outcome: 'grouped', lockedMilestone: 9, lockedScore: 1009, lockedVersion: 'v1-draft-2', lockedBaseline: 1000 });
+      expect(byUser['m1']).toMatchObject({ outcome: 'grouped', lockedMilestone: 9, lockedScore: 1009, lockedVersion: 'v1', lockedBaseline: 1000 });
       expect(byUser['w1']).toMatchObject({ outcome: 'no_tournament', lockedMilestone: 9 });
       expect(byUser['lapsed']).toMatchObject({ outcome: 'not_ranked' });
       expect(byUser['lapsed']['groupId']).toBeUndefined();
@@ -212,7 +220,7 @@ describe('TournamentsService (#12)', () => {
       await t.service.ensureLocked('2026-12', EX, 'men');
       expect(t.rankCalls[0]).toEqual(['m1', EX, '2026-11-30', 'men', new Date('2026-12-01T00:00:00Z')]);
       // The baseline: the 90 days before, sets saved before the lock, under the rank's version.
-      expect(t.strengthCalls[0]).toEqual(['m1', { from: '2026-09-02', to: '2026-11-30' }, new Date('2026-12-01T00:00:00Z'), 'v1-draft-2', '2026-11-30']);
+      expect(t.strengthCalls[0]).toEqual(['m1', { from: '2026-09-02', to: '2026-11-30' }, new Date('2026-12-01T00:00:00Z'), 'v1', '2026-11-30']);
     });
 
     it('a set saved after the lock never enters the baseline, even when dated before it', async () => {
@@ -317,15 +325,91 @@ describe('TournamentsService (#12)', () => {
   });
 
   describe('the enrolment reminder', () => {
-    it('goes out on the 20th, only to members who have entered before', async () => {
+    it('goes out once per season, only to members who have entered before, whichever run or instance sends it', async () => {
       const t = setup({ now: '2026-11-25T12:00:00Z' });
       t.member('a');
       await t.join('a');
-      t.setNow('2026-12-20T00:10:00Z');
-      expect(await t.service.remindEnrollmentOpen()).toBe(1);
-      expect(t.reminders).toEqual([{ type: 'tournamentEnrollmentOpen', recipientId: 'a', targetId: '2027-01' }]);
-      t.setNow('2026-12-21T00:10:00Z');
+      t.setNow('2026-12-19T23:00:00Z');
       expect(await t.service.remindEnrollmentOpen()).toBe(0);
+      t.setNow('2026-12-20T00:00:00Z');
+      // Two instances (or a retried run) at the same moment: one sends.
+      const both = await Promise.all([t.service.remindEnrollmentOpen(), t.service.remindEnrollmentOpen()]);
+      expect(both.sort()).toEqual([0, 1]);
+      expect(t.reminders).toEqual([{ type: 'tournamentEnrollmentOpen', recipientId: 'a', targetId: '2027-01' }]);
+      for (const at of ['2026-12-20T01:00:00Z', '2026-12-21T00:10:00Z', '2026-12-31T23:00:00Z']) {
+        t.setNow(at);
+        expect(await t.service.remindEnrollmentOpen()).toBe(0);
+      }
+      expect(t.reminders).toHaveLength(1);
+      // The next season gets its own, once.
+      t.setNow('2027-01-20T03:00:00Z');
+      expect(await t.service.remindEnrollmentOpen()).toBe(1);
+      expect(t.reminders.map((r) => r.targetId)).toEqual(['2027-01', '2027-02']);
+    });
+
+    it('a run missed at midnight is made up later while enrolment is open, but never after it closes', async () => {
+      const t = setup({ now: '2026-11-25T12:00:00Z' });
+      t.member('a');
+      await t.join('a');
+      t.setNow('2026-12-23T07:00:00Z');
+      expect(await t.service.remindEnrollmentOpen()).toBe(1);
+      t.setNow('2027-02-01T00:00:00Z');
+      expect(await t.service.remindEnrollmentOpen()).toBe(0);
+    });
+  });
+
+  describe('machine lifts (no comparable machine identity)', () => {
+    it('refuses to enter a machine or cable standard, with the reason; the rank itself is untouched', async () => {
+      const t = setup();
+      t.member('a');
+      const view = ranked(9);
+      t.rankOf.set('a', { ...view, benchmark: { ...(view.benchmark as NonNullable<ExerciseRankView['benchmark']>), machine: true } });
+      await expect(t.join('a')).rejects.toThrow(/Machine and cable lifts have no tournament/);
+      expect(t.entries.docs).toHaveLength(0);
+    });
+
+    it('an entry made before the rule is not grouped at the lock, and says why', async () => {
+      const t = setup();
+      for (const id of ['a', 'b', 'c']) {
+        t.member(id);
+        await t.join(id);
+      }
+      t.machineStandard.value = true;
+      t.setNow('2026-12-01T01:00:00Z');
+      await t.service.lockDue();
+      expect(t.groups.docs).toHaveLength(0);
+      expect((await t.service.overview('a')).entries[0].status).toBe('not_eligible');
+    });
+  });
+
+  describe('erasing a member (account deletion hook)', () => {
+    it('removes their entries, group places and frozen results; group-mates move up', async () => {
+      const t = setup();
+      for (const id of ['a', 'b', 'c', 'd']) {
+        t.member(id);
+        await t.join(id);
+      }
+      t.setNow('2026-12-15T12:00:00Z');
+      await t.service.lockDue();
+      const groupId = String(t.groups.docs[0]._id);
+      t.lift('a', '2026-12-03', 1100);
+      t.lift('b', '2026-12-04', 1300);
+      t.setNow('2027-01-05T00:00:00Z');
+      await t.service.finalizeDue();
+      expect(await t.service.eraseMember('b')).toEqual({ entries: 1, groups: 1 });
+      expect(t.entries.docs.some((doc) => doc['userId'] === 'b')).toBe(false);
+      const group = t.groups.docs[0] as Record<string, unknown>;
+      expect(group['memberIds']).not.toContain('b');
+      expect((group['results'] as { userId: string }[]).map((row) => row.userId)).not.toContain('b');
+      expect(JSON.stringify(t.groups.docs)).not.toContain('"b"');
+      const view = await t.service.group('a', groupId);
+      expect(view.standings.map((row) => [row.userId, row.place])).toEqual([
+        ['a', 1],
+        ['c', undefined],
+        ['d', undefined],
+      ]);
+      // Idempotent: nothing left to erase.
+      expect(await t.service.eraseMember('b')).toEqual({ entries: 0, groups: 0 });
     });
   });
 
@@ -383,20 +467,41 @@ describe('TournamentsService (#12)', () => {
       expect(view.own).toMatchObject({ baseline: 1000, strengthScore: 1000, bonusBp: 0, score: 1000 });
       expect(view.standings.find((row) => row.userId === 'a')?.score).toBeUndefined();
       expect(view.standings.find((row) => row.userId === 'c')?.score).toBe(1000);
-      expect(t.strengthCalls.at(-1)).toEqual(expect.arrayContaining([{ from: '2026-12-01', to: '2026-12-31' }, new Date('2027-01-04T00:00:00Z'), expect.objectContaining({ version: 'v1-draft-2' })]));
+      expect(t.strengthCalls.at(-1)).toEqual(expect.arrayContaining([{ from: '2026-12-01', to: '2026-12-31' }, new Date('2027-01-04T00:00:00Z'), expect.objectContaining({ version: 'v1' })]));
     });
 
     it('scores the whole season under the one standard copied at the lock, whatever is published later (#5)', async () => {
       const t = await season();
       const entry = t.entries.docs.find((doc) => doc['userId'] === 'a') as Record<string, unknown>;
-      expect(entry['lockedStandard']).toMatchObject({ version: 'v1-draft-2', method: 'e1rm', measure: 'weight_reps' });
-      expect(entry['lockedVersion']).toBe('v1-draft-2');
+      expect(entry['lockedStandard']).toMatchObject({ version: 'v1', method: 'e1rm', measure: 'weight_reps' });
+      expect(entry['lockedVersion']).toBe('v1');
       // Every entrant of the lock holds the same version.
-      expect(new Set(t.entries.docs.filter((doc) => doc['lockedStandard']).map((doc) => (doc['lockedStandard'] as { version: string }).version))).toEqual(new Set(['v1-draft-2']));
+      expect(new Set(t.entries.docs.filter((doc) => doc['lockedStandard']).map((doc) => (doc['lockedStandard'] as { version: string }).version))).toEqual(new Set(['v1']));
       t.lift('a', '2026-12-03', 1150);
       t.standardsChanged.value = true;
       expect((await t.service.group('a', t.groupId)).own).toMatchObject({ score: 1208, improvementBp: 1500, bonusBp: 500 });
       expect(t.strengthCalls.at(-1)?.[3]).toEqual(entry['lockedStandard']);
+    });
+
+    it('reads, displays and finalises under the frozen v1 copy after a later release changes today’s standards (#5)', async () => {
+      const t = await season();
+      t.lift('a', '2026-12-03', 1150);
+      // A later release: today's rank view now uses another version and method.
+      for (const id of ['a', 'b', 'c', 'd']) {
+        const view = ranked(9);
+        t.rankOf.set(id, { ...view, benchmark: { ...(view.benchmark as NonNullable<ExerciseRankView['benchmark']>), version: 'v2', method: 'reps' } });
+      }
+      t.standardsChanged.value = true;
+      const live = await t.service.group('a', t.groupId);
+      expect(live).toMatchObject({ method: 'e1rm', standardsVersion: 'v1', final: false });
+      expect(live.own).toMatchObject({ score: 1208, bonusBp: 500 });
+      t.setNow('2027-01-04T00:00:00Z');
+      await t.service.finalizeDue();
+      const final = await t.service.group('a', t.groupId);
+      expect(final).toMatchObject({ method: 'e1rm', standardsVersion: 'v1', final: true });
+      expect(final.own).toMatchObject({ score: 1208, bonusBp: 500 });
+      // Every scoring read used the frozen copy, never a version name.
+      expect(t.strengthCalls.slice(-4).every((call) => typeof call[3] === 'object' && (call[3] as { version: string }).version === 'v1')).toBe(true);
     });
 
     it('an entry locked before copies were kept falls back to its version name, and withholds the bonus if it is gone', async () => {

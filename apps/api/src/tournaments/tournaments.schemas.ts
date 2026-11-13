@@ -24,7 +24,7 @@ export class TournamentEntryRecord {
   /** The disclosure the member agreed to (`TOURNAMENT_CONSENT_VERSION`). */
   @Prop({ required: true }) consentVersion!: number;
   /** Set at the lock: what came of the entry. Absent before it. */
-  @Prop({ enum: ['grouped', 'no_tournament', 'not_ranked'] }) outcome?: string;
+  @Prop({ enum: ['grouped', 'no_tournament', 'not_ranked', 'not_eligible'] }) outcome?: string;
   @Prop() groupId?: string;
   /** The rank at the lock: milestone 0–23 (it chose the group), its rank score and the benchmark version. */
   @Prop() lockedMilestone?: number;
@@ -101,5 +101,20 @@ export class TournamentLockRecord {
   @Prop({ type: Date, required: true }) expireAt!: Date;
 }
 export const TournamentLockSchema = SchemaFactory.createForClass(TournamentLockRecord);
+
+/**
+ * The "enrolment is open" reminder, once per season. Unique on `season`: whichever hourly run (or
+ * instance) creates the row sends it, and every later run finds it and sends nothing. A run that
+ * was missed (the server was down at midnight) still sends it later while enrolment is open.
+ */
+@Schema({ ...baseSchemaOptions, collection: 'tournament_reminders' })
+export class TournamentReminderRecord {
+  @Prop({ required: true }) season!: string;
+  @Prop({ type: Date, required: true }) sentAt!: Date;
+  @Prop({ type: Date, required: true }) expireAt!: Date;
+}
+export const TournamentReminderSchema = SchemaFactory.createForClass(TournamentReminderRecord);
+TournamentReminderSchema.index({ season: 1 }, { unique: true });
+TournamentReminderSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 });
 TournamentLockSchema.index({ season: 1, exerciseId: 1, category: 1 }, { unique: true });
 TournamentLockSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 });

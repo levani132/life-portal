@@ -36,10 +36,12 @@ export interface SeasonView {
  * - `grouped`: in a group of 3–100 after the lock.
  * - `no_tournament`: fewer than 3 people entered this exercise and category.
  * - `not_ranked`: no current rank on the exercise at the lock, so no group.
+ * - `not_eligible`: the exercise has no tournament (a machine or cable standard: machines are not
+ *   comparable between members). Only an entry made before that rule can reach it.
  * - `voided`: removed by the developer, with a reason.
  * - `forming`: the lock has passed and groups are being formed.
  */
-export type TournamentEntryStatus = 'entered' | 'forming' | 'grouped' | 'no_tournament' | 'not_ranked' | 'voided';
+export type TournamentEntryStatus = 'entered' | 'forming' | 'grouped' | 'no_tournament' | 'not_ranked' | 'not_eligible' | 'voided';
 
 export interface TournamentEntry {
   id: string;
@@ -106,8 +108,10 @@ export interface TournamentGroupView {
   category: TournamentCategory;
   /** e.g. "Veteran II" or "Achiever III – Veteran I". */
   rankRange: string;
-  /** How scores read: × body weight (`e1rm`) or reps. */
+  /** How scores read: × body weight (`e1rm`) or reps. From the standard frozen at the lock. */
   method: RankMethod;
+  /** The standards version the season is scored under, frozen at the lock (e.g. `v1`). */
+  standardsVersion?: string;
   /** Live until grace ends, then frozen. Ordered by place; members without a score last. */
   standings: TournamentStanding[];
   final: boolean;

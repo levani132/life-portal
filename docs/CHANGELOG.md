@@ -2,6 +2,15 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-13: Tournaments use standards v1; no machine tournaments
+
+- **A tournament group says which standards it is scored under** (v1), fixed for the month.
+- **Machine and cable lifts have no tournament.** Machines differ between gyms, so their loads
+  can't be compared fairly between people. Your rank on them still works.
+- **The "enrolment is open" reminder arrives once per month**, even if the server was down at
+  midnight on the 20th.
+- Tournaments are still behind a flag.
+
 ## 2026-11-13: Strength standards v1 are fixed
 
 - **The rank standards are final for v1.** A future change will come as a new version and never

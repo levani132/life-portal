@@ -111,6 +111,18 @@ export function tournamentStandard(
   return { standard, version: chosen.version, changed: !!wanted && chosen.version !== wanted };
 }
 
+/**
+ * Why a standard has no tournament (#12), or `null` when it has one. A **machine or cable**
+ * standard has none: machines are private to the member who adds them, so nothing tells two
+ * members' leg-press sleds or cable stacks apart, and their loads are not comparable (cams,
+ * pulley ratios, sled weight, friction). Its rank still works for the member alone. Free-weight
+ * standards are safe: sets with a machine attached never count toward them.
+ */
+export function tournamentExclusion(standard: Pick<ExerciseStandard, 'machine'> | undefined): 'no_benchmark' | 'machine' | null {
+  if (!standard) return 'no_benchmark';
+  return standard.machine ? 'machine' : null;
+}
+
 /** The days a season's baseline and its competition are measured over. */
 export function scoringWindows(target: Pick<Season, 'firstDay' | 'lastDay'>) {
   const baselineTo = addDays(target.firstDay, -1);

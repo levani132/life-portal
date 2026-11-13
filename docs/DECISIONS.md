@@ -1737,3 +1737,23 @@ the content, taken from `v1-rc1` before the promotion.
   `lockedVersion`) resolving to the same standard, so it is not treated as a replaced draft.
 - **What freezing does not do.** `trainingRanks` stays off in production, and weight-only sets
   logged before catalogue v2 stay as logged.
+
+## 2026-11-13: Tournament release readiness: no machine tournaments, reminders once per season, an erase hook (issue #12)
+
+- **Machine and cable standards have no tournament.** The owner asked not to claim
+  cross-machine fairness. Machines are private rows (`training_machines`), so two members'
+  "Leg Press" can be different sleds with different cams and carriage weights, and the app can't
+  tell. `tournamentExclusion()` excludes all 99 `machine: true` standards of v1, and ranks are
+  unchanged. Free weights are safe because machine sets never count toward a free-weight
+  standard. The way back is a shared machine identity, not a looser rule.
+- **The enrolment reminder moved into the hourly job, with a unique row per season.** The daily
+  00:10 cron sent nothing if the server was down at that minute, and two instances (or a manual
+  rerun) would each have sent it. The trade-off: a crash between the claim and the sends loses
+  that month's reminder. Losing one is better than sending two, since a reminder is optional and
+  a duplicate costs trust.
+- **`eraseMember()` exists before account deletion does.** Deletion is not claimed. The hook
+  removes entries, group membership and frozen results, so the future flow has one call to make
+  and a test that says what it must remove.
+- **The group view reads `method` and `standardsVersion` from the frozen copy.** It used to read
+  today's rank view, so a later release could have changed how a finished season's scores were
+  labelled.

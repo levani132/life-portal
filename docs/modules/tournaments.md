@@ -56,8 +56,16 @@ each other's names.
   unique `tournament_locks` row makes it happen once; a claim older than two minutes without
   `formedAt` is taken over.
 - **Variants never mix.** Each tournament is one catalogue exercise (one `seedKey`), so
-  variants and machines are never compared with each other. A machine exercise with its own
-  standard can have its own tournament.
+  variants are never compared with each other.
+- **No machine or cable tournaments** (owner, #12, 2026-11-13: don't claim cross-machine
+  fairness). Machines (`training_machines`) are private to whoever adds them, so nothing tells two
+  members' leg-press sleds or cable stacks apart, and their loads differ (cams, pulley ratios,
+  sled weight). `tournamentExclusion()` refuses every `machine: true` standard: 99 of v1's 287,
+  including Smith machine, cable, lever and selectorised lifts. The join is refused with the
+  reason, the panel says so, and an entry made before the rule gets `not_eligible` at the lock.
+  The rank itself is untouched. Free-weight standards are safe because sets with a machine
+  attached never count toward them. Lifting this needs a shared machine identity (a public machine
+  catalogue, or grouping by make and model) and is future work.
 
 ## Scoring (owner-approved)
 
@@ -83,7 +91,9 @@ tournamentScore  = best × (1 + improvementBonus)
   rounding never grants a bonus. The score is rounded to a whole rank-score unit (0.001× body
   weight). Examples: +3% gives +1%; +15% or more gives +5%; getting weaker gives no penalty and no
   bonus.
-- **Standards.** One scoring standard per season, copied at the lock (#5). Each entry stores
+- **Standards.** One scoring standard per season, copied at the lock (#5). Today that is the
+  frozen official **v1**, and joining, the lock, scoring and the group view all read it: the group
+  shows `standardsVersion` and reads `method` from the copy, never from today's standards. Each entry stores
   `lockedStandard` (version, method, measure, both categories' tier starts, machine) next to
   `lockedVersion`; every entry of a lock gets the same version, because they all rank on the day
   before the season. The baseline and every later score use that copy (`tournamentStandard`), and
@@ -142,9 +152,10 @@ tournamentScore  = best × (1 + improvementBonus)
 
 | Collection | Holds |
 |---|---|
-| `tournament_entries` | userId, exerciseId, season, category, consentVersion; at the lock `outcome` (`grouped`/`no_tournament`/`not_ranked`), `groupId`, the frozen rank, `lockedBaseline` and `lockedStandard`; `voidedAt`/`voidReason`. Unique per user, exercise and season |
+| `tournament_entries` | userId, exerciseId, season, category, consentVersion; at the lock `outcome` (`grouped`/`no_tournament`/`not_ranked`/`not_eligible`), `groupId`, the frozen rank, `lockedBaseline` and `lockedStandard`; `voidedAt`/`voidReason`. Unique per user, exercise and season |
 | `tournament_groups` | season, exercise, category, index, milestone range, `memberIds`; after grace `finalizedAt` and `results` (each member's frozen score breakdown) |
 | `tournament_locks` | who is forming one exercise-and-category's groups, and when it finished |
+| `tournament_reminders` | one row per season once its enrolment reminder has been sent |
 
 **Retention.** Every row carries `expireAt`: 12 months after the season's `finalizesAt`. A TTL
 index deletes it.
@@ -162,7 +173,7 @@ benchmark change. Live standings are not stored.
 | `POST /entries` | `{exerciseId, season, category, consentVersion}`. 400 outside enrolment, on an old consent version, a category that doesn't match the rank's standards, no social profile, no benchmark or no current rank. 409 if already entered |
 | `DELETE /entries/:id` | Withdraw, own entry only, any time: the entry is deleted and the member leaves the group at once |
 | `POST /entries/:id/void` | Developer only, `{reason}`. The member sees the reason; the group no longer shows them |
-| `GET /groups/:id` | Own group only, otherwise 404. `standings` (identity, place, score), `final`, `method`, and `own` (the viewer's breakdown) |
+| `GET /groups/:id` | Own group only, otherwise 404. `standings` (identity, place, score), `final`, `method` and `standardsVersion` (from the frozen copy), and `own` (the viewer's breakdown) |
 
 ## Integrity
 
@@ -182,20 +193,37 @@ preferences. The lock-screen text is generic.
 
 | Type | When |
 |---|---|
-| `tournamentEnrollmentOpen` | 00:10 UTC on the 20th, to members with any entry still within retention |
+| `tournamentEnrollmentOpen` | Once per season, at the first hourly run after 00:00 UTC on the 20th, to members with any entry still within retention |
 | `tournamentGroupAssigned` | When groups are formed, to members who got a group |
 | `tournamentResultsReady` | When a group's results are frozen, to its members, once |
 
 No per-set, rank-change or position notifications exist.
 
+**Jobs and idempotency.** One hourly job (`tournament-lock`, off with `DISABLE_SCHEDULES`) forms
+due groups, freezes due results and sends the enrolment reminder; every step is also triggered
+lazily by the first read that needs it. Each is once-only however many runs, readers or instances
+overlap: groups by the unique `tournament_locks` claim (a claim older than two minutes is taken
+over, so a crash is retried), results by the conditional `finalizedAt` write, and the reminder by a
+unique `tournament_reminders` row per season. A failed step is logged and retried by the next run.
+A missed midnight is made up later while enrolment is open; a reminder is never sent once
+enrolment has closed. The trade-off: a crash between claiming and sending loses that season's
+reminder rather than risking a second one.
+
 ## Deletion
 
-There is no account-deletion feature yet. When one is added, it must delete the member's
-`tournament_entries` and remove them from `tournament_groups.memberIds`, exactly as withdrawal
-does. Deleting workouts is covered under Scoring, "Edits and deletions".
+There is **no account-deletion feature yet**, so the app does not claim full deletion. The hook
+is ready: `TournamentsService.eraseMember(userId)` (exported by `TournamentsModule`) deletes the
+member's `tournament_entries` and removes them from every group's `memberIds` and frozen
+`results`; group-mates' places are derived, so they move up. It is idempotent and tested. The
+account-deletion flow, when it is built, must call it. Until then a member removes themselves by
+withdrawing (any time), and every row expires 12 months after its season's results are final.
+
+**Deleting workouts** needs no tournament cleanup: tournaments store no sets, only frozen scores
+and the day of the best workout. Before the lock a deletion shapes the baseline; during the season
+it changes the live score; after the lock it never moves the frozen baseline, and after
+`finalizesAt` it changes nothing (see Scoring, "Edits and deletions").
 
 ## Open (flagged to the owner on #12)
 
-- **Machines.** Different machines logged against one machine exercise are compared in one
-  tournament.
+- **Machine tournaments** are off until there is a shared machine identity (see Matching).
 - **Production rollout.** It stays off until review.

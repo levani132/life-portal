@@ -14,6 +14,8 @@ import {
   TournamentGroupSchema,
   TournamentLockRecord,
   TournamentLockSchema,
+  TournamentReminderRecord,
+  TournamentReminderSchema,
 } from './tournaments.schemas';
 import { TournamentsService } from './tournaments.service';
 
@@ -53,7 +55,10 @@ class TournamentsController {
   }
 }
 
-/** Hourly lock and results freeze, and the enrolment reminder on the 20th. Off with `DISABLE_SCHEDULES`. */
+/**
+ * Hourly: form due groups, freeze due results, and send the enrolment reminder once per season.
+ * Each step is idempotent and retried by the next run if it failed. Off with `DISABLE_SCHEDULES`.
+ */
 @Injectable()
 class TournamentJobs {
   private readonly logger = new Logger(TournamentJobs.name);
@@ -66,12 +71,11 @@ class TournamentJobs {
     if (formed) this.logger.log(`Formed tournament groups for ${formed} exercise(s)`);
     const finalized = await this.tournaments.finalizeDue();
     if (finalized) this.logger.log(`Froze results for ${finalized} tournament group(s)`);
-  }
-
-  @Cron('0 10 0 * * *', { name: 'tournament-enrolment-reminder', timeZone: 'UTC' })
-  async remind() {
-    if (this.tournaments.schedulesDisabled) return;
-    await this.tournaments.remindEnrollmentOpen();
+    const reminded = await this.tournaments.remindEnrollmentOpen().catch((error: unknown) => {
+      this.logger.warn(`Enrolment reminder failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+      return 0;
+    });
+    if (reminded) this.logger.log(`Sent the enrolment reminder to ${reminded} member(s)`);
   }
 }
 
@@ -83,9 +87,11 @@ class TournamentJobs {
       { name: TournamentEntryRecord.name, schema: TournamentEntrySchema },
       { name: TournamentGroupRecord.name, schema: TournamentGroupSchema },
       { name: TournamentLockRecord.name, schema: TournamentLockSchema },
+      { name: TournamentReminderRecord.name, schema: TournamentReminderSchema },
     ]),
   ],
   controllers: [TournamentsController],
   providers: [TournamentsService, TournamentJobs],
+  exports: [TournamentsService],
 })
 export class TournamentsModule {}

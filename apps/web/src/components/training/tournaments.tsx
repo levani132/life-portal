@@ -64,6 +64,8 @@ export function entryStatusText(entry: TournamentEntry): string {
       return 'Fewer than 3 people entered this exercise in your category, so there is no competition this month. Nobody is invented to fill a group.';
     case 'not_ranked':
       return 'You had no current rank on this exercise when enrolment closed, so you weren’t placed in a group.';
+    case 'not_eligible':
+      return 'Machine and cable lifts have no tournament, so you weren’t placed in a group. Machines differ, so loads can’t be compared fairly between people.';
     case 'voided':
       return `Removed from this tournament${entry.voidReason ? `: ${entry.voidReason}` : '.'}`;
   }
@@ -82,6 +84,18 @@ export function TournamentPanel({ exerciseId, today }: { exerciseId: string; tod
   // No standards for this exercise: no tournament either, and nothing to say here.
   if (rank.data.reason === 'no_benchmark') return null;
   const entries = overview.data.entries.filter((entry) => entry.exerciseId === exerciseId);
+  if (rank.data.benchmark?.machine && !entries.length) {
+    // Machines are private to whoever adds them, so nothing tells two people's machines apart.
+    return (
+      <section aria-label="Tournaments" className="rounded-xl border border-border p-3 text-sm">
+        <h4 className="label">Monthly tournament</h4>
+        <p className="mt-1 text-ink-muted">
+          Machine and cable lifts have no tournament: machines differ, so loads can’t be compared fairly between people. Your rank on this
+          lift still works. Free-weight lifts have tournaments.
+        </p>
+      </section>
+    );
+  }
   const open = overview.data.enrollable;
   const enteredOpen = open && entries.some((entry) => entry.season.id === open.id);
   return (
@@ -183,6 +197,7 @@ export function GroupList({ groupId }: { groupId: string }) {
     <div className="mt-2 rounded-lg bg-surface-raised p-2">
       <p className="text-xs text-ink-muted">
         {data.rankRange} · {data.standings.length} {data.standings.length === 1 ? 'member' : 'members'} ·{' '}
+        {data.standardsVersion ? `standards ${data.standardsVersion}, fixed for the month · ` : ''}
         {data.final
           ? 'final results'
           : `live until ${localTime(data.season.finalizesAt)}; workouts dated ${data.season.firstDay} to ${data.season.lastDay} (UTC month) and saved by then count`}
@@ -190,7 +205,9 @@ export function GroupList({ groupId }: { groupId: string }) {
       <ol className="mt-2 space-y-1" aria-label={data.final ? 'Final standings' : 'Live standings'}>
         {data.standings.map((row, i) => (
           <li key={row.userId ?? `hidden-${i}`} className="flex items-center gap-2">
-            <span className="w-8 shrink-0 text-right tabular-nums text-ink-muted">{row.place ? ordinal(row.place) : '–'}</span>
+            <span className="w-8 shrink-0 text-right tabular-nums text-ink-muted">
+              {row.place ? ordinal(row.place) : <span aria-label="No place">–</span>}
+            </span>
             {row.avatarUrl ? (
               <img src={row.avatarUrl} alt="" className="h-6 w-6 shrink-0 rounded-full object-cover" />
             ) : (

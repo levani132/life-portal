@@ -14,6 +14,7 @@ jest.mock('../../lib/hooks', () => ({
       category: 'women',
       rankRange: 'Achiever III – Veteran I',
       method: 'e1rm',
+      standardsVersion: 'v1',
       final: false,
       standings: [
         { self: false, place: 1, score: 1370 },
@@ -59,6 +60,8 @@ it('shows places and scores, hides a blocked member’s identity, and explains o
   render(<GroupList groupId="g" />);
   expect(screen.getByText('A member')).toBeTruthy();
   expect(screen.getByText('1st')).toBeTruthy();
+  expect(screen.getByText(/standards v1, fixed for the month/)).toBeTruthy();
+  expect(screen.getByLabelText('No place')).toBeTruthy();
   expect(screen.getByText('1.37× body weight')).toBeTruthy();
   expect(screen.getByText('no valid set yet')).toBeTruthy();
   const own = screen.getByLabelText('How your score is worked out');
@@ -75,6 +78,7 @@ it('explains sparse, unranked and voided entries honestly', () => {
   });
   expect(entryStatusText(entry('no_tournament'))).toMatch(/Fewer than 3 .* Nobody is invented/);
   expect(entryStatusText(entry('not_ranked'))).toMatch(/no current rank/);
+  expect(entryStatusText(entry('not_eligible'))).toMatch(/Machine and cable lifts have no tournament/);
   expect(entryStatusText(entry('voided', { voidReason: 'Impossible set' }))).toBe('Removed from this tournament: Impossible set');
   expect(entryStatusText(entry('grouped', { result: { place: 2, of: 7, score: 1137 } }))).toBe('Final result: 2nd of 7.');
   expect(entryStatusText(entry('grouped', { result: { of: 7 } }))).toMatch(/no valid set this month, so no place/);

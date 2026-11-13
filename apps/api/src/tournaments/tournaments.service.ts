@@ -35,6 +35,7 @@ import {
   season as seasonOf,
   seasonDayAt,
   seasonPhase,
+  tournamentExclusion,
   tournamentScore,
   type FrozenStandard,
   type Season,
@@ -47,7 +48,13 @@ import { SocialGraphService } from '../social-graph/social-graph.module';
 import { SocialService } from '../social/social.module';
 import { TrainingProfileService } from '../training/profile.service';
 import { TrainingRankService } from '../training/rank.service';
-import { TournamentEntryRecord, TournamentGroupRecord, TournamentLockRecord, type FrozenResult } from './tournaments.schemas';
+import {
+  TournamentEntryRecord,
+  TournamentGroupRecord,
+  TournamentLockRecord,
+  TournamentReminderRecord,
+  type FrozenResult,
+} from './tournaments.schemas';
 
 type EntryRow = TournamentEntryRecord & { _id: unknown; createdAt?: Date };
 type GroupRow = TournamentGroupRecord & { _id: unknown };
@@ -90,6 +97,7 @@ export class TournamentsService implements OnModuleInit {
     @InjectModel(TournamentEntryRecord.name) private readonly entries: Model<TournamentEntryRecord>,
     @InjectModel(TournamentGroupRecord.name) private readonly groups: Model<TournamentGroupRecord>,
     @InjectModel(TournamentLockRecord.name) private readonly locks: Model<TournamentLockRecord>,
+    @InjectModel(TournamentReminderRecord.name) private readonly reminders: Model<TournamentReminderRecord>,
     private readonly ranks: TrainingRankService,
     private readonly profiles: TrainingProfileService,
     private readonly social: SocialService,
@@ -223,6 +231,7 @@ export class TournamentsService implements OnModuleInit {
     const ranked = await this.ranks
       .rankFor(userId, group.exerciseId, seasonDayAt(now), group.category as TournamentCategory)
       .catch(() => undefined);
+    const standardsVersion = own.lockedStandard?.version ?? own.lockedVersion;
     return {
       id: String(group._id),
       exerciseId: group.exerciseId,
@@ -230,7 +239,9 @@ export class TournamentsService implements OnModuleInit {
       season: seasonView(target, now),
       category: group.category as TournamentCategory,
       rankRange: groupRangeLabel(group),
-      method: ranked?.view.benchmark?.method ?? 'e1rm',
+      // How scores read comes from the standard frozen at the lock, never today's standards.
+      method: own.lockedStandard?.method ?? ranked?.view.benchmark?.method ?? 'e1rm',
+      ...(standardsVersion ? { standardsVersion } : {}),
       standings,
       final: !!group.finalizedAt,
       ...(mine?.score !== undefined ? { own: ownScore(mine) } : {}),
@@ -326,6 +337,11 @@ export class TournamentsService implements OnModuleInit {
     }
     const { view } = await this.ranks.rankFor(userId, input.exerciseId, seasonDayAt(now), input.category);
     if (view.reason === 'no_benchmark') throw new BadRequestException('This exercise has no rank standards, so it has no tournament.');
+    if (view.benchmark && tournamentExclusion(view.benchmark) === 'machine') {
+      throw new BadRequestException(
+        'Machine and cable lifts have no tournament: machines differ, so loads can’t be compared fairly between people. Your rank on it still works.',
+      );
+    }
     if (view.status !== 'ranked') {
       throw new BadRequestException('You need a current rank on this exercise to join: log a valid set before enrolment closes.');
     }
@@ -367,6 +383,30 @@ export class TournamentsService implements OnModuleInit {
     return { voided: true };
   }
 
+  /**
+   * Removes everything tournaments hold about a member: their entries, their place in every group
+   * and their frozen results. For account deletion (none exists yet; docs/modules/tournaments.md
+   * says it must call this). Group-mates' rows are kept; places are derived, so theirs move up.
+   */
+  async eraseMember(userId: string): Promise<{ entries: number; groups: number }> {
+    const groups = await this.groups
+      .find({ $or: [{ memberIds: userId }, { 'results.userId': userId }] })
+      .lean<GroupRow[]>();
+    for (const group of groups) {
+      await this.groups.updateOne(
+        { _id: group._id },
+        {
+          $set: {
+            memberIds: group.memberIds.filter((id) => id !== userId),
+            ...(group.results ? { results: group.results.filter((row) => row.userId !== userId) } : {}),
+          },
+        },
+      );
+    }
+    const { deletedCount } = await this.entries.deleteMany({ userId });
+    return { entries: deletedCount ?? 0, groups: groups.length };
+  }
+
   private async leaveGroup(groupId: string, userId: string) {
     const group = await this.groups.findOne({ _id: groupId }).lean<GroupRow>();
     if (group) {
@@ -392,6 +432,7 @@ export class TournamentsService implements OnModuleInit {
     const lockDay = addDays(target.firstDay, -1);
     const entrants: TournamentEntrant[] = [];
     const notRanked: EntryRow[] = [];
+    const notEligible: EntryRow[] = [];
     const locked = new Map<string, { milestone: number; score: number; version: string; baseline: number; standard: FrozenStandard }>();
     const windows = scoringWindows(target);
     for (const row of rows) {
@@ -408,6 +449,11 @@ export class TournamentsService implements OnModuleInit {
               .strengthBest(row.userId, exerciseId, category, { from: windows.baselineFrom, to: windows.baselineTo }, target.locksAt, version, lockDay)
               .catch(() => undefined)
           : undefined;
+      if (baseline?.standard && tournamentExclusion(baseline.standard) === 'machine') {
+        // Only an entry made before machine lifts were excluded can get here.
+        notEligible.push(row);
+        continue;
+      }
       if (!current || !version || !baseline?.best || !baseline.standard) {
         notRanked.push(row);
         continue;
@@ -451,6 +497,9 @@ export class TournamentsService implements OnModuleInit {
     }
     for (const row of notRanked) {
       await this.entries.updateOne({ ...key, userId: row.userId }, { $set: { outcome: 'not_ranked' } });
+    }
+    for (const row of notEligible) {
+      await this.entries.updateOne({ ...key, userId: row.userId }, { $set: { outcome: 'not_eligible' } });
     }
     await this.locks.updateOne(key, { $set: { formedAt: now } });
     for (const { userId, groupId } of assigned) {
@@ -508,13 +557,21 @@ export class TournamentsService implements OnModuleInit {
   }
 
   /**
-   * On the 20th: remind members who have entered before (and still have entries within the
-   * retention period) that next month is open. Nobody else is ever sent one.
+   * Once per season, at the first hourly run after enrolment opens on the 20th: remind members who
+   * have entered before (and still have entries within the retention period) that next month is
+   * open. Nobody else is ever sent one. A unique row per season makes it once, across runs,
+   * restarts and instances; a run missed at midnight is made up later while enrolment is open.
    */
   async remindEnrollmentOpen(): Promise<number> {
     const now = this.now();
     const open = enrollableSeason(now);
-    if (!open || seasonDayAt(now) !== seasonDayAt(open.enrolOpensAt)) return 0;
+    if (!open) return 0;
+    try {
+      await this.reminders.create({ season: open.id, sentAt: now, expireAt: expiryFor(open) });
+    } catch (error) {
+      if ((error as { code?: number }).code === 11000) return 0;
+      throw error;
+    }
     const recipients = (await this.entries.distinct('userId', {})) as string[];
     for (const recipientId of recipients) {
       void this.notifications.remind({ type: 'tournamentEnrollmentOpen', recipientId, targetId: open.id });

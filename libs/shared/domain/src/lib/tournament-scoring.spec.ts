@@ -4,9 +4,11 @@ import {
   freezeStandard,
   placeStandings,
   scoringWindows,
+  tournamentExclusion,
   tournamentScore,
   tournamentStandard,
 } from './tournament-scoring';
+import { RANK_BENCHMARKS } from './strength-ranks';
 import { season } from './tournaments';
 
 const STANDARD: ExerciseStandard = {
@@ -128,6 +130,20 @@ describe('scoring windows and standards', () => {
     const copy = freezeStandard('a', source);
     source.starts.men[1] = 1;
     expect(copy.starts.men[1]).toBe(STANDARD.starts.men[1]);
+  });
+});
+
+describe('which standards have a tournament', () => {
+  it('excludes machine and cable standards, which no machine identity makes comparable, and keeps free weights', () => {
+    const v1 = RANK_BENCHMARKS.find((version) => version.version === 'v1') as BenchmarkVersion;
+    const all = Object.values(v1.exercises);
+    const machines = all.filter((standard) => tournamentExclusion(standard) === 'machine');
+    expect(machines.length).toBeGreaterThan(0);
+    expect(machines.every((standard) => standard.machine)).toBe(true);
+    expect(all.filter((standard) => tournamentExclusion(standard) === null).every((standard) => !standard.machine)).toBe(true);
+    expect(tournamentExclusion(v1.exercises['fedb:Leg_Press'])).toBe('machine');
+    expect(tournamentExclusion(v1.exercises['fedb:Barbell_Bench_Press_-_Medium_Grip'])).toBeNull();
+    expect(tournamentExclusion(undefined)).toBe('no_benchmark');
   });
 });
 
