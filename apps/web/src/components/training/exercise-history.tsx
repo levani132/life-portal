@@ -72,7 +72,10 @@ export function formatMetric(metric: ProgressMetric, value: number, unit: Weight
 const chartValue = (metric: ProgressMetric, value: number, unit: WeightUnit) =>
   WEIGHT_METRICS.has(metric) ? gramsToDisplay(value, unit) : value;
 
-export function ExerciseHistory({ exerciseId }: { exerciseId: string }) {
+/** One part of the history, for a tab of the exercise's details. Without it, everything. */
+export type HistorySection = 'progress' | 'rank' | 'sessions';
+
+export function ExerciseHistory({ exerciseId, section }: { exerciseId: string; section?: HistorySection }) {
   const [range, setRange] = useState<ProgressRange>('3m');
   const workoutDay = useWorkoutDay();
   const today = workoutDay();
@@ -81,6 +84,22 @@ export function ExerciseHistory({ exerciseId }: { exerciseId: string }) {
     `/training/exercises/${exerciseId}/progress?range=${range}&today=${today}`,
     { keepPreviousData: true },
   );
+  const show = (part: HistorySection) => !section || section === part;
+  // The rank says what it needs by itself (a weigh-in, a working set), sessions or not.
+  const rank = (
+    <>
+      <StrengthRank exerciseId={exerciseId} today={today} />
+      <TournamentPanel exerciseId={exerciseId} today={today} />
+    </>
+  );
+  if (section === 'rank') {
+    return (
+      <div className="space-y-4">
+        {rank}
+        <TrainingLevelLink today={today} />
+      </div>
+    );
+  }
   if (progress.error) return <ErrorNote message={(progress.error as Error).message} />;
   if (!progress.data) return <Spinner />;
   const view = progress.data;
@@ -96,14 +115,17 @@ export function ExerciseHistory({ exerciseId }: { exerciseId: string }) {
   return (
     <div className="space-y-4">
       {earlier}
-      <KeyFigures view={view} unit={unit} />
-      <StrengthRank exerciseId={exerciseId} today={today} />
-      <TournamentPanel exerciseId={exerciseId} today={today} />
-      <ProgressChart view={view} unit={unit} range={range} onRange={setRange} loading={progress.isValidating} />
-      {view.nextRecord && <NextRecordCard next={view.nextRecord} unit={unit} />}
-      {view.records.length > 0 && <Records records={view.records} unit={unit} />}
-      <Sessions exerciseId={exerciseId} measure={view.exercise.measure} />
-      <TrainingLevelLink today={today} />
+      {show('progress') && <KeyFigures view={view} unit={unit} />}
+      {!section && rank}
+      {show('progress') && (
+        <>
+          <ProgressChart view={view} unit={unit} range={range} onRange={setRange} loading={progress.isValidating} />
+          {view.nextRecord && <NextRecordCard next={view.nextRecord} unit={unit} />}
+          {view.records.length > 0 && <Records records={view.records} unit={unit} />}
+        </>
+      )}
+      {show('sessions') && <Sessions exerciseId={exerciseId} measure={view.exercise.measure} />}
+      {!section && <TrainingLevelLink today={today} />}
     </div>
   );
 }

@@ -2,6 +2,20 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-13: Sets are ticked off in the row; exercise details in tabs
+
+- **In a workout, each set is one row: its numbers, and a tick at the end.** Planned sets are
+  there from the start, already filled in; change a number in the row if you need to and tick it.
+  The separate "Log set" form is gone. Tick again to take a set back (its numbers stay in the
+  row), and edit a done set right in its row. The set number opens type and RPE.
+- **A big "Add set" button** under the rows adds one more, starting from the set above it.
+- **Pull-ups, dips and the like have one weight box instead of two.** `+` is added weight, `−` is
+  assistance; tap the sign to switch (or type a minus where the keyboard has one).
+- **Tap an exercise's name in a workout to open its details**: how it is done, your progress,
+  your rank and tournament, and your past sessions.
+- **Exercise details are in tabs** (About, Progress, Rank, History), in the Exercises tab too, so
+  nothing hides below a long scroll.
+
 ## 2026-11-13: Tournaments use standards v1; no machine tournaments
 
 - **A tournament group says which standards it is scored under** (v1), fixed for the month.

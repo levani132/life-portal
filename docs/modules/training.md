@@ -141,6 +141,16 @@ the `{userId, 'plan.planId', day}` index.
   else last time's last set, else the target (low end of a range, planned weight if any). The web
   carries a weight logged earlier in the same workout into a target without one, so the second
   set of a new exercise is still one tap.
+- **The set table** (`components/training/set-table.tsx`): one row per set, inputs in the row, a
+  tick at the end. Logged sets, then sets still in the queue, then open rows: one per open
+  target (each pre-filled as above), then rows added with "Add set". An open row is never data;
+  ticking it sends the set, un-ticking a logged one deletes it and keeps its numbers in an open
+  row. What is typed into open rows is browser state keyed by row position. A logged row's
+  numbers save (`PATCH /sets/:id`) when the row is left. Type and RPE sit behind the set number.
+- **One signed load field for `bodyweight_reps`** (web only; storage is unchanged): below zero is
+  `assistGrams`, above is `weightGrams`, zero or empty is neither. The field has a sign switch,
+  because the iOS decimal pad has no minus key. The carry-over above never adds assistance to a
+  target that names added weight, or the reverse.
 - **Swap** (`POST …/exercises/:weId/swap`) replaces a workout exercise that has no sets with a new
   row in the same `order` (409 `HAS_SETS` otherwise): `exerciseId` stays immutable. Targets carry
   over when the measure matches; otherwise the same number of empty targets of the same types.

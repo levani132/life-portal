@@ -49,15 +49,15 @@ import {
   useWorkoutDay,
 } from '../../lib/training';
 import { clearQueueError, enqueue, useTrainingQueue } from '../../lib/training-queue';
-import { ExerciseHistory } from './exercise-history';
+import { ExerciseDetail, type ExerciseDetailTab } from './exercise-detail';
 import { ExerciseSearch, MachineChoice } from './exercise-picker';
 import { SuggestedPlans } from './plan-suggestions';
 import { GROUP_STYLES, exerciseGroup, usePlanStyle } from '../../lib/training-colors';
 import { RestTimer } from './rest-timer';
 import { RestEditor } from './rest-editor';
 import { exerciseRest, sessionFocus } from '../../lib/training-workout';
-import { SetForm, SetLine, type SetFormValue } from './set-row';
-import { SuggestionRows, suggestionValue } from './suggestion-row';
+import { SetForm, type SetFormValue } from './set-row';
+import { SetTable } from './set-table';
 
 interface PendingSet {
   sessionId: string;
@@ -140,7 +140,7 @@ export function CurrentWorkout({ onBrowsePlans }: { onBrowsePlans?: () => void }
 }
 
 /**
- * One session, open or finished: exercises in order, their sets, a form for the next set, and
+ * One session, open or finished: exercises in order, their sets as a table to tick off, and
  * the session's own controls. Finished sessions stay editable (spec 020, story 1 #5).
  */
 export function WorkoutSession({ session, onGone }: { session: SessionDetail; onGone?: () => void }) {
@@ -486,7 +486,8 @@ function ExerciseBlock({
   const measure = exercise.snapshot.measure;
   const [editing, setEditing] = useState<WorkoutSet | null>(null);
   const [choosingMachine, setChoosingMachine] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
+  /** The exercise's details (how it is done, progress, rank, history), opened on a tab. */
+  const [detail, setDetail] = useState<ExerciseDetailTab | null>(null);
   const [swapping, setSwapping] = useState(false);
   const [editingRest, setEditingRest] = useState(false);
   /** A done exercise opened again, to look at it or add a set. Stays open until closed. */
@@ -508,13 +509,6 @@ function ExerciseBlock({
     }
   };
   const done = exercise.sets.length + pending.length;
-  // Start the next set from the last one logged, else from the same set last time.
-  const lastValue = pending.length ? pending[pending.length - 1].value : exercise.sets[exercise.sets.length - 1];
-  // From a plan (spec 023): the open targets still to do, after any sets waiting to be sent.
-  const suggestions = exercise.openTargets.slice(pending.length);
-  const next = suggestions[0] ? suggestionValue(exercise, suggestions[0], done, lastValue) : undefined;
-  const initial: Partial<WorkoutSet> | undefined =
-    next?.value ?? lastValue ?? exercise.previous?.sets[done] ?? exercise.previous?.sets[exercise.previous.sets.length - 1];
   const fromPlan = Boolean(exercise.planned);
   const canSwap = fromPlan && done === 0 && session.status === 'open';
 
@@ -576,7 +570,17 @@ function ExerciseBlock({
                 {superset.position}
               </span>
             )}
-            <span className="truncate">{exercise.snapshot.name}</span>
+            <button
+              type="button"
+              className="truncate text-left underline decoration-ink-faint/50 decoration-dotted underline-offset-4 hover:decoration-ink"
+              onClick={(event) => {
+                event.stopPropagation();
+                setDetail('about');
+              }}
+              aria-label={`${exercise.snapshot.name}: details, progress and rank`}
+            >
+              {exercise.snapshot.name}
+            </button>
             {state === 'current' && (
               <span className="shrink-0 rounded-full bg-train-pull-solid px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
                 Now
@@ -659,7 +663,7 @@ function ExerciseBlock({
               <SkipForward className="h-4 w-4" />
             </button>
           )}
-          <button type="button" className={iconButton} onClick={() => setShowHistory(true)} aria-label={`${exercise.snapshot.name} history`}>
+          <button type="button" className={iconButton} onClick={() => setDetail('progress')} aria-label={`${exercise.snapshot.name} progress and history`} title="Progress, rank and history">
             <HistoryIcon className="h-4 w-4" />
           </button>
           <button type="button" className={iconButton} disabled={!canMoveUp || busy} onClick={() => onMove(-1)} aria-label="Move up">
@@ -680,9 +684,6 @@ function ExerciseBlock({
           currentId={exercise.machineId ?? ''}
           onChoose={(machineId) => void setMachine(machineId)}
         />
-      </Modal>
-      <Modal open={showHistory} onClose={() => setShowHistory(false)} title={exercise.snapshot.name} wide>
-        <ExerciseHistory exerciseId={exercise.exerciseId} />
       </Modal>
       <Modal open={swapping} onClose={() => setSwapping(false)} title={`Swap ${exercise.snapshot.name}`} wide>
         <ExerciseSearch
@@ -713,41 +714,29 @@ function ExerciseBlock({
           {exercise.previous.sets.map((set) => describeSet(set, measure, unit)).join(', ')}
         </p>
       )}
-      <div className="mb-3">
-        {exercise.sets.map((set, index) => (
-          <SetLine key={set.id} index={index + 1} set={set} measure={measure} onClick={() => setEditing(set)} />
-        ))}
-        {pending.map((item, index) => (
-          <SetLine key={`pending-${index}`} index={exercise.sets.length + index + 1} set={item.value} measure={measure} pending />
-        ))}
-        {estimate && (
-          <p className="mt-1 px-2 text-xs">
-            <span className="font-medium">{estimate.value}</span>
-            <span className="text-ink-faint"> · {estimate.basis}</span>
-          </p>
-        )}
-      </div>
-      {exercise.skipped ? (
-        <p className="text-sm text-ink-faint">
+      <SetTable
+        exercise={exercise}
+        pending={pending.map((item) => item.value)}
+        onLog={log}
+        onEdit={setEditing}
+      />
+      {estimate && (
+        <p className="mt-2 px-2 text-xs">
+          <span className="font-medium">{estimate.value}</span>
+          <span className="text-ink-faint"> · {estimate.basis}</span>
+        </p>
+      )}
+      {exercise.skipped && (
+        <p className="mt-2 text-sm text-ink-faint">
           Skipped.{' '}
           <button type="button" className="underline" disabled={busy} onClick={() => onSkip(false)}>
             Do it after all
           </button>
         </p>
-      ) : (
-        <>
-          <SuggestionRows
-            measure={measure}
-            targets={suggestions}
-            firstIndex={done + 1}
-            first={next}
-            onLog={log}
-          />
-          <SetForm key={`${done}:${suggestions.length}`} measure={measure} initial={initial} submitLabel="Log set" onSubmit={log} />
-        </>
       )}
       </>
       )}
+      {detail && <ExerciseDetail id={exercise.exerciseId} initialTab={detail} onClose={() => setDetail(null)} />}
       {editing && (
         <EditSet set={editing} measure={measure} onClose={() => setEditing(null)} />
       )}
