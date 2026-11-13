@@ -1666,3 +1666,28 @@ building it:
   Places are derived from frozen scores and current members, so leaving still takes effect.
 - **Others see place and score only.** The breakdown (best, baseline, improvement, bonus, day)
   goes to the viewer alone, matching the owner's privacy limits.
+
+## 2026-11-13: Rank standards v1-draft-3: 280 exercises, provisional ratio standards, load conventions everywhere (issue #5)
+
+Owner direction: rank substantially more of the catalogue, keep variants distinct, label weaker
+evidence instead of excluding it, and make the weight convention obvious.
+
+- **Ratios to a main lift, labelled provisional.** There are no published tables for most
+  isolation, dumbbell, cable and machine lifts. Each one is a typical ratio to the squat,
+  deadlift or bench standard, and is flagged `provisional`. The rank shows a "Provisional" tag
+  and explains it, instead of the exercise staying unranked.
+- **Variants stay distinct.** Smith, machine, cable, EZ-bar, dumbbell and barbell versions each
+  have their own standard and load convention. A Smith press is never a bench press, and the
+  rules that keep machine sets off free-weight standards are unchanged.
+- **Every standard states how load is entered, and logging shows it.** A set entered per pair
+  instead of per dumbbell, or with the sled's weight included, would rank wrongly. The note comes
+  from the standard (`rankLoadNote`), is shown under the exercise in a workout, and is derived
+  on read, never stored.
+- **The catalogue measure is checked, not assumed.** A test pins every standard to its catalogue
+  row and that row's measure. That is how the 17 body-weight lifts filed under "other" equipment
+  (weighted pull-ups, ring dips…) were found to be logged as weight only; they stay excluded
+  rather than ranked on the added weight alone.
+- **Reps tiers are at least 3 apart**, so every division is reachable. That moved women's push-up
+  Explorer from 2 to 3 reps.
+- **Still a draft.** `v1-draft-3` replaces `v1-draft-2` in place. Not frozen, production off.
+

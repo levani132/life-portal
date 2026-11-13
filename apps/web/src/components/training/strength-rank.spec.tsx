@@ -105,3 +105,12 @@ it('explains the work-capacity part, and says nothing for push-ups', () => {
   expect(workCapacityLine(at(0, 1), benchmark)).toMatch(/add 1% each, up to \+5%/);
   expect(workCapacityLine(at(3, 4), { ...benchmark, method: 'reps' })).toBeUndefined();
 });
+
+it('labels a provisional standard visibly and explains its limits', () => {
+  responses['/portal'] = access(true);
+  responses[RANK_URL] = view({ benchmark: { ...benchmark, provisional: true, note: 'The weight of one dumbbell.' } });
+  render(<StrengthRank exerciseId="e1" today="2026-11-13" />);
+  expect(screen.getByText('Provisional')).toBeTruthy();
+  expect(screen.getByText(/estimated from the main lifts by typical ratios/)).toBeTruthy();
+  expect(screen.getByText('The weight of one dumbbell.')).toBeTruthy();
+});

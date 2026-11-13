@@ -109,7 +109,14 @@ function Ranked({ view, unit, onChangeStandards }: { view: ExerciseRankView; uni
           <RankBadge position={current} />
           <div className="min-w-0 flex-1">
             <p className="text-xs text-ink-faint">Current · best set in the last {view.windowDays} days</p>
-            <p className="font-semibold">{rankLabel(current)}</p>
+            <p className="font-semibold">
+              {rankLabel(current)}
+              {benchmark.provisional && (
+                <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                  Provisional
+                </span>
+              )}
+            </p>
             <Progress position={current} benchmark={benchmark} />
           </div>
         </div>
@@ -139,6 +146,12 @@ function Ranked({ view, unit, onChangeStandards }: { view: ExerciseRankView; uni
           {current && workCapacityLine(current, benchmark) && <p>{workCapacityLine(current, benchmark)}</p>}
           {benchmark.note && <p>{benchmark.note}</p>}
           {benchmark.machine && <p>Machine standards are rougher: the same weight feels different on different machines.</p>}
+          {benchmark.provisional && (
+            <p className="text-amber-600 dark:text-amber-400">
+              Provisional standard: estimated from the main lifts by typical ratios, not from published tables for this exercise, so
+              treat the rank as a rough guide.
+            </p>
+          )}
           <p>
             {benchmark.method === 'e1rm'
               ? `Score: your Epley estimated one-rep max, scaled to a ${(benchmark.referenceBodyWeightGrams ?? 0) / 1000} kg body weight (×(reference ÷ your weight)^⅔), as a multiple of that weight.`

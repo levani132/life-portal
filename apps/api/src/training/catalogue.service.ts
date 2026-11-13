@@ -15,7 +15,7 @@ import {
   type TrainingDeleteResult,
   type TrainingImage,
 } from '@life-portal/shared-types';
-import { normaliseSearch } from '@life-portal/shared-domain';
+import { normaliseSearch, rankLoadNote } from '@life-portal/shared-domain';
 import { MediaService } from '../media/media.service';
 import { Exercise, TrainingPlan, WorkoutExercise, WorkoutSet } from './training.schemas';
 
@@ -123,7 +123,7 @@ export class CatalogueService {
     const [rows, recent] = await Promise.all([
       this.exercises
         .find(this.visible(userId, extra))
-        .select('name searchName primaryMuscles equipmentType measure userId')
+        .select('name searchName primaryMuscles equipmentType measure userId seedKey')
         .sort({ name: 1, _id: 1 })
         .limit(RANK_CAP)
         .lean<ExerciseRow[]>(),
@@ -278,7 +278,14 @@ export class CatalogueService {
       equipmentType: row.equipmentType as EquipmentType,
       measure: row.measure as Measure,
       isOwn: Boolean(row.userId),
+      ...this.loadNote(row),
     };
+  }
+
+  /** Shared rows only: a private exercise has no standard, whatever it is called. */
+  private loadNote(row: ExerciseRow): { loadNote?: string } {
+    const note = row.userId ? undefined : rankLoadNote(row.seedKey, row.measure as Measure);
+    return note ? { loadNote: note } : {};
   }
 
   private async toExercise(row: ExerciseRow): Promise<ExerciseDto> {

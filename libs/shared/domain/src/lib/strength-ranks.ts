@@ -44,8 +44,13 @@ export interface ExerciseStandard {
    * standard's sets do not, because a machine is not the lift the standard describes.
    */
   machine?: boolean;
-  /** How load is read, shown with the rank (e.g. "The weight of one dumbbell."). */
+  /** How load is read, shown with the rank and while logging (e.g. "The weight of one dumbbell."). */
   note?: string;
+  /**
+   * Weaker evidence: an isolation, cable, machine, kettlebell or endurance standard extrapolated
+   * from the main lifts by typical ratios rather than published tables of its own. Shown as such.
+   */
+  provisional?: boolean;
 }
 
 export interface BenchmarkVersion {
@@ -77,6 +82,7 @@ interface LiftOptions {
   measure?: Measure;
   machine?: boolean;
   note?: string;
+  provisional?: boolean;
 }
 
 /** A load standard: men's tier starts as body-weight multiples, women's derived by family. */
@@ -86,14 +92,48 @@ const lift = (men: number[], family: Family, options: LiftOptions = {}): Exercis
   starts: { men, women: men.map((value) => r10(value * RANK_WOMEN_FACTORS[family])) },
   ...(options.machine ? { machine: true } : {}),
   ...(options.note ? { note: options.note } : {}),
+  ...(options.provisional ? { provisional: true } : {}),
 });
 
 /** A variant: another lift's men's standard times a ratio (e.g. incline ≈ 0.80 × flat bench). */
 const variant = (base: number[], ratio: number, family: Family, options: LiftOptions = {}) =>
   lift(base.map((value) => r10(value * ratio)), family, options);
 
+// How load is read. Shown with the rank and while logging, so a set is entered the same way the
+// standard assumes.
+const BAR = 'The bar and plates together.';
+const EZ_BAR = 'The EZ bar and plates together.';
 const PER_DUMBBELL = 'The weight of one dumbbell.';
+const ONE_ARM_DUMBBELL = 'The weight of the dumbbell, one arm at a time.';
+const ONE_DUMBBELL_BOTH_HANDS = 'The weight of the one dumbbell, held in both hands.';
+const PER_KETTLEBELL = 'The weight of one kettlebell.';
+const ONE_KETTLEBELL = 'The weight of the kettlebell.';
 const STACK = 'The weight on the stack or the plates loaded; machines differ, so compare like with like.';
+const STACK_PER_SIDE = 'The weight on one stack (each side).';
+const STACK_ONE_ARM = 'The weight on the stack, one arm or leg at a time.';
+const PLATES_LOADED = 'The plates loaded, not the sled or carriage; machines differ, so compare like with like.';
+const SMITH = 'The plates on the Smith bar; bars differ (some are counterweighted), so compare like with like.';
+const BODY = 'Your body weight counts automatically; log only weight you add.';
+const REPS_ONLY = 'Reps in one set; added weight is not counted.';
+
+/** A standard extrapolated by ratio: shown as provisional. */
+const rough = (base: number[], ratio: number, family: Family, options: LiftOptions = {}) =>
+  variant(base, ratio, family, { ...options, provisional: true });
+/** A machine or cable standard: rougher by nature, and provisional. */
+const machine = (base: number[], ratio: number, family: Family, note = STACK) =>
+  variant(base, ratio, family, { machine: true, note, provisional: true });
+
+/** Reps tiers at least 3 apart, so each splits into three distinct divisions. */
+const spaced = (starts: number[]) => starts.reduce<number[]>((out, value, i) => [...out, i === 0 ? 0 : Math.max(value, out[i - 1] + 3)], []);
+
+/** A reps standard (bodyweight endurance). Women's starts are `womenRatio` of men's. */
+const reps = (men: number[], womenRatio: number, provisional = true): ExerciseStandard => ({
+  method: 'reps',
+  measure: 'bodyweight_reps',
+  starts: { men: spaced(men), women: spaced(men.map((value) => Math.round(value * womenRatio))) },
+  note: REPS_ONLY,
+  ...(provisional ? { provisional: true } : {}),
+});
 
 // Base lifts, men, Explorer → Legend (Initiate starts at 0).
 const BACK_SQUAT = bw(0, 0.75, 1.1, 1.5, 1.85, 2.2, 2.5, 2.85);
@@ -102,42 +142,43 @@ const BENCH = bw(0, 0.55, 0.85, 1.1, 1.4, 1.65, 1.9, 2.15);
 /** Explorer ≈ one strict rep: scaled, one pull-up at 55 kg scores 0.88 and at 110 kg 1.11. */
 const PULL_UP = bw(0, 0.85, 1.05, 1.2, 1.35, 1.55, 1.75, 1.95);
 
-const STANDARDS_V1_DRAFT_2: Record<string, ExerciseStandard> = {
+const STANDARDS_V1_DRAFT_3: Record<string, ExerciseStandard> = {
   // Squat and hinge
-  'fedb:Barbell_Squat': lift(BACK_SQUAT, 'legs'),
-  'fedb:Barbell_Full_Squat': lift(BACK_SQUAT, 'legs'),
-  'fedb:Front_Barbell_Squat': variant(BACK_SQUAT, 0.8, 'legs'),
-  'fedb:Front_Squat_Clean_Grip': variant(BACK_SQUAT, 0.8, 'legs'),
-  'fedb:Barbell_Deadlift': lift(DEADLIFT, 'legs'),
-  'fedb:Sumo_Deadlift': lift(DEADLIFT, 'legs'),
-  'fedb:Romanian_Deadlift': variant(DEADLIFT, 0.75, 'legs'),
-  'fedb:Stiff-Legged_Barbell_Deadlift': variant(DEADLIFT, 0.75, 'legs'),
-  'fedb:Barbell_Hip_Thrust': variant(BACK_SQUAT, 1.3, 'hipThrust'),
+  'fedb:Barbell_Squat': lift(BACK_SQUAT, 'legs', { note: BAR }),
+  'fedb:Barbell_Full_Squat': lift(BACK_SQUAT, 'legs', { note: BAR }),
+  'fedb:Front_Barbell_Squat': variant(BACK_SQUAT, 0.8, 'legs', { note: BAR }),
+  'fedb:Front_Squat_Clean_Grip': variant(BACK_SQUAT, 0.8, 'legs', { note: BAR }),
+  'fedb:Barbell_Deadlift': lift(DEADLIFT, 'legs', { note: BAR }),
+  'fedb:Sumo_Deadlift': lift(DEADLIFT, 'legs', { note: BAR }),
+  'fedb:Romanian_Deadlift': variant(DEADLIFT, 0.75, 'legs', { note: BAR }),
+  'fedb:Stiff-Legged_Barbell_Deadlift': variant(DEADLIFT, 0.75, 'legs', { note: BAR }),
+  'fedb:Barbell_Hip_Thrust': variant(BACK_SQUAT, 1.3, 'hipThrust', { note: BAR }),
   // Press
-  'fedb:Barbell_Bench_Press_-_Medium_Grip': lift(BENCH, 'press'),
-  'fedb:Wide-Grip_Barbell_Bench_Press': lift(BENCH, 'press'),
-  'fedb:Bench_Press_-_Powerlifting': lift(BENCH, 'press'),
-  'fedb:Decline_Barbell_Bench_Press': lift(BENCH, 'press'),
-  'fedb:Close-Grip_Barbell_Bench_Press': variant(BENCH, 0.9, 'press'),
-  'fedb:Barbell_Incline_Bench_Press_-_Medium_Grip': variant(BENCH, 0.8, 'press'),
-  'fedb:Standing_Military_Press': variant(BENCH, 0.65, 'press'),
-  'fedb:Barbell_Shoulder_Press': variant(BENCH, 0.65, 'press'),
-  'fedb:Seated_Barbell_Military_Press': variant(BENCH, 0.65, 'press'),
+  'fedb:Barbell_Bench_Press_-_Medium_Grip': lift(BENCH, 'press', { note: BAR }),
+  'fedb:Wide-Grip_Barbell_Bench_Press': lift(BENCH, 'press', { note: BAR }),
+  'fedb:Bench_Press_-_Powerlifting': lift(BENCH, 'press', { note: BAR }),
+  'fedb:Decline_Barbell_Bench_Press': lift(BENCH, 'press', { note: BAR }),
+  'fedb:Close-Grip_Barbell_Bench_Press': variant(BENCH, 0.9, 'press', { note: BAR }),
+  'fedb:Barbell_Incline_Bench_Press_-_Medium_Grip': variant(BENCH, 0.8, 'press', { note: BAR }),
+  'fedb:Standing_Military_Press': variant(BENCH, 0.65, 'press', { note: BAR }),
+  'fedb:Barbell_Shoulder_Press': variant(BENCH, 0.65, 'press', { note: BAR }),
+  'fedb:Seated_Barbell_Military_Press': variant(BENCH, 0.65, 'press', { note: BAR }),
   'fedb:Dumbbell_Bench_Press': variant(BENCH, 0.4, 'press', { note: PER_DUMBBELL }),
   'fedb:Incline_Dumbbell_Press': variant(BENCH, 0.34, 'press', { note: PER_DUMBBELL }),
   'fedb:Dumbbell_Shoulder_Press': variant(BENCH, 0.32, 'press', { note: PER_DUMBBELL }),
   'fedb:Seated_Dumbbell_Press': variant(BENCH, 0.32, 'press', { note: PER_DUMBBELL }),
   // Pull
-  'fedb:Bent_Over_Barbell_Row': variant(BENCH, 0.85, 'pull'),
-  'fedb:One-Arm_Dumbbell_Row': variant(BENCH, 0.45, 'pull', { note: 'The weight of the dumbbell, one arm at a time.' }),
+  'fedb:Bent_Over_Barbell_Row': variant(BENCH, 0.85, 'pull', { note: BAR }),
+  'fedb:One-Arm_Dumbbell_Row': variant(BENCH, 0.45, 'pull', { note: ONE_ARM_DUMBBELL }),
   // Bodyweight: body weight plus any added load.
-  'fedb:Pullups': lift(PULL_UP, 'bodyweightPull', { measure: 'bodyweight_reps' }),
-  'fedb:Chin-Up': variant(PULL_UP, 1.03, 'bodyweightPull', { measure: 'bodyweight_reps' }),
-  'fedb:Dips_-_Triceps_Version': lift(bw(0, 0.85, 1.15, 1.4, 1.65, 1.9, 2.1, 2.3), 'bodyweightPull', { measure: 'bodyweight_reps' }),
+  'fedb:Pullups': lift(PULL_UP, 'bodyweightPull', { measure: 'bodyweight_reps', note: BODY }),
+  'fedb:Chin-Up': variant(PULL_UP, 1.03, 'bodyweightPull', { measure: 'bodyweight_reps', note: BODY }),
+  'fedb:Dips_-_Triceps_Version': lift(bw(0, 0.85, 1.15, 1.4, 1.65, 1.9, 2.1, 2.3), 'bodyweightPull', { measure: 'bodyweight_reps', note: BODY }),
   'fedb:Pushups': {
     method: 'reps',
     measure: 'bodyweight_reps',
-    starts: { men: [0, 5, 12, 22, 30, 40, 55, 75], women: [0, 2, 6, 12, 18, 25, 35, 45] },
+    starts: { men: [0, 5, 12, 22, 30, 40, 55, 75], women: [0, 3, 6, 12, 18, 25, 35, 45] },
+    note: REPS_ONLY,
   },
   // Machines and cables: rougher, because loads differ between machines.
   'fedb:Leg_Press': variant(BACK_SQUAT, 1.75, 'legs', { machine: true, note: STACK }),
@@ -148,6 +189,271 @@ const STANDARDS_V1_DRAFT_2: Record<string, ExerciseStandard> = {
   'fedb:Seated_Cable_Rows': variant(BENCH, 0.89, 'pull', { machine: true, note: STACK }),
   'fedb:Leverage_Chest_Press': variant(BENCH, 0.9, 'press', { machine: true, note: STACK }),
   'fedb:Machine_Bench_Press': variant(BENCH, 0.9, 'press', { machine: true, note: STACK }),
+
+  // ── Added in v1-draft-3 (#5, owner 2026-11-13: rank much more of the catalogue) ──────────
+  // Ratios to the base lifts follow typical coaching-table relationships between lifts. They are
+  // extrapolations, so everything below except the close barbell variants is provisional.
+
+  // Barbell squat and hinge variants
+  'fedb:Box_Squat': variant(BACK_SQUAT, 0.95, 'legs', { note: BAR }),
+  'fedb:Wide_Stance_Barbell_Squat': variant(BACK_SQUAT, 0.95, 'legs', { note: BAR }),
+  'fedb:Narrow_Stance_Squats': variant(BACK_SQUAT, 0.9, 'legs', { note: BAR }),
+  'fedb:Zercher_Squats': rough(BACK_SQUAT, 0.75, 'legs', { note: BAR }),
+  'fedb:Barbell_Hack_Squat': rough(BACK_SQUAT, 0.6, 'legs', { note: BAR }),
+  'fedb:Barbell_Lunge': rough(BACK_SQUAT, 0.55, 'legs', { note: BAR }),
+  'fedb:Barbell_Walking_Lunge': rough(BACK_SQUAT, 0.55, 'legs', { note: BAR }),
+  'fedb:Barbell_Side_Split_Squat': rough(BACK_SQUAT, 0.5, 'legs', { note: BAR }),
+  'fedb:Barbell_Step_Ups': rough(BACK_SQUAT, 0.45, 'legs', { note: BAR }),
+  'fedb:Barbell_Glute_Bridge': rough(BACK_SQUAT, 1.1, 'hipThrust', { note: BAR }),
+  'fedb:Deficit_Deadlift': variant(DEADLIFT, 0.92, 'legs', { note: BAR }),
+  'fedb:Rack_Pulls': variant(DEADLIFT, 1.1, 'legs', { note: BAR }),
+  'fedb:Trap_Bar_Deadlift': variant(DEADLIFT, 1.05, 'legs', { note: 'The trap bar and plates together.' }),
+  'fedb:Good_Morning': rough(DEADLIFT, 0.45, 'legs', { note: BAR }),
+  'fedb:Power_Clean': rough(DEADLIFT, 0.6, 'legs', { note: BAR }),
+  'fedb:Barbell_Shrug': rough(DEADLIFT, 0.85, 'pull', { note: BAR }),
+  'fedb:Standing_Barbell_Calf_Raise': rough(BACK_SQUAT, 0.8, 'legs', { note: BAR }),
+
+  // Barbell and EZ-bar presses, rows and arms
+  'fedb:Floor_Press': variant(BENCH, 0.92, 'press', { note: BAR }),
+  'fedb:Wide-Grip_Decline_Barbell_Bench_Press': variant(BENCH, 1, 'press', { note: BAR }),
+  'fedb:Standing_Barbell_Press_Behind_Neck': rough(BENCH, 0.6, 'press', { note: BAR }),
+  'fedb:JM_Press': rough(BENCH, 0.55, 'press', { note: BAR }),
+  'fedb:Lying_Triceps_Press': rough(BENCH, 0.4, 'press', { note: EZ_BAR }),
+  'fedb:EZ-Bar_Skullcrusher': rough(BENCH, 0.4, 'press', { note: EZ_BAR }),
+  'fedb:Standing_Overhead_Barbell_Triceps_Extension': rough(BENCH, 0.35, 'press', { note: BAR }),
+  'fedb:Reverse_Grip_Bent-Over_Rows': variant(BENCH, 0.85, 'pull', { note: BAR }),
+  'fedb:T-Bar_Row_with_Handle': rough(BENCH, 0.8, 'pull', { note: 'The plates loaded on the bar.' }),
+  'fedb:Upright_Barbell_Row': rough(BENCH, 0.5, 'pull', { note: BAR }),
+  'fedb:Barbell_Curl': rough(BENCH, 0.5, 'pull', { note: BAR }),
+  'fedb:Wide-Grip_Standing_Barbell_Curl': rough(BENCH, 0.47, 'pull', { note: BAR }),
+  'fedb:Close-Grip_Standing_Barbell_Curl': rough(BENCH, 0.48, 'pull', { note: BAR }),
+  'fedb:EZ-Bar_Curl': rough(BENCH, 0.47, 'pull', { note: EZ_BAR }),
+  'fedb:Close-Grip_EZ_Bar_Curl': rough(BENCH, 0.47, 'pull', { note: EZ_BAR }),
+  'fedb:Preacher_Curl': rough(BENCH, 0.42, 'pull', { note: BAR }),
+  'fedb:Reverse_Barbell_Curl': rough(BENCH, 0.38, 'pull', { note: BAR }),
+
+  // Dumbbells (load per dumbbell unless noted)
+  'fedb:Decline_Dumbbell_Bench_Press': rough(BENCH, 0.42, 'press', { note: PER_DUMBBELL }),
+  'fedb:Dumbbell_Bench_Press_with_Neutral_Grip': rough(BENCH, 0.38, 'press', { note: PER_DUMBBELL }),
+  'fedb:Hammer_Grip_Incline_DB_Bench_Press': rough(BENCH, 0.32, 'press', { note: PER_DUMBBELL }),
+  'fedb:One_Arm_Dumbbell_Bench_Press': rough(BENCH, 0.38, 'press', { note: ONE_ARM_DUMBBELL }),
+  'fedb:Dumbbell_Floor_Press': rough(BENCH, 0.37, 'press', { note: PER_DUMBBELL }),
+  'fedb:Arnold_Dumbbell_Press': rough(BENCH, 0.28, 'press', { note: PER_DUMBBELL }),
+  'fedb:Standing_Dumbbell_Press': rough(BENCH, 0.3, 'press', { note: PER_DUMBBELL }),
+  'fedb:Dumbbell_One-Arm_Shoulder_Press': rough(BENCH, 0.3, 'press', { note: ONE_ARM_DUMBBELL }),
+  'fedb:Dumbbell_Flyes': rough(BENCH, 0.25, 'press', { note: PER_DUMBBELL }),
+  'fedb:Incline_Dumbbell_Flyes': rough(BENCH, 0.22, 'press', { note: PER_DUMBBELL }),
+  'fedb:Side_Lateral_Raise': rough(BENCH, 0.13, 'press', { note: PER_DUMBBELL }),
+  'fedb:Seated_Side_Lateral_Raise': rough(BENCH, 0.12, 'press', { note: PER_DUMBBELL }),
+  'fedb:One-Arm_Side_Laterals': rough(BENCH, 0.14, 'press', { note: ONE_ARM_DUMBBELL }),
+  'fedb:Front_Dumbbell_Raise': rough(BENCH, 0.14, 'press', { note: PER_DUMBBELL }),
+  'fedb:Reverse_Flyes': rough(BENCH, 0.1, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Seated_Bent-Over_Rear_Delt_Raise': rough(BENCH, 0.1, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Bent_Over_Two-Dumbbell_Row': rough(BENCH, 0.38, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Dumbbell_Incline_Row': rough(BENCH, 0.35, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Straight-Arm_Dumbbell_Pullover': rough(BENCH, 0.3, 'pull', { note: ONE_DUMBBELL_BOTH_HANDS }),
+  'fedb:Dumbbell_Shrug': rough(DEADLIFT, 0.4, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Dumbbell_Bicep_Curl': rough(BENCH, 0.24, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Dumbbell_Alternate_Bicep_Curl': rough(BENCH, 0.24, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Seated_Dumbbell_Curl': rough(BENCH, 0.23, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Incline_Dumbbell_Curl': rough(BENCH, 0.21, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Concentration_Curls': rough(BENCH, 0.22, 'pull', { note: ONE_ARM_DUMBBELL }),
+  'fedb:Hammer_Curls': rough(BENCH, 0.26, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Alternate_Hammer_Curl': rough(BENCH, 0.26, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Cross_Body_Hammer_Curl': rough(BENCH, 0.25, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Zottman_Curl': rough(BENCH, 0.2, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Two-Arm_Dumbbell_Preacher_Curl': rough(BENCH, 0.2, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Tricep_Dumbbell_Kickback': rough(BENCH, 0.09, 'press', { note: PER_DUMBBELL }),
+  'fedb:Lying_Dumbbell_Tricep_Extension': rough(BENCH, 0.16, 'press', { note: PER_DUMBBELL }),
+  'fedb:Standing_Dumbbell_Triceps_Extension': rough(BENCH, 0.3, 'press', { note: ONE_DUMBBELL_BOTH_HANDS }),
+  'fedb:Dumbbell_Squat': rough(BACK_SQUAT, 0.3, 'legs', { note: PER_DUMBBELL }),
+  'fedb:Dumbbell_Lunges': rough(BACK_SQUAT, 0.25, 'legs', { note: PER_DUMBBELL }),
+  'fedb:Dumbbell_Rear_Lunge': rough(BACK_SQUAT, 0.25, 'legs', { note: PER_DUMBBELL }),
+  'fedb:Split_Squat_with_Dumbbells': rough(BACK_SQUAT, 0.25, 'legs', { note: PER_DUMBBELL }),
+  'fedb:Dumbbell_Step_Ups': rough(BACK_SQUAT, 0.22, 'legs', { note: PER_DUMBBELL }),
+  'fedb:Stiff-Legged_Dumbbell_Deadlift': rough(DEADLIFT, 0.35, 'legs', { note: PER_DUMBBELL }),
+
+  // Kettlebells
+  'fedb:Goblet_Squat': rough(BACK_SQUAT, 0.45, 'legs', { note: ONE_KETTLEBELL }),
+  'fedb:Front_Squats_With_Two_Kettlebells': rough(BACK_SQUAT, 0.3, 'legs', { note: PER_KETTLEBELL }),
+  'fedb:Kettlebell_One-Legged_Deadlift': rough(DEADLIFT, 0.3, 'legs', { note: ONE_KETTLEBELL }),
+  'fedb:Two-Arm_Kettlebell_Military_Press': rough(BENCH, 0.28, 'press', { note: PER_KETTLEBELL }),
+  'fedb:One-Arm_Kettlebell_Row': rough(BENCH, 0.42, 'pull', { note: ONE_KETTLEBELL }),
+  'fedb:Two-Arm_Kettlebell_Row': rough(BENCH, 0.35, 'pull', { note: PER_KETTLEBELL }),
+
+  // Cables
+  'fedb:Triceps_Pushdown': machine(BENCH, 0.5, 'press'),
+  'fedb:Triceps_Pushdown_-_V-Bar_Attachment': machine(BENCH, 0.5, 'press'),
+  'fedb:Triceps_Pushdown_-_Rope_Attachment': machine(BENCH, 0.42, 'press'),
+  'fedb:Reverse_Grip_Triceps_Pushdown': machine(BENCH, 0.35, 'press'),
+  'fedb:Triceps_Overhead_Extension_with_Rope': machine(BENCH, 0.4, 'press'),
+  'fedb:Cable_Rope_Overhead_Triceps_Extension': machine(BENCH, 0.4, 'press'),
+  'fedb:Cable_One_Arm_Tricep_Extension': machine(BENCH, 0.2, 'press', STACK_ONE_ARM),
+  'fedb:Standing_Biceps_Cable_Curl': machine(BENCH, 0.45, 'pull'),
+  'fedb:Cable_Hammer_Curls_-_Rope_Attachment': machine(BENCH, 0.42, 'pull'),
+  'fedb:Cable_Preacher_Curl': machine(BENCH, 0.38, 'pull'),
+  'fedb:Standing_One-Arm_Cable_Curl': machine(BENCH, 0.22, 'pull', STACK_ONE_ARM),
+  'fedb:Face_Pull': machine(BENCH, 0.4, 'pull'),
+  'fedb:Straight-Arm_Pulldown': machine(BENCH, 0.4, 'pull'),
+  'fedb:Rope_Straight-Arm_Pulldown': machine(BENCH, 0.38, 'pull'),
+  'fedb:V-Bar_Pulldown': machine(BENCH, 0.86, 'pull'),
+  'fedb:Underhand_Cable_Pulldowns': machine(BENCH, 0.86, 'pull'),
+  'fedb:Full_Range-Of-Motion_Lat_Pulldown': machine(BENCH, 0.86, 'pull'),
+  'fedb:Wide-Grip_Pulldown_Behind_The_Neck': machine(BENCH, 0.75, 'pull'),
+  'fedb:One_Arm_Lat_Pulldown': machine(BENCH, 0.45, 'pull', STACK_ONE_ARM),
+  'fedb:Seated_One-arm_Cable_Pulley_Rows': machine(BENCH, 0.45, 'pull', STACK_ONE_ARM),
+  'fedb:Elevated_Cable_Rows': machine(BENCH, 0.85, 'pull'),
+  'fedb:Upright_Cable_Row': machine(BENCH, 0.5, 'pull'),
+  'fedb:Cable_Rear_Delt_Fly': machine(BENCH, 0.12, 'pull', STACK_PER_SIDE),
+  'fedb:Cable_Seated_Lateral_Raise': machine(BENCH, 0.1, 'press', STACK_ONE_ARM),
+  'fedb:Cable_Crossover': machine(BENCH, 0.25, 'press', STACK_PER_SIDE),
+  'fedb:Low_Cable_Crossover': machine(BENCH, 0.22, 'press', STACK_PER_SIDE),
+  'fedb:Flat_Bench_Cable_Flyes': machine(BENCH, 0.22, 'press', STACK_PER_SIDE),
+  'fedb:Cable_Chest_Press': machine(BENCH, 0.6, 'press'),
+  'fedb:Seated_Cable_Shoulder_Press': machine(BENCH, 0.5, 'press'),
+  'fedb:Pull_Through': machine(DEADLIFT, 0.4, 'hipThrust'),
+  'fedb:Cable_Shrugs': machine(DEADLIFT, 0.7, 'pull'),
+
+  // Machines
+  'fedb:Lying_Leg_Curls': machine(BACK_SQUAT, 0.6, 'legs'),
+  'fedb:Standing_Leg_Curl': machine(BACK_SQUAT, 0.28, 'legs', STACK_ONE_ARM),
+  'fedb:Single-Leg_Leg_Extension': machine(BACK_SQUAT, 0.38, 'legs', STACK_ONE_ARM),
+  'fedb:Hack_Squat': machine(BACK_SQUAT, 1, 'legs', PLATES_LOADED),
+  'fedb:Narrow_Stance_Hack_Squats': machine(BACK_SQUAT, 0.95, 'legs', PLATES_LOADED),
+  'fedb:Narrow_Stance_Leg_Press': machine(BACK_SQUAT, 1.65, 'legs', PLATES_LOADED),
+  'fedb:Standing_Calf_Raises': machine(BACK_SQUAT, 0.95, 'legs'),
+  'fedb:Seated_Calf_Raise': machine(BACK_SQUAT, 0.75, 'legs'),
+  'fedb:Calf_Press_On_The_Leg_Press_Machine': machine(BACK_SQUAT, 1.2, 'legs', PLATES_LOADED),
+  'fedb:Thigh_Adductor': machine(BACK_SQUAT, 0.75, 'legs'),
+  'fedb:Thigh_Abductor': machine(BACK_SQUAT, 0.75, 'legs'),
+  'fedb:Butterfly': machine(BENCH, 0.75, 'press'),
+  'fedb:Reverse_Machine_Flyes': machine(BENCH, 0.55, 'pull'),
+  'fedb:Leverage_Incline_Chest_Press': machine(BENCH, 0.8, 'press'),
+  'fedb:Leverage_Decline_Chest_Press': machine(BENCH, 0.95, 'press'),
+  'fedb:Leverage_Shoulder_Press': machine(BENCH, 0.6, 'press'),
+  'fedb:Machine_Shoulder_Military_Press': machine(BENCH, 0.6, 'press'),
+  'fedb:Machine_Triceps_Extension': machine(BENCH, 0.5, 'press'),
+  'fedb:Leverage_High_Row': machine(BENCH, 0.85, 'pull'),
+  'fedb:Leverage_Iso_Row': machine(BENCH, 0.85, 'pull'),
+  'fedb:Lying_T-Bar_Row': machine(BENCH, 0.75, 'pull', PLATES_LOADED),
+  'fedb:Machine_Bicep_Curl': machine(BENCH, 0.45, 'pull'),
+  'fedb:Machine_Preacher_Curls': machine(BENCH, 0.4, 'pull'),
+  'fedb:Leverage_Shrug': machine(DEADLIFT, 0.8, 'pull', PLATES_LOADED),
+  'fedb:Smith_Machine_Squat': machine(BACK_SQUAT, 0.95, 'legs', SMITH),
+  'fedb:Smith_Machine_Bench_Press': machine(BENCH, 0.95, 'press', SMITH),
+  'fedb:Smith_Machine_Incline_Bench_Press': machine(BENCH, 0.8, 'press', SMITH),
+  'fedb:Smith_Machine_Close-Grip_Bench_Press': machine(BENCH, 0.85, 'press', SMITH),
+  'fedb:Smith_Machine_Overhead_Shoulder_Press': machine(BENCH, 0.62, 'press', SMITH),
+  'fedb:Smith_Machine_Bent_Over_Row': machine(BENCH, 0.8, 'pull', SMITH),
+  'fedb:Smith_Machine_Stiff-Legged_Deadlift': machine(DEADLIFT, 0.7, 'legs', SMITH),
+  'fedb:Smith_Machine_Calf_Raise': machine(BACK_SQUAT, 0.85, 'legs', SMITH),
+  'fedb:Smith_Machine_Hip_Raise': machine(BACK_SQUAT, 1.1, 'hipThrust', SMITH),
+
+  // Close variants of the above (same lift, different grip, bench angle, or one arm at a time)
+  'fedb:Alternate_Incline_Dumbbell_Curl': rough(BENCH, 0.21, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Incline_Hammer_Curls': rough(BENCH, 0.22, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Standing_Concentration_Curl': rough(BENCH, 0.2, 'pull', { note: ONE_ARM_DUMBBELL }),
+  'fedb:One_Arm_Dumbbell_Preacher_Curl': rough(BENCH, 0.2, 'pull', { note: ONE_ARM_DUMBBELL }),
+  'fedb:Preacher_Hammer_Dumbbell_Curl': rough(BENCH, 0.21, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Standing_Dumbbell_Reverse_Curl': rough(BENCH, 0.18, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Spider_Curl': rough(BENCH, 0.38, 'pull', { note: EZ_BAR }),
+  'fedb:Drag_Curl': rough(BENCH, 0.42, 'pull', { note: BAR }),
+  'fedb:Reverse_Barbell_Preacher_Curls': rough(BENCH, 0.33, 'pull', { note: EZ_BAR }),
+  'fedb:Lying_High_Bench_Barbell_Curl': rough(BENCH, 0.38, 'pull', { note: BAR }),
+  'fedb:Overhead_Cable_Curl': machine(BENCH, 0.2, 'pull', STACK_PER_SIDE),
+  'fedb:High_Cable_Curls': machine(BENCH, 0.2, 'pull', STACK_PER_SIDE),
+  'fedb:Reverse_Cable_Curl': machine(BENCH, 0.36, 'pull'),
+  'fedb:Lying_Cable_Curl': machine(BENCH, 0.4, 'pull'),
+  'fedb:Standing_Palms-In_Dumbbell_Press': rough(BENCH, 0.3, 'press', { note: PER_DUMBBELL }),
+  'fedb:Standing_Alternating_Dumbbell_Press': rough(BENCH, 0.3, 'press', { note: PER_DUMBBELL }),
+  'fedb:Standing_Palm-In_One-Arm_Dumbbell_Press': rough(BENCH, 0.3, 'press', { note: ONE_ARM_DUMBBELL }),
+  'fedb:Incline_Dumbbell_Bench_With_Palms_Facing_In': rough(BENCH, 0.32, 'press', { note: PER_DUMBBELL }),
+  'fedb:Close-Grip_Dumbbell_Press': rough(BENCH, 0.32, 'press', { note: PER_DUMBBELL }),
+  'fedb:Decline_Dumbbell_Flyes': rough(BENCH, 0.26, 'press', { note: PER_DUMBBELL }),
+  'fedb:One-Arm_Flat_Bench_Dumbbell_Flye': rough(BENCH, 0.24, 'press', { note: ONE_ARM_DUMBBELL }),
+  'fedb:Front_Two-Dumbbell_Raise': rough(BENCH, 0.13, 'press', { note: PER_DUMBBELL }),
+  'fedb:Front_Plate_Raise': rough(BENCH, 0.22, 'press', { note: 'The weight of the plate, held in both hands.' }),
+  'fedb:Standing_Front_Barbell_Raise_Over_Head': rough(BENCH, 0.25, 'press', { note: BAR }),
+  'fedb:Lying_One-Arm_Lateral_Raise': rough(BENCH, 0.1, 'press', { note: ONE_ARM_DUMBBELL }),
+  'fedb:One-Arm_Incline_Lateral_Raise': rough(BENCH, 0.1, 'press', { note: ONE_ARM_DUMBBELL }),
+  'fedb:Front_Cable_Raise': machine(BENCH, 0.12, 'press', STACK_ONE_ARM),
+  'fedb:Standing_Low-Pulley_Deltoid_Raise': machine(BENCH, 0.09, 'press', STACK_ONE_ARM),
+  'fedb:Bent_Over_Low-Pulley_Side_Lateral': machine(BENCH, 0.08, 'pull', STACK_ONE_ARM),
+  'fedb:Dumbbell_Lying_Rear_Lateral_Raise': rough(BENCH, 0.09, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Bent_Over_Dumbbell_Rear_Delt_Raise_With_Head_On_Bench': rough(BENCH, 0.1, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Cable_Rope_Rear-Delt_Rows': machine(BENCH, 0.4, 'pull'),
+  'fedb:Standing_Dumbbell_Upright_Row': rough(BENCH, 0.22, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Smith_Machine_Upright_Row': machine(BENCH, 0.48, 'pull', SMITH),
+  'fedb:Bent_Over_Two-Dumbbell_Row_With_Palms_In': rough(BENCH, 0.38, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Alternating_Kettlebell_Row': rough(BENCH, 0.35, 'pull', { note: PER_KETTLEBELL }),
+  'fedb:Bent_Over_Two-Arm_Long_Bar_Row': rough(BENCH, 0.75, 'pull', { note: 'The plates loaded on the bar.' }),
+  'fedb:One-Arm_Long_Bar_Row': rough(BENCH, 0.4, 'pull', { note: 'The plates loaded on the bar, one arm.' }),
+  'fedb:Kneeling_High_Pulley_Row': machine(BENCH, 0.8, 'pull'),
+  'fedb:Kneeling_Single-Arm_High_Pulley_Row': machine(BENCH, 0.4, 'pull', STACK_ONE_ARM),
+  'fedb:Bent-Arm_Dumbbell_Pullover': rough(BENCH, 0.32, 'pull', { note: ONE_DUMBBELL_BOTH_HANDS }),
+  'fedb:Bent-Arm_Barbell_Pullover': rough(BENCH, 0.4, 'pull', { note: BAR }),
+  'fedb:Seated_Triceps_Press': rough(BENCH, 0.28, 'press', { note: ONE_DUMBBELL_BOTH_HANDS }),
+  'fedb:Standing_One-Arm_Dumbbell_Triceps_Extension': rough(BENCH, 0.12, 'press', { note: ONE_ARM_DUMBBELL }),
+  'fedb:Dumbbell_One-Arm_Triceps_Extension': rough(BENCH, 0.12, 'press', { note: ONE_ARM_DUMBBELL }),
+  'fedb:Decline_EZ_Bar_Triceps_Extension': rough(BENCH, 0.38, 'press', { note: EZ_BAR }),
+  'fedb:Incline_Barbell_Triceps_Extension': rough(BENCH, 0.36, 'press', { note: BAR }),
+  'fedb:Close-Grip_EZ-Bar_Press': rough(BENCH, 0.8, 'press', { note: EZ_BAR }),
+  'fedb:Kneeling_Cable_Triceps_Extension': machine(BENCH, 0.4, 'press'),
+  'fedb:Cable_Lying_Triceps_Extension': machine(BENCH, 0.4, 'press'),
+  'fedb:Standing_Low-Pulley_One-Arm_Triceps_Extension': machine(BENCH, 0.18, 'press', STACK_ONE_ARM),
+  'fedb:Board_Press': variant(BENCH, 1.05, 'press', { note: BAR }),
+  'fedb:Pin_Presses': variant(BENCH, 1.05, 'press', { note: BAR }),
+  'fedb:Decline_Smith_Press': machine(BENCH, 1, 'press', SMITH),
+  'fedb:Incline_Cable_Chest_Press': machine(BENCH, 0.5, 'press'),
+  'fedb:Standing_Cable_Chest_Press': machine(BENCH, 0.5, 'press'),
+  'fedb:Incline_Cable_Flye': machine(BENCH, 0.2, 'press', STACK_PER_SIDE),
+  'fedb:Single-Arm_Cable_Crossover': machine(BENCH, 0.15, 'press', STACK_ONE_ARM),
+  'fedb:Cable_Shoulder_Press': machine(BENCH, 0.5, 'press'),
+  'fedb:Kettlebell_Seated_Press': rough(BENCH, 0.28, 'press', { note: PER_KETTLEBELL }),
+  'fedb:Alternating_Kettlebell_Press': rough(BENCH, 0.28, 'press', { note: PER_KETTLEBELL }),
+  'fedb:Barbell_Squat_To_A_Bench': variant(BACK_SQUAT, 0.95, 'legs', { note: BAR }),
+  'fedb:Front_Barbell_Squat_To_A_Bench': variant(BACK_SQUAT, 0.78, 'legs', { note: BAR }),
+  'fedb:Speed_Squats': rough(BACK_SQUAT, 0.6, 'legs', { note: BAR }),
+  'fedb:Weighted_Squat': rough(BACK_SQUAT, 0.6, 'legs', { note: 'The weight you hold or wear, without your body weight.' }),
+  'fedb:Dumbbell_Squat_To_A_Bench': rough(BACK_SQUAT, 0.3, 'legs', { note: PER_DUMBBELL }),
+  'fedb:Plie_Dumbbell_Squat': rough(BACK_SQUAT, 0.45, 'legs', { note: ONE_DUMBBELL_BOTH_HANDS }),
+  'fedb:Elevated_Back_Lunge': rough(BACK_SQUAT, 0.5, 'legs', { note: BAR }),
+  'fedb:Smith_Single-Leg_Split_Squat': machine(BACK_SQUAT, 0.45, 'legs', SMITH),
+  'fedb:Smith_Machine_Leg_Press': machine(BACK_SQUAT, 1.2, 'legs', SMITH),
+  'fedb:Lying_Machine_Squat': machine(BACK_SQUAT, 1, 'legs'),
+  'fedb:Stiff_Leg_Barbell_Good_Morning': rough(DEADLIFT, 0.42, 'legs', { note: BAR }),
+  'fedb:Seated_Good_Mornings': rough(DEADLIFT, 0.3, 'legs', { note: BAR }),
+  'fedb:Leverage_Deadlift': machine(DEADLIFT, 1, 'legs', PLATES_LOADED),
+  'fedb:Cable_Deadlifts': machine(DEADLIFT, 0.5, 'legs'),
+  'fedb:Barbell_Shrug_Behind_The_Back': rough(DEADLIFT, 0.75, 'pull', { note: BAR }),
+  'fedb:Smith_Machine_Behind_the_Back_Shrug': machine(DEADLIFT, 0.75, 'pull', SMITH),
+  'fedb:Barbell_Seated_Calf_Raise': rough(BACK_SQUAT, 0.6, 'legs', { note: BAR }),
+  'fedb:Standing_Dumbbell_Calf_Raise': rough(BACK_SQUAT, 0.35, 'legs', { note: PER_DUMBBELL }),
+  'fedb:Calf_Press': machine(BACK_SQUAT, 1.1, 'legs'),
+  'fedb:Smith_Machine_Reverse_Calf_Raises': machine(BACK_SQUAT, 0.3, 'legs', SMITH),
+  'fedb:Hyperextensions_Back_Extensions': rough(DEADLIFT, 0.15, 'legs', { note: 'The weight you hold, without your body weight.' }),
+  'fedb:Single-Arm_Push-Up': reps([0, 1, 3, 6, 10, 14, 19, 25], 0.6),
+  'fedb:Incline_Push-Up_Medium': reps([0, 8, 18, 30, 40, 52, 70, 95], 0.65),
+  'fedb:Incline_Push-Up_Wide': reps([0, 8, 18, 30, 40, 52, 70, 95], 0.65),
+  'fedb:Incline_Push-Up_Close-Grip': reps([0, 6, 15, 25, 34, 45, 60, 80], 0.6),
+  'fedb:Pushups_Close_and_Wide_Hand_Positions': reps([0, 5, 12, 22, 30, 40, 55, 75], 0.6),
+  'fedb:Natural_Glute_Ham_Raise': reps([0, 1, 3, 5, 8, 11, 15, 20], 0.7),
+
+  // Bodyweight: body weight plus any added load
+  'fedb:V-Bar_Pullup': variant(PULL_UP, 1, 'bodyweightPull', { measure: 'bodyweight_reps', note: BODY, provisional: true }),
+  'fedb:Wide-Grip_Rear_Pull-Up': variant(PULL_UP, 0.92, 'bodyweightPull', { measure: 'bodyweight_reps', note: BODY, provisional: true }),
+  // Bodyweight endurance: reps in one set
+  'fedb:Push-Up_Wide': reps([0, 5, 12, 22, 30, 40, 55, 75], 0.6),
+  'fedb:Push-Ups_-_Close_Triceps_Position': reps([0, 4, 10, 18, 25, 33, 45, 60], 0.55),
+  'fedb:Push-Ups_With_Feet_Elevated': reps([0, 4, 10, 18, 25, 33, 45, 60], 0.55),
+  'fedb:Decline_Push-Up': reps([0, 4, 10, 18, 25, 33, 45, 60], 0.55),
+  'fedb:Incline_Push-Up': reps([0, 8, 18, 30, 40, 52, 70, 95], 0.65),
+  'fedb:Handstand_Push-Ups': reps([0, 1, 3, 6, 10, 14, 19, 25], 0.6),
+  'fedb:Bench_Dips': reps([0, 8, 15, 25, 35, 45, 58, 75], 0.75),
+  'fedb:Inverted_Row': reps([0, 3, 8, 14, 20, 26, 33, 42], 0.7),
+  'fedb:Hanging_Leg_Raise': reps([0, 3, 8, 12, 18, 24, 30, 40], 0.85),
+  'fedb:Bodyweight_Squat': reps([0, 15, 25, 40, 55, 75, 100, 130], 0.85),
+  'fedb:Bodyweight_Walking_Lunge': reps([0, 10, 20, 32, 45, 60, 80, 100], 0.85),
 };
 
 /**
@@ -157,7 +463,7 @@ const STANDARDS_V1_DRAFT_2: Record<string, ExerciseStandard> = {
  */
 export const RANK_BENCHMARKS: readonly BenchmarkVersion[] = [
   {
-    version: 'v1-draft-2',
+    version: 'v1-draft-3',
     draft: true,
     from: '0000-01-01',
     basis:
@@ -165,9 +471,18 @@ export const RANK_BENCHMARKS: readonly BenchmarkVersion[] = [
       'with the top tier kept below world-record lifts. Your estimated one-rep max is scaled to an 80 kg ' +
       '(men) or 60 kg (women) body weight with a 2/3 exponent. Not measured from LifePortal members, ' +
       'and not percentiles of anyone.',
-    exercises: STANDARDS_V1_DRAFT_2,
+    exercises: STANDARDS_V1_DRAFT_3,
   },
 ];
+
+/**
+ * How load is entered for a shared catalogue exercise under the newest standards ("The weight of
+ * one dumbbell."), so logging can say so. Undefined for unranked or private exercises.
+ */
+export function rankLoadNote(seedKey: string | undefined, measure: Measure, versions: readonly BenchmarkVersion[] = RANK_BENCHMARKS) {
+  const standard = seedKey ? versions[versions.length - 1].exercises[seedKey] : undefined;
+  return standard && standard.measure === measure ? standard.note : undefined;
+}
 
 /** The version that applies to a set done on `day`. */
 export function benchmarkFor(day: string, versions: readonly BenchmarkVersion[] = RANK_BENCHMARKS): BenchmarkVersion {
@@ -329,6 +644,7 @@ export function exerciseRank(input: RankInput, versions: readonly BenchmarkVersi
     basis: todayVersion.basis,
     ...(standard.note ? { note: standard.note } : {}),
     ...(standard.machine ? { machine: true } : {}),
+    ...(standard.provisional ? { provisional: true } : {}),
   };
   const sets = input.sets.filter((set) => set.day <= input.today);
 

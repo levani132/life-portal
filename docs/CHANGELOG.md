@@ -2,6 +2,17 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-13: Strength ranks for 280 exercises (draft standards)
+
+- **Most lifts you log now have a rank**: curls, raises, triceps work, flyes, lunges, calf
+  raises, kettlebell and Smith-machine lifts, cable and machine exercises, and body-weight
+  variants. That is 280 exercises, up from 36.
+- **Provisional ranks are labelled.** Where no published standard exists, the rank is estimated
+  from the main lifts and marked "Provisional".
+- **Each exercise says how to enter the weight**, such as per dumbbell, the bar and plates, or
+  one stack per side. You see this with the rank and while logging a workout.
+- Ranks are still behind a flag and the standards are a draft for review.
+
 ## 2026-11-13: Monthly strength tournaments (internal only)
 
 - **Join a lift's monthly tournament** from its statistics, from the 20th of the month before.

@@ -3,6 +3,7 @@ import {
   exerciseRank as rankWith,
   milestoneStarts,
   rankLabel,
+  rankLoadNote,
   rankPosition,
   scoreSet,
   type BenchmarkVersion,
@@ -189,7 +190,7 @@ describe('strength ranks (#5b)', () => {
   });
 });
 
-describe('published standards: stress profiles (v1-draft-2)', () => {
+describe('published standards: stress profiles (v1-draft-3)', () => {
   const v = RANK_BENCHMARKS[RANK_BENCHMARKS.length - 1];
   const tierOf = (seedKey: string, standards: 'men' | 'women', weightKg: number, reps: number, bodyKg: number) => {
     const standard = v.exercises[seedKey];
@@ -278,3 +279,42 @@ describe('published standards: stress profiles (v1-draft-2)', () => {
   });
 });
 
+describe('catalogue coverage (v1-draft-3)', () => {
+  const v = RANK_BENCHMARKS[RANK_BENCHMARKS.length - 1];
+  const published = (input: Parameters<typeof rankWith>[0]) => rankWith(input, RANK_BENCHMARKS);
+
+  it('ranks a dumbbell curl per dumbbell, marked provisional, saying how load is read', () => {
+    // 16 kg × 8 at 80 kg: e1RM 20.3 kg per dumbbell → 0.25× body weight.
+    const view = published({ exerciseId: 'c', seedKey: 'fedb:Dumbbell_Bicep_Curl', measure: 'weight_reps', standards: 'men', sets: [set(TODAY, 16, 8, 80)], today: TODAY });
+    expect(view).toMatchObject({ status: 'ranked', benchmark: { provisional: true, note: 'The weight of one dumbbell.' }, current: { score: 253, tier: 'Challenger' } });
+  });
+
+  it('keeps the main barbell lifts out of the provisional label, with the bar convention stated', () => {
+    expect(v.exercises['fedb:Barbell_Squat']).toMatchObject({ note: 'The bar and plates together.' });
+    expect(v.exercises['fedb:Barbell_Squat'].provisional).toBeUndefined();
+    expect(v.exercises['fedb:Trap_Bar_Deadlift'].provisional).toBeUndefined();
+  });
+
+  it('keeps variants distinct: a Smith press is not a bench press, a pushdown is a machine standard', () => {
+    expect(v.exercises['fedb:Smith_Machine_Bench_Press']).toMatchObject({ machine: true, provisional: true });
+    expect(v.exercises['fedb:Smith_Machine_Bench_Press'].starts.men).not.toEqual(v.exercises['fedb:Barbell_Bench_Press_-_Medium_Grip'].starts.men);
+    expect(v.exercises['fedb:Triceps_Pushdown']).toMatchObject({ machine: true });
+  });
+
+  it('gives reps standards three distinct divisions per tier, for both standards', () => {
+    for (const standard of Object.values(v.exercises).filter((s) => s.method === 'reps')) {
+      for (const starts of [standard.starts.men, standard.starts.women]) {
+        const divisions = milestoneStarts(starts);
+        divisions.slice(1).forEach((value, i) => expect(value).toBeGreaterThan(divisions[i]));
+      }
+    }
+  });
+
+  it('tells logging how load is entered, only for a ranked exercise under its own measure', () => {
+    expect(rankLoadNote('fedb:Hammer_Curls', 'weight_reps')).toBe('The weight of one dumbbell.');
+    expect(rankLoadNote('fedb:Pullups', 'bodyweight_reps')).toBe('Your body weight counts automatically; log only weight you add.');
+    expect(rankLoadNote('fedb:Pullups', 'weight_reps')).toBeUndefined();
+    expect(rankLoadNote('fedb:Crunches', 'bodyweight_reps')).toBeUndefined();
+    expect(rankLoadNote(undefined, 'weight_reps')).toBeUndefined();
+  });
+});

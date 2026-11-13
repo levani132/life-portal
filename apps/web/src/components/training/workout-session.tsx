@@ -36,6 +36,7 @@ import {
 } from '@life-portal/shared-domain';
 import { ErrorNote, Modal, Spinner, Textarea } from '../ui';
 import { api, ApiError } from '../../lib/api';
+import { useApi } from '../../lib/hooks';
 import {
   describeOneRepMax,
   describeSet,
@@ -695,6 +696,7 @@ function ExerciseBlock({
       {editingRest && (
         <RestEditor session={session} exercise={exercise} defaultSeconds={defaultRest} onClose={() => setEditingRest(false)} />
       )}
+      <LoadHint exerciseId={exercise.exerciseId} />
       {exercise.planned && (
         <p className="mb-2 mt-1 text-xs text-ink-faint">
           {[
@@ -751,6 +753,16 @@ function ExerciseBlock({
       )}
     </section>
   );
+}
+
+/**
+ * How to enter the weight for this exercise (per dumbbell, the bar and plates, one stack…), from
+ * its rank standard, so a set is logged the way its rank reads it. Nothing for other exercises.
+ */
+function LoadHint({ exerciseId }: { exerciseId: string }) {
+  const { data } = useApi<ExerciseListItem>(`/training/exercises/${exerciseId}`);
+  if (!data?.loadNote) return null;
+  return <p className="mt-1 text-xs text-ink-faint">Weight: {data.loadNote}</p>;
 }
 
 function EditSet({

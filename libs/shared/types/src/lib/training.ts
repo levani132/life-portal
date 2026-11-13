@@ -104,6 +104,8 @@ export interface ExerciseListItem {
   isOwn: boolean;
   /** The caller logged it in the last 90 days; such rows are listed first. */
   recent?: boolean;
+  /** How load is entered for this exercise, from its rank standard (e.g. per dumbbell). */
+  loadNote?: string;
 }
 
 /** A signed, short-lived link to a stored photo. The storage key never leaves the API. */
@@ -643,6 +645,8 @@ export interface RankBenchmark {
   note?: string;
   /** A machine or cable standard: loads differ between machines, so it is rougher. */
   machine?: boolean;
+  /** Weaker evidence: extrapolated from the main lifts by typical ratios. Shown as provisional. */
+  provisional?: boolean;
 }
 
 /** `GET /training/exercises/:id/rank`. Derived on every read; nothing about it is stored. */

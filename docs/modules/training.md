@@ -449,52 +449,23 @@ weigh-in. A set more than 1.5× where Legend starts is taken as a logging error 
 (`excluded.implausible`). Only the exact catalogue rows below (by `seedKey`) are ranked; own
 exercises and everything else say so (`no_benchmark`). Units don't matter: everything is grams.
 
-**Coverage and thresholds (v1-draft-2).** Body-weight multiples at the reference weight where each
-tier starts (Initiate starts at 0), push-ups in reps:
+**Coverage and thresholds (v1-draft-3).** 280 catalogue exercises, each with its load convention
+and evidence label. Isolation, dumbbell, kettlebell, machine, cable and endurance standards are
+**provisional**: ratios to a main lift, not tables of their own, and the UI says so. The full table
+and the reasons for each excluded group are in [rank-standards.md](rank-standards.md). The main
+lifts below kept their v1-draft-2 values:
 
-| Exercise | Men (Explorer → Legend) | Women |
+| Lift | Men (Explorer → Legend) | Women |
 |---|---|---|
 | Barbell Squat | 0.75 · 1.10 · 1.50 · 1.85 · 2.20 · 2.50 · 2.85 | 0.59 · 0.86 · 1.17 · 1.44 · 1.72 · 1.95 · 2.22 |
-| Barbell Full Squat | 0.75 · 1.10 · 1.50 · 1.85 · 2.20 · 2.50 · 2.85 | 0.59 · 0.86 · 1.17 · 1.44 · 1.72 · 1.95 · 2.22 |
-| Front Barbell Squat | 0.60 · 0.88 · 1.20 · 1.48 · 1.76 · 2.00 · 2.28 | 0.47 · 0.69 · 0.94 · 1.15 · 1.37 · 1.56 · 1.78 |
-| Front Squat Clean Grip | 0.60 · 0.88 · 1.20 · 1.48 · 1.76 · 2.00 · 2.28 | 0.47 · 0.69 · 0.94 · 1.15 · 1.37 · 1.56 · 1.78 |
 | Barbell Deadlift | 0.90 · 1.30 · 1.75 · 2.15 · 2.55 · 2.90 · 3.25 | 0.70 · 1.01 · 1.37 · 1.68 · 1.99 · 2.26 · 2.54 |
-| Sumo Deadlift | 0.90 · 1.30 · 1.75 · 2.15 · 2.55 · 2.90 · 3.25 | 0.70 · 1.01 · 1.37 · 1.68 · 1.99 · 2.26 · 2.54 |
-| Romanian Deadlift | 0.68 · 0.98 · 1.31 · 1.61 · 1.91 · 2.18 · 2.44 | 0.53 · 0.76 · 1.02 · 1.26 · 1.49 · 1.70 · 1.90 |
-| Stiff-Legged Barbell Deadlift | 0.68 · 0.98 · 1.31 · 1.61 · 1.91 · 2.18 · 2.44 | 0.53 · 0.76 · 1.02 · 1.26 · 1.49 · 1.70 · 1.90 |
-| Barbell Hip Thrust | 0.98 · 1.43 · 1.95 · 2.41 · 2.86 · 3.25 · 3.71 | 0.78 · 1.14 · 1.56 · 1.93 · 2.29 · 2.60 · 2.97 |
 | Barbell Bench Press - Medium Grip | 0.55 · 0.85 · 1.10 · 1.40 · 1.65 · 1.90 · 2.15 | 0.39 · 0.60 · 0.77 · 0.98 · 1.16 · 1.33 · 1.51 |
-| Wide-Grip Barbell Bench Press | 0.55 · 0.85 · 1.10 · 1.40 · 1.65 · 1.90 · 2.15 | 0.39 · 0.60 · 0.77 · 0.98 · 1.16 · 1.33 · 1.51 |
-| Bench Press - Powerlifting | 0.55 · 0.85 · 1.10 · 1.40 · 1.65 · 1.90 · 2.15 | 0.39 · 0.60 · 0.77 · 0.98 · 1.16 · 1.33 · 1.51 |
-| Decline Barbell Bench Press | 0.55 · 0.85 · 1.10 · 1.40 · 1.65 · 1.90 · 2.15 | 0.39 · 0.60 · 0.77 · 0.98 · 1.16 · 1.33 · 1.51 |
-| Close-Grip Barbell Bench Press | 0.50 · 0.77 · 0.99 · 1.26 · 1.49 · 1.71 · 1.94 | 0.35 · 0.54 · 0.69 · 0.88 · 1.04 · 1.20 · 1.36 |
-| Barbell Incline Bench Press - Medium Grip | 0.44 · 0.68 · 0.88 · 1.12 · 1.32 · 1.52 · 1.72 | 0.31 · 0.48 · 0.62 · 0.78 · 0.92 · 1.06 · 1.20 |
-| Standing Military Press | 0.36 · 0.55 · 0.72 · 0.91 · 1.07 · 1.24 · 1.40 | 0.25 · 0.39 · 0.50 · 0.64 · 0.75 · 0.87 · 0.98 |
-| Barbell Shoulder Press | 0.36 · 0.55 · 0.72 · 0.91 · 1.07 · 1.24 · 1.40 | 0.25 · 0.39 · 0.50 · 0.64 · 0.75 · 0.87 · 0.98 |
-| Seated Barbell Military Press | 0.36 · 0.55 · 0.72 · 0.91 · 1.07 · 1.24 · 1.40 | 0.25 · 0.39 · 0.50 · 0.64 · 0.75 · 0.87 · 0.98 |
-| Dumbbell Bench Press (per dumbbell) | 0.22 · 0.34 · 0.44 · 0.56 · 0.66 · 0.76 · 0.86 | 0.15 · 0.24 · 0.31 · 0.39 · 0.46 · 0.53 · 0.60 |
-| Incline Dumbbell Press (per dumbbell) | 0.19 · 0.29 · 0.37 · 0.48 · 0.56 · 0.65 · 0.73 | 0.13 · 0.20 · 0.26 · 0.34 · 0.39 · 0.45 · 0.51 |
-| Dumbbell Shoulder Press (per dumbbell) | 0.18 · 0.27 · 0.35 · 0.45 · 0.53 · 0.61 · 0.69 | 0.13 · 0.19 · 0.24 · 0.32 · 0.37 · 0.43 · 0.48 |
-| Seated Dumbbell Press (per dumbbell) | 0.18 · 0.27 · 0.35 · 0.45 · 0.53 · 0.61 · 0.69 | 0.13 · 0.19 · 0.24 · 0.32 · 0.37 · 0.43 · 0.48 |
-| Bent Over Barbell Row | 0.47 · 0.72 · 0.94 · 1.19 · 1.40 · 1.62 · 1.83 | 0.34 · 0.52 · 0.68 · 0.86 · 1.01 · 1.17 · 1.32 |
-| One-Arm Dumbbell Row (per dumbbell) | 0.25 · 0.38 · 0.50 · 0.63 · 0.74 · 0.86 · 0.97 | 0.18 · 0.27 · 0.36 · 0.45 · 0.53 · 0.62 · 0.70 |
 | Pullups | 0.85 · 1.05 · 1.20 · 1.35 · 1.55 · 1.75 · 1.95 | 0.72 · 0.89 · 1.02 · 1.15 · 1.32 · 1.49 · 1.66 |
-| Chin-Up | 0.88 · 1.08 · 1.24 · 1.39 · 1.60 · 1.80 · 2.01 | 0.75 · 0.92 · 1.05 · 1.18 · 1.36 · 1.53 · 1.71 |
-| Dips - Triceps Version | 0.85 · 1.15 · 1.40 · 1.65 · 1.90 · 2.10 · 2.30 | 0.72 · 0.98 · 1.19 · 1.40 · 1.62 · 1.79 · 1.96 |
-| Pushups | 5 · 12 · 22 · 30 · 40 · 55 · 75 | 2 · 6 · 12 · 18 · 25 · 35 · 45 |
-| Leg Press (machine) | 1.31 · 1.93 · 2.63 · 3.24 · 3.85 · 4.38 · 4.99 | 1.02 · 1.51 · 2.05 · 2.53 · 3.00 · 3.42 · 3.89 |
-| Leg Extensions (machine) | 0.59 · 0.86 · 1.17 · 1.44 · 1.72 · 1.95 · 2.22 | 0.46 · 0.67 · 0.91 · 1.12 · 1.34 · 1.52 · 1.73 |
-| Seated Leg Curl (machine) | 0.47 · 0.69 · 0.95 · 1.17 · 1.39 · 1.58 · 1.80 | 0.37 · 0.54 · 0.74 · 0.91 · 1.08 · 1.23 · 1.40 |
-| Wide-Grip Lat Pulldown (machine) | 0.47 · 0.73 · 0.95 · 1.20 · 1.42 · 1.63 · 1.85 | 0.34 · 0.53 · 0.68 · 0.86 · 1.02 · 1.17 · 1.33 |
-| Close-Grip Front Lat Pulldown (machine) | 0.47 · 0.73 · 0.95 · 1.20 · 1.42 · 1.63 · 1.85 | 0.34 · 0.53 · 0.68 · 0.86 · 1.02 · 1.17 · 1.33 |
-| Seated Cable Rows (machine) | 0.49 · 0.76 · 0.98 · 1.25 · 1.47 · 1.69 · 1.91 | 0.35 · 0.55 · 0.71 · 0.90 · 1.06 · 1.22 · 1.38 |
-| Leverage Chest Press (machine) | 0.50 · 0.77 · 0.99 · 1.26 · 1.49 · 1.71 · 1.94 | 0.35 · 0.54 · 0.69 · 0.88 · 1.04 · 1.20 · 1.36 |
-| Machine Bench Press (machine) | 0.50 · 0.77 · 0.99 · 1.26 · 1.49 · 1.71 · 1.94 | 0.35 · 0.54 · 0.69 · 0.88 · 1.04 · 1.20 · 1.36 |
+| Pushups (reps) | 5 · 12 · 22 · 30 · 40 · 55 · 75 | 3 · 6 · 12 · 18 · 25 · 35 · 45 |
 
-**Not ranked yet**, for lack of usable data: hack squat and Smith-machine lifts (counterweights
-and sled weights vary), machine shoulder press, lying leg curl, T-bar row, Olympic lifts and
-other technique-limited work, curls and other arm isolation, kettlebell work, lunges and split
-squats, and assisted pull-ups/dips.
+**Load convention while logging.** `ExerciseListItem.loadNote` (from `rankLoadNote`, the newest
+standard's note, shared rows only) is shown under an exercise in a workout, so a set is entered
+the way its rank reads it.
 
 **How v1-draft-2 was set** (research report, 2026-11-13). Evidence is labelled (R) research, (C)
 coaching standards, (E) elite competition, (S) self-reported app users:
@@ -587,7 +558,7 @@ lost by changing the data it came from, never by a benchmark change.
 **Benchmarks and versions.** `RANK_BENCHMARKS` lists every version with the day it starts
 applying. Stable by default: a version that is not a draft is never edited; any recalibration is a
 new version with a later `from`, reviewed and manual, and earlier sets keep the version of their
-day. **v1 is a draft** (`v1-draft-2`, applies to all history; it replaced `v1-draft`): the thresholds are the app's
+day. **v1 is a draft** (`v1-draft-3`, applies to all history; it replaced `v1-draft-2`, which replaced `v1-draft`): the thresholds are the app's
 proposal for owner review, not measured from LifePortal members and not competition records, and
 the UI says so. Draft values may change before v1 is fixed, and ranks shown under the draft
 change with them; this is the one exception to the stability rule and ends when v1 is frozen.
