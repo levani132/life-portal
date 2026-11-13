@@ -17,6 +17,9 @@ Explicit publishing is separate from live widget sharing: a private Food widget 
 - `feed_feedback` (#3 task A): `userId`, `kind` post/author, `targetId` (a post or user id), unique `(userId, kind, targetId)`. A viewer's "Not interested" posts and authors hidden from For You. It only shapes For You (the one collection this needs; it records the person's own choice, not derived data). Deleted with the account.
 - `for_you_sessions` (#9): `userId` (unique), random `seed`, `mode` ranked/chronological, `entries: [{postId, reasons: [{code, topicId?}]}]` (at most 300) and `expiresAt` with a TTL index (30 minutes). The order of one viewer's ranked For You session and nothing else: no content, no scores, no interaction data. A new first page replaces it. It is the one stored derived value in posts, a documented exception to principle 3 (DECISIONS 2026-11-13). There is no account deletion yet; when there is, it must delete this row too, though it expires within 30 minutes anyway.
 - `feed_preferences` (#10): `userId` (unique), `interests` (catalogue ids, ≤ 20) and optional `recommendationsResetAt`. The viewer's own explicit choices, not an inferred profile: private, never on a profile or shared, used by For You only. There is no account deletion yet; when there is, it must delete this row.
+- `feed_metric_keys` (#11): `key` (unique), `owner`, optional `count`, `expiresAt` (TTL). Short-lived keys for For You measurement: one per account, post, event and UTC day for de-duplication (2 days), one per account and day for visits (8 days) and one per account and day holding the daily event count (2 days). `key` and `owner` are HMAC-SHA256 values keyed by a secret derived from `JWT_SECRET`; no account id, post id or event is stored in clear. See *For You measurement* below.
+- `feed_metrics_daily` (#11): `day` (UTC), `postId` (`''` for the day's totals), `counts` per event, `visitors`, `returningVisitors` (totals row only), `expiresAt` (TTL, 90 days); unique `(day, postId)`. Aggregate counts only: no account, no key, no time of day.
+- `feed_preferences.metricsOptOut` (#11): the account opted out of For You measurement. Absent means not opted out.
 - Like and comment counts are never stored on the post; `PostEngagementService` counts rows on read (principle 3).
 - `foods.attribution`, `foods.postImportKey`: provenance and unique per-user publication/food-facts key (partial unique index). Existing documents require no backfill. `saved_meals.postImportKey` similarly makes repeat whole-meal imports idempotent. These are independent recipient-owned copies, never links into an author's tracking data.
 
@@ -170,6 +173,61 @@ Web: `components/for-you-preferences.tsx`. The setup step `interests-v1` (skippa
 blocking Home) and Settings → *For You* share the `InterestPicker` (each tap saves); Settings adds
 *Clear interests* and *Reset recommendations* (with a confirmation saying what it does and doesn't
 forget). Both appear only for accounts with For You.
+
+### For You measurement (#11)
+
+Behind **`forYouMetrics`, off for every cohort and for the developer** until a group policy or an
+account override turns it on (`DEFAULT_OFF_FEATURES`; the developer follows the *internal* group's
+value for these). Building it was approved; **collecting production data was not**, and is a
+separate rollout decision. Nothing here is read by ranking (#9): `ForYouService` never touches it.
+
+What is counted, per UTC day, in total and per post: `impression` (at least half the card, or half
+the screen for a taller card, visible for 1 s), `videoStart`, `video25/50/75/100` (the first loop),
+`quickSkip` (left the screen after less than 2 s of play, before finishing), and `like`, `comment`,
+`repost` and `notInterested` made on a For You card; plus `visitors` and `returningVisitors` (also
+visited on one of the previous 7 days). Only on For You; Wall, profiles and post pages are never
+measured.
+
+- `GET /posts/for-you/metrics` → `{enabled, optedOut, active}`; `PUT … {optedOut}` sets the opt-out.
+  Opting out stops counting at once (every request re-checks it) and deletes the account's keys.
+- `POST /posts/for-you/metrics/events {events: [{postId, type}] (≤ 50), visit?}` → `{accepted,
+  dropped}`, always 2xx for a valid body. An event counts only if: the flag is on and the account
+  has not opted out; the post passes the same `forYouEligible()` check as the feed **at the time it
+  is counted** (public, live, original, discoverable author, not blocked, muted, hidden, reported
+  or Not interested); a `like`, `comment` or `repost` matches the stored row and `notInterested`
+  matches the stored feedback; the same account has not counted that post and event today; and
+  the account is under **2,000 events a day**. Everything else is dropped without saying why.
+- `GET /posts/for-you/metrics/report?range=7|28` (developer only) → `FeedMetricsReport`: totals,
+  one row per day and the 50 most-seen posts. Counts are always shown; **a rate is only shown over
+  at least 30** impressions, video starts or visitors (`perMille()`, `null` below). Nothing is per
+  account, and the view has no user list or history.
+- Web: `lib/feed-metrics.ts` (tracker, impression hook) and the video hook in `post-media.tsx`.
+  The browser checks the status first and creates nothing while measurement is inactive. It sends
+  every 15 s and when the page is hidden or left, with `fetch(keepalive)` (a beacon cannot carry
+  the token) and never retries. Settings → For You → *Measurement* says what is kept, how long and
+  who sees it, and holds the opt-out, which can be set before measurement ever runs. Developer
+  view: `/settings/for-you-metrics`.
+
+**Privacy.** The keys are **pseudonymous, not anonymous**: the server holds the secret, so anyone
+with it and a candidate account id can recompute an account's keys and see which posts it saw in
+the last 2 days. That is why keys are HMAC'd (an unkeyed hash of guessable ids could be reversed by
+anyone with the database), live at most 8 days, and are never shown. The daily aggregates hold no
+account; a post's row is about the post, though **with very few viewers a count can still point to
+a person** (one impression on a post with one known viewer), which is why rates need 30 and the
+view is developer-only. Rotating `JWT_SECRET` makes all existing keys unlinkable (they then simply
+expire). **Account deletion** (not built yet) must call `FeedMetricsService.forget()`, which deletes
+every key for the account's last 9 days by `owner`; the aggregates need nothing. Because opting out deletes the visit key, opting back in on the same day counts that account as a visitor a second time.
+
+**Abuse.** One account adds at most 1 to any post's count per event per day, at most 2,000 events a
+day and 50 per request, and only for posts it may see in For You; engagement events cannot be
+invented. Requests are authenticated like every route. There is no per-IP limit or bot detection:
+a coordinated group of real accounts can still inflate counts, by at most one each.
+
+**Atlas M0 budget (512 MB).** A key row is about 150 bytes with its indexes. At 100 active viewers
+× 200 events a day, keys hold about 40,000 rows (≈ 6 MB) at steady state; daily rows are about
+300 bytes per post seen per day, so 2,000 posts a day for 90 days is about 54 MB. Each counted
+event costs a handful of small reads and writes; at the cap, one account's day is about 10,000
+operations. Revisit before rolling out beyond a few hundred accounts.
 
 ## Media storage
 

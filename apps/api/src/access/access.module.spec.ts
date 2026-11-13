@@ -46,12 +46,24 @@ function fixture(
 }
 
 describe('feature access resolution', () => {
-  it('gives the configured developer everything without reading a cohort policy', async () => {
-    const f = fixture({ user: { cohort: 'production' } });
+  it('gives the configured developer everything except default-off features', async () => {
+    const f = fixture({ user: { cohort: 'production' }, policy: { overrides: { money: false } } });
     const { cohort, access } = await f.service.forUser(DEV);
     expect(cohort).toBe('developer');
-    expect(Object.values(access).every(Boolean)).toBe(true);
-    expect(f.policies.findOne).not.toHaveBeenCalled();
+    expect(Object.entries(access).every(([id, on]) => on || id === 'forYouMetrics')).toBe(true);
+    expect(access.forYouMetrics).toBe(false);
+  });
+
+  it('turns measurement on for the developer only with the internal group (#11)', async () => {
+    const f = fixture({
+      user: { cohort: 'production', featureOverrides: { forYouMetrics: true } },
+      policy: { overrides: { forYouMetrics: true } },
+    });
+    expect((await f.service.forUser(DEV)).access.forYouMetrics).toBe(true);
+    expect(f.policies.findOne).toHaveBeenCalledWith({ cohort: 'internal' });
+    const off = fixture({ user: { cohort: 'production', featureOverrides: { forYouMetrics: true } } });
+    // The developer's own stored overrides are not used; only the internal policy is.
+    expect((await off.service.forUser(DEV)).access.forYouMetrics).toBe(false);
   });
 
   it('lets a user override beat the cohort policy', async () => {

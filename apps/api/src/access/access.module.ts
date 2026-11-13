@@ -34,6 +34,7 @@ import {
 import { Type } from 'class-transformer';
 import {
   COHORTS,
+  DEFAULT_OFF_FEATURES,
   type AccessUser,
   type CohortPolicy,
   type FeatureAccess,
@@ -62,6 +63,7 @@ class FeatureOverridesDto {
   @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() forYou?: boolean;
   @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() trainingLevels?: boolean;
   @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() forYouRanking?: boolean;
+  @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() forYouMetrics?: boolean;
   @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() training?: boolean;
   @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() social?: boolean;
   @ValidateIf((_, value: unknown) => value !== undefined)
@@ -112,17 +114,18 @@ export class AccessService {
       userId === this.config.developerUserId
         ? 'developer'
         : (user.cohort ?? 'internal');
-    const policy =
+    // The developer has every feature, except default-off ones (#11), which follow the internal
+    // group's policy: turning measurement on for internal accounts is what turns it on there.
+    const policy = await this.policies
+      .findOne({ cohort: cohort === 'developer' ? 'internal' : cohort })
+      .lean();
+    const overrides =
       cohort === 'developer'
-        ? null
-        : await this.policies.findOne({ cohort }).lean();
-    return {
-      cohort,
-      access: resolveFeatureAccess(cohort, {
-        ...policy?.overrides,
-        ...user.featureOverrides,
-      }),
-    };
+        ? Object.fromEntries(
+            DEFAULT_OFF_FEATURES.map((id) => [id, policy?.overrides?.[id]]),
+          )
+        : { ...policy?.overrides, ...user.featureOverrides };
+    return { cohort, access: resolveFeatureAccess(cohort, overrides) };
   }
   async require(userId: string, module: FeatureId) {
     if (!(await this.forUser(userId)).access[module])

@@ -23,9 +23,15 @@ export const FEATURE_IDS = [
   'forYou',
   'trainingLevels',
   'forYouRanking',
+  'forYouMetrics',
 ] as const;
 export type FeatureId = (typeof FEATURE_IDS)[number];
 export type FeatureAccess = Record<FeatureId, boolean>;
+/**
+ * Off for every cohort, the developer included, unless a group policy or account override turns
+ * them on. For features that collect data (#11): existing is not a reason to run.
+ */
+export const DEFAULT_OFF_FEATURES: readonly FeatureId[] = ['forYouMetrics'];
 export const AUDIENCES = ['private', 'friends', 'public'] as const;
 export type Audience = (typeof AUDIENCES)[number];
 export const MODULES: {
@@ -154,4 +160,5 @@ export const FEATURES: { id: FeatureId; name: string }[] = [
   { id: 'forYou', name: 'For You feed' },
   { id: 'trainingLevels', name: 'Training levels' },
   { id: 'forYouRanking', name: 'For You personalised ranking' },
+  { id: 'forYouMetrics', name: 'For You measurement' },
 ];

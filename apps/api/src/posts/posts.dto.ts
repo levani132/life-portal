@@ -19,6 +19,8 @@ import {
 } from 'class-validator';
 import {
   AUDIENCES,
+  FEED_METRIC_EVENTS,
+  FEED_METRICS_RANGES,
   MAX_FOR_YOU_INTERESTS,
   MAX_POST_ITEMS,
   MAX_POST_MEDIA,
@@ -26,6 +28,7 @@ import {
   POST_KINDS,
   REPORT_REASONS,
   type Audience,
+  type FeedMetricEvent,
   type FoodPostKind,
   type MealSlot,
   type PostSelection,
@@ -91,6 +94,26 @@ export class FeedPreferencesDto {
   @IsString({ each: true })
   @MaxLength(64, { each: true })
   interests!: string[];
+}
+/** One For You measurement event (#11). The post is checked for eligibility in the service. */
+class FeedMetricInputDto {
+  @IsString() @MaxLength(24) postId!: string;
+  @IsIn(FEED_METRIC_EVENTS) type!: FeedMetricEvent;
+}
+/** `POST /posts/for-you/metrics/events`: at most 50 events, the shared domain cap. */
+export class FeedMetricsBatchDto {
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => FeedMetricInputDto)
+  events!: FeedMetricInputDto[];
+  @ValidateIf((_, v: unknown) => v !== undefined) @IsBoolean() visit?: boolean;
+}
+export class FeedMetricsOptOutDto {
+  @IsBoolean() optedOut!: boolean;
+}
+export class FeedMetricsReportDto {
+  @Type(() => Number) @IsIn(FEED_METRICS_RANGES) range = 7;
 }
 export class ForYouDto {
   @ValidateIf((_, v: unknown) => v !== undefined)

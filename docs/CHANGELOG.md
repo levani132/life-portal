@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-13: For You measurement, built and switched off
+
+- **Settings → For You → Measurement** says plainly whether For You viewing is counted for you (it
+  isn't: measurement is off for everyone), what would be counted, how long it's kept and who sees
+  it, and lets you opt out in advance.
+- For the developer, a *For You measurement* page shows daily totals (posts seen, video play,
+  likes, comments, reposts, Not interested, visitors), with rates only over at least 30.
+
 ## 2026-11-13: Choose your interests for For You
 
 - **Tell For You what you like.** Setup now has an optional step to pick a few interests, such as

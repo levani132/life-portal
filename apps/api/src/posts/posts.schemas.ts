@@ -106,5 +106,7 @@ export class FeedPreferencesRecord {
   @Prop({ required: true, unique: true }) userId!: string;
   @Prop({ type: [String], default: [] }) interests!: string[];
   @Prop({ type: Date }) recommendationsResetAt?: Date;
+  /** Opted out of For You measurement (#11). Absent means not opted out. */
+  @Prop() metricsOptOut?: boolean;
 }
 export const FeedPreferencesSchema = SchemaFactory.createForClass(FeedPreferencesRecord);

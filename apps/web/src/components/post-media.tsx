@@ -1,8 +1,9 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Volume2, VolumeX } from 'lucide-react';
-import type { PostMedia } from '@life-portal/shared-types';
-import { clampAspect } from '@life-portal/shared-domain';
+import type { FeedMetricEvent, PostMedia } from '@life-portal/shared-types';
+import { FEED_METRICS_CONFIG, clampAspect, videoMilestones } from '@life-portal/shared-domain';
+import { usePostMetrics } from '../lib/feed-metrics';
 
 /**
  * A post's photos and videos, swiped sideways. The first item sets the frame (between 4:5 and
@@ -114,6 +115,7 @@ function PostVideo({
     if (visible && active && !document.hidden) void element.play().catch(() => undefined);
     else element.pause();
   }, [visible, active]);
+  useVideoMetrics(video, visible && active);
   return (
     <button
       type="button"
@@ -136,4 +138,50 @@ function PostVideo({
       </span>
     </button>
   );
+}
+
+/**
+ * For You measurement (#11) for one video: a start, how far the first loop got (25/50/75/100%),
+ * and a quick skip when it leaves the screen after less than 2 s of play. Only inside a measured
+ * For You card; elsewhere `usePostMetrics()` is null and nothing is attached.
+ */
+function useVideoMetrics(video: RefObject<HTMLVideoElement | null>, onScreen: boolean) {
+  const record = usePostMetrics();
+  const state = useRef({ started: false, finished: false, skipped: false, maxTime: 0, sent: new Set<FeedMetricEvent>() });
+  useEffect(() => {
+    const element = video.current;
+    if (!element || !record) return;
+    const s = state.current;
+    const send = (type: FeedMetricEvent) => {
+      s.sent.add(type);
+      record(type);
+    };
+    const onPlaying = () => {
+      if (s.started) return;
+      s.started = true;
+      send('videoStart');
+    };
+    const onTime = () => {
+      if (!s.started || s.finished || !element.duration) return;
+      // A loop starting over means the first play reached the end.
+      if (element.currentTime + 0.5 < s.maxTime) s.finished = true;
+      s.maxTime = Math.max(s.maxTime, element.currentTime);
+      const fraction = s.finished ? 1 : s.maxTime / element.duration;
+      for (const type of videoMilestones(fraction, s.sent)) send(type);
+    };
+    element.addEventListener('playing', onPlaying);
+    element.addEventListener('timeupdate', onTime);
+    return () => {
+      element.removeEventListener('playing', onPlaying);
+      element.removeEventListener('timeupdate', onTime);
+    };
+  }, [video, record]);
+  useEffect(() => {
+    if (onScreen || !record) return;
+    const s = state.current;
+    if (s.started && !s.skipped && !s.sent.has('video100') && s.maxTime * 1000 < FEED_METRICS_CONFIG.quickSkipMs) {
+      s.skipped = true;
+      record('quickSkip');
+    }
+  }, [onScreen, record]);
 }

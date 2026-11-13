@@ -2,7 +2,12 @@
 
 import clsx from 'clsx';
 import { useState } from 'react';
-import { FOR_YOU_INTERESTS, type FeedPreferences, type PortalState } from '@life-portal/shared-types';
+import {
+  FOR_YOU_INTERESTS,
+  type FeedMetricsStatus,
+  type FeedPreferences,
+  type PortalState,
+} from '@life-portal/shared-types';
 import { formatDay } from '@life-portal/shared-domain';
 import { api } from '../lib/api';
 import { useApi } from '../lib/hooks';
@@ -146,6 +151,72 @@ export function ForYouSettings({ portal }: { portal: PortalState }) {
         </p>
       )}
       {problem && <ErrorNote message={problem} />}
+      <MeasurementSettings />
     </Panel>
   );
+}
+
+/** Same key as the For You feed, so opting out here stops a page that is already open. */
+export const METRICS_KEY = '/posts/for-you/metrics';
+
+/**
+ * For You measurement (#11): what is collected, how long it is kept, who sees it, and the opt-out.
+ * Shown whether or not measurement is on, so the opt-out can be set before it ever is.
+ */
+export function MeasurementSettings() {
+  const { data, error, mutate } = useApi<FeedMetricsStatus>(METRICS_KEY);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  if (error) return <ErrorNote message={(error as Error).message} />;
+  if (!data) return null;
+  async function toggle(optedOut: boolean) {
+    setBusy(true);
+    setProblem(null);
+    try {
+      await mutate(await api.put<FeedMetricsStatus>(METRICS_KEY, { optedOut }), { revalidate: false });
+    } catch (caught) {
+      setProblem(caught instanceof Error ? caught.message : 'Could not save.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="mt-4 border-t border-border pt-4" aria-label="For You measurement">
+      <h3 className="text-sm font-medium">Measurement</h3>
+      <p className="mt-1 text-sm text-ink-muted">{measurementState(data)}</p>
+      <details className="mt-2 text-xs text-ink-muted">
+        <summary className="cursor-pointer text-ink">What is measured and kept</summary>
+        <ul className="mt-2 list-disc space-y-1 pl-4">
+          <li>
+            Daily totals for For You: posts at least half on screen for a second, how far videos
+            played, and likes, comments, reposts and Not interested made from For You.
+          </li>
+          <li>The totals carry no name or account, and are deleted after 90 days.</li>
+          <li>
+            To count each thing once, coded keys made from your account are kept for 2 days (8 for
+            visits). They are pseudonymous, not anonymous: the server can recompute them.
+          </li>
+          <li>Only the app&apos;s developer sees the totals. They do not change what For You shows you.</li>
+          <li>Turning this off stops counting at once and deletes your keys.</li>
+        </ul>
+      </details>
+      <label className="mt-3 flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={data.optedOut}
+          disabled={busy}
+          className="h-4 w-4 rounded border-border bg-surface"
+          onChange={(event) => void toggle(event.target.checked)}
+        />
+        Don&apos;t measure my For You viewing
+      </label>
+      {problem && <ErrorNote message={problem} />}
+    </section>
+  );
+}
+
+export function measurementState(status: FeedMetricsStatus) {
+  if (status.optedOut) return 'Off: you opted out. Nothing about your For You viewing is counted.';
+  if (!status.enabled) return 'Not running for your account. Nothing about your For You viewing is counted.';
+  return 'On: your For You viewing is counted in daily totals.';
 }

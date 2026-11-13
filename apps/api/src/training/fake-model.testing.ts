@@ -145,6 +145,10 @@ export class FakeModel {
       const { at, last } = parent(path);
       delete at[last];
     }
+    for (const [path, value] of Object.entries(update['$inc'] ?? {})) {
+      const { at, last } = parent(path);
+      at[last] = ((at[last] as number | undefined) ?? 0) + (value as number);
+    }
   }
 
   async updateOne(filter: Filter, update: Record<string, Record<string, unknown>>, options: { upsert?: boolean } = {}) {
@@ -153,11 +157,11 @@ export class FakeModel {
     else if (options.upsert) {
       // Like Mongo: the filter's plain equality fields seed the new document.
       const seeded = Object.fromEntries(Object.entries(filter).filter(([key, value]) => !key.startsWith('$') && (typeof value !== 'object' || value === null)));
-      const created = { _id: new Types.ObjectId(), createdAt: new Date(), ...seeded } as Doc;
+      const created = { _id: new Types.ObjectId(), createdAt: new Date(), ...seeded, ...clone(update['$setOnInsert'] ?? {}) } as Doc;
       this.apply(created, update);
       this.docs.push(created);
     }
-    return { matchedCount: doc ? 1 : 0 };
+    return { matchedCount: doc ? 1 : 0, upsertedCount: !doc && options.upsert ? 1 : 0 };
   }
 
   async deleteOne(filter: Filter) {

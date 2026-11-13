@@ -21,11 +21,16 @@ describe('portal policy', () => {
     const access = resolveFeatureAccess('internal', { epam: true });
     expect(access.epam).toBe(false);
     expect(MODULE_IDS.filter((id) => access[id])).toHaveLength(8);
+    const developer = resolveFeatureAccess('developer', { nutrition: false });
     expect(
-      Object.values(
-        resolveFeatureAccess('developer', { nutrition: false }),
-      ).every(Boolean),
+      Object.entries(developer).every(([id, on]) => on || id === 'forYouMetrics'),
     ).toBe(true);
+  });
+  it('keeps measurement off for every cohort and the developer until turned on (#11)', () => {
+    for (const cohort of ['production', 'internal', 'developer'] as const) {
+      expect(resolveFeatureAccess(cohort).forYouMetrics).toBe(false);
+      expect(resolveFeatureAccess(cohort, { forYouMetrics: true }).forYouMetrics).toBe(true);
+    }
   });
   it('releases training to internal and developer accounts only (spec 020)', () => {
     expect(resolveFeatureAccess('production').training).toBe(false);

@@ -1,5 +1,6 @@
 import {
   MODULE_IDS,
+  DEFAULT_OFF_FEATURES,
   FEATURE_IDS,
   type Audience,
   type FeatureAccess,
@@ -8,6 +9,10 @@ import {
   type UserCohort,
 } from '@life-portal/shared-types';
 
+/**
+ * A feature in `DEFAULT_OFF_FEATURES` is on only when `overrides` says so, for every cohort and
+ * the developer too (whose overrides are the internal group's policy, see `AccessService`).
+ */
 export function resolveFeatureAccess(
   cohort: UserCohort | 'developer',
   overrides: Partial<FeatureAccess> = {},
@@ -15,9 +20,11 @@ export function resolveFeatureAccess(
   return Object.fromEntries(
     FEATURE_IDS.map((id) => [
       id,
-      cohort === 'developer' ||
-        (id !== 'epam' &&
-          (overrides[id] ?? (cohort === 'internal' || id === 'nutrition'))),
+      DEFAULT_OFF_FEATURES.includes(id)
+        ? overrides[id] === true
+        : cohort === 'developer' ||
+          (id !== 'epam' &&
+            (overrides[id] ?? (cohort === 'internal' || id === 'nutrition'))),
     ]),
   ) as FeatureAccess;
 }

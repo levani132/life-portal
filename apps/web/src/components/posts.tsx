@@ -2,7 +2,7 @@
 import { Avatar } from './avatar';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, type ReactNode } from 'react';
+import { useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Apple,
   CalendarDays,
@@ -15,6 +15,8 @@ import {
 import {
   REPORT_REASONS,
   type Audience,
+  type FeedMetricEvent,
+  type FeedMetricsStatus,
   type FoodPost,
   type PostImportPreview,
   type PostImportResult,
@@ -34,9 +36,16 @@ import {
 } from './post-header-controls';
 import { PostEngagement } from './post-engagement';
 import { PostMediaCarousel } from './post-media';
+import { METRICS_KEY } from './for-you-preferences';
 import { MacroRings } from './macro-rings';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { SOCIAL_REFRESH } from '../lib/social-hooks';
+import {
+  FeedMetricsContext,
+  PostMetricsContext,
+  useFeedMetricsTracker,
+  useImpression,
+} from '../lib/feed-metrics';
 import {
   ErrorNote,
   Field,
@@ -47,6 +56,7 @@ import {
   Textarea,
 } from './ui';
 const FOR_YOU_REFRESH = { ...SOCIAL_REFRESH, refreshInterval: 0, revalidateOnFocus: false };
+
 
 /**
  * Why For You placed a post (#9): the first reason in one quiet line under the header, all of
@@ -119,6 +129,12 @@ export function PostsList({
     // feed under the reader and expire their "Older posts" link. It refreshes when asked.
     feed === 'forYou' ? FOR_YOU_REFRESH : SOCIAL_REFRESH,
   );
+  // For You measurement (#11): only when the API says it is on and not opted out.
+  const metrics = useApi<FeedMetricsStatus>(
+    feed === 'forYou' ? METRICS_KEY : null,
+    FOR_YOU_REFRESH,
+  );
+  const tracker = useFeedMetricsTracker(metrics.data?.active === true);
   if (result.error)
     return <ErrorNote message={(result.error as Error).message} />;
   if (!result.data || result.isLoading)
@@ -140,6 +156,7 @@ export function PostsList({
       </div>
     );
   return (
+    <FeedMetricsContext.Provider value={tracker}>
     <div className="space-y-5">
       <div className="-mx-4 space-y-0.5 sm:mx-0 sm:space-y-5">
         {result.data.posts.map((post) => {
@@ -199,6 +216,7 @@ export function PostsList({
         )}
       </div>
     </div>
+    </FeedMetricsContext.Provider>
   );
 }
 /**
@@ -246,6 +264,18 @@ export function PostCard({
   const [removed, setRemoved] = useState(false);
   const action = useAction();
   const router = useRouter();
+  // For You measurement (#11): a For You card's events, while measurement is active.
+  const tracker = useContext(FeedMetricsContext);
+  const onForYou = !!forYou;
+  const recordMetric = useMemo(
+    () =>
+      onForYou && tracker
+        ? (type: FeedMetricEvent) => tracker.record(post.id, type)
+        : null,
+    [onForYou, tracker, post.id],
+  );
+  const card = useRef<HTMLElement>(null);
+  useImpression(card, recordMetric ? () => recordMetric('impression') : null);
   async function remove() {
     if (
       await action.run(
@@ -268,6 +298,7 @@ export function PostCard({
       { revalidate: false },
     );
     if (!ok) return;
+    if (kind === 'post' && on) recordMetric?.('notInterested');
     setDismissed(on ? kind : null);
     if (kind === 'author') forYou?.onAuthorHidden(on);
   }
@@ -339,7 +370,9 @@ export function PostCard({
   const hasFood = !!post.kind;
   const PreviewIcon = presentation.icon;
   return (
+    <PostMetricsContext.Provider value={recordMetric}>
     <article
+      ref={card}
       className={`card overflow-hidden p-4 sm:p-5 ${detail ? 'rounded-2xl' : 'rounded-none border-0 sm:rounded-2xl sm:border'}`}
     >
       {post.repost && (
@@ -550,6 +583,7 @@ export function PostCard({
         <ImportPost postId={post.id} onClose={() => setImporting(false)} />
       )}
     </article>
+    </PostMetricsContext.Provider>
   );
 }
 function EditPost({ post, onClose }: { post: FoodPost; onClose: () => void }) {

@@ -18,6 +18,7 @@ import { ErrorNote } from './ui';
 import { requestNotificationOffer } from './notifications';
 import { messagingAvailable } from './messages';
 import { PostShareSheet } from './post-share-sheet';
+import { usePostMetrics } from '../lib/feed-metrics';
 
 export function PostEngagement({
   post,
@@ -40,6 +41,7 @@ export function PostEngagement({
   const feedStale = useRef(false);
   const portal = useApi<PortalState>('/portal');
   const canSend = messagingAvailable(portal.data?.access);
+  const recordMetric = usePostMetrics();
   const value = optimistic ?? stats.data;
   async function like() {
     if (!value || locked.current) return;
@@ -56,6 +58,7 @@ export function PostEngagement({
       const result = liked
         ? await api.put<Engagement>(`/posts/${post.id}/like`, {})
         : await api.delete<Engagement>(`/posts/${post.id}/like`);
+      if (liked) recordMetric?.('like');
       await stats.mutate(result, false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not update your like.');
@@ -79,6 +82,7 @@ export function PostEngagement({
       const result = reposted
         ? await api.put<Engagement>(`/posts/${post.id}/repost`, {})
         : await api.delete<Engagement>(`/posts/${post.id}/repost`);
+      if (reposted) recordMetric?.('repost');
       await stats.mutate(result, false);
       // The feed is refreshed when the sheet closes: a repost card replaces this one (it is keyed
       // by the repost), which would unmount the open sheet under the finger.
@@ -216,6 +220,7 @@ function PostComments({
   }, [text]);
   const requestId = useRef<string | null>(null);
   const locked = useRef(false);
+  const recordMetric = usePostMetrics();
   const comments = [
     ...new Map(
       [...older, ...(result.data?.comments ?? [])].map((row) => [row.id, row]),
@@ -241,6 +246,7 @@ function PostComments({
       ]);
       setText('');
       requestId.current = null;
+      recordMetric?.('comment');
       await result.mutate().catch(() => undefined);
       onChanged();
       requestNotificationOffer('comment');

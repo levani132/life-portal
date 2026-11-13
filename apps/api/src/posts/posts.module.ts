@@ -27,6 +27,9 @@ import {
   CreatePostDto,
   AddPostCommentDto,
   UpdatePostAudienceDto,
+  FeedMetricsBatchDto,
+  FeedMetricsOptOutDto,
+  FeedMetricsReportDto,
   FeedPreferencesDto,
   ForYouDto,
   ImportPostDto,
@@ -49,6 +52,13 @@ import {
 } from './posts.schemas';
 import { PostsService } from './posts.service';
 import { ForYouService } from './for-you.service';
+import {
+  FeedMetricKeyRecord,
+  FeedMetricKeySchema,
+  FeedMetricsDailyRecord,
+  FeedMetricsDailySchema,
+  FeedMetricsService,
+} from './feed-metrics.service';
 @RequireModule('foodPosts')
 @UseInterceptors(SocialNoStore)
 @Controller('posts')
@@ -57,6 +67,7 @@ class PostsController {
     private readonly posts: PostsService,
     private readonly engagement: PostEngagementService,
     private readonly forYouFeed: ForYouService,
+    private readonly metrics: FeedMetricsService,
   ) {}
   @Post('preview') preview(
     @CurrentUser('userId') userId: string,
@@ -99,6 +110,30 @@ class PostsController {
   /** "Reset recommendations": earlier likes, comments and reposts stop shaping For You. */
   @Post('for-you/reset') resetForYou(@CurrentUser('userId') userId: string) {
     return this.forYouFeed.resetRecommendations(userId);
+  }
+  /** Whether For You measurement (#11) runs for this account, and its opt-out. */
+  @Get('for-you/metrics') metricsStatus(@CurrentUser('userId') userId: string) {
+    return this.metrics.status(userId);
+  }
+  @Put('for-you/metrics') setMetricsOptOut(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: FeedMetricsOptOutDto,
+  ) {
+    return this.metrics.setOptOut(userId, dto.optedOut);
+  }
+  /** Answers 2xx with what was counted; anything not countable is dropped, never an error. */
+  @Post('for-you/metrics/events') recordMetrics(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: FeedMetricsBatchDto,
+  ) {
+    return this.metrics.record(userId, dto);
+  }
+  /** Developer only: daily aggregates, never per account. */
+  @Get('for-you/metrics/report') metricsReport(
+    @CurrentUser('userId') userId: string,
+    @Query() query: FeedMetricsReportDto,
+  ) {
+    return this.metrics.report(userId, query.range);
   }
   @Get('reports') reports(@CurrentUser('userId') userId: string) {
     return this.posts.reportQueue(userId);
@@ -258,10 +293,12 @@ class PublicPostsController {
       { name: FeedFeedbackRecord.name, schema: FeedFeedbackSchema },
       { name: ForYouSessionRecord.name, schema: ForYouSessionSchema },
       { name: FeedPreferencesRecord.name, schema: FeedPreferencesSchema },
+      { name: FeedMetricKeyRecord.name, schema: FeedMetricKeySchema },
+      { name: FeedMetricsDailyRecord.name, schema: FeedMetricsDailySchema },
     ]),
   ],
   controllers: [PostsController, PublicPostsController],
-  providers: [PostsService, PostEngagementService, ForYouService],
+  providers: [PostsService, PostEngagementService, ForYouService, FeedMetricsService],
   // Messages renders shared posts through the same read authorization as opening one.
   exports: [PostsService],
 })

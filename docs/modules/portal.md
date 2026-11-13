@@ -9,6 +9,11 @@ food publishing remains separate. See [social.md](social.md) for profiles and co
 write production. Missing legacy cohorts resolve as internal. The only developer is the exact
 account ID in server `DEVELOPER_USER_ID`, independent of legacy `roles: ['owner']`.
 The developer always has all modules; EPAM is denied to every other account regardless of override.
+**Default-off features** (`DEFAULT_OFF_FEATURES`, today only `forYouMetrics`, #11) are the
+exception: they are off for every cohort *and the developer* unless an override says `true`. The
+developer takes these from the *internal* group's policy, so turning one on for internal accounts
+is also what turns it on for the developer. Used for features that collect data, so existing is
+never enough to run.
 
 Production defaults to Food; internal defaults to all general modules. The `feature_policies`
 collection stores cohort overrides because releases need changing without a deploy. User

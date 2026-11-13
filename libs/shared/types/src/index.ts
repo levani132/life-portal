@@ -13,6 +13,7 @@ export * from './lib/dashboard';
 export * from './lib/portal';
 export * from './lib/social';
 export * from './lib/posts';
+export * from './lib/feed-metrics';
 export * from './lib/notifications';
 export * from './lib/messages';
 export * from './lib/training';

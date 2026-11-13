@@ -1527,3 +1527,25 @@ whichever instance received the last update; it still fires once.
 **Also decided.** Strength ranks (#5b) are not built: using other members' private training data,
 the cohort threshold and the reference data need explicit owner approval first.
 
+
+## 2026-11-13: For You measurement is built but off for everyone, with pseudonymous keys (issue #11)
+
+**Decision.** Count what For You shows and what people do with it as **daily aggregates only**,
+behind `forYouMetrics`, which is **off for every cohort and the developer** until turned on
+(`DEFAULT_OFF_FEATURES`, a new rule in `resolveFeatureAccess`; the developer follows the internal
+group's value for these). De-duplication, visits and the daily cap use **HMAC keys** keyed by a
+secret derived from `JWT_SECRET`, kept 2–8 days. Opting out in Settings stops counting at once and
+deletes the account's keys. The metrics never feed ranking.
+
+**Why.**
+- **Building, not collecting.** The owner lifted the hold for building only. A flag that is off by
+  default even for the developer means existing code collects nothing until someone decides to.
+- **HMAC, not a plain hash.** A SHA-256 of a user id, post id and day can be reversed by anyone
+  holding the database, because the inputs are guessable. With a keyed HMAC only the server can
+  link a key to an account. That is still pseudonymous, not anonymous, and the docs say so.
+- **Aggregates, not events.** No row says who saw what; a per-account history cannot be built from
+  stored data beyond the 2-day key window, and only with the secret.
+- **Rates need 30.** A rate over three views describes three people, not the post.
+
+**Not met / open.** A post with one known viewer still shows a count of one to the developer.
+There is no per-IP or bot defence beyond per-account limits. Rollout needs a separate decision.
