@@ -478,10 +478,13 @@ proposal for owner review, not measured from LifePortal members and not competit
 the UI says so. Draft values may change before v1 is fixed, and ranks shown under the draft
 change with them; this is the one exception to the stability rule and ends when v1 is frozen.
 
-**Future, not built:** opt-in **monthly** tournaments (calendar-month seasons; exact boundaries and
-time zone decided when designed) among members with a similar current rank, up to about 100, no
-fake opponents, explicit opt-in for anything shown publicly, with anti-cheating and fairness rules.
-Population-based calibration is optional future research. Neither is part of #5b.
+**Tournaments (#12, in progress):** opt-in **monthly** tournaments among members with a similar
+current rank, up to about 100, no fake opponents. Only the season calendar and matchmaking are
+built so far, as pure domain functions (`libs/shared/domain/src/lib/tournaments.ts`): Tbilisi-time
+calendar months, enrolment from the 20th of the month before, a lock at 00:00 on the 1st, 3 days of
+grace, and groups by current division, widened upward below 3 entrants and split above 100. Nothing
+is stored, scored or shown yet; the proposed rules and open questions are in
+`specs/026-strength-tournaments/spec.md`. Population-based calibration is optional future research.
 
 ### The Home card (US4)
 

@@ -75,8 +75,10 @@ search, connection actions and money widget sharing have their own tests.
    4 strength ranks and levels: **levels done** (#5a, `trainingLevels` flag); **strength ranks
    built with draft standards** (#5b, `trainingRanks` flag, off for production): personal,
    per exercise, against fixed versioned standards, never other members' data; current (90 days)
-   and highest-ever ranks. Freezing v1 thresholds waits on owner review. *Later, separate scope:*
-   opt-in **monthly** tournaments (calendar-month seasons) among similarly ranked members.
+   and highest-ever ranks. Freezing v1 thresholds waits on owner review. *In progress (#12):*
+   opt-in **monthly** tournaments (calendar-month seasons) among similarly ranked members. The
+   season calendar and matchmaking are built (domain only); storage, scoring, visibility and UI
+   wait on owner answers (`specs/026-strength-tournaments/`).
    *Later, not built:* ranks and levels may become a modest credibility signal for creators'
    training content in For You, with relevance and quality staying primary, no suppression of
    beginners, imported ("verified") workouts weighted over self-reported ones, and resistance to

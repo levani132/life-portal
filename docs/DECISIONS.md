@@ -1572,3 +1572,24 @@ women's) are the member's own explicit choice in the training profile.
 
 **Open, for the owner.** The v1 thresholds are a draft (`v1-draft`) until reviewed; whether two
 standards sets (and these references, 80 kg and 60 kg) are the right categories; the exercise list.
+
+## 2026-11-13: Tournament seasons run on Tbilisi time and group by division, mixing standards (issue #12, proposed)
+
+**Status: proposed defaults, awaiting owner review on #12.** Built only as pure domain functions.
+
+- **One clock for everyone.** A tournament needs a single lock and finish instant for every
+  entrant, unlike meals and payments, whose day belongs to one person. Asia/Tbilisi is UTC+4 all
+  year, so there is no daylight-saving edge. A set still belongs to the month by its workout's
+  own `day`.
+- **Lock, then grace.** Enrolment locks at 00:00 on the 1st, with no late entries, so groups are
+  formed once and never reshuffled. Three days of grace let late-logged workouts count. A set
+  saved after grace never counts, which is what makes final standings final.
+- **Groups mix men's and women's standards.** A milestone is already normalised to each member's
+  own standards. Splitting groups by standards would tell up to 100 people which one a member
+  chose.
+- **Sparse is honest.** Short divisions widen upward, and the widened range is shown. An exercise
+  with fewer than 3 entrants has no tournament that month. Nobody is invented.
+- **Snapshots are coming.** Entries will snapshot rank and baseline at lock, and results will be
+  frozen at finalisation. This is a deliberate exception to "derived never persisted", for the
+  same reason as `meal_entries.facts`: a later edit or benchmark change must not rewrite a
+  finished competition. Not built yet.

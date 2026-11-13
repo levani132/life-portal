@@ -36,3 +36,4 @@ export * from './lib/for-you-ranking';
 export * from './lib/for-you-interests';
 export * from './lib/feed-metrics';
 export * from './lib/strength-ranks';
+export * from './lib/tournaments';
