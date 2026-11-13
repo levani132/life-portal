@@ -4,6 +4,8 @@ import { GroupList, JoinConsent, entryStatusText } from './tournaments';
 import { api } from '../../lib/api';
 
 jest.mock('../../lib/api', () => ({ api: { post: jest.fn(), delete: jest.fn() } }));
+/** Changed per test: whether the group's results are final. */
+const mockFinal = { value: false };
 jest.mock('../../lib/hooks', () => ({
   useApi: () => ({
     data: {
@@ -15,7 +17,9 @@ jest.mock('../../lib/hooks', () => ({
       rankRange: 'Achiever III – Veteran I',
       method: 'e1rm',
       standardsVersion: 'v1',
-      final: false,
+      get final() {
+        return mockFinal.value;
+      },
       standings: [
         { self: false, place: 1, score: 1370 },
         { userId: 'me', displayName: 'Me', username: 'me', self: true, place: 2, score: 1137 },
@@ -82,4 +86,13 @@ it('explains sparse, unranked and voided entries honestly', () => {
   expect(entryStatusText(entry('voided', { voidReason: 'Impossible set' }))).toBe('Removed from this tournament: Impossible set');
   expect(entryStatusText(entry('grouped', { result: { place: 2, of: 7, score: 1137 } }))).toBe('Final result: 2nd of 7.');
   expect(entryStatusText(entry('grouped', { result: { of: 7 } }))).toMatch(/no valid set this month, so no place/);
+});
+
+it('once final, a member without a valid set reads "no valid set", not "yet"', () => {
+  mockFinal.value = true;
+  render(<GroupList groupId="g" />);
+  expect(screen.getByText('no valid set')).toBeTruthy();
+  expect(screen.queryByText('no valid set yet')).toBeNull();
+  expect(screen.getByLabelText('Final standings')).toBeTruthy();
+  mockFinal.value = false;
 });

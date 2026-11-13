@@ -215,7 +215,7 @@ export function GroupList({ groupId }: { groupId: string }) {
             )}
             <span className="truncate">{row.displayName ?? 'A member'}</span>
             {row.self && <span className="text-xs text-ink-muted">(you)</span>}
-            <span className="ml-auto shrink-0 tabular-nums text-xs">{row.score !== undefined ? format(row.score) : 'no valid set yet'}</span>
+            <span className="ml-auto shrink-0 tabular-nums text-xs">{row.score !== undefined ? format(row.score) : data.final ? 'no valid set' : 'no valid set yet'}</span>
           </li>
         ))}
       </ol>

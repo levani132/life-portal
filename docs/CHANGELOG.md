@@ -9,6 +9,8 @@ User-visible changes. Newest first.
   can't be compared fairly between people. Your rank on them still works.
 - **The "enrolment is open" reminder arrives once per month**, even if the server was down at
   midnight on the 20th.
+- **Final results say "no valid set"** for a member without one, rather than "no valid set yet".
+- **Error messages are announced by screen readers** (they are alerts now), across the app.
 - Tournaments are still behind a flag.
 
 ## 2026-11-13: Strength standards v1 are fixed
