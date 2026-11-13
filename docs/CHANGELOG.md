@@ -2,6 +2,17 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-13: For You learns what you like
+
+- **For You is ordered for you.** Posts on topics and from people you like, comment on and repost
+  rise, fresh posts and ones other members engage with get a boost, and every fifth post is
+  something new from a smaller voice, so the feed never becomes only more of the same. Each post
+  says why it's there in one line under the name; tap it for the full reasons and what they're
+  based on: only your likes, comments and reposts from the last 90 days, never your food logs or
+  health data. Until you've interacted with a few posts, For You stays newest first. Not interested
+  and hiding an author always win. Behind the new For You ranking feature (internal and developer
+  accounts for now).
+
 ## 2026-11-13: Exercise statistics
 
 - **See how an exercise is going.** An exercise's history, from a workout or the exercise library,

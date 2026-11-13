@@ -1228,6 +1228,23 @@ prolific poster filling the page until #3 ranks properly. Its cursor is keyed se
 Wall's so positions are never interchangeable. The `forYou` flag stays off for production until
 image moderation exists (roadmap launch gate).
 
+## 2026-11-13: For You ranking v1 stores a short-lived order, and reads no nutrition
+
+Issue #9 (owner decisions on the review). Ranking is derived on read like everything else, but a
+ranked feed cannot be paged by position the way a newest-first feed can: likes arriving between
+pages would move posts across the page boundary, so a reader would see some twice and miss others.
+So a first page stores **only the order**: `for_you_sessions`, one row per viewer, ≤ 300 post ids
+with reason codes, deleted by a TTL index after 30 minutes. It is the one exception to principle 3
+in posts. It holds no content and no scores, and every page re-reads and re-checks its posts, so
+the cache can never show something the viewer may no longer see. Budget: ≈ 15 KB a viewer.
+
+Inputs are the viewer's own likes, comments and reposts (90 days) and, later, chosen interests.
+**Imports are not a signal**: they are recorded only in the viewer's private food rows, and even a
+post-id-only read crosses the nutrition boundary; a future social "save" event could carry them
+after its own privacy review. Exploration is seeded per session rather than random so ranking stays
+deterministic and testable. `forYouRanking` is a separate flag from `forYou` (the production
+moderation gate), off for production. Hiding an author stays an exclusion, not a down-weight.
+
 ## 2026-11-12: For You ranking is on hold; Not interested ships first
 
 Issue #3 asked for signals, an interest profile, topics, ranked paging and metrics at once. The

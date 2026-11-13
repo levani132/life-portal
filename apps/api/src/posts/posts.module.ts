@@ -39,10 +39,13 @@ import {
   FeedFeedbackSchema,
   FoodPostRecord,
   FoodPostSchema,
+  ForYouSessionRecord,
+  ForYouSessionSchema,
   PostReportRecord,
   PostReportSchema,
 } from './posts.schemas';
 import { PostsService } from './posts.service';
+import { ForYouService } from './for-you.service';
 @RequireModule('foodPosts')
 @UseInterceptors(SocialNoStore)
 @Controller('posts')
@@ -50,6 +53,7 @@ class PostsController {
   constructor(
     private readonly posts: PostsService,
     private readonly engagement: PostEngagementService,
+    private readonly forYouFeed: ForYouService,
   ) {}
   @Post('preview') preview(
     @CurrentUser('userId') userId: string,
@@ -69,12 +73,15 @@ class PostsController {
   ) {
     return this.posts.list(userId, query);
   }
-  /** Declared before `:id` so "for-you" is never read as a post id. */
+  /**
+   * Declared before `:id` so "for-you" is never read as a post id. Ranked with `forYouRanking`
+   * (#9), otherwise the newest-first feed.
+   */
   @Get('for-you') forYou(
     @CurrentUser('userId') userId: string,
     @Query() query: ForYouDto,
   ) {
-    return this.posts.forYou(userId, query);
+    return this.forYouFeed.page(userId, query);
   }
   @Get('reports') reports(@CurrentUser('userId') userId: string) {
     return this.posts.reportQueue(userId);
@@ -232,10 +239,11 @@ class PublicPostsController {
       { name: PostCommentRecord.name, schema: PostCommentSchema },
       { name: PostReportRecord.name, schema: PostReportSchema },
       { name: FeedFeedbackRecord.name, schema: FeedFeedbackSchema },
+      { name: ForYouSessionRecord.name, schema: ForYouSessionSchema },
     ]),
   ],
   controllers: [PostsController, PublicPostsController],
-  providers: [PostsService, PostEngagementService],
+  providers: [PostsService, PostEngagementService, ForYouService],
   // Messages renders shared posts through the same read authorization as opening one.
   exports: [PostsService],
 })

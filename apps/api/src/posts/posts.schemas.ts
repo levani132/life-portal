@@ -3,6 +3,7 @@ import {
   AUDIENCES,
   REPORT_REASONS,
   type Audience,
+  type ForYouReasonCode,
   type FoodPublication,
   type MediaKind,
   type ReportReason,
@@ -76,3 +77,23 @@ export class FeedFeedbackRecord {
 }
 export const FeedFeedbackSchema = SchemaFactory.createForClass(FeedFeedbackRecord);
 FeedFeedbackSchema.index({ userId: 1, kind: 1, targetId: 1 }, { unique: true });
+/**
+ * A viewer's ranked For You session (#9): the order of at most 300 post ids and short reason
+ * codes, so paging stays stable while engagement moves. The one documented exception to "derived
+ * is never persisted" in posts (DECISIONS 2026-11-13): it holds no content, one row per viewer
+ * (replaced by each new first page) and Mongo's TTL monitor deletes it after `expiresAt`. Every
+ * post is re-read and re-checked when its page is served.
+ */
+@Schema({ ...baseSchemaOptions, collection: 'for_you_sessions' })
+export class ForYouSessionRecord {
+  @Prop({ required: true, unique: true }) userId!: string;
+  /** Random per session: seeds exploration and binds cursors to this session. */
+  @Prop({ required: true }) seed!: string;
+  @Prop({ type: String, enum: ['ranked', 'chronological'], required: true })
+  mode!: 'ranked' | 'chronological';
+  @Prop({ type: [Object], default: [] })
+  entries!: { postId: string; reasons: { code: ForYouReasonCode; topicId?: string }[] }[];
+  @Prop({ type: Date, required: true }) expiresAt!: Date;
+}
+export const ForYouSessionSchema = SchemaFactory.createForClass(ForYouSessionRecord);
+ForYouSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });

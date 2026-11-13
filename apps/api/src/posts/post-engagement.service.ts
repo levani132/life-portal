@@ -26,6 +26,8 @@ export class PostLikeRecord {
 }
 export const PostLikeSchema = SchemaFactory.createForClass(PostLikeRecord);
 PostLikeSchema.index({ postId: 1, userId: 1 }, { unique: true });
+// A viewer's own recent likes, for For You affinity (#9).
+PostLikeSchema.index({ userId: 1, createdAt: -1 });
 
 @Schema({ collection: 'post_comments', timestamps: true })
 export class PostCommentRecord {
@@ -43,6 +45,8 @@ PostCommentSchema.index(
   { unique: true },
 );
 PostCommentSchema.index({ postId: 1, deleted: 1, _id: -1 });
+// A viewer's own recent comments, for For You affinity (#9).
+PostCommentSchema.index({ userId: 1, createdAt: -1 });
 
 const LIKE_WINDOW_MS = 15 * 60_000;
 const COMMENT_WINDOW_MS = 2 * 60_000;

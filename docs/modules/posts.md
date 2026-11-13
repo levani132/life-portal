@@ -15,6 +15,7 @@ Explicit publishing is separate from live widget sharing: a private Food widget 
 - `post_likes`: one row per `(postId, userId)` (unique index), so liking twice is a no-op and a duplicate-key race is tolerated. Unliking deletes the row.
 - `post_comments`: `postId`, author `userId`, client `requestId` UUID (unique per `(postId, userId, requestId)` for retry safety), text (1–1000, trimmed) and a `deleted` flag. Deleting clears the text and keeps the row. Index `(postId, deleted, _id desc)` serves the newest-first list.
 - `feed_feedback` (#3 task A): `userId`, `kind` post/author, `targetId` (a post or user id), unique `(userId, kind, targetId)`. A viewer's "Not interested" posts and authors hidden from For You. It only shapes For You (the one collection this needs; it records the person's own choice, not derived data). Deleted with the account.
+- `for_you_sessions` (#9): `userId` (unique), random `seed`, `mode` ranked/chronological, `entries: [{postId, reasons: [{code, topicId?}]}]` (at most 300) and `expiresAt` with a TTL index (30 minutes). The order of one viewer's ranked For You session and nothing else: no content, no scores, no interaction data. A new first page replaces it. It is the one stored derived value in posts, a documented exception to principle 3 (DECISIONS 2026-11-13). There is no account deletion yet; when there is, it must delete this row too, though it expires within 30 minutes anyway.
 - Like and comment counts are never stored on the post; `PostEngagementService` counts rows on read (principle 3).
 - `foods.attribution`, `foods.postImportKey`: provenance and unique per-user publication/food-facts key (partial unique index). Existing documents require no backfill. `saved_meals.postImportKey` similarly makes repeat whole-meal imports idempotent. These are independent recipient-owned copies, never links into an author's tracking data.
 
@@ -36,7 +37,7 @@ Authenticated `/api/posts` routes require **social + nutrition + foodPosts**, ev
 - `GET /:id` returns the complete permitted snapshot. Every read (detail, feed, a message's post card) signs fresh `media[].url`/`posterUrl` read links only after the audience check. They are signed at the start of the hour and valid for two, so a URL is stable (cacheable) for an hour and dies within two; someone dropped from the audience can never get a new one.
 - `PATCH /:id {title,caption,audience}` and `DELETE /:id` are owner-only; food facts and media stay immutable. A post with neither food nor media cannot be edited down to no text. `PATCH /:id/audience {audience}` is the header's quick audience switch, also owner-only.
 - `GET /:id/engagement` returns `{likeCount, commentCount, liked, reposted, repostCount}`. `PUT /:id/like` and `DELETE /:id/like` set the viewer's like and return the new counts.
-- `PUT /:id/not-interested` and `PUT /:id/hide-author` (#3 task A, needs `forYou`) record that the viewer doesn't want this post, or this post's author, in For You; the matching `DELETE`s undo. Only for another member's post the viewer can read now (404 otherwise, 400 for your own). Repeats are no-ops. For You leaves hidden authors out in the query and Not-interested posts in the scan; Friends, profiles and links are unchanged. Hiding an author is an exclusion, not a down-weight, because there is no ranking yet.
+- `PUT /:id/not-interested` and `PUT /:id/hide-author` (#3 task A, needs `forYou`) record that the viewer doesn't want this post, or this post's author, in For You; the matching `DELETE`s undo. Only for another member's post the viewer can read now (404 otherwise, 400 for your own). Repeats are no-ops. For You leaves hidden authors out in the query and Not-interested posts in the scan; Friends, profiles and links are unchanged. Hiding an author is an exclusion, not a down-weight, even with ranking (#9): an explicit "don't show me" stays absolute.
 - **What may shape For You:** only published post content and in-app interactions with posts. Private nutrition logs, weight, targets, Apple Health and other health tracking never drive recommendations (owner decision on #3, 2026-11-12).
 - `PUT /:id/repost` reposts a post the viewer can read and returns the new counts. 400 for your own post or a private one (`canRepost()` in the domain lib). A repeat is a no-op. `DELETE /:id/repost` takes it back.
 - In `GET /`, a repost row is shown only when the viewer passes `readable()` for the **repost** (its reposter and copied audience) **and** for the **original**, loaded fresh: the original's audience, blocks, author access, reports and deletion always win. The card is the original's DTO plus `repost: {id, by, isMine, createdAt}`, so likes, comments, shares and reposts from it all target the original. A post already shown in a page (as itself or another repost) is skipped.
@@ -88,6 +89,55 @@ Diet tags use EU nutrition-claim definitions (Regulation 1924/2006) where one ex
 Hashtags: a `#` at the start or after anything but a letter, digit, `_`, `/`, `&` or `#` (so not inside words, URLs or entities). Then 1–50 Unicode letters, marks, digits or `_` with at least one letter. NFC-normalised, lower-cased, deduplicated in order of first appearance, at most 10 per post (`MAX_POST_HASHTAGS`). Any interest is allowed, not only food.
 
 The card shows diet tags as small chips under the nutrition summary, each with its basis on hover and for screen readers (`DietTopicChips` in `posts.tsx`). Hashtags are not repeated as chips because they are already in the caption; they become links once Explore exists.
+
+### For You ranking (#9, task C)
+
+Behind `forYouRanking` (off for production, on for internal and developer; independent of the
+`forYou` moderation gate, which still applies). Without it `GET /posts/for-you` is the newest-first
+feed above, unchanged. With it, `ForYouService` (`apps/api/src/posts/for-you.service.ts`) answers:
+
+- **First page (no cursor)** builds a session. The pool is the newest 400 rows matching the plain
+  feed's query, filtered by `PostsService.forYouEligible()` (discoverable author, not excluded or
+  hidden, not Not-interested, not reported by the viewer, `readableAuthor()` once per author), first
+  300 kept. **Eligibility is decided before scoring and again for every page.**
+- **Signals**: only the viewer's own likes, comments (not deleted) and reposts since
+  `signalSince(now, resetAt)` (90 days, or a later "Reset recommendations" from #10), at most 500
+  of each, joined to the target post's author and `postTopics()`. Interactions with deleted posts
+  and own posts don't count. **Never imports** (they live in private nutrition rows; owner decision
+  on #9), food logs, weight, targets, Apple Health or impressions.
+- **Engagement** per candidate: distinct members who liked, commented on or reposted it, never the
+  author, the viewer or anyone the viewer blocked or muted; each member once.
+- **Ranking**: `rankForYou()` (`libs/shared/domain/src/lib/for-you-ranking.ts`), pure, `now` and
+  `seed` explicit, weights in the documented `FOR_YOU_CONFIG`:
+  - affinity per topic and per author = Σ kind weight (like 1, comment 2, repost 3) × ½^(age/30 d);
+    a chosen interest (#10) adds 2 to its topic.
+  - score = 1 × ln(1 + Σ topic affinity) + 1.2 × ln(1 + author affinity)
+    + 1 × ½^(age hours/72) + 0.5 × ln(1 + min(engaged members, 50)).
+  - **Sparse fallback**: fewer than 3 interactions in the window and no interests → newest first,
+    no reasons, no exploration.
+  - **Exploration**: every 5th slot goes to a post with no affinity to the viewer (author or topics)
+    and fewer than 3 engaged members, in a seeded order (FNV-1a of seed + post id): stable for a
+    session, different between sessions and viewers.
+  - **Diversity** per page of 10: at most 2 per author and 3 per topic. When nothing left fits, the
+    topic limit gives way first, then the author limit; posts are deferred, never dropped.
+- **Reasons** (≤ 2, codes stored, words made per read by `forYouReasonText()`): *Matches your
+  interest: X*, *Because you engaged with posts tagged X*, *You've engaged with N's posts before*
+  (≥ 2 interactions), *Popular with members* (≥ 5 engaged members), *Something new, outside what
+  you usually engage with* (an exploration slot), *Posted recently* (≤ 48 h, when nothing else
+  applies). A reason that would need a missing label is left out rather than made vague.
+- **Paging**: the cursor is an encrypted `{seed, offset}` under its own key. A page re-reads its
+  posts, re-runs `forYouEligible()` and the full `readable()`, and skips anything no longer
+  eligible, so mid-session deletions, audience changes, blocks, reports and Not interested win, and
+  nothing repeats or is skipped. An unknown or expired session answers `{posts: [], expired: true}`;
+  a tampered cursor is 400.
+- **Web**: For You does not poll (`refreshInterval: 0`, no revalidate on focus), because a first
+  page starts a new session. A ranked card shows its first reason under the header (`ForYouReasons`
+  in `posts.tsx`), opening to all reasons and what they are based on. An expired page offers
+  *Back to the top*.
+- **Budget (Atlas M0)**: a session row is ≈ 300 × (24-byte id + short codes) ≈ 15 KB, one per viewer
+  for 30 minutes: 1,000 concurrent viewers ≈ 15 MB. A first page reads ≤ 400 posts, ≤ 1,500 own
+  interaction rows and the pool's like/comment/repost rows; later pages read ≤ 20 posts each.
+  New indexes: `post_likes (userId, createdAt)` and `post_comments (userId, createdAt)`.
 
 ## Media storage
 

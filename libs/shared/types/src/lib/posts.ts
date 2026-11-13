@@ -82,6 +82,20 @@ export interface PostTopic {
   label: string;
   basis: string;
 }
+/**
+ * Why For You ranked a post where it is (#9). Only ever true statements about the viewer's own
+ * likes, comments and reposts, their chosen interests, or the post itself. Absent in the
+ * chronological fallback.
+ */
+export const FOR_YOU_REASON_CODES = ['interest', 'topic', 'author', 'popular', 'explore', 'fresh'] as const;
+export type ForYouReasonCode = (typeof FOR_YOU_REASON_CODES)[number];
+export interface ForYouReason {
+  code: ForYouReasonCode;
+  /** The post topic the reason is about, for `interest` and `topic`. */
+  topicId?: string;
+  /** Ready to show, e.g. "Because you engaged with posts tagged High protein". */
+  text: string;
+}
 export interface FoodPost {
   id: string;
   author: PostAuthor;
@@ -106,6 +120,8 @@ export interface FoodPost {
   media: PostMedia[];
   /** Diet tags and caption hashtags, computed on read from the whole publication (issue #8). */
   topics: PostTopic[];
+  /** For You with personalised ranking only: up to two reasons this post is here. */
+  reasons?: ForYouReason[];
   isOwner: boolean;
   /**
    * Set when this card is someone's repost: the post itself is always the original (its id,
@@ -124,6 +140,8 @@ export interface PostRepost {
 export interface PostPage {
   posts: FoodPost[];
   nextCursor?: string;
+  /** A ranked For You cursor whose session has expired: start again from the top. */
+  expired?: boolean;
 }
 export interface PostImportItem {
   key: string;

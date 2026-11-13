@@ -252,9 +252,8 @@ export class PostsService {
     row: FoodPostRecord,
   ): Promise<PostAuthor | null> {
     const own = row.userId === viewerId;
-    const [connection, enabled, reported, author] = await Promise.all([
-      own ? null : this.graph.between(viewerId, row.userId),
-      this.enabled(row.userId),
+    const [author, reported] = await Promise.all([
+      this.readableAuthor(viewerId, row),
       own
         ? null
         : this.reports.exists({
@@ -263,10 +262,21 @@ export class PostsService {
               (row as FoodPostRecord & { _id: Types.ObjectId })._id,
             ),
           }),
+    ]);
+    return author && !reported ? author : null;
+  }
+  /** Everything `readable()` checks except the viewer's report of this one post. */
+  private async readableAuthor(
+    viewerId: string,
+    row: Pick<FoodPostRecord, 'userId' | 'audience'>,
+  ): Promise<PostAuthor | null> {
+    const own = row.userId === viewerId;
+    const [connection, enabled, author] = await Promise.all([
+      own ? null : this.graph.between(viewerId, row.userId),
+      this.enabled(row.userId),
       this.social.postAuthor(row.userId),
     ]);
     return author &&
-      !reported &&
       canReadFoodPost({
         own,
         audience: row.audience,
@@ -448,20 +458,8 @@ export class PostsService {
    * FOR_YOU_AUTHOR_CAP posts per author; extras are skipped (they stay on the profile).
    */
   async forYou(userId: string, query: ForYouDto): Promise<PostPage> {
-    await this.requireEnabled(userId);
-    await this.access.require(userId, 'forYou');
-    const [graphHidden, feedback] = await Promise.all([
-      this.graph.hiddenAuthorIds(userId),
-      this.feedback.find({ userId }).select('kind targetId').lean(),
-    ]);
-    const notInterested = new Set(
-      feedback.filter((f) => f.kind === 'post').map((f) => f.targetId),
-    );
-    const excluded = [
-      userId,
-      ...graphHidden,
-      ...feedback.filter((f) => f.kind === 'author').map((f) => f.targetId),
-    ];
+    await this.forYouGate(userId);
+    const { excluded, notInterested } = await this.forYouFilter(userId);
     let cursor = this.cursor(query.cursor, 'forYou');
     let scanned = 0;
     const visible: FoodPost[] = [];
@@ -515,6 +513,78 @@ export class PostsService {
       posts: visible,
       ...(last ? { nextCursor: this.encode(last, 'forYou') } : {}),
     };
+  }
+  // ------------------------------------------------------------------ For You helpers (#9)
+  // The ranked feed (ForYouService) reuses exactly these checks, before scoring and again when a
+  // page is served, so ranking can never widen who sees what.
+
+  /** The features both For You orders need. */
+  async forYouGate(userId: string) {
+    await this.requireEnabled(userId);
+    await this.access.require(userId, 'forYou');
+  }
+
+  /** Authors left out of the query (self, blocked either way, muted, hidden) and Not-interested posts. */
+  async forYouFilter(userId: string) {
+    const [graphHidden, feedback] = await Promise.all([
+      this.graph.hiddenAuthorIds(userId),
+      this.feedback.find({ userId }).select('kind targetId').lean(),
+    ]);
+    return {
+      graphHidden: new Set(graphHidden),
+      notInterested: new Set(feedback.filter((f) => f.kind === 'post').map((f) => f.targetId)),
+      excluded: [userId, ...graphHidden, ...feedback.filter((f) => f.kind === 'author').map((f) => f.targetId)],
+    };
+  }
+
+  /** The For You query for live, public, original posts, excluding `excluded` authors. */
+  forYouQuery(excluded: string[]) {
+    return { audience: 'public' as const, deleted: { $ne: true }, ...ORIGINAL, userId: { $nin: excluded } };
+  }
+
+  /**
+   * The rows that may appear in this viewer's For You now, in the given order: public, live,
+   * original, a discoverable author not excluded, not Not-interested, not reported by the viewer,
+   * and readable by the same rule as every other read: `readableAuthor()` once per author, and the
+   * viewer's reports for all rows in one query.
+   */
+  async forYouEligible(
+    userId: string,
+    rows: PostRow[],
+    filter?: Awaited<ReturnType<PostsService['forYouFilter']>>,
+  ): Promise<PostRow[]> {
+    const { excluded, notInterested } = filter ?? (await this.forYouFilter(userId));
+    const out = new Set(excluded);
+    const candidates = rows.filter(
+      (row) =>
+        row.audience === 'public' &&
+        !row.deleted &&
+        !row.repostOf &&
+        !out.has(row.userId) &&
+        !notInterested.has(String(row._id)),
+    );
+    if (!candidates.length) return [];
+    const authorIds = [...new Set(candidates.map((row) => row.userId))];
+    const [discoverable, reported] = await Promise.all([
+      this.social.discoverableIds(authorIds),
+      this.reports
+        .find({ userId, postId: { $in: candidates.map((row) => String(row._id)) } })
+        .select('postId')
+        .lean(),
+    ]);
+    const reportedIds = new Set(reported.map((row) => row.postId));
+    const authorOk = new Map<string, boolean>();
+    for (const authorId of authorIds) {
+      if (!discoverable.has(authorId)) continue;
+      authorOk.set(authorId, !!(await this.readableAuthor(userId, { userId: authorId, audience: 'public' })));
+    }
+    return candidates.filter((row) => authorOk.get(row.userId) && !reportedIds.has(String(row._id)));
+  }
+
+  /** A For You card: the full `readable()` check again, then the feed teaser. */
+  async forYouCard(userId: string, row: PostRow): Promise<FoodPost | null> {
+    const author = await this.readable(userId, row);
+    return author ? this.dto(row, author, userId, true) : null;
   }
   /**
    * One feed card. A repost must pass the audience check for its reposter *and* the original for

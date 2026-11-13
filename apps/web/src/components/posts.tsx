@@ -46,6 +46,37 @@ import {
   Spinner,
   Textarea,
 } from './ui';
+const FOR_YOU_REFRESH = { ...SOCIAL_REFRESH, refreshInterval: 0, revalidateOnFocus: false };
+
+/**
+ * Why For You placed a post (#9): the first reason in one quiet line under the header, all of
+ * them and what they are based on when opened. Only ever on ranked For You cards.
+ */
+export function ForYouReasons({ reasons }: { reasons?: FoodPost['reasons'] }) {
+  if (!reasons?.length) return null;
+  return (
+    <details className="group mt-2 text-[11px] text-ink-faint">
+      <summary className="cursor-pointer list-none truncate hover:text-ink-muted [&::-webkit-details-marker]:hidden">
+        <span className="sr-only">Why you're seeing this: </span>
+        {reasons[0].text}
+        <span aria-hidden="true" className="ml-1 group-open:hidden">· Why?</span>
+      </summary>
+      <div className="mt-1 space-y-0.5">
+        <p className="font-medium text-ink-muted">Why you're seeing this</p>
+        <ul className="list-disc pl-4">
+          {reasons.map((reason) => (
+            <li key={`${reason.code}:${reason.topicId ?? ''}`}>{reason.text}</li>
+          ))}
+        </ul>
+        <p>
+          Based only on your likes, comments and reposts in the last 90 days, and interests you
+          choose. Never your food logs, weight or health data.
+        </p>
+      </div>
+    </details>
+  );
+}
+
 export function PostsList({
   authorId,
   preview = 'normal',
@@ -84,12 +115,30 @@ export function PostsList({
   const search = query.toString();
   const result = useApi<PostPage>(
     search ? `${path}?${search}` : path,
-    SOCIAL_REFRESH,
+    // A ranked For You first page starts a new session (#9), so polling it would reshuffle the
+    // feed under the reader and expire their "Older posts" link. It refreshes when asked.
+    feed === 'forYou' ? FOR_YOU_REFRESH : SOCIAL_REFRESH,
   );
   if (result.error)
     return <ErrorNote message={(result.error as Error).message} />;
   if (!result.data || result.isLoading)
     return <Spinner label="Loading posts…" />;
+  if (result.data.expired)
+    return (
+      <div className="card p-6 text-sm text-ink-muted">
+        <p>Your For You feed has been refreshed since this page was loaded.</p>
+        <button
+          type="button"
+          className="btn-ghost mt-3"
+          onClick={() => {
+            setCursor(undefined);
+            setHistory([]);
+          }}
+        >
+          Back to the top
+        </button>
+      </div>
+    );
   return (
     <div className="space-y-5">
       <div className="-mx-4 space-y-0.5 sm:mx-0 sm:space-y-5">
@@ -359,6 +408,7 @@ export function PostCard({
           }
         />
       </div>
+      {forYou && <ForYouReasons reasons={post.reasons} />}
       {post.title && post.title !== post.contentLabel && (
         <h2 className="mt-4 whitespace-pre-wrap break-words text-lg font-semibold">
           {post.title}
