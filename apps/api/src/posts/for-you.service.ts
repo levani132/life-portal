@@ -3,10 +3,14 @@ import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import { Model, Types } from 'mongoose';
-import type { FoodPost, ForYouReason, PostPage } from '@life-portal/shared-types';
+import type { FeedPreferences, FoodPost, ForYouReason, PostPage } from '@life-portal/shared-types';
 import {
   FOR_YOU_CONFIG,
   forYouReasonText,
+  interestForTopic,
+  interestTopicIds,
+  interestsProblem,
+  knownInterests,
   postTopics,
   rankForYou,
   signalSince,
@@ -17,7 +21,7 @@ import {
 import { AccessService } from '../access/access.module';
 import { PostCommentRecord, PostLikeRecord } from './post-engagement.service';
 import { PostsService } from './posts.service';
-import { FoodPostRecord, ForYouSessionRecord } from './posts.schemas';
+import { FeedPreferencesRecord, FoodPostRecord, ForYouSessionRecord } from './posts.schemas';
 import type { ForYouDto } from './posts.dto';
 
 type PostRow = FoodPostRecord & { _id: Types.ObjectId };
@@ -29,7 +33,7 @@ const POOL_SCAN = 400;
 /** At most this many of each kind of the viewer's own interactions are read. */
 const SIGNAL_LIMIT = 500;
 
-/** What #10 will supply: chosen interest topics and a "Reset recommendations" time. */
+/** From #10: chosen interests as post topics, and the "Reset recommendations" time. */
 export interface ForYouPreferences {
   interestTopicIds?: string[];
   resetAt?: string;
@@ -53,6 +57,7 @@ export class ForYouService {
     @InjectModel(PostLikeRecord.name) private readonly likes: Model<PostLikeRecord>,
     @InjectModel(PostCommentRecord.name) private readonly comments: Model<PostCommentRecord>,
     @InjectModel(ForYouSessionRecord.name) private readonly sessions: Model<ForYouSessionRecord>,
+    @InjectModel(FeedPreferencesRecord.name) private readonly prefs: Model<FeedPreferencesRecord>,
     private readonly feed: PostsService,
     private readonly access: AccessService,
     @Inject(CONFIG) private readonly config: AppConfig,
@@ -72,9 +77,47 @@ export class ForYouService {
     return this.serve(userId, session, cursor.offset);
   }
 
-  /** The preferences #10 will store; until then none, and ranking works without them. */
-  async preferences(_userId: string): Promise<ForYouPreferences> {
-    return {};
+  /** Chosen interests (#10) as post topics, and the reset time, for ranking. */
+  async preferences(userId: string): Promise<ForYouPreferences & { interests: string[] }> {
+    const row = await this.prefs.findOne({ userId }).lean();
+    const interests = knownInterests(row?.interests);
+    return {
+      interests,
+      interestTopicIds: interestTopicIds(interests),
+      ...(row?.recommendationsResetAt ? { resetAt: row.recommendationsResetAt.toISOString() } : {}),
+    };
+  }
+
+  // ------------------------------------------------------------------ preferences API (#10)
+
+  async getPreferences(userId: string): Promise<FeedPreferences> {
+    await this.feed.forYouGate(userId);
+    return this.toPreferences(await this.prefs.findOne({ userId }).lean());
+  }
+
+  /** Replaces the chosen interests; `[]` clears them. Unknown ids are refused, not dropped. */
+  async setInterests(userId: string, interests: string[]): Promise<FeedPreferences> {
+    await this.feed.forYouGate(userId);
+    const problem = interestsProblem(interests);
+    if (problem) throw new BadRequestException(problem);
+    await this.prefs.updateOne({ userId }, { $set: { interests: knownInterests(interests) } }, { upsert: true });
+    return this.toPreferences(await this.prefs.findOne({ userId }).lean());
+  }
+
+  /** "Reset recommendations": For You ignores the viewer's earlier likes, comments and reposts. */
+  async resetRecommendations(userId: string, now = new Date()): Promise<FeedPreferences> {
+    await this.feed.forYouGate(userId);
+    await this.prefs.updateOne({ userId }, { $set: { recommendationsResetAt: now } }, { upsert: true });
+    // The current order was built from what was just reset; the next first page starts fresh.
+    await this.sessions.deleteMany({ userId });
+    return this.toPreferences(await this.prefs.findOne({ userId }).lean());
+  }
+
+  private toPreferences(row: { interests?: string[]; recommendationsResetAt?: Date } | null): FeedPreferences {
+    return {
+      interests: knownInterests(row?.interests),
+      ...(row?.recommendationsResetAt ? { recommendationsResetAt: row.recommendationsResetAt.toISOString() } : {}),
+    };
   }
 
   private async build(userId: string, now: Date) {
@@ -199,7 +242,7 @@ export class ForYouService {
   ): Promise<PostPage> {
     const pageSize = FOR_YOU_CONFIG.pageSize;
     const posts: FoodPost[] = [];
-    const filter = await this.feed.forYouFilter(userId);
+    const [filter, { interests }] = await Promise.all([this.feed.forYouFilter(userId), this.preferences(userId)]);
     let index = offset;
     while (posts.length < pageSize && index < session.entries.length) {
       const chunk = session.entries.slice(index, index + pageSize * 2);
@@ -214,7 +257,7 @@ export class ForYouService {
         const row = eligible.get(entry.postId);
         const card = row && (await this.feed.forYouCard(userId, row));
         if (!card) continue;
-        posts.push({ ...card, reasons: this.reasons(entry, card) });
+        posts.push({ ...card, reasons: this.reasons(entry, card, interests) });
         if (posts.length === pageSize) break;
       }
     }
@@ -224,10 +267,12 @@ export class ForYouService {
     };
   }
 
-  private reasons(entry: RankedEntry, card: FoodPost): ForYouReason[] {
+  private reasons(entry: RankedEntry, card: FoodPost, interests: string[]): ForYouReason[] {
     return entry.reasons.flatMap((reason) => {
+      // An interest reason names the interest ("Baking"), not the hashtag that matched it.
+      const interest = reason.code === 'interest' && reason.topicId ? interestForTopic(interests, reason.topicId) : undefined;
       const text = forYouReasonText(reason, {
-        topicLabel: card.topics.find((topic) => topic.id === reason.topicId)?.label,
+        topicLabel: interest?.label ?? card.topics.find((topic) => topic.id === reason.topicId)?.label,
         authorName: card.author.displayName,
       });
       return text ? [{ code: reason.code, ...(reason.topicId ? { topicId: reason.topicId } : {}), text }] : [];

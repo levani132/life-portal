@@ -97,3 +97,14 @@ export class ForYouSessionRecord {
 }
 export const ForYouSessionSchema = SchemaFactory.createForClass(ForYouSessionRecord);
 ForYouSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+/**
+ * A viewer's explicit For You preferences (#10): the interest ids they chose and when they last
+ * reset recommendations. Their own choices, not an inferred profile; private, used by For You only.
+ */
+@Schema({ ...baseSchemaOptions, collection: 'feed_preferences' })
+export class FeedPreferencesRecord {
+  @Prop({ required: true, unique: true }) userId!: string;
+  @Prop({ type: [String], default: [] }) interests!: string[];
+  @Prop({ type: Date }) recommendationsResetAt?: Date;
+}
+export const FeedPreferencesSchema = SchemaFactory.createForClass(FeedPreferencesRecord);

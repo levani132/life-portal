@@ -262,3 +262,53 @@ export interface PublicPostPreview {
   /** A signed link to the first photo (or a video's still), valid for under two hours. */
   photoUrl?: string;
 }
+
+// ------------------------------------------------------------------ For You interests (#10)
+
+/** Bumped when interests are added, renamed or retired; stored ids never change meaning. */
+export const FOR_YOU_INTERESTS_VERSION = 1;
+export const MAX_FOR_YOU_INTERESTS = 20;
+
+/**
+ * A broad interest someone can choose for For You (#10). It matches posts through their computed
+ * topics (#8): a diet tag, or caption hashtags. Choosing one never hides anything; it only lifts
+ * matching posts when personalised ranking (#9) is on.
+ */
+export interface ForYouInterest {
+  id: string;
+  label: string;
+  group: 'diet' | 'general';
+  /** Post topic ids (`diet:*`, `tag:*`) this interest matches. */
+  topicIds: readonly string[];
+}
+
+const tags = (...names: string[]) => names.map((name) => `tag:${name}`);
+
+export const FOR_YOU_INTERESTS: readonly ForYouInterest[] = [
+  { id: 'high-protein', label: 'High protein', group: 'diet', topicIds: ['diet:high-protein'] },
+  { id: 'low-carb', label: 'Low carb', group: 'diet', topicIds: ['diet:low-carb'] },
+  { id: 'low-fat', label: 'Low fat', group: 'diet', topicIds: ['diet:low-fat'] },
+  { id: 'low-calorie', label: 'Low calorie', group: 'diet', topicIds: ['diet:low-calorie'] },
+  { id: 'low-sugar', label: 'Low sugar', group: 'diet', topicIds: ['diet:low-sugar'] },
+  { id: 'high-fibre', label: 'High fibre', group: 'diet', topicIds: ['diet:high-fibre'] },
+  { id: 'home-cooking', label: 'Home cooking', group: 'general', topicIds: tags('homecooking', 'homemade', 'cooking') },
+  { id: 'quick-meals', label: 'Quick meals', group: 'general', topicIds: tags('quickmeals', 'easyrecipes', 'quick', 'easy') },
+  { id: 'meal-prep', label: 'Meal prep', group: 'general', topicIds: tags('mealprep', 'batchcooking') },
+  { id: 'baking', label: 'Baking', group: 'general', topicIds: tags('baking', 'bread', 'cake') },
+  { id: 'desserts', label: 'Desserts', group: 'general', topicIds: tags('dessert', 'desserts', 'sweets') },
+  { id: 'breakfast', label: 'Breakfast', group: 'general', topicIds: tags('breakfast', 'brunch') },
+  { id: 'vegetarian', label: 'Vegetarian', group: 'general', topicIds: tags('vegetarian', 'veggie') },
+  { id: 'vegan', label: 'Vegan', group: 'general', topicIds: tags('vegan', 'plantbased') },
+  { id: 'fitness', label: 'Fitness', group: 'general', topicIds: tags('fitness', 'gym', 'workout', 'training') },
+  { id: 'running', label: 'Running', group: 'general', topicIds: tags('running', 'run') },
+  { id: 'travel-food', label: 'Food on the road', group: 'general', topicIds: tags('travel', 'streetfood', 'foodtravel') },
+  { id: 'budget', label: 'Budget eats', group: 'general', topicIds: tags('budget', 'cheapeats', 'budgetmeals') },
+];
+
+/** The viewer's own For You preferences. Private; used by For You only. */
+export interface FeedPreferences {
+  /** Chosen interest ids that are still in the catalogue. */
+  interests: string[];
+  /** For You ignores the viewer's likes, comments and reposts before this ("Reset recommendations"). */
+  recommendationsResetAt?: string;
+}

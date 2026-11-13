@@ -27,6 +27,7 @@ import {
   CreatePostDto,
   AddPostCommentDto,
   UpdatePostAudienceDto,
+  FeedPreferencesDto,
   ForYouDto,
   ImportPostDto,
   PostListDto,
@@ -37,6 +38,8 @@ import {
 import {
   FeedFeedbackRecord,
   FeedFeedbackSchema,
+  FeedPreferencesRecord,
+  FeedPreferencesSchema,
   FoodPostRecord,
   FoodPostSchema,
   ForYouSessionRecord,
@@ -82,6 +85,20 @@ class PostsController {
     @Query() query: ForYouDto,
   ) {
     return this.forYouFeed.page(userId, query);
+  }
+  /** The viewer's own For You interests and reset time (#10). Private; For You only. */
+  @Get('for-you/preferences') forYouPreferences(@CurrentUser('userId') userId: string) {
+    return this.forYouFeed.getPreferences(userId);
+  }
+  @Put('for-you/preferences') setForYouPreferences(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: FeedPreferencesDto,
+  ) {
+    return this.forYouFeed.setInterests(userId, dto.interests);
+  }
+  /** "Reset recommendations": earlier likes, comments and reposts stop shaping For You. */
+  @Post('for-you/reset') resetForYou(@CurrentUser('userId') userId: string) {
+    return this.forYouFeed.resetRecommendations(userId);
   }
   @Get('reports') reports(@CurrentUser('userId') userId: string) {
     return this.posts.reportQueue(userId);
@@ -240,6 +257,7 @@ class PublicPostsController {
       { name: PostReportRecord.name, schema: PostReportSchema },
       { name: FeedFeedbackRecord.name, schema: FeedFeedbackSchema },
       { name: ForYouSessionRecord.name, schema: ForYouSessionSchema },
+      { name: FeedPreferencesRecord.name, schema: FeedPreferencesSchema },
     ]),
   ],
   controllers: [PostsController, PublicPostsController],

@@ -16,6 +16,7 @@ Explicit publishing is separate from live widget sharing: a private Food widget 
 - `post_comments`: `postId`, author `userId`, client `requestId` UUID (unique per `(postId, userId, requestId)` for retry safety), text (1–1000, trimmed) and a `deleted` flag. Deleting clears the text and keeps the row. Index `(postId, deleted, _id desc)` serves the newest-first list.
 - `feed_feedback` (#3 task A): `userId`, `kind` post/author, `targetId` (a post or user id), unique `(userId, kind, targetId)`. A viewer's "Not interested" posts and authors hidden from For You. It only shapes For You (the one collection this needs; it records the person's own choice, not derived data). Deleted with the account.
 - `for_you_sessions` (#9): `userId` (unique), random `seed`, `mode` ranked/chronological, `entries: [{postId, reasons: [{code, topicId?}]}]` (at most 300) and `expiresAt` with a TTL index (30 minutes). The order of one viewer's ranked For You session and nothing else: no content, no scores, no interaction data. A new first page replaces it. It is the one stored derived value in posts, a documented exception to principle 3 (DECISIONS 2026-11-13). There is no account deletion yet; when there is, it must delete this row too, though it expires within 30 minutes anyway.
+- `feed_preferences` (#10): `userId` (unique), `interests` (catalogue ids, ≤ 20) and optional `recommendationsResetAt`. The viewer's own explicit choices, not an inferred profile: private, never on a profile or shared, used by For You only. There is no account deletion yet; when there is, it must delete this row.
 - Like and comment counts are never stored on the post; `PostEngagementService` counts rows on read (principle 3).
 - `foods.attribution`, `foods.postImportKey`: provenance and unique per-user publication/food-facts key (partial unique index). Existing documents require no backfill. `saved_meals.postImportKey` similarly makes repeat whole-meal imports idempotent. These are independent recipient-owned copies, never links into an author's tracking data.
 
@@ -138,6 +139,37 @@ feed above, unchanged. With it, `ForYouService` (`apps/api/src/posts/for-you.ser
   for 30 minutes: 1,000 concurrent viewers ≈ 15 MB. A first page reads ≤ 400 posts, ≤ 1,500 own
   interaction rows and the pool's like/comment/repost rows; later pages read ≤ 20 posts each.
   New indexes: `post_likes (userId, createdAt)` and `post_comments (userId, createdAt)`.
+
+### For You interests and reset (#10, task D)
+
+The catalogue is `FOR_YOU_INTERESTS` in `libs/shared/types/src/lib/posts.ts` (version
+`FOR_YOU_INTERESTS_VERSION`): the six diet topics plus twelve broad interests (home cooking, quick
+meals, meal prep, baking, desserts, breakfast, vegetarian, vegan, fitness, running, food on the
+road, budget eats). **An interest matches posts only through their computed topics** (#8): a diet
+interest matches its `diet:*` tag; a broad one matches a few caption hashtags (Baking →
+`#baking`, `#bread`, `#cake`). Hashtags are matched exactly after the caption parser's lowercase,
+NFC normalisation. Ids are stable; retiring one means removing it from the catalogue, and it is then
+ignored on read (never an error).
+
+- `GET /posts/for-you/preferences` → `{interests, recommendationsResetAt?}` (known ids only).
+- `PUT /posts/for-you/preferences {interests}` replaces the list (`[]` clears it). Unknown ids or
+  more than 20 → 400. Needs the For You features like the feed.
+- `POST /posts/for-you/reset` sets `recommendationsResetAt` to now and drops the current ranked
+  session, so the next first page is rebuilt without earlier likes, comments and reposts. Interests
+  are kept; the likes themselves are untouched.
+
+How they shape ranking (#9, only with `forYouRanking`): each chosen interest adds a fixed 2 to the
+topic affinity of the topics it maps to, and any interest counts as enough signal to leave the
+chronological fallback. A matching post's reason names the interest: *Matches your interest:
+Baking*. **When few or no posts match**, nothing is filtered out: interests only add to a score,
+so the rest of the pool still fills the feed by freshness and engagement, and the exploration share
+(every 5th slot, posts unrelated to the viewer's interests and history) keeps it varied. Without
+`forYouRanking` interests are stored and editable but change nothing, and the copy says so.
+
+Web: `components/for-you-preferences.tsx`. The setup step `interests-v1` (skippable, never
+blocking Home) and Settings → *For You* share the `InterestPicker` (each tap saves); Settings adds
+*Clear interests* and *Reset recommendations* (with a confirmation saying what it does and doesn't
+forget). Both appear only for accounts with For You.
 
 ## Media storage
 

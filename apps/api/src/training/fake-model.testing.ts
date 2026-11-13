@@ -147,9 +147,16 @@ export class FakeModel {
     }
   }
 
-  async updateOne(filter: Filter, update: Record<string, Record<string, unknown>>) {
+  async updateOne(filter: Filter, update: Record<string, Record<string, unknown>>, options: { upsert?: boolean } = {}) {
     const doc = this.docs.find((row) => matches(row, filter));
     if (doc) this.apply(doc, update);
+    else if (options.upsert) {
+      // Like Mongo: the filter's plain equality fields seed the new document.
+      const seeded = Object.fromEntries(Object.entries(filter).filter(([key, value]) => !key.startsWith('$') && (typeof value !== 'object' || value === null)));
+      const created = { _id: new Types.ObjectId(), createdAt: new Date(), ...seeded } as Doc;
+      this.apply(created, update);
+      this.docs.push(created);
+    }
     return { matchedCount: doc ? 1 : 0 };
   }
 

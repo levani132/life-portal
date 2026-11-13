@@ -2,6 +2,15 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-13: Choose your interests for For You
+
+- **Tell For You what you like.** Setup now has an optional step to pick a few interests, such as
+  High protein, Baking, Quick meals or Running, and you can change them anytime in Settings → For
+  You. They're private and only used for For You. With personalised ranking on, posts that match
+  rise a little, with a line saying which interest they match; other posts still fill the feed.
+- **Start For You fresh.** *Reset recommendations* in Settings makes For You forget your earlier
+  likes, comments and reposts (they stay where they are). *Clear interests* is separate.
+
 ## 2026-11-13: For You learns what you like
 
 - **For You is ordered for you.** Posts on topics and from people you like, comment on and repost

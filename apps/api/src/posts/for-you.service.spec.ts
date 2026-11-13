@@ -14,6 +14,7 @@ function fixture(options: { ranking?: boolean } = {}) {
   const likes = new FakeModel();
   const comments = new FakeModel();
   const sessions = new FakeModel();
+  const prefs = new FakeModel();
   const notInterested = new Set<string>();
   const hidden = new Set<string>();
   const unreadable = new Set<string>();
@@ -36,6 +37,7 @@ function fixture(options: { ranking?: boolean } = {}) {
     likes as never,
     comments as never,
     sessions as never,
+    prefs as never,
     feed as never,
     access as never,
     { jwtSecret: 'test-secret' } as never,
@@ -47,7 +49,7 @@ function fixture(options: { ranking?: boolean } = {}) {
   };
   const like = (userId: string, postId: string, ageMinutes = 10) =>
     likes.docs.push({ _id: new Types.ObjectId(), userId, postId, createdAt: minutesAgo(ageMinutes) });
-  return { service, posts, likes, comments, sessions, feed, access, notInterested, hidden, unreadable, add, like };
+  return { service, posts, likes, comments, sessions, prefs, feed, access, notInterested, hidden, unreadable, add, like };
 }
 
 it('serves the plain newest-first feed without forYouRanking', async () => {
@@ -152,13 +154,34 @@ it('counts each engaged member once, never the author, the viewer or someone the
   expect(counts.get(post)).toBe(2);
 });
 
-it('honours a reset and chosen interests once #10 supplies them', async () => {
+it('honours chosen interests and a reset, naming the interest in the reason (#10)', async () => {
   const f = fixture();
   for (let i = 0; i < 3; i++) f.like(ME, f.add(`liked${i}`, '#pasta', 600, { audience: 'friends' }), 120);
-  const cake = f.add('baker', '#cake', 300);
+  const bread = f.add('baker', 'sourdough #bread', 300);
   f.add('cook', '#pasta', 300);
-  jest.spyOn(f.service, 'preferences').mockResolvedValue({ resetAt: minutesAgo(60).toISOString(), interestTopicIds: ['tag:cake'] });
+  await f.service.setInterests(ME, ['baking']);
+  await f.service.resetRecommendations(ME, minutesAgo(60));
   const page = await f.service.page(ME, {}, NOW);
-  expect(page.posts[0].id).toBe(cake);
-  expect(page.posts[0].reasons?.[0].text).toBe('Matches your interest: #cake');
+  expect(page.posts[0].id).toBe(bread);
+  expect(page.posts[0].reasons?.[0].text).toBe('Matches your interest: Baking');
+  // The pasta likes were before the reset: nothing claims them.
+  expect(page.posts.some((p) => p.reasons?.some((r) => r.code === 'topic'))).toBe(false);
+});
+
+it('stores only known interests, clears them, and resets by dropping the session', async () => {
+  const f = fixture();
+  await expect(f.service.setInterests(ME, ['baking', 'astrology'])).rejects.toBeInstanceOf(BadRequestException);
+  expect(await f.service.setInterests(ME, ['vegan', 'baking', 'vegan'])).toEqual({ interests: ['baking', 'vegan'] });
+  expect(await f.service.setInterests(ME, [])).toEqual({ interests: [] });
+  f.add('a');
+  await f.service.page(ME, {}, NOW);
+  expect(f.sessions.docs).toHaveLength(1);
+  const reset = await f.service.resetRecommendations(ME, NOW);
+  expect(reset.recommendationsResetAt).toBe(NOW.toISOString());
+  expect(f.sessions.docs).toHaveLength(0);
+  expect(f.prefs.docs).toHaveLength(1);
+  // A retired id left in storage is ignored on read.
+  f.prefs.docs[0].interests = ['retired', 'baking'];
+  expect((await f.service.getPreferences(ME)).interests).toEqual(['baking']);
+  expect(f.feed.forYouGate).toHaveBeenCalledWith(ME);
 });

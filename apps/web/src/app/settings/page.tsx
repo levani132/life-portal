@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { HealthConnectionSettings } from '../../components/apple-health';
 import { HealthShortcutAdminSetting } from '../../components/health-shortcut-admin-setting';
 import { ThemePreferenceControl } from '../../components/theme-preference';
+import { ForYouSettings, hasForYou } from '../../components/for-you-preferences';
 import type {
   Currency,
   FxRatePoint,
@@ -78,6 +79,11 @@ function Settings() {
             <HealthConnectionSettings />
           </div>
         )}
+        {hasForYou(portal.data) && (
+          <div className="mb-4">
+            <ForYouSettings portal={portal.data} />
+          </div>
+        )}
         <div className="card divide-y divide-border">
           {[
             { href: '/settings/modules', label: 'Manage modules' },
@@ -127,6 +133,7 @@ function Settings() {
         <ThemePreferenceControl />
         {portal.data.access.nutrition && <HealthConnectionSettings />}
         {portal.data.cohort === 'developer' && <HealthShortcutAdminSetting />}
+        <ForYouSettings portal={portal.data} />
         <Panel
           title="Display currency"
           description="Everything is converted into this on the way out. Amounts keep the currency they were entered in."

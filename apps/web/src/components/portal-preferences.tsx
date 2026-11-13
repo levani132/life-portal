@@ -19,6 +19,7 @@ import { ErrorNote, Select, Spinner } from './ui';
 import { NutritionOnboarding } from './nutrition-onboarding';
 import { AppleHealthPanel } from './apple-health';
 import { useIsIOS } from '../lib/ios-device';
+import { InterestPicker, hasForYou, interestsCopy } from './for-you-preferences';
 
 export function PortalPreferencesPanel({
   mode,
@@ -44,12 +45,15 @@ const CARD_ID: Record<ModuleId, string> = {
   epam: 'board:epam',
   training: 'training',
 };
+const INTERESTS_STEP = SETUP_STEPS.indexOf('interests-v1');
+const READY_STEP = SETUP_STEPS.indexOf('ready');
 const STEPS = [
   'Your modules',
   'Your privacy',
   'Your Home',
   'Your food & activity',
   'Apple Health',
+  'Your interests',
   'Ready to begin',
 ];
 function PreferencesEditor({
@@ -77,7 +81,8 @@ function PreferencesEditor({
   const relevantStep = (id: string) =>
     (selected.includes('nutrition') ||
       !['nutrition-profile-v2', 'apple-health-v1'].includes(id)) &&
-    (ios || id !== 'apple-health-v1');
+    (ios || id !== 'apple-health-v1') &&
+    (id !== 'interests-v1' || hasForYou(initial));
   const visibleSteps = SETUP_STEPS.map((id, index) => ({ id, index })).filter(
     ({ id }) => relevantStep(id),
   );
@@ -202,7 +207,9 @@ function PreferencesEditor({
             ? 'Everything starts private. Choose who can see each widget on your profile and in Friends.'
             : active === 2
               ? 'Put the things you use most at the top.'
-              : 'Your portal is ready. Start with one small thing.'}
+              : active === INTERESTS_STEP
+                ? `Optional. Pick a few things you'd like to see more of. ${interestsCopy(initial.access.forYouRanking)} You can change or clear them in Settings.`
+                : 'Your portal is ready. Start with one small thing.'}
       </p>
       {error && (
         <div className="mb-4" role="alert">
@@ -334,7 +341,8 @@ function PreferencesEditor({
         )}
         {active === 3 && <NutritionOnboarding onSaved={next} />}
         {active === 4 && ios && <AppleHealthPanel setupGuide />}
-        {active === 5 && (
+        {active === INTERESTS_STEP && hasForYou(initial) && <InterestPicker />}
+        {active === READY_STEP && (
           <div className="card p-6">
             <Check className="mb-4 text-emerald-400" size={28} />
             <p className="font-medium">
@@ -363,11 +371,11 @@ function PreferencesEditor({
               Back
             </button>
           )}
-          {isSetup && step < 5 ? (
+          {isSetup && step < READY_STEP ? (
             <button className="btn btn-primary" type="button" onClick={next}>
               {pending
                 ? 'Saving…'
-                : step === 3 || step === 4
+                : step === 3 || step === 4 || step === INTERESTS_STEP
                   ? 'Skip for now / continue'
                   : 'Continue'}
             </button>
@@ -380,7 +388,7 @@ function PreferencesEditor({
               {pending ? 'Saving…' : isSetup ? 'Go to my Home' : 'Save changes'}
             </button>
           )}
-          {isSetup && step < 5 && (
+          {isSetup && step < READY_STEP && (
             <button
               className="px-2 py-3 text-sm text-ink-muted"
               type="button"

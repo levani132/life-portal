@@ -19,6 +19,7 @@ import {
 } from 'class-validator';
 import {
   AUDIENCES,
+  MAX_FOR_YOU_INTERESTS,
   MAX_POST_ITEMS,
   MAX_POST_MEDIA,
   MEAL_SLOTS,
@@ -82,6 +83,14 @@ export class UpdatePostDto {
   @IsString() @MaxLength(120) title!: string;
   @IsString() @MaxLength(1000) caption!: string;
   @IsIn(AUDIENCES) audience!: Audience;
+}
+/** `PUT /posts/for-you/preferences` (#10). Ids are checked against the catalogue in the service. */
+export class FeedPreferencesDto {
+  @IsArray()
+  @ArrayMaxSize(MAX_FOR_YOU_INTERESTS)
+  @IsString({ each: true })
+  @MaxLength(64, { each: true })
+  interests!: string[];
 }
 export class ForYouDto {
   @ValidateIf((_, v: unknown) => v !== undefined)

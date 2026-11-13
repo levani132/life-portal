@@ -99,7 +99,7 @@ export class PortalPreferencesDto implements PortalPreferences {
   @ValidateIf((_, value: unknown) => value !== undefined)
   @IsInt()
   @Min(0)
-  @Max(5)
+  @Max(SETUP_STEPS.length - 1)
   setupStep?: number;
   @ValidateIf((_, value: unknown) => value !== undefined)
   @IsBoolean()
@@ -134,11 +134,14 @@ export class PortalService {
         completedSetupSteps,
         setupDismissed: false,
       });
-    const required = SETUP_STEPS.filter(
-      (id) =>
-        (!id.startsWith('nutrition-') && !id.startsWith('apple-')) ||
-        (identity.access.nutrition &&
-          (settings.selectedModules ?? ['nutrition']).includes('nutrition')),
+    const forYou =
+      identity.access.forYou && identity.access.social && identity.access.foodPosts && identity.access.nutrition;
+    const required = SETUP_STEPS.filter((id) =>
+      id.startsWith('interests-')
+        ? forYou
+        : (!id.startsWith('nutrition-') && !id.startsWith('apple-')) ||
+          (identity.access.nutrition &&
+            (settings.selectedModules ?? ['nutrition']).includes('nutrition')),
     );
     return {
       completedSetupSteps,

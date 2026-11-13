@@ -33,3 +33,4 @@ export * from './lib/post-topics';
 export * from './lib/training-levels';
 export * from './lib/exercise-progress';
 export * from './lib/for-you-ranking';
+export * from './lib/for-you-interests';

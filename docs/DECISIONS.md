@@ -1228,6 +1228,17 @@ prolific poster filling the page until #3 ranks properly. Its cursor is keyed se
 Wall's so positions are never interchangeable. The `forYou` flag stays off for production until
 image moderation exists (roadmap launch gate).
 
+## 2026-11-13: For You interests match published topics only
+
+Issue #10 (owner decisions). Interests are explicit, private choices stored in `feed_preferences`,
+never an inferred profile and never health attributes. A broad interest is defined by the post
+topics it matches (#8): diet tags, or a few caption hashtags. That keeps the promise honest (an
+interest can only lift posts that actually say they're about it) and means the catalogue can grow
+without touching ranking. Interests only add to a score; they never filter, so a thin interest
+cannot empty the feed. *Clear interests* and *Reset recommendations* are separate: one forgets what
+you chose, the other what you did. The setup step is optional for existing members, offered through
+the existing setup continuation, and never blocks Home.
+
 ## 2026-11-13: For You ranking v1 stores a short-lived order, and reads no nutrition
 
 Issue #9 (owner decisions on the review). Ranking is derived on read like everything else, but a

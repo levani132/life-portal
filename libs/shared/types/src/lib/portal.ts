@@ -103,6 +103,8 @@ export const SETUP_STEPS = [
   'home',
   'nutrition-profile-v2',
   'apple-health-v1',
+  /** Optional For You interests (#10); only for accounts with For You. */
+  'interests-v1',
   'ready',
 ] as const;
 export type SetupStep = (typeof SETUP_STEPS)[number];
