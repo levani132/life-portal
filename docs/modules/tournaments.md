@@ -83,10 +83,14 @@ tournamentScore  = best × (1 + improvementBonus)
   rounding never grants a bonus. The score is rounded to a whole rank-score unit (0.001× body
   weight). Examples: +3% gives +1%; +15% or more gives +5%; getting weaker gives no penalty and no
   bonus.
-- **Standards.** Scores use the benchmark version frozen at the lock (`lockedVersion`). If that
-  draft was replaced, the current version scores the season and the bonus is **withheld**
-  (`bonusWithheld: 'standards_changed'`): a baseline under other standards can't be compared
-  fairly.
+- **Standards.** One scoring standard per season, copied at the lock (#5). Each entry stores
+  `lockedStandard` (version, method, measure, both categories' tier starts, machine) next to
+  `lockedVersion`; every entry of a lock gets the same version, because they all rank on the day
+  before the season. The baseline and every later score use that copy (`tournamentStandard`), and
+  sets are read under its measure, so a new release candidate, a replaced draft or a catalogue
+  measure change never switches a season mid-way. Only an entry locked before copies were kept
+  (none exist: the flag has been off) falls back to its version name; if that draft is gone, the
+  current version scores and the bonus is **withheld** (`bonusWithheld: 'standards_changed'`).
 - **Places.** Descending tournament score within the group (`placeStandings`). Exactly equal
   scores share a place (1, 1, 3), with no tie-break by volume or workouts. A member without a
   valid set this season has no score and no place, and is listed last.
@@ -138,7 +142,7 @@ tournamentScore  = best × (1 + improvementBonus)
 
 | Collection | Holds |
 |---|---|
-| `tournament_entries` | userId, exerciseId, season, category, consentVersion; at the lock `outcome` (`grouped`/`no_tournament`/`not_ranked`), `groupId`, the frozen rank and `lockedBaseline`; `voidedAt`/`voidReason`. Unique per user, exercise and season |
+| `tournament_entries` | userId, exerciseId, season, category, consentVersion; at the lock `outcome` (`grouped`/`no_tournament`/`not_ranked`), `groupId`, the frozen rank, `lockedBaseline` and `lockedStandard`; `voidedAt`/`voidReason`. Unique per user, exercise and season |
 | `tournament_groups` | season, exercise, category, index, milestone range, `memberIds`; after grace `finalizedAt` and `results` (each member's frozen score breakdown) |
 | `tournament_locks` | who is forming one exercise-and-category's groups, and when it finished |
 

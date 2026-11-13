@@ -2,7 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import type { ExerciseRankView, Measure, RankStandards, SetType } from '@life-portal/shared-types';
-import { bestStrength, bodyWeightOn, exerciseRank, tournamentStandard, type RankSet, type StrengthBest } from '@life-portal/shared-domain';
+import {
+  bestStrength,
+  bodyWeightOn,
+  exerciseRank,
+  freezeStandard,
+  tournamentStandard,
+  type FrozenStandard,
+  type RankSet,
+  type StrengthBest,
+} from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
 import { NutritionService } from '../nutrition/nutrition.service';
 import { CatalogueService } from './catalogue.service';
@@ -70,9 +79,10 @@ export class TrainingRankService {
 
   /**
    * For tournament scoring (#12): the best valid strength score (no work-capacity bonus) among a
-   * member's sets dated `from`–`to` and saved before `savedBefore`, under the benchmark version
-   * frozen at the lock (`version`), or today's when that version no longer exists (`changed`).
-   * No feature check, as for `rankFor`.
+   * member's sets dated `from`–`to` and saved before `savedBefore`, under the standard frozen at
+   * the lock (`locked`: its copy, or for older entries its version name, or today's when that
+   * version no longer exists: `changed`). Returns the copy it scored under, which the lock stores.
+   * Sets are read under the frozen standard's measure. No feature check, as for `rankFor`.
    */
   async strengthBest(
     userId: string,
@@ -80,16 +90,21 @@ export class TrainingRankService {
     standards: RankStandards,
     window: { from: string; to: string },
     savedBefore: Date,
-    version: string | undefined,
+    locked: string | FrozenStandard | undefined,
     today: string,
-  ): Promise<{ best?: StrengthBest; version?: string; changed: boolean }> {
+  ): Promise<{ best?: StrengthBest; version?: string; standard?: FrozenStandard; changed: boolean }> {
     const exercise = await this.catalogue.readable(userId, exerciseId, { includeArchived: true });
     const measure = exercise.measure as Measure;
-    const scoring = tournamentStandard(exercise.userId ? undefined : exercise.seedKey, measure, version, today);
+    const scoring = tournamentStandard(exercise.userId ? undefined : exercise.seedKey, measure, locked, today);
     if (!scoring) return { changed: false };
-    const sets = await this.load(userId, exerciseId, measure, window.to, savedBefore);
+    const sets = await this.load(userId, exerciseId, scoring.standard.measure, window.to, savedBefore);
     const best = bestStrength(scoring.standard, standards, sets, window.from, window.to);
-    return { ...(best ? { best } : {}), version: scoring.version, changed: scoring.changed };
+    return {
+      ...(best ? { best } : {}),
+      version: scoring.version,
+      standard: freezeStandard(scoring.version, scoring.standard),
+      changed: scoring.changed,
+    };
   }
 
   /** The caller's sets of one exercise under its current measure, in finished sessions up to today. */

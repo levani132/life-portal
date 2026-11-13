@@ -36,6 +36,7 @@ import {
   seasonDayAt,
   seasonPhase,
   tournamentScore,
+  type FrozenStandard,
   type Season,
   type TournamentEntrant,
 } from '@life-portal/shared-domain';
@@ -264,7 +265,7 @@ export class TournamentsService implements OnModuleInit {
         row.category as TournamentCategory,
         { from: windows.seasonFrom, to: windows.seasonTo },
         target.finalizesAt,
-        row.lockedVersion,
+        row.lockedStandard ?? row.lockedVersion,
         seasonDayAt(now),
       )
       .catch(() => undefined);
@@ -391,7 +392,7 @@ export class TournamentsService implements OnModuleInit {
     const lockDay = addDays(target.firstDay, -1);
     const entrants: TournamentEntrant[] = [];
     const notRanked: EntryRow[] = [];
-    const locked = new Map<string, { milestone: number; score: number; version: string; baseline: number }>();
+    const locked = new Map<string, { milestone: number; score: number; version: string; baseline: number; standard: FrozenStandard }>();
     const windows = scoringWindows(target);
     for (const row of rows) {
       const result = await this.ranks
@@ -407,12 +408,12 @@ export class TournamentsService implements OnModuleInit {
               .strengthBest(row.userId, exerciseId, category, { from: windows.baselineFrom, to: windows.baselineTo }, target.locksAt, version, lockDay)
               .catch(() => undefined)
           : undefined;
-      if (!current || !version || !baseline?.best) {
+      if (!current || !version || !baseline?.best || !baseline.standard) {
         notRanked.push(row);
         continue;
       }
       entrants.push({ userId: row.userId, milestone: current.milestone, score: current.score });
-      locked.set(row.userId, { milestone: current.milestone, score: current.score, version, baseline: baseline.best.score });
+      locked.set(row.userId, { milestone: current.milestone, score: current.score, version, baseline: baseline.best.score, standard: baseline.standard });
     }
     const { groups, unmatched } = matchEntrants(entrants);
     // A retaken claim starts over, so a half-finished earlier attempt leaves nothing behind.
@@ -433,7 +434,13 @@ export class TournamentsService implements OnModuleInit {
     const snapshot = (userId: string) => {
       const rank = locked.get(userId);
       return rank
-        ? { lockedMilestone: rank.milestone, lockedScore: rank.score, lockedVersion: rank.version, lockedBaseline: rank.baseline }
+        ? {
+            lockedMilestone: rank.milestone,
+            lockedScore: rank.score,
+            lockedVersion: rank.version,
+            lockedBaseline: rank.baseline,
+            lockedStandard: rank.standard,
+          }
         : {};
     };
     for (const { userId, groupId } of assigned) {

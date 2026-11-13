@@ -201,10 +201,16 @@ by the API, the form and the tests). Fields that do not apply are rejected, not 
 | Measure | Required | Also allowed |
 | --- | --- | --- |
 | `weight_reps` | reps, weightGrams | |
-| `bodyweight_reps` | reps | weightGrams (added load) |
+| `bodyweight_reps` | reps | weightGrams (added load) **or** assistGrams (machine assistance), never both |
 | `assisted_reps` | reps, assistGrams | |
 | `duration` | durationSeconds | weightGrams |
 | `distance_duration` | distanceMeters, durationSeconds | |
+
+A body-weight set is body weight plus a **signed external load** (#5): added weight, assistance,
+or neither (weight 0 is the same as none). Both at once is refused ("Use added weight or
+assistance, not both."), for sets and for plan targets alike; switching an assisted set to added
+weight clears `assistGrams` in the same edit. Older body-weight sets carry no assistance and read
+exactly as before.
 
 Limits (`SET_LIMITS`): reps 1–1000, weight 0–1,000,000 g, assistance 1–500,000 g, time
 1–86,400 s, distance 1–1,000,000 m.
@@ -223,7 +229,17 @@ has no job runner. It costs one count query when the stored rows already carry t
 deletes. **To change the catalogue, edit the file and bump `version`.**
 
 Mapping (`catalogueMeasure`): cardio → distance and time; stretching or a static hold → time;
-no equipment or "body only" → bodyweight reps; everything else → weight × reps.
+no equipment or "body only" → bodyweight reps; the 16 pulls and dips in
+`BODYWEIGHT_CATALOGUE_IDS` (weighted pull-ups, bar and ring dips, muscle-ups, suspended rows…,
+tagged "other" in the dataset) → bodyweight reps; everything else → weight × reps.
+
+**Catalogue v2 (#5)** moved those 16 from weight × reps to bodyweight reps. Shared rows are
+updated in place on the next boot (same `_id`, so logged sets still point at them). A workout
+exercise keeps the measure in its snapshot, so sets logged before v2 stay weight only: they read,
+edit and validate as logged, are never reinterpreted as added load, and are left out of the new
+measure's history, records, ranks and tournaments. The progress view returns
+`earlierMeasureSets` and the statistics page says how many were left out. Plan targets are not
+snapshotted: a planned weight on one of these exercises now reads as added load.
 
 `CatalogueService` does not extend `OwnedCrudService`: its `scoped()` would hide shared rows.
 `visible()` is the one place the shared-or-own filter is written; writes go through `own()`
@@ -319,7 +335,7 @@ Nothing is stored, so correcting or deleting a set moves every figure at once.
   set `order`: not by `loggedAt`, because a set added to an old workout later still happened
   then. Only sets whose workout exercise's snapshot has the exercise's current measure count.
 - **Effective load** (`effectiveLoadGrams`): weight × reps → the weight; bodyweight reps → body
-  weight + added load; assisted → body weight − assistance, floored at 0; none for timed or
+  weight + added load − assistance, floored at 0; assisted → body weight − assistance, floored at 0; none for timed or
   distance work. Body weight is the weigh-in **on or before** the session's day
   (`bodyWeightOn`), read from `NutritionService.weighInsUpTo` (Training never reads `weigh_ins`).
   Without a weigh-in a bodyweight set has no load, so no volume, heaviest or 1RM: no figure
@@ -449,7 +465,7 @@ weigh-in. A set more than 1.5× where Legend starts is taken as a logging error 
 (`excluded.implausible`). Only the exact catalogue rows below (by `seedKey`) are ranked; own
 exercises and everything else say so (`no_benchmark`). Units don't matter: everything is grams.
 
-**Coverage and thresholds (v1-draft-3).** 280 catalogue exercises, each with its load convention
+**Coverage and thresholds (v1-rc1).** 287 catalogue exercises, each with its load convention
 and evidence label. Isolation, dumbbell, kettlebell, machine, cable and endurance standards are
 **provisional**: ratios to a main lift, not tables of their own, and the UI says so. The full table
 and the reasons for each excluded group are in [rank-standards.md](rank-standards.md). The main
@@ -558,7 +574,7 @@ lost by changing the data it came from, never by a benchmark change.
 **Benchmarks and versions.** `RANK_BENCHMARKS` lists every version with the day it starts
 applying. Stable by default: a version that is not a draft is never edited; any recalibration is a
 new version with a later `from`, reviewed and manual, and earlier sets keep the version of their
-day. **v1 is a draft** (`v1-draft-3`, applies to all history; it replaced `v1-draft-2`, which replaced `v1-draft`): the thresholds are the app's
+day. **v1 is a draft** (`v1-rc1`, release candidate 1, applies to all history; it replaced `v1-draft-3`, `v1-draft-2` and `v1-draft`): the thresholds are the app's
 proposal for owner review, not measured from LifePortal members and not competition records, and
 the UI says so. Draft values may change before v1 is fixed, and ranks shown under the draft
 change with them; this is the one exception to the stability rule and ends when v1 is frozen.

@@ -123,6 +123,8 @@ describe('describeTarget', () => {
     expect(describeTarget('weight_reps', working({ reps: 8, repsMax: 12 }))).toBe('8–12 reps');
     expect(describeTarget('weight_reps', working({ reps: 5, weightGrams: 60_000 }))).toBe('60 kg × 5');
     expect(describeTarget('bodyweight_reps', working({ reps: 8, weightGrams: 10_000 }))).toBe('+10 kg × 8');
+    expect(describeTarget('bodyweight_reps', working({ reps: 8, assistGrams: 15_000 }))).toBe('−15 kg × 8');
+    expect(describeTarget('bodyweight_reps', working({ reps: 8, weightGrams: 0 }))).toBe('8 reps');
     expect(describeTarget('assisted_reps', working({ reps: 6, repsMax: 8, assistGrams: 20_000 }))).toBe('−20 kg × 6–8');
     expect(describeTarget('duration', working({ durationSeconds: 45 }))).toBe('0:45');
     expect(describeTarget('distance_duration', working({ distanceMeters: 1000, durationSeconds: 300 }))).toBe('1 km in 5:00');
@@ -244,5 +246,15 @@ describe('validatePlan: supersets (spec 025)', () => {
   });
   it('refuses any other key, naming the field', () => {
     expect(validatePlan(plan('a b'), () => 'weight_reps').map((p) => p.path)).toEqual(['workouts.0.exercises.0.superset']);
+  });
+});
+
+describe('validatePlanTarget: body weight with a signed load (#5)', () => {
+  it('takes added weight or assistance on a body-weight exercise, not both', () => {
+    expect(validatePlanTarget('bodyweight_reps', working({ reps: 5, weightGrams: 20_000 }))).toBeNull();
+    expect(validatePlanTarget('bodyweight_reps', working({ reps: 5, assistGrams: 20_000 }))).toBeNull();
+    expect(validatePlanTarget('bodyweight_reps', working({ reps: 5, weightGrams: 20_000, assistGrams: 10_000 }))).toBe(
+      'Use added weight or assistance, not both.',
+    );
   });
 });

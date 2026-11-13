@@ -583,3 +583,58 @@ describe('SessionsService: plan workouts (spec 023)', () => {
     expect(session.exercises).toEqual([]);
   });
 });
+
+describe('Body weight with a signed external load (#5)', () => {
+  it('logs, reads and edits added weight, assistance and zero added load on a body-weight exercise', async () => {
+    const f = fixture();
+    f.weighIns.push({ day: '2026-11-01', weightGrams: 80_000 });
+    const session = await f.service.start(ME, { requestId: randomUUID(), day: '2026-11-12' }, T0);
+    const pull = await f.service.addExercise(ME, session.id, { requestId: randomUUID(), exerciseId: f.pullUp });
+    const add = (input: Record<string, unknown>) => f.service.addSet(ME, session.id, pull.id, { requestId: randomUUID(), ...input }, T0);
+    expect((await add({ reps: 5, weightGrams: 20_000 })).set.effectiveLoad?.grams).toBe(100_000);
+    const assisted = await add({ reps: 8, assistGrams: 30_000 });
+    expect(assisted.set).toMatchObject({ assistGrams: 30_000, effectiveLoad: { grams: 50_000 } });
+    expect((await add({ reps: 3, weightGrams: 0 })).set.effectiveLoad?.grams).toBe(80_000);
+    await expect(add({ reps: 3, weightGrams: 5_000, assistGrams: 5_000 })).rejects.toThrow('Use added weight or assistance, not both.');
+    // Switching an assisted set to added weight needs the assistance cleared in the same edit.
+    await expect(f.service.updateSet(ME, assisted.set.id, { weightGrams: 10_000 })).rejects.toThrow('not both');
+    const switched = await f.service.updateSet(ME, assisted.set.id, { weightGrams: 10_000, assistGrams: null });
+    expect(switched.set).toMatchObject({ weightGrams: 10_000, effectiveLoad: { grams: 90_000 } });
+    expect(switched.set.assistGrams).toBeUndefined();
+  });
+
+  it('keeps sets logged as weight only before the measure changed: unchanged, editable as before, counted apart', async () => {
+    const f = fixture();
+    f.weighIns.push({ day: '2026-11-01', weightGrams: 80_000 });
+    const weighted = new Types.ObjectId();
+    f.exercises.docs.push({ _id: weighted, name: 'Weighted Pull Ups', searchName: 'weighted pull ups', primaryMuscles: ['lats'], secondaryMuscles: [], equipmentType: 'other', measure: 'weight_reps', seedKey: 'fedb:Weighted_Pull_Ups', archived: false, aliases: [] });
+    const id = String(weighted);
+    const old = await f.service.start(ME, { requestId: randomUUID(), day: '2026-10-01' }, T0);
+    const oldEx = await f.service.addExercise(ME, old.id, { requestId: randomUUID(), exerciseId: id });
+    const legacy = await f.service.addSet(ME, old.id, oldEx.id, { requestId: randomUUID(), reps: 5, weightGrams: 20_000 }, T0);
+    await f.service.finish(ME, old.id, 'now', min(30));
+
+    // Catalogue v2: the shared row becomes body weight plus a signed load.
+    (f.exercises.docs.find((doc) => String(doc['_id']) === id) as Record<string, unknown>)['measure'] = 'bodyweight_reps';
+
+    const fresh = await f.service.start(ME, { requestId: randomUUID(), day: '2026-11-12' }, min(60));
+    const freshEx = await f.service.addExercise(ME, fresh.id, { requestId: randomUUID(), exerciseId: id });
+    const now = await f.service.addSet(ME, fresh.id, freshEx.id, { requestId: randomUUID(), reps: 5, weightGrams: 20_000 }, min(61));
+    expect(now.set.effectiveLoad?.grams).toBe(100_000);
+
+    // The old set reads and edits exactly as logged: weight only, no body weight, no assistance.
+    const oldDetail = await f.service.detail(ME, old.id);
+    expect(oldDetail.exercises[0].snapshot.measure).toBe('weight_reps');
+    expect(oldDetail.exercises[0].sets[0]).toMatchObject({ weightGrams: 20_000 });
+    expect(oldDetail.exercises[0].sets[0].effectiveLoad).toBeUndefined();
+    await expect(f.service.updateSet(ME, legacy.set.id, { assistGrams: 5_000 })).rejects.toThrow('does not apply');
+    expect((await f.service.updateSet(ME, legacy.set.id, { reps: 6 })).set).toMatchObject({ reps: 6, weightGrams: 20_000 });
+
+    // History, records and the progress view count the new measure only, and say how many were left out.
+    const history = await f.progress.history(ME, id);
+    expect(history.sessions.map((s) => s.sessionId)).toEqual([fresh.id]);
+    const view = await f.progress.progressView(ME, id, 'all', '2026-11-13');
+    expect(view).toMatchObject({ totalSessions: 1, earlierMeasureSets: 1 });
+    expect((await f.progress.progressView(ME, f.pullUp, 'all', '2026-11-13')).earlierMeasureSets).toBeUndefined();
+  });
+});

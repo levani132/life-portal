@@ -41,6 +41,20 @@ describe('CatalogueSeeder', () => {
     expect(exercises.docs[0]).toMatchObject({ name: 'Back Squat', seedVersion: 2 });
   });
 
+  it('moves weighted pull-ups and dips to body weight in catalogue v2, keeping the row (#5)', async () => {
+    const exercises = new FakeModel();
+    const seeder = new CatalogueSeeder(exercises as never);
+    const pull = { id: 'Weighted_Pull_Ups', name: 'Weighted Pull Ups', force: 'pull', level: 'intermediate', mechanic: 'compound', equipment: 'other', primaryMuscles: ['lats'], secondaryMuscles: [], category: 'strength' };
+    const sled = { ...pull, id: 'Sled_Row', name: 'Sled Row' };
+    // A row as version 1 wrote it.
+    exercises.docs.push({ _id: new Types.ObjectId(), seedKey: 'fedb:Weighted_Pull_Ups', seedVersion: 1, measure: 'weight_reps', archived: false });
+    const id = exercises.docs[0]['_id'];
+    await seeder.seed({ version: 2, source: 'test', exercises: [pull, sled] });
+    expect(exercises.docs.find((doc) => doc['seedKey'] === 'fedb:Weighted_Pull_Ups')).toMatchObject({ _id: id, measure: 'bodyweight_reps', seedVersion: 2 });
+    expect(exercises.docs.find((doc) => doc['seedKey'] === 'fedb:Sled_Row')).toMatchObject({ measure: 'weight_reps' });
+    expect((catalogueFile as CatalogueFile).version).toBeGreaterThanOrEqual(2);
+  });
+
   it('keeps facts only and drops duplicated muscles', () => {
     const row = catalogueRow(file.exercises[0], 1);
     expect(row).not.toHaveProperty('instructions');

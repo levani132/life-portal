@@ -427,3 +427,41 @@ describe('weekSummary', () => {
     expect(summary.workoutsThisWeek).toBe(2);
   });
 });
+
+describe('body weight with a signed external load (#5)', () => {
+  const body = { day: '2026-11-01', weightGrams: 80_000 };
+
+  it('accepts added weight, assistance, zero added load or neither, never both', () => {
+    expect(validateSetValues('bodyweight_reps', { reps: 5, weightGrams: 20_000 })).toBeNull();
+    expect(validateSetValues('bodyweight_reps', { reps: 5, assistGrams: 25_000 })).toBeNull();
+    expect(validateSetValues('bodyweight_reps', { reps: 5, weightGrams: 0 })).toBeNull();
+    expect(validateSetValues('bodyweight_reps', { reps: 5 })).toBeNull();
+    expect(validateSetValues('bodyweight_reps', { reps: 5, weightGrams: 0, assistGrams: 10_000 })).toBeNull();
+    expect(validateSetValues('bodyweight_reps', { reps: 5, weightGrams: 5_000, assistGrams: 10_000 })).toBe(
+      'Use added weight or assistance, not both.',
+    );
+  });
+
+  it('adds weight, subtracts assistance, and never goes below zero', () => {
+    expect(effectiveLoadGrams('bodyweight_reps', { reps: 5, weightGrams: 20_000 }, body)?.grams).toBe(100_000);
+    expect(effectiveLoadGrams('bodyweight_reps', { reps: 5, assistGrams: 25_000 }, body)?.grams).toBe(55_000);
+    expect(effectiveLoadGrams('bodyweight_reps', { reps: 5, weightGrams: 0 }, body)?.grams).toBe(80_000);
+    expect(effectiveLoadGrams('bodyweight_reps', { reps: 5 }, body)?.grams).toBe(80_000);
+    expect(effectiveLoadGrams('bodyweight_reps', { reps: 5, assistGrams: 90_000 }, body)?.grams).toBe(0);
+    expect(effectiveLoadGrams('bodyweight_reps', { reps: 5, weightGrams: 20_000 }, undefined)).toBeUndefined();
+  });
+
+  it('leaves weight × reps exactly as it was: the weight is the load, body weight is not added', () => {
+    expect(effectiveLoadGrams('weight_reps', { reps: 5, weightGrams: 20_000 }, body)).toEqual({ grams: 20_000 });
+  });
+
+  it('measures the weighted pull-ups, dips and suspended rows as body weight, and only those "other" entries', () => {
+    const other = { category: 'strength', equipment: 'other', force: 'pull' };
+    for (const id of ['Weighted_Pull_Ups', 'Parallel_Bar_Dip', 'Ring_Dips', 'Muscle_Up', 'Suspended_Row', 'Dips_-_Chest_Version']) {
+      expect([id, catalogueMeasure({ ...other, id })]).toEqual([id, 'bodyweight_reps']);
+    }
+    expect(catalogueMeasure({ ...other, id: 'Sled_Row' })).toBe('weight_reps');
+    expect(catalogueMeasure({ ...other, id: 'Some_Other_Thing' })).toBe('weight_reps');
+    expect(catalogueMeasure(other)).toBe('weight_reps');
+  });
+});

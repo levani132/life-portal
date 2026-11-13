@@ -92,7 +92,11 @@ export function describeSet(set: SetValues, measure: Measure, unit: WeightUnit =
     case 'weight_reps':
       return `${w(set.weightGrams ?? 0)} × ${set.reps ?? 0}`;
     case 'bodyweight_reps':
-      return set.weightGrams ? `+${w(set.weightGrams)} × ${set.reps}` : `${set.reps} reps`;
+      return set.weightGrams
+        ? `+${w(set.weightGrams)} × ${set.reps}`
+        : set.assistGrams
+          ? `−${w(set.assistGrams)} × ${set.reps}`
+          : `${set.reps} reps`;
     case 'assisted_reps':
       return `−${w(set.assistGrams ?? 0)} × ${set.reps ?? 0}`;
     case 'duration':

@@ -114,3 +114,11 @@ it('labels a provisional standard visibly and explains its limits', () => {
   expect(screen.getByText(/estimated from the main lifts by typical ratios/)).toBeTruthy();
   expect(screen.getByText('The weight of one dumbbell.')).toBeTruthy();
 });
+
+it('says plainly that a machine rank is a personal benchmark, not comparable across gyms', () => {
+  responses['/portal'] = access(true);
+  responses[RANK_URL] = view({ benchmark: { ...benchmark, machine: true } });
+  render(<StrengthRank exerciseId="e1" today="2026-11-13" />);
+  expect(screen.getByText('Machine rank: a rough personal benchmark, not comparable across gyms.')).toBeTruthy();
+  expect(screen.getByText(/stack ratios, cams/)).toBeTruthy();
+});

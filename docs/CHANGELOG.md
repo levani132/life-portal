@@ -2,6 +2,19 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-13: Weighted pull-ups and dips count your body weight
+
+- **Weighted pull-ups, bar and ring dips, suspended rows and similar** now count your body weight
+  plus what you add, like Pullups. Enter only the weight you add.
+- **Assistance works on body-weight exercises.** On a pull-up or dip you can enter the assistance
+  a machine gives you instead of added weight, and it counts for progress and ranks.
+- **Nothing you logged before changes.** Sets logged as weight only on these exercises stay as
+  they were in their workouts. The statistics page says how many were logged that way and
+  leaves them out of its figures.
+- **Machine ranks say they are personal benchmarks.** They are not comparable across gyms.
+- **Rank standards are now release candidate 1.** Small isolation lifts such as raises and
+  kickbacks were too strict at the top and have been widened. Ranks are still behind a flag.
+
 ## 2026-11-13: Strength ranks for 280 exercises (draft standards)
 
 - **Most lifts you log now have a rank**: curls, raises, triceps work, flyes, lunges, calf

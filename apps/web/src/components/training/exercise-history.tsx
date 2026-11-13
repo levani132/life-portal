@@ -84,9 +84,18 @@ export function ExerciseHistory({ exerciseId }: { exerciseId: string }) {
   if (progress.error) return <ErrorNote message={(progress.error as Error).message} />;
   if (!progress.data) return <Spinner />;
   const view = progress.data;
-  if (!view.totalSessions) return <EmptyState message="Not done yet. Log it in a workout and it shows up here." />;
+  const earlier = view.earlierMeasureSets ? <EarlierSetsNote count={view.earlierMeasureSets} /> : null;
+  if (!view.totalSessions) {
+    return (
+      <div className="space-y-3">
+        <EmptyState message="Not done yet. Log it in a workout and it shows up here." />
+        {earlier}
+      </div>
+    );
+  }
   return (
     <div className="space-y-4">
+      {earlier}
       <KeyFigures view={view} unit={unit} />
       <StrengthRank exerciseId={exerciseId} today={today} />
       <TournamentPanel exerciseId={exerciseId} today={today} />
@@ -96,6 +105,19 @@ export function ExerciseHistory({ exerciseId }: { exerciseId: string }) {
       <Sessions exerciseId={exerciseId} measure={view.exercise.measure} />
       <TrainingLevelLink today={today} />
     </div>
+  );
+}
+
+/**
+ * Sets logged under an older measure (#5: weighted pull-ups and dips used to be weight only)
+ * are kept exactly as logged; they are left out of these figures rather than reinterpreted.
+ */
+function EarlierSetsNote({ count }: { count: number }) {
+  return (
+    <p className="rounded-xl border border-border p-3 text-xs text-ink-faint">
+      {count === 1 ? '1 earlier set was' : `${count} earlier sets were`} logged as weight only, before this exercise
+      counted your body weight. They stay in their workouts as logged and are not counted here.
+    </p>
   );
 }
 

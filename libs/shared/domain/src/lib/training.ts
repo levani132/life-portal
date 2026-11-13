@@ -31,8 +31,10 @@ export interface SetFieldRule {
 
 const SET_FIELD_RULES: Record<Measure, SetFieldRule> = {
   weight_reps: { allowed: ['reps', 'weightGrams'], required: ['reps', 'weightGrams'] },
-  // The weight is optional added load (a belt, a vest).
-  bodyweight_reps: { allowed: ['reps', 'weightGrams'], required: ['reps'] },
+  // Body weight plus a signed external load: optional added weight (a belt, a vest) or optional
+  // assistance (a band, a machine), never both. Older sets carry neither or only added weight,
+  // and read exactly as before (#5).
+  bodyweight_reps: { allowed: ['reps', 'weightGrams', 'assistGrams'], required: ['reps'] },
   assisted_reps: { allowed: ['reps', 'assistGrams'], required: ['reps', 'assistGrams'] },
   // The weight is optional (a loaded carry for time).
   duration: { allowed: ['durationSeconds', 'weightGrams'], required: ['durationSeconds'] },
@@ -89,6 +91,9 @@ export function validateSetValues(
     if (value < min || value > max) {
       return `${FIELD_LABELS[field]} must be between ${min} and ${max}.`;
     }
+  }
+  if (measure === 'bodyweight_reps' && values.weightGrams && values.assistGrams) {
+    return 'Use added weight or assistance, not both.';
   }
   return null;
 }
@@ -182,15 +187,44 @@ export function catalogueMuscles(names: string[]): Muscle[] {
 }
 
 /**
+ * Dataset exercises tagged equipment "other" that move the lifter's own body: pull-ups, dips,
+ * muscle-ups and suspended rows. Logged as weight only they ignored body weight, so a weighted
+ * pull-up could not be ranked or compared (#5). They are body weight plus a signed external load
+ * (added weight or assistance). Sets logged before the change keep the measure in their snapshot
+ * and are never reinterpreted. Sled_Row is the one "other" pull that stays weight × reps: the
+ * sled, not the body, is the load.
+ */
+export const BODYWEIGHT_CATALOGUE_IDS: ReadonlySet<string> = new Set([
+  'Bodyweight_Mid_Row',
+  'Dips_-_Chest_Version',
+  'Gironda_Sternum_Chins',
+  'Inverted_Row_with_Straps',
+  'Kipping_Muscle_Up',
+  'Mixed_Grip_Chin',
+  'Muscle_Up',
+  'One_Arm_Chin-Up',
+  'Parallel_Bar_Dip',
+  'Ring_Dips',
+  'Rocky_Pull-Ups_Pulldowns',
+  'Side_To_Side_Chins',
+  'Suspended_Push-Up',
+  'Suspended_Row',
+  'Weighted_Bench_Dip',
+  'Weighted_Pull_Ups',
+]);
+
+/**
  * How a dataset exercise is measured (research R2): cardio is distance and time, stretches and
  * static holds are time, movements without equipment are bodyweight reps, the rest weight × reps.
+ * `BODYWEIGHT_CATALOGUE_IDS` are bodyweight reps whatever their equipment tag.
  */
 export function catalogueMeasure(
-  entry: Pick<CatalogueEntry, 'category' | 'equipment' | 'force'>,
+  entry: Pick<CatalogueEntry, 'category' | 'equipment' | 'force'> & { id?: string },
 ): Measure {
   if (entry.category === 'cardio') return 'distance_duration';
   if (entry.category === 'stretching' || entry.force === 'static') return 'duration';
   if (entry.equipment === 'body only' || entry.equipment === null) return 'bodyweight_reps';
+  if (entry.id && BODYWEIGHT_CATALOGUE_IDS.has(entry.id)) return 'bodyweight_reps';
   return 'weight_reps';
 }
 
@@ -238,7 +272,10 @@ export function effectiveLoadGrams(
     case 'weight_reps':
       return set.weightGrams === undefined ? undefined : { grams: set.weightGrams };
     case 'bodyweight_reps':
-      return body ? { grams: body.weightGrams + (set.weightGrams ?? 0), bodyWeightDay: body.day } : undefined;
+      // Body weight plus added load, or minus assistance (never below zero).
+      return body
+        ? { grams: Math.max(0, body.weightGrams + (set.weightGrams ?? 0) - (set.assistGrams ?? 0)), bodyWeightDay: body.day }
+        : undefined;
     case 'assisted_reps':
       return body
         ? { grams: Math.max(0, body.weightGrams - (set.assistGrams ?? 0)), bodyWeightDay: body.day }

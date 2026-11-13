@@ -1,6 +1,7 @@
 import type { BenchmarkVersion, ExerciseStandard, RankSet } from './strength-ranks';
 import {
   bestStrength,
+  freezeStandard,
   placeStandings,
   scoringWindows,
   tournamentScore,
@@ -105,6 +106,23 @@ describe('scoring windows and standards', () => {
     expect(tournamentStandard('bench', 'weight_reps', 'gone', '2026-12-20', versions)).toMatchObject({ version: 'b', changed: true });
     expect(tournamentStandard('bench', 'bodyweight_reps', 'a', '2026-12-20', versions)).toBeUndefined();
     expect(tournamentStandard(undefined, 'weight_reps', 'a', '2026-12-20', versions)).toBeUndefined();
+  });
+
+  it('scores a season under its copy from the lock, unchanged by any later version or measure (#5)', () => {
+    const frozen = freezeStandard('a', { ...STANDARD, note: 'not scoring', provisional: true });
+    expect(frozen).toEqual({ version: 'a', method: STANDARD.method, measure: STANDARD.measure, starts: STANDARD.starts });
+    const replaced: BenchmarkVersion[] = [{ version: 'b', draft: true, from: '0000-01-01', basis: '', exercises: { bench: { ...STANDARD, starts: { men: STANDARD.starts.men.map((x) => x * 2), women: STANDARD.starts.women } } } }];
+    // The copy wins over the published versions, and even over a changed logging measure.
+    expect(tournamentStandard('bench', 'bodyweight_reps', frozen, '2026-12-20', replaced)).toEqual({
+      standard: { method: STANDARD.method, measure: STANDARD.measure, starts: STANDARD.starts },
+      version: 'a',
+      changed: false,
+    });
+    // Mutating the source after the copy changes nothing.
+    const source = { ...STANDARD, starts: { men: [...STANDARD.starts.men], women: [...STANDARD.starts.women] } };
+    const copy = freezeStandard('a', source);
+    source.starts.men[1] = 1;
+    expect(copy.starts.men[1]).toBe(STANDARD.starts.men[1]);
   });
 });
 

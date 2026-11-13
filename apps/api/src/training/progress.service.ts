@@ -52,6 +52,11 @@ export interface ExerciseProgress {
   rows: Map<string, SetRow>;
   sessions: Map<string, { day: string; startedAt: Date }>;
   marks: Map<string, RecordKind[]>;
+  /**
+   * Sets of this exercise logged under another measure (the catalogue changed how it is logged).
+   * They stay in their workouts as logged, and are not counted here.
+   */
+  otherMeasureSets: number;
 }
 
 /**
@@ -142,6 +147,13 @@ export class ProgressService {
         rows: new Map(mine.map(({ row }) => [String(row._id), row])),
         sessions,
         marks: personalRecords(measure, sets).marks,
+        otherMeasureSets: rows.filter(
+          (row) =>
+            row.exerciseId === exerciseId &&
+            sessions.has(row.sessionId) &&
+            measureOf.get(row.workoutExerciseId) !== undefined &&
+            measureOf.get(row.workoutExerciseId) !== measure,
+        ).length,
       });
     }
     return result;
@@ -238,7 +250,8 @@ export class ProgressService {
       this.load(userId, [{ exerciseId: exercise.id, measure }]),
       this.profiles?.read(userId),
     ]);
-    const sets = (loaded.get(`${exercise.id}:${measure}`)?.sets ?? []).filter((set) => set.day <= today);
+    const own = loaded.get(`${exercise.id}:${measure}`);
+    const sets = (own?.sets ?? []).filter((set) => set.day <= today);
     const all = progressPoints(measure, sets);
     const inRange = pointsInRange(all, range, today);
     const metrics = progressMetricsFor(measure);
@@ -254,6 +267,7 @@ export class ProgressService {
       trend: progressTrend(all, metrics[0], today),
       nextRecord: nextRecord(measure, records, sets, profile?.weightUnit ?? 'kg'),
       records,
+      ...(own?.otherMeasureSets ? { earlierMeasureSets: own.otherMeasureSets } : {}),
     };
   }
 }

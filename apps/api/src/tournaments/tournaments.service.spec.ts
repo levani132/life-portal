@@ -59,14 +59,19 @@ function setup(options: { now?: string; access?: Partial<FeatureAccess> } = {}) 
         _standards: RankStandards,
         window: { from: string; to: string },
         savedBefore: Date,
-        version: string | undefined,
+        locked: string | { version: string } | undefined,
         today: string,
       ) => {
-        strengthCalls.push([userId, window, savedBefore, version, today]);
+        strengthCalls.push([userId, window, savedBefore, locked, today]);
+        // A frozen copy scores as it was copied; a bare version name follows `standardsChanged`.
+        const frozen = typeof locked === 'object';
+        const version = frozen ? locked.version : locked;
+        const changed = frozen ? false : standardsChanged.value;
+        const standard = frozen ? locked : { version, method: 'e1rm', measure: 'weight_reps', starts: { men: [0, 1], women: [0, 1] } };
         const sets = (history.get(userId) ?? []).filter((set) => set.day >= window.from && set.day <= window.to && set.savedAt < savedBefore);
-        if (!sets.length) return { changed: standardsChanged.value };
+        if (!sets.length) return { standard, changed };
         const best = sets.reduce((a, b) => (b.score > a.score ? b : a));
-        return { best: { score: best.score, basis: { setId: 's', sessionId: 'w', day: best.day, reps: 1 } }, version, changed: standardsChanged.value };
+        return { best: { score: best.score, basis: { setId: 's', sessionId: 'w', day: best.day, reps: 1 } }, version, standard, changed };
       },
     } as never,
     { read: async (userId: string) => ({ rankStandards: standards.get(userId) }) } as never,
@@ -378,11 +383,25 @@ describe('TournamentsService (#12)', () => {
       expect(view.own).toMatchObject({ baseline: 1000, strengthScore: 1000, bonusBp: 0, score: 1000 });
       expect(view.standings.find((row) => row.userId === 'a')?.score).toBeUndefined();
       expect(view.standings.find((row) => row.userId === 'c')?.score).toBe(1000);
-      expect(t.strengthCalls.at(-1)).toEqual(expect.arrayContaining([{ from: '2026-12-01', to: '2026-12-31' }, new Date('2027-01-04T00:00:00Z'), 'v1-draft-2']));
+      expect(t.strengthCalls.at(-1)).toEqual(expect.arrayContaining([{ from: '2026-12-01', to: '2026-12-31' }, new Date('2027-01-04T00:00:00Z'), expect.objectContaining({ version: 'v1-draft-2' })]));
     });
 
-    it('withholds the bonus, and says so, when the standards changed after the lock', async () => {
+    it('scores the whole season under the one standard copied at the lock, whatever is published later (#5)', async () => {
       const t = await season();
+      const entry = t.entries.docs.find((doc) => doc['userId'] === 'a') as Record<string, unknown>;
+      expect(entry['lockedStandard']).toMatchObject({ version: 'v1-draft-2', method: 'e1rm', measure: 'weight_reps' });
+      expect(entry['lockedVersion']).toBe('v1-draft-2');
+      // Every entrant of the lock holds the same version.
+      expect(new Set(t.entries.docs.filter((doc) => doc['lockedStandard']).map((doc) => (doc['lockedStandard'] as { version: string }).version))).toEqual(new Set(['v1-draft-2']));
+      t.lift('a', '2026-12-03', 1150);
+      t.standardsChanged.value = true;
+      expect((await t.service.group('a', t.groupId)).own).toMatchObject({ score: 1208, improvementBp: 1500, bonusBp: 500 });
+      expect(t.strengthCalls.at(-1)?.[3]).toEqual(entry['lockedStandard']);
+    });
+
+    it('an entry locked before copies were kept falls back to its version name, and withholds the bonus if it is gone', async () => {
+      const t = await season();
+      for (const doc of t.entries.docs) delete (doc as Record<string, unknown>)['lockedStandard'];
       t.lift('a', '2026-12-03', 1150);
       t.standardsChanged.value = true;
       expect((await t.service.group('a', t.groupId)).own).toMatchObject({ score: 1150, improvementBp: 1500, bonusBp: 0, bonusWithheld: 'standards_changed' });

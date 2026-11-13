@@ -1,3 +1,4 @@
+import { RANK_TIERS } from '@life-portal/shared-types';
 import {
   RANK_BENCHMARKS,
   exerciseRank as rankWith,
@@ -190,7 +191,7 @@ describe('strength ranks (#5b)', () => {
   });
 });
 
-describe('published standards: stress profiles (v1-draft-3)', () => {
+describe('published standards: stress profiles (v1-rc1)', () => {
   const v = RANK_BENCHMARKS[RANK_BENCHMARKS.length - 1];
   const tierOf = (seedKey: string, standards: 'men' | 'women', weightKg: number, reps: number, bodyKg: number) => {
     const standard = v.exercises[seedKey];
@@ -279,7 +280,7 @@ describe('published standards: stress profiles (v1-draft-3)', () => {
   });
 });
 
-describe('catalogue coverage (v1-draft-3)', () => {
+describe('catalogue coverage (v1-rc1)', () => {
   const v = RANK_BENCHMARKS[RANK_BENCHMARKS.length - 1];
   const published = (input: Parameters<typeof rankWith>[0]) => rankWith(input, RANK_BENCHMARKS);
 
@@ -312,9 +313,142 @@ describe('catalogue coverage (v1-draft-3)', () => {
 
   it('tells logging how load is entered, only for a ranked exercise under its own measure', () => {
     expect(rankLoadNote('fedb:Hammer_Curls', 'weight_reps')).toBe('The weight of one dumbbell.');
-    expect(rankLoadNote('fedb:Pullups', 'bodyweight_reps')).toBe('Your body weight counts automatically; log only weight you add.');
+    expect(rankLoadNote('fedb:Pullups', 'bodyweight_reps')).toBe('Your body weight counts automatically; log only weight you add, or the assistance a machine gives you.');
     expect(rankLoadNote('fedb:Pullups', 'weight_reps')).toBeUndefined();
     expect(rankLoadNote('fedb:Crunches', 'bodyweight_reps')).toBeUndefined();
     expect(rankLoadNote(undefined, 'weight_reps')).toBeUndefined();
+  });
+  describe('weighted and assisted body-weight lifts (#5)', () => {
+    const pull = (sets: RankSet[], seedKey = 'fedb:Weighted_Pull_Ups') =>
+      published({ exerciseId: 'p', seedKey, measure: 'bodyweight_reps', standards: 'men', sets, today: TODAY });
+
+    it('ranks a weighted pull-up as body weight plus the added load, like a pull-up', () => {
+      // 80 kg + 20 kg × 5: e1RM 116.7 kg → 1.46× body weight → Veteran.
+      const weighted = pull([set(TODAY, 20, 5, 80)]);
+      expect(weighted).toMatchObject({ status: 'ranked', current: { tier: 'Veteran', basis: { loadGrams: 100_000 } } });
+      expect(weighted.benchmark?.provisional).toBeUndefined();
+      expect(pull([set(TODAY, 20, 5, 80)], 'fedb:Pullups').current?.score).toBe(weighted.current?.score);
+    });
+
+    it('scores zero added load as body weight alone, the same as leaving the weight empty', () => {
+      const zero = pull([set(TODAY, 0, 1, 80)]);
+      const empty = pull([set(TODAY, 0, 1, 80, { weightGrams: undefined })]);
+      expect(zero.current).toMatchObject({ tier: 'Explorer', basis: { loadGrams: 80_000 } });
+      expect(empty.current?.score).toBe(zero.current?.score);
+    });
+
+    it('subtracts machine assistance: an assisted pull-up ranks below an unassisted one', () => {
+      const assisted = pull([set(TODAY, 0, 5, 80, { weightGrams: undefined, assistGrams: 30_000 })], 'fedb:Pullups');
+      expect(assisted.current).toMatchObject({ tier: 'Initiate', basis: { loadGrams: 50_000 } });
+    });
+
+    it('ranks dips on a bar like the triceps dip, and ring dips as harder', () => {
+      const bar = published({ exerciseId: 'd', seedKey: 'fedb:Parallel_Bar_Dip', measure: 'bodyweight_reps', standards: 'men', sets: [set(TODAY, 10, 8, 80)], today: TODAY });
+      const triceps = published({ exerciseId: 'd', seedKey: 'fedb:Dips_-_Triceps_Version', measure: 'bodyweight_reps', standards: 'men', sets: [set(TODAY, 10, 8, 80)], today: TODAY });
+      const rings = published({ exerciseId: 'd', seedKey: 'fedb:Ring_Dips', measure: 'bodyweight_reps', standards: 'men', sets: [set(TODAY, 10, 8, 80)], today: TODAY });
+      expect(bar.current?.milestone).toBe(triceps.current?.milestone);
+      expect(rings.current?.milestone).toBeGreaterThan(bar.current?.milestone ?? 99);
+      expect(rings.benchmark?.provisional).toBe(true);
+    });
+
+    it('does not count an assisted set toward a reps standard', () => {
+      const rows = published({ exerciseId: 'r', seedKey: 'fedb:Suspended_Row', measure: 'bodyweight_reps', standards: 'men', sets: [set(TODAY, 0, 30, undefined, { assistGrams: 10_000 })], today: TODAY });
+      expect(rows.status).not.toBe('ranked');
+      expect(rows.current).toBeUndefined();
+      const plain = published({ exerciseId: 'r', seedKey: 'fedb:Suspended_Row', measure: 'bodyweight_reps', standards: 'men', sets: [set(TODAY, 0, 12, undefined)], today: TODAY });
+      expect(plain.current?.score).toBe(12);
+    });
+
+    it('never ranks a set logged as weight only under the old measure', () => {
+      expect(published({ exerciseId: 'p', seedKey: 'fedb:Weighted_Pull_Ups', measure: 'weight_reps', standards: 'men', sets: [set(TODAY, 20, 5, 80)], today: TODAY })).toMatchObject({
+        status: 'unranked',
+        reason: 'no_benchmark',
+      });
+    });
+
+    it('leaves skill, kipping, partial-body and combination movements unranked', () => {
+      for (const id of ['Muscle_Up', 'Kipping_Muscle_Up', 'One_Arm_Chin-Up', 'Rocky_Pull-Ups_Pulldowns', 'Weighted_Bench_Dip', 'Sled_Row', 'Gironda_Sternum_Chins', 'Side_To_Side_Chins', 'Bodyweight_Mid_Row']) {
+        expect([id, v.exercises[`fedb:${id}`]]).toEqual([id, undefined]);
+      }
+    });
+  });
+});
+
+describe('plausibility grid (#5 release candidate)', () => {
+  const v = RANK_BENCHMARKS[RANK_BENCHMARKS.length - 1];
+  /** Tier index for a one-rep max (total load: for body-weight lifts body plus added). */
+  const tierAt = (key: string, sex: 'men' | 'women', oneRepMaxKg: number, bodyKg: number) => {
+    const standard = v.exercises[`fedb:${key}`];
+    const weightKg = standard.measure === 'bodyweight_reps' ? oneRepMaxKg - bodyKg : oneRepMaxKg;
+    const scored = scoreSet(standard, sex, set(TODAY, weightKg, 1, bodyKg));
+    if ('skip' in scored) throw new Error(`${key} not scored`);
+    return RANK_TIERS.indexOf(rankPosition(scored.score, standard.starts[sex], scored.basis).tier);
+  };
+  const T = (name: (typeof RANK_TIERS)[number]) => RANK_TIERS.indexOf(name);
+  // Beginner / intermediate / advanced one-rep maxes as body-weight multiples, from coaching
+  // standards and app-user tables at middling body weights.
+  const LEVELS: [string, number[], number[]][] = [
+    ['Barbell_Squat', [0.75, 1.25, 1.75], [0.5, 1.0, 1.5]],
+    ['Barbell_Bench_Press_-_Medium_Grip', [0.5, 1.0, 1.5], [0.25, 0.6, 0.9]],
+    ['Barbell_Deadlift', [1.0, 1.5, 2.25], [0.6, 1.25, 1.75]],
+    ['Standing_Military_Press', [0.35, 0.65, 0.9], [0.2, 0.4, 0.6]],
+    ['Bent_Over_Barbell_Row', [0.5, 0.9, 1.25], [0.3, 0.6, 0.85]],
+    ['Pullups', [1.0, 1.25, 1.6], [0.85, 1.05, 1.35]],
+    ['Parallel_Bar_Dip', [1.0, 1.4, 1.8], [0.85, 1.15, 1.5]],
+  ];
+  const BODIES = { men: [55, 70, 80, 100, 130], women: [45, 55, 65, 80, 100] } as const;
+
+  it.each(LEVELS)('%s: beginner, intermediate and advanced land in their bands at every body weight, both sexes', (key, men, women) => {
+    for (const [sex, ratios] of [['men', men], ['women', women]] as const) {
+      for (const body of BODIES[sex]) {
+        const [beginner, intermediate, advanced] = ratios.map((ratio) => tierAt(key, sex, ratio * body, body));
+        const at = `${key} ${sex} ${body} kg`;
+        expect([at, beginner <= T('Challenger')]).toEqual([at, true]);
+        expect([at, intermediate >= T('Explorer') && intermediate <= T('Veteran')]).toEqual([at, true]);
+        expect([at, advanced >= T('Achiever') && advanced <= T('Master')]).toEqual([at, true]);
+        expect([at, beginner < advanced && beginner <= intermediate && intermediate <= advanced]).toEqual([at, true]);
+      }
+    }
+  });
+
+  it('never ranks a heavier lifter lower for the same body-weight multiple (the 2/3 scaling direction)', () => {
+    for (const [key, men, women] of LEVELS) {
+      for (const [sex, ratios] of [['men', men], ['women', women]] as const) {
+        for (const ratio of ratios) {
+          const tiers = BODIES[sex].map((body) => tierAt(key, sex, ratio * body, body));
+          tiers.slice(1).forEach((tier, i) => expect([key, sex, ratio, tier >= tiers[i]]).toEqual([key, sex, ratio, true]));
+        }
+      }
+    }
+  });
+
+  it('puts app-user intermediate and elite isolation and machine lifts where those words say, within a tier', () => {
+    // Strength Level, men 80 kg / women 60 kg, one-rep max: [intermediate, elite] (per dumbbell).
+    // Reverse fly's elite figure (42 kg) is above the lateral raise's (34 kg) in the same tables,
+    // implausible for a smaller movement, so only its intermediate figure is held to (review doc).
+    const evidence: [string, 'men' | 'women', number, number, number | undefined][] = [
+      ['Side_Lateral_Raise', 'men', 80, 16, 34],
+      ['Side_Lateral_Raise', 'women', 60, 9, 17],
+      ['Dumbbell_Bicep_Curl', 'men', 80, 22, 42],
+      ['Dumbbell_Bicep_Curl', 'women', 60, 12, 24],
+      ['Triceps_Pushdown', 'men', 80, 56, 107],
+      ['Tricep_Dumbbell_Kickback', 'men', 80, 18, 40],
+      ['Reverse_Flyes', 'men', 80, 17, undefined],
+      ['Leg_Press', 'men', 80, 230, 395],
+      ['Leg_Press', 'women', 60, 140, 277],
+    ];
+    for (const [key, sex, body, intermediate, elite] of evidence) {
+      const standard = v.exercises[`fedb:${key}`];
+      const machineSet = standard.machine ? { machine: true } : {};
+      const tier = (kg: number) => {
+        const scored = scoreSet(standard, sex, set(TODAY, kg, 1, body, machineSet));
+        if ('skip' in scored) throw new Error(key);
+        // Never thrown out as implausible: an elite figure stays under the ceiling.
+        expect(scored.score).toBeLessThan(standard.starts[sex][7] * 1.5);
+        return RANK_TIERS.indexOf(rankPosition(scored.score, standard.starts[sex], scored.basis).tier);
+      };
+      expect([key, sex, 'intermediate', Math.abs(tier(intermediate) - T('Achiever')) <= 1]).toEqual([key, sex, 'intermediate', true]);
+      if (elite) expect([key, sex, 'elite', Math.abs(tier(elite) - T('Elite')) <= 1]).toEqual([key, sex, 'elite', true]);
+    }
   });
 });

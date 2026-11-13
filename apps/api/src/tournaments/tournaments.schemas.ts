@@ -1,4 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import type { FrozenStandard } from '@life-portal/shared-domain';
 import { TOURNAMENT_CATEGORIES } from '@life-portal/shared-types';
 import { baseSchemaOptions } from '../common/mongoose';
 
@@ -35,6 +36,12 @@ export class TournamentEntryRecord {
    * those sets never moves it.
    */
   @Prop() lockedBaseline?: number;
+  /**
+   * The scoring standard, copied at the lock (#5): thresholds, method and measure under
+   * `lockedVersion`. The season is scored under this copy to the end, whatever replaces the
+   * published standards meanwhile. Absent on entries locked before copies were kept.
+   */
+  @Prop({ type: Object }) lockedStandard?: FrozenStandard;
   /** Developer voiding: the member sees the reason; the rest of the group no longer sees them. */
   @Prop({ type: Date }) voidedAt?: Date;
   @Prop({ maxlength: 300 }) voidReason?: string;

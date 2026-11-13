@@ -80,6 +80,12 @@ type Family = keyof typeof RANK_WOMEN_FACTORS;
 
 interface LiftOptions {
   measure?: Measure;
+  /**
+   * How much wider than the base lift the tiers spread: tier i is the base's tier i times the
+   * ratio times (base_i / base_Explorer)^spread. App-user data puts an elite isolation or machine
+   * lift 4–7× its beginner figure where the base barbell lift is about 3× (see `spreadFor`).
+   */
+  spread?: number;
   machine?: boolean;
   note?: string;
   provisional?: boolean;
@@ -97,7 +103,19 @@ const lift = (men: number[], family: Family, options: LiftOptions = {}): Exercis
 
 /** A variant: another lift's men's standard times a ratio (e.g. incline ≈ 0.80 × flat bench). */
 const variant = (base: number[], ratio: number, family: Family, options: LiftOptions = {}) =>
-  lift(base.map((value) => r10(value * ratio)), family, options);
+  lift(
+    base.map((value) => r10(value * ratio * (value && options.spread ? Math.pow(value / base[1], options.spread) : 1))),
+    family,
+    options,
+  );
+
+/**
+ * Spread for a ratio standard (rc1 plausibility review, #5): small raises, flyes and kickbacks
+ * (≤ 0.15 of the base) 0.5; other isolation-sized lifts (< 0.6) and every machine 0.25; compound
+ * free-weight variants none. Checked against Strength Level's app-user tables for lateral raise,
+ * reverse fly, kickback, curl, pushdown and leg press (docs/modules/rank-standards.md).
+ */
+const spreadFor = (ratio: number, isMachine = false) => (ratio <= 0.15 ? 0.5 : ratio < 0.6 || isMachine ? 0.25 : 0);
 
 // How load is read. Shown with the rank and while logging, so a set is entered the same way the
 // standard assumes.
@@ -113,15 +131,16 @@ const STACK_PER_SIDE = 'The weight on one stack (each side).';
 const STACK_ONE_ARM = 'The weight on the stack, one arm or leg at a time.';
 const PLATES_LOADED = 'The plates loaded, not the sled or carriage; machines differ, so compare like with like.';
 const SMITH = 'The plates on the Smith bar; bars differ (some are counterweighted), so compare like with like.';
-const BODY = 'Your body weight counts automatically; log only weight you add.';
-const REPS_ONLY = 'Reps in one set; added weight is not counted.';
+const BODY = 'Your body weight counts automatically; log only weight you add, or the assistance a machine gives you.';
+const REPS_ONLY = 'Reps in one set; added weight is not counted, and assisted sets do not count.';
+const REPS_ANGLE = 'Reps in one set, at a body angle you keep the same; added weight is not counted.';
 
 /** A standard extrapolated by ratio: shown as provisional. */
 const rough = (base: number[], ratio: number, family: Family, options: LiftOptions = {}) =>
-  variant(base, ratio, family, { ...options, provisional: true });
+  variant(base, ratio, family, { spread: spreadFor(ratio, options.machine), ...options, provisional: true });
 /** A machine or cable standard: rougher by nature, and provisional. */
 const machine = (base: number[], ratio: number, family: Family, note = STACK) =>
-  variant(base, ratio, family, { machine: true, note, provisional: true });
+  variant(base, ratio, family, { machine: true, note, provisional: true, spread: spreadFor(ratio, true) });
 
 /** Reps tiers at least 3 apart, so each splits into three distinct divisions. */
 const spaced = (starts: number[]) => starts.reduce<number[]>((out, value, i) => [...out, i === 0 ? 0 : Math.max(value, out[i - 1] + 3)], []);
@@ -141,8 +160,10 @@ const DEADLIFT = bw(0, 0.9, 1.3, 1.75, 2.15, 2.55, 2.9, 3.25);
 const BENCH = bw(0, 0.55, 0.85, 1.1, 1.4, 1.65, 1.9, 2.15);
 /** Explorer ≈ one strict rep: scaled, one pull-up at 55 kg scores 0.88 and at 110 kg 1.11. */
 const PULL_UP = bw(0, 0.85, 1.05, 1.2, 1.35, 1.55, 1.75, 1.95);
+/** Bar dips: a few more reps than pull-ups at each level, so slightly higher multiples. */
+const DIP = bw(0, 0.85, 1.15, 1.4, 1.65, 1.9, 2.1, 2.3);
 
-const STANDARDS_V1_DRAFT_3: Record<string, ExerciseStandard> = {
+const STANDARDS_V1_RC1: Record<string, ExerciseStandard> = {
   // Squat and hinge
   'fedb:Barbell_Squat': lift(BACK_SQUAT, 'legs', { note: BAR }),
   'fedb:Barbell_Full_Squat': lift(BACK_SQUAT, 'legs', { note: BAR }),
@@ -173,7 +194,14 @@ const STANDARDS_V1_DRAFT_3: Record<string, ExerciseStandard> = {
   // Bodyweight: body weight plus any added load.
   'fedb:Pullups': lift(PULL_UP, 'bodyweightPull', { measure: 'bodyweight_reps', note: BODY }),
   'fedb:Chin-Up': variant(PULL_UP, 1.03, 'bodyweightPull', { measure: 'bodyweight_reps', note: BODY }),
-  'fedb:Dips_-_Triceps_Version': lift(bw(0, 0.85, 1.15, 1.4, 1.65, 1.9, 2.1, 2.3), 'bodyweightPull', { measure: 'bodyweight_reps', note: BODY }),
+  'fedb:Dips_-_Triceps_Version': lift(DIP, 'bodyweightPull', { measure: 'bodyweight_reps', note: BODY }),
+  // Logged as weight only until catalogue v2 (#5); now body weight plus a signed external load.
+  'fedb:Weighted_Pull_Ups': lift(PULL_UP, 'bodyweightPull', { measure: 'bodyweight_reps', note: BODY }),
+  'fedb:Parallel_Bar_Dip': lift(DIP, 'bodyweightPull', { measure: 'bodyweight_reps', note: BODY }),
+  'fedb:Dips_-_Chest_Version': lift(DIP, 'bodyweightPull', { measure: 'bodyweight_reps', note: BODY }),
+  'fedb:Mixed_Grip_Chin': variant(PULL_UP, 1, 'bodyweightPull', { measure: 'bodyweight_reps', note: BODY, provisional: true }),
+  // Rings move, so the same strength makes fewer reps than on a fixed bar.
+  'fedb:Ring_Dips': variant(DIP, 0.85, 'bodyweightPull', { measure: 'bodyweight_reps', note: BODY, provisional: true }),
   'fedb:Pushups': {
     method: 'reps',
     measure: 'bodyweight_reps',
@@ -181,14 +209,14 @@ const STANDARDS_V1_DRAFT_3: Record<string, ExerciseStandard> = {
     note: REPS_ONLY,
   },
   // Machines and cables: rougher, because loads differ between machines.
-  'fedb:Leg_Press': variant(BACK_SQUAT, 1.75, 'legs', { machine: true, note: STACK }),
-  'fedb:Leg_Extensions': variant(BACK_SQUAT, 0.78, 'legs', { machine: true, note: STACK }),
-  'fedb:Seated_Leg_Curl': variant(BACK_SQUAT, 0.63, 'legs', { machine: true, note: STACK }),
-  'fedb:Wide-Grip_Lat_Pulldown': variant(BENCH, 0.86, 'pull', { machine: true, note: STACK }),
-  'fedb:Close-Grip_Front_Lat_Pulldown': variant(BENCH, 0.86, 'pull', { machine: true, note: STACK }),
-  'fedb:Seated_Cable_Rows': variant(BENCH, 0.89, 'pull', { machine: true, note: STACK }),
-  'fedb:Leverage_Chest_Press': variant(BENCH, 0.9, 'press', { machine: true, note: STACK }),
-  'fedb:Machine_Bench_Press': variant(BENCH, 0.9, 'press', { machine: true, note: STACK }),
+  'fedb:Leg_Press': variant(BACK_SQUAT, 1.75, 'legs', { machine: true, note: STACK, spread: 0.25 }),
+  'fedb:Leg_Extensions': variant(BACK_SQUAT, 0.78, 'legs', { machine: true, note: STACK, spread: 0.25 }),
+  'fedb:Seated_Leg_Curl': variant(BACK_SQUAT, 0.63, 'legs', { machine: true, note: STACK, spread: 0.25 }),
+  'fedb:Wide-Grip_Lat_Pulldown': variant(BENCH, 0.86, 'pull', { machine: true, note: STACK, spread: 0.25 }),
+  'fedb:Close-Grip_Front_Lat_Pulldown': variant(BENCH, 0.86, 'pull', { machine: true, note: STACK, spread: 0.25 }),
+  'fedb:Seated_Cable_Rows': variant(BENCH, 0.89, 'pull', { machine: true, note: STACK, spread: 0.25 }),
+  'fedb:Leverage_Chest_Press': variant(BENCH, 0.9, 'press', { machine: true, note: STACK, spread: 0.25 }),
+  'fedb:Machine_Bench_Press': variant(BENCH, 0.9, 'press', { machine: true, note: STACK, spread: 0.25 }),
 
   // ── Added in v1-draft-3 (#5, owner 2026-11-13: rank much more of the catalogue) ──────────
   // Ratios to the base lifts follow typical coaching-table relationships between lifts. They are
@@ -247,8 +275,8 @@ const STANDARDS_V1_DRAFT_3: Record<string, ExerciseStandard> = {
   'fedb:Seated_Side_Lateral_Raise': rough(BENCH, 0.12, 'press', { note: PER_DUMBBELL }),
   'fedb:One-Arm_Side_Laterals': rough(BENCH, 0.14, 'press', { note: ONE_ARM_DUMBBELL }),
   'fedb:Front_Dumbbell_Raise': rough(BENCH, 0.14, 'press', { note: PER_DUMBBELL }),
-  'fedb:Reverse_Flyes': rough(BENCH, 0.1, 'pull', { note: PER_DUMBBELL }),
-  'fedb:Seated_Bent-Over_Rear_Delt_Raise': rough(BENCH, 0.1, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Reverse_Flyes': rough(BENCH, 0.12, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Seated_Bent-Over_Rear_Delt_Raise': rough(BENCH, 0.12, 'pull', { note: PER_DUMBBELL }),
   'fedb:Bent_Over_Two-Dumbbell_Row': rough(BENCH, 0.38, 'pull', { note: PER_DUMBBELL }),
   'fedb:Dumbbell_Incline_Row': rough(BENCH, 0.35, 'pull', { note: PER_DUMBBELL }),
   'fedb:Straight-Arm_Dumbbell_Pullover': rough(BENCH, 0.3, 'pull', { note: ONE_DUMBBELL_BOTH_HANDS }),
@@ -263,7 +291,7 @@ const STANDARDS_V1_DRAFT_3: Record<string, ExerciseStandard> = {
   'fedb:Cross_Body_Hammer_Curl': rough(BENCH, 0.25, 'pull', { note: PER_DUMBBELL }),
   'fedb:Zottman_Curl': rough(BENCH, 0.2, 'pull', { note: PER_DUMBBELL }),
   'fedb:Two-Arm_Dumbbell_Preacher_Curl': rough(BENCH, 0.2, 'pull', { note: PER_DUMBBELL }),
-  'fedb:Tricep_Dumbbell_Kickback': rough(BENCH, 0.09, 'press', { note: PER_DUMBBELL }),
+  'fedb:Tricep_Dumbbell_Kickback': rough(BENCH, 0.12, 'press', { note: PER_DUMBBELL }),
   'fedb:Lying_Dumbbell_Tricep_Extension': rough(BENCH, 0.16, 'press', { note: PER_DUMBBELL }),
   'fedb:Standing_Dumbbell_Triceps_Extension': rough(BENCH, 0.3, 'press', { note: ONE_DUMBBELL_BOTH_HANDS }),
   'fedb:Dumbbell_Squat': rough(BACK_SQUAT, 0.3, 'legs', { note: PER_DUMBBELL }),
@@ -378,9 +406,8 @@ const STANDARDS_V1_DRAFT_3: Record<string, ExerciseStandard> = {
   'fedb:One-Arm_Incline_Lateral_Raise': rough(BENCH, 0.1, 'press', { note: ONE_ARM_DUMBBELL }),
   'fedb:Front_Cable_Raise': machine(BENCH, 0.12, 'press', STACK_ONE_ARM),
   'fedb:Standing_Low-Pulley_Deltoid_Raise': machine(BENCH, 0.09, 'press', STACK_ONE_ARM),
-  'fedb:Bent_Over_Low-Pulley_Side_Lateral': machine(BENCH, 0.08, 'pull', STACK_ONE_ARM),
-  'fedb:Dumbbell_Lying_Rear_Lateral_Raise': rough(BENCH, 0.09, 'pull', { note: PER_DUMBBELL }),
-  'fedb:Bent_Over_Dumbbell_Rear_Delt_Raise_With_Head_On_Bench': rough(BENCH, 0.1, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Dumbbell_Lying_Rear_Lateral_Raise': rough(BENCH, 0.11, 'pull', { note: PER_DUMBBELL }),
+  'fedb:Bent_Over_Dumbbell_Rear_Delt_Raise_With_Head_On_Bench': rough(BENCH, 0.12, 'pull', { note: PER_DUMBBELL }),
   'fedb:Cable_Rope_Rear-Delt_Rows': machine(BENCH, 0.4, 'pull'),
   'fedb:Standing_Dumbbell_Upright_Row': rough(BENCH, 0.22, 'pull', { note: PER_DUMBBELL }),
   'fedb:Smith_Machine_Upright_Row': machine(BENCH, 0.48, 'pull', SMITH),
@@ -451,6 +478,10 @@ const STANDARDS_V1_DRAFT_3: Record<string, ExerciseStandard> = {
   'fedb:Handstand_Push-Ups': reps([0, 1, 3, 6, 10, 14, 19, 25], 0.6),
   'fedb:Bench_Dips': reps([0, 8, 15, 25, 35, 45, 58, 75], 0.75),
   'fedb:Inverted_Row': reps([0, 3, 8, 14, 20, 26, 33, 42], 0.7),
+  'fedb:Inverted_Row_with_Straps': { ...reps([0, 3, 8, 14, 20, 26, 33, 42], 0.7), note: REPS_ANGLE },
+  'fedb:Suspended_Row': { ...reps([0, 3, 8, 14, 20, 26, 33, 42], 0.7), note: REPS_ANGLE },
+  // Unstable handles: about as hard as a feet-elevated push-up.
+  'fedb:Suspended_Push-Up': reps([0, 4, 10, 18, 25, 33, 45, 60], 0.55),
   'fedb:Hanging_Leg_Raise': reps([0, 3, 8, 12, 18, 24, 30, 40], 0.85),
   'fedb:Bodyweight_Squat': reps([0, 15, 25, 40, 55, 75, 100, 130], 0.85),
   'fedb:Bodyweight_Walking_Lunge': reps([0, 10, 20, 32, 45, 60, 80, 100], 0.85),
@@ -463,15 +494,16 @@ const STANDARDS_V1_DRAFT_3: Record<string, ExerciseStandard> = {
  */
 export const RANK_BENCHMARKS: readonly BenchmarkVersion[] = [
   {
-    version: 'v1-draft-3',
+    version: 'v1-rc1',
     draft: true,
     from: '0000-01-01',
     basis:
-      'Draft standards for review, informed by published coaching standards and app-user percentiles, ' +
+      'Release candidate 1, still a draft until the owner freezes it. Informed by published coaching ' +
+      'standards and app-user tables, ' +
       'with the top tier kept below world-record lifts. Your estimated one-rep max is scaled to an 80 kg ' +
       '(men) or 60 kg (women) body weight with a 2/3 exponent. Not measured from LifePortal members, ' +
       'and not percentiles of anyone.',
-    exercises: STANDARDS_V1_DRAFT_3,
+    exercises: STANDARDS_V1_RC1,
   },
 ];
 
@@ -537,7 +569,10 @@ export function scoreSet(standard: ExerciseStandard, standards: RankStandards, s
   if (set.type === 'warmup' || !set.reps || set.reps < 1) return { skip: 'invalid' };
   if (set.machine && !standard.machine) return { skip: 'machine' };
   const base = { setId: set.id, sessionId: set.sessionId, day: set.day, reps: set.reps };
-  if (standard.method === 'reps') return { score: set.reps, basis: base };
+  if (standard.method === 'reps') {
+    // Reps of your own body weight: an assisted set is a different, easier exercise.
+    return set.assistGrams ? { skip: 'invalid' } : { score: set.reps, basis: base };
+  }
   const body = freshBodyWeight(set.body, set.day);
   if (!body) return { skip: 'noBodyWeight' };
   const load = effectiveLoadGrams(standard.measure, set, body);

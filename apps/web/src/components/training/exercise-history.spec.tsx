@@ -87,3 +87,10 @@ it('treats a faster pace as up', () => {
   expect(screen.getByText('Up')).toBeTruthy();
   expect(screen.getByText(/0:10 \/km/)).toBeTruthy();
 });
+
+it('says when earlier sets were logged under the old measure, even with none since', () => {
+  responses[progressUrl('3m')] = { data: view({ points: [], sessionsInRange: 0, totalSessions: 0, records: [], nextRecord: undefined, earlierMeasureSets: 3 }) };
+  render(<ExerciseHistory exerciseId="e1" />);
+  expect(screen.getByText(/3 earlier sets were logged as weight only/)).toBeTruthy();
+  expect(screen.getByText(/Not done yet/)).toBeTruthy();
+});

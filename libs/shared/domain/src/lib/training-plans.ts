@@ -53,6 +53,9 @@ export function validatePlanTarget(measure: Measure, target: PlanTarget): string
     const { min, max } = SET_LIMITS[field];
     if (value < min || value > max) return `${FIELD_LABELS[field]} must be between ${min} and ${max}.`;
   }
+  if (measure === 'bodyweight_reps' && target.weightGrams && target.assistGrams) {
+    return 'Use added weight or assistance, not both.';
+  }
   if (REP_MEASURES.includes(measure) && target.reps == null) return 'Reps are required.';
   if (measure === 'duration' && target.durationSeconds == null) return 'Time is required.';
   if (measure === 'distance_duration' && target.distanceMeters == null && target.durationSeconds == null) {
@@ -146,7 +149,11 @@ export function describeTarget(measure: Measure, target: PlanTarget, unit: Weigh
       text = target.weightGrams != null ? `${w(target.weightGrams)} × ${reps}` : `${reps} reps`;
       break;
     case 'bodyweight_reps':
-      text = target.weightGrams ? `+${w(target.weightGrams)} × ${reps}` : `${reps} reps`;
+      text = target.weightGrams
+        ? `+${w(target.weightGrams)} × ${reps}`
+        : target.assistGrams
+          ? `−${w(target.assistGrams)} × ${reps}`
+          : `${reps} reps`;
       break;
     case 'assisted_reps':
       text = target.assistGrams ? `−${w(target.assistGrams)} × ${reps}` : `${reps} reps`;

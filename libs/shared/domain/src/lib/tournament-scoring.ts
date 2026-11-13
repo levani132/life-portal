@@ -59,20 +59,51 @@ export function bestStrength(
 }
 
 /**
- * The standard a tournament is scored under: the benchmark version frozen at the lock when it
- * still exists, otherwise the current one with `changed: true` (a draft was replaced). Undefined
- * when the exercise has no standard for this measure.
+ * The scoring standard a season is locked to (#5, #12): a copy of the thresholds, method and
+ * measure, taken once at the lock and stored with each entry. A season is scored under this copy
+ * to the end, so replacing a draft, publishing a new version or changing how the exercise is
+ * logged never moves a season already under way. Load notes and labels are not scoring, so they
+ * are not copied.
+ */
+export interface FrozenStandard {
+  version: string;
+  method: ExerciseStandard['method'];
+  measure: Measure;
+  starts: Record<RankStandards, number[]>;
+  machine?: boolean;
+}
+
+export function freezeStandard(version: string, standard: ExerciseStandard): FrozenStandard {
+  return {
+    version,
+    method: standard.method,
+    measure: standard.measure,
+    starts: { men: [...standard.starts.men], women: [...standard.starts.women] },
+    ...(standard.machine ? { machine: true } : {}),
+  };
+}
+
+/**
+ * The standard a tournament is scored under. A season frozen at its lock (`locked` is a
+ * `FrozenStandard`) is always scored under that copy. Entries locked before copies were kept carry
+ * only the version name: that version when it still exists, otherwise the current one with
+ * `changed: true` (a draft was replaced). Undefined when the exercise has no standard for this measure.
  */
 export function tournamentStandard(
   seedKey: string | undefined,
   measure: Measure,
-  lockedVersion: string | undefined,
+  locked: string | FrozenStandard | undefined,
   today: string,
   versions: readonly BenchmarkVersion[] = RANK_BENCHMARKS,
 ): { standard: ExerciseStandard; version: string; changed: boolean } | undefined {
   if (!seedKey) return undefined;
-  const locked = lockedVersion ? versions.find((version) => version.version === lockedVersion) : undefined;
-  const chosen = locked ?? benchmarkFor(today, versions);
+  if (locked && typeof locked === 'object') {
+    const { version, ...standard } = locked;
+    return { standard, version, changed: false };
+  }
+  const lockedVersion = locked;
+  const named = lockedVersion ? versions.find((version) => version.version === lockedVersion) : undefined;
+  const chosen = named ?? benchmarkFor(today, versions);
   const standard = chosen.exercises[seedKey];
   if (!standard || standard.measure !== measure) return undefined;
   return { standard, version: chosen.version, changed: !!lockedVersion && chosen.version !== lockedVersion };

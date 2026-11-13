@@ -117,6 +117,9 @@ function Ranked({ view, unit, onChangeStandards }: { view: ExerciseRankView; uni
                 </span>
               )}
             </p>
+            {benchmark.machine && (
+              <p className="text-xs text-ink-faint">Machine rank: a rough personal benchmark, not comparable across gyms.</p>
+            )}
             <Progress position={current} benchmark={benchmark} />
           </div>
         </div>
@@ -145,7 +148,12 @@ function Ranked({ view, unit, onChangeStandards }: { view: ExerciseRankView; uni
           {current && <p>From: {describeBasis(current, benchmark, unit)}.</p>}
           {current && workCapacityLine(current, benchmark) && <p>{workCapacityLine(current, benchmark)}</p>}
           {benchmark.note && <p>{benchmark.note}</p>}
-          {benchmark.machine && <p>Machine standards are rougher: the same weight feels different on different machines.</p>}
+          {benchmark.machine && (
+            <p>
+              Machine standards are rougher: the same weight feels different on different machines (stack ratios, cams, sled
+              weight), so a machine rank tracks your own progress on the machine you use. It is not comparable across gyms.
+            </p>
+          )}
           {benchmark.provisional && (
             <p className="text-amber-600 dark:text-amber-400">
               Provisional standard: estimated from the main lifts by typical ratios, not from published tables for this exercise, so

@@ -1691,3 +1691,34 @@ evidence instead of excluding it, and make the weight convention obvious.
   Explorer from 2 to 3 reps.
 - **Still a draft.** `v1-draft-3` replaces `v1-draft-2` in place. Not frozen, production off.
 
+
+## 2026-11-13: Weighted pull-ups and dips as body weight plus a signed load; a season keeps one standard; rank standards v1-rc1 (issue #5)
+
+Owner direction (12:55Z): support weighted pull-ups, dips and related lifts without reinterpreting
+history; freeze one standard per tournament season; check the standards systematically against
+public evidence and propose a named release candidate, without enabling production.
+
+- **Signed load, not a new measure.** `bodyweight_reps` now accepts added weight *or* assistance,
+  never both. A new measure would have split Pullups' existing history; the signed load reads
+  every existing body-weight set exactly as before (they carry no assistance) and lets assisted
+  Pullups and Dips count, which v1-draft-3's doc wrongly claimed they already did.
+- **The catalogue measure changes; history does not.** Catalogue v2 measures 16 "other" pulls and
+  dips as body weight. Sets keep their snapshot measure, so a weight-only set logged before stays
+  weight only. Reading it as "added load" would have been a guess (some people log the total), so
+  those sets are left out of the new measure's figures and counted (`earlierMeasureSets`)
+  instead. Converting them would need each person to say which they meant: a migration choice
+  for later, not taken silently. Sled Row stays weight × reps: the sled is the load.
+- **Nine of the 17 stay unranked** with reasons: muscle-ups (skill), one-arm chin-up (no data),
+  rare chin variants, a combination drill, a feet-on-floor dip, an unclear row setup, the sled.
+- **A tournament copies its standard at the lock.** A version name could be resolved to a
+  replaced draft, which forced the "bonus withheld" fallback. The copy (`lockedStandard`) makes
+  the season immune to new versions and measure changes; the fallback remains only for entries
+  locked without a copy, of which there are none.
+- **Spread for ratio standards.** Public app-user tables (Strength Level) showed constant ratios
+  were up to 2× too strict at the top for small isolation lifts, and their implausibility ceiling
+  would have discarded genuine sets. Ratio standards now widen above Explorer by
+  (base_i / base_Explorer)^spread: 0.5 for small raises, flyes and kickbacks, 0.25 for other
+  isolation lifts and machines. Kickbacks and rear-delt raises moved from 0.09–0.10 to 0.11–0.12
+  of the bench. The bent-over low-pulley lateral was dropped: its divisions are about 1 kg apart,
+  finer than stack plates.
+- **v1-rc1** is the name for review. Still `draft: true`; freezing it is the owner's go/no-go.

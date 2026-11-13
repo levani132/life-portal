@@ -564,6 +564,12 @@ export interface ExerciseProgressView {
   trend?: ProgressTrend;
   nextRecord?: NextRecord;
   records: RecordEntry[];
+  /**
+   * Sets logged before the catalogue changed how this exercise is measured (#5: weighted
+   * pull-ups and dips were weight only). They stay in their workouts unchanged and are left out
+   * of this history, its records and ranks. Absent when there are none.
+   */
+  earlierMeasureSets?: number;
 }
 
 
