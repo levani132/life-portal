@@ -23,6 +23,8 @@ export class ApiError extends Error {
     readonly status: number,
     /** Field-level messages from `class-validator`, when present. */
     readonly details?: string[],
+    /** The API's machine-readable `code` (e.g. `PLAN_CHANGED`), when it sent one. */
+    readonly code?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -47,7 +49,7 @@ export const tokens = {
 };
 
 /** Shared across callers so simultaneous 401s cause exactly one refresh. */
-let refreshPromise: Promise<boolean> | null = null;
+let refreshPromise: Promise<'ok' | 'refused' | 'unreachable'> | null = null;
 
 async function parseError(response: Response): Promise<ApiError> {
   let payload: unknown;
@@ -57,31 +59,47 @@ async function parseError(response: Response): Promise<ApiError> {
     return new ApiError(response.statusText || 'Request failed', response.status);
   }
 
-  const body = payload as { message?: string | string[]; error?: string };
+  const body = payload as { message?: string | string[]; error?: string; code?: unknown };
+  const code = typeof body.code === 'string' ? body.code : undefined;
   if (Array.isArray(body.message)) {
-    return new ApiError(body.message[0] ?? 'Validation failed', response.status, body.message);
+    return new ApiError(body.message[0] ?? 'Validation failed', response.status, body.message, code);
   }
-  return new ApiError(body.message ?? body.error ?? 'Request failed', response.status);
+  return new ApiError(body.message ?? body.error ?? 'Request failed', response.status, undefined, code);
 }
 
-async function refreshSession(): Promise<boolean> {
+/**
+ * `refused` means the server said no (the session is over); `unreachable` means it could not be
+ * asked. Only `refused` signs the person out: offline (spec 027) a refresh that cannot reach the
+ * server must keep the tokens, or opening the app without signal would log you out.
+ */
+async function refreshSession(): Promise<'ok' | 'refused' | 'unreachable'> {
   const refreshToken = tokens.refresh;
-  if (!refreshToken) return false;
+  if (!refreshToken) return 'refused';
 
+  let response: Response;
   try {
-    const response = await fetch(`${API_URL}/auth/refresh`, {
+    response = await fetch(`${API_URL}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
     });
-    if (!response.ok) {
-      tokens.clear();
-      return false;
-    }
-    tokens.set((await response.json()) as AuthTokens);
-    return true;
   } catch {
-    return false;
+    return 'unreachable';
+  }
+  if (response.status >= 500) return 'unreachable';
+  if (!response.ok) {
+    tokens.clear();
+    return 'refused';
+  }
+  tokens.set((await response.json()) as AuthTokens);
+  return 'ok';
+}
+
+/** No answer from the server at all (offline, DNS, a dropped connection). Never an `ApiError`. */
+export class NetworkError extends Error {
+  constructor(message = 'No connection.') {
+    super(message);
+    this.name = 'NetworkError';
   }
 }
 
@@ -104,31 +122,40 @@ interface RequestOptions {
   anonymous?: boolean;
   /** Internal: prevents a refresh loop. */
   isRetry?: boolean;
+  /** Extra headers, e.g. `Idempotency-Key` from the offline outbox (spec 027). */
+  headers?: Record<string, string>;
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, anonymous, isRetry } = options;
 
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...options.headers };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (!anonymous) {
     const access = tokens.access;
     if (access) headers['Authorization'] = `Bearer ${access}`;
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new NetworkError();
+  }
 
   if (response.status === 401 && !anonymous && !isRetry) {
     refreshPromise ??= refreshSession().finally(() => {
       refreshPromise = null;
     });
-    if (await refreshPromise) {
+    const refreshed = await refreshPromise;
+    if (refreshed === 'ok') {
       return request<T>(path, { ...options, isRetry: true });
     }
+    if (refreshed === 'unreachable') throw new NetworkError();
     tokens.clear();
     // Let the auth context redirect; throwing here keeps SWR from caching a bad result.
     throw new ApiError('Your session has expired. Please sign in again.', 401);

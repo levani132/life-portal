@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { HealthConnectionSettings } from '../../components/apple-health';
 import { HealthShortcutAdminSetting } from '../../components/health-shortcut-admin-setting';
 import { ThemePreferenceControl } from '../../components/theme-preference';
+import { OfflineDataSettings } from '../../components/offline-data-settings';
 import { ForYouSettings, hasForYou } from '../../components/for-you-preferences';
 import type {
   Currency,
@@ -73,6 +74,9 @@ function Settings() {
         <div className="mb-4">
           <ThemePreferenceControl />
         </div>
+        <div className="mb-4">
+          <OfflineDataSettings />
+        </div>
         {portal.data.cohort === 'developer' && <HealthShortcutAdminSetting />}
         {portal.data.access.nutrition && (
           <div className="mb-4">
@@ -131,6 +135,7 @@ function Settings() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <ThemePreferenceControl />
+        <OfflineDataSettings />
         {portal.data.access.nutrition && <HealthConnectionSettings />}
         {portal.data.cohort === 'developer' && <HealthShortcutAdminSetting />}
         <ForYouSettings portal={portal.data} />

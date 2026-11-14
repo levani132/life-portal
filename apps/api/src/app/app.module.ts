@@ -30,6 +30,7 @@ import { SpendingModule } from '../spending/spending.module';
 import { StocksModule } from '../stocks/stocks.module';
 import { StorageModule } from '../storage/storage.module';
 import { MediaModule } from '../media/media.module';
+import { IdempotencyModule } from '../idempotency/idempotency.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { MediaModule } from '../media/media.module';
     StorageModule,
     MediaModule,
     AuthModule,
+    IdempotencyModule,
     AccessModule,
     SocialGraphModule,
     NotificationsModule,

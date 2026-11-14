@@ -717,9 +717,10 @@ plan workout (right after Finish, and opened from History) shows `PlanDayUpdate`
 (`plan-day-update.tsx`, issue #15) under its header when there is something to update: Review opens
 the changes, the day after and the day now; "Not now" hides it on this device only (localStorage,
 wrapped in try/catch) and changes nothing. Once applied it says so in one line. Sets go through
-`lib/training-queue.ts`: each is shown at once as a pending row, sent in order, and retried on
-`online`, focus and every 5 s after a network or server error. The queue is in memory only:
-closing the app with writes still pending loses them. Weight fields use `Input` with
+`lib/training-queue.ts`, which rides the durable outbox (`docs/modules/offline.md`, spec 027):
+each is shown at once as a pending row, kept on the device until the server acknowledges it,
+sent in order with its `requestId` as `Idempotency-Key`, and retried with backoff. Closing the app
+no longer loses unsent sets. A refused set stays until "Discard unsaved sets" (confirmed). Weight fields use `Input` with
 `inputMode="decimal"`, so a comma from a Georgian keyboard works.
 
 **Colour system (spec 024, display only).** Training is colourful by derivation, never by stored

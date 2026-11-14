@@ -1,126 +1,80 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
-import { ApiError } from './api';
+import { useMemo, useSyncExternalStore } from 'react';
+import { enqueueWrite, onWriteDone, outbox, useOutbox } from './offline/runtime';
+import type { OutboxItem, WriteMethod } from './offline/types';
+import { revalidateTraining } from './training';
 
 /**
- * The gym has bad signal (spec 020, research R7). Sets are logged through this queue: each
- * write is keyed by its `requestId`, shown at once as a pending row, sent in order, and retried
- * when the connection comes back. The API answers a repeated `requestId` with the original row,
- * so a retry after a lost response never creates a duplicate.
- *
- * In memory only: closing the app with writes still pending loses those writes. Full offline
- * logging is out of scope for this phase.
+ * The gym has bad signal (spec 020, research R7). Sets are logged through the durable outbox
+ * (spec 027, issue #16): each write is kept on the device until the server acknowledges it,
+ * shown at once as a pending row, sent in order, retried when the connection comes back, and
+ * sent with its `requestId` as `Idempotency-Key`, so a retry after a lost response, a reload or
+ * a crash never creates a duplicate. Closing the app no longer loses unsent sets.
  */
 export interface QueuedJob<M = unknown> {
   /** The request's `requestId`. A second job with the same id is ignored. */
   id: string;
-  /** What the UI needs to draw the pending row. */
+  /** What the UI needs to draw the pending row. Serialisable: it is stored on the device. */
   meta: M;
-  run: () => Promise<unknown>;
-  onDone?: () => unknown;
-  onError?: (message: string) => void;
+  method: WriteMethod;
+  path: string;
+  body?: unknown;
+  /** A line for the sync sheet, e.g. "Set · Bench press". */
+  label?: string;
 }
 
-let jobs: QueuedJob[] = [];
-let draining = false;
-let retryTimer: ReturnType<typeof setTimeout> | undefined;
-let lastError: string | null = null;
-const listeners = new Set<() => void>();
-let snapshot: { jobs: QueuedJob[]; offline: boolean; error: string | null } = {
-  jobs: [],
-  offline: false,
-  error: null,
-};
-let offline = false;
-
-function publish() {
-  snapshot = { jobs: [...jobs], offline, error: lastError };
-  listeners.forEach((listener) => listener());
-}
-
-/** A failure worth retrying: no response at all, a timeout, rate limiting or a server error. */
-function isTransient(error: unknown): boolean {
-  if (!(error instanceof ApiError)) return true;
-  return error.status >= 500 || error.status === 408 || error.status === 429;
-}
-
-function scheduleRetry() {
-  if (retryTimer) return;
-  retryTimer = setTimeout(() => {
-    retryTimer = undefined;
-    void drain();
-  }, 5000);
-}
-
-async function drain() {
-  if (draining) return;
-  draining = true;
-  try {
-    while (jobs.length) {
-      const job = jobs[0];
-      try {
-        await job.run();
-        offline = false;
-        // Refetch before dropping the pending row, so the saved row replaces it without a gap.
-        // A failed refetch is not a failed write: the write is done.
-        try {
-          await job.onDone?.();
-        } catch {
-          // the next refresh shows it
-        }
-        jobs = jobs.slice(1);
-        publish();
-      } catch (error) {
-        if (isTransient(error)) {
-          offline = true;
-          publish();
-          scheduleRetry();
-          return;
-        }
-        // The server refused it (validation, gone): retrying would fail the same way.
-        jobs = jobs.slice(1);
-        lastError = error instanceof ApiError ? error.message : 'Could not save.';
-        job.onError?.(lastError);
-        publish();
-      }
-    }
-  } finally {
-    draining = false;
-  }
-}
-
-export function enqueue<M>(job: QueuedJob<M>) {
-  if (jobs.some((queued) => queued.id === job.id)) return;
-  jobs = [...jobs, job as QueuedJob];
-  lastError = null;
-  publish();
-  void drain();
-}
-
-export function clearQueueError() {
-  lastError = null;
-  publish();
-}
+/** Acknowledged but not yet refetched: still drawn as pending, so the saved row replaces it without a gap. */
+let settling: OutboxItem[] = [];
+const settleListeners = new Set<() => void>();
+const publishSettling = () => settleListeners.forEach((listener) => listener());
 
 if (typeof window !== 'undefined') {
-  const wake = () => void drain();
-  window.addEventListener('online', wake);
-  window.addEventListener('focus', wake);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') wake();
+  onWriteDone((item) => {
+    if (!item.kind.startsWith('training.')) return;
+    settling = [...settling, item];
+    publishSettling();
+    void revalidateTraining()
+      .catch(() => undefined)
+      .finally(() => {
+        settling = settling.filter((other) => other.id !== item.id);
+        publishSettling();
+      });
   });
 }
 
-const subscribe = (listener: () => void) => {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+export function enqueue<M>(job: QueuedJob<M>): void {
+  void enqueueWrite({ ...job, kind: 'training.set' });
+}
+
+/** Gives up the training writes the server refused. Explicit: the person pressed Discard. */
+export function clearQueueError(): void {
+  for (const id of refusedIds) void outbox.discard(id);
+}
+let refusedIds: string[] = [];
+
+const subscribeSettling = (listener: () => void) => {
+  settleListeners.add(listener);
+  return () => settleListeners.delete(listener);
 };
 
-export function useTrainingQueue() {
-  return useSyncExternalStore(
-    subscribe,
-    () => snapshot,
-    () => snapshot,
-  );
+export function useTrainingQueue(): { jobs: { id: string; meta: unknown }[]; offline: boolean; error: string | null } {
+  const snapshot = useOutbox();
+  const settled = useSyncExternalStore(subscribeSettling, () => settling, () => settling);
+  return useMemo(() => {
+    // Stored data outlives the code that wrote it: an item without the meta the UI draws from is
+    // still sent and shown in the sync sheet, but never handed to the workout screens.
+    const training = snapshot.items.filter(
+      (item) => item.kind.startsWith('training.') && typeof item.meta === 'object' && item.meta !== null,
+    );
+    const waiting = training.filter((item) => item.state === 'pending' || item.state === 'auth');
+    const refused = training.filter((item) => item.state === 'error' || item.state === 'conflict');
+    refusedIds = refused.map((item) => item.id);
+    const ids = new Set(waiting.map((item) => item.id));
+    return {
+      jobs: [...waiting, ...settled.filter((item) => !ids.has(item.id))].map((item) => ({ id: item.id, meta: item.meta })),
+      offline: snapshot.offline && waiting.length > 0,
+      error: refused.length ? (refused[refused.length - 1].lastError ?? 'Could not save.') : null,
+    };
+  }, [snapshot, settled]);
 }

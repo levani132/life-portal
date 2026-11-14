@@ -329,12 +329,22 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
               </div>
             </div>
           )}
-          {queue.offline && <p className="text-xs text-amber-400">No connection: sets are kept and sent when it is back.</p>}
+          {queue.offline && (
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              No connection: sets are kept on this device and sent when it is back.
+            </p>
+          )}
           {queue.error && (
             <div>
               <ErrorNote message={queue.error} />
-              <button type="button" className="mt-1 text-xs text-ink-faint underline" onClick={clearQueueError}>
-                Dismiss
+              <button
+                type="button"
+                className="mt-1 text-xs text-ink-faint underline"
+                onClick={() => {
+                  if (window.confirm('Discard the sets that could not be saved? They are not on the server.')) clearQueueError();
+                }}
+              >
+                Discard unsaved sets
               </button>
             </div>
           )}
@@ -495,9 +505,10 @@ function ExerciseBlock({
     enqueue<PendingSet>({
       id: requestId,
       meta: { sessionId: session.id, workoutExerciseId: exercise.id, value },
-      run: () =>
-        api.post(`/training/sessions/${session.id}/exercises/${exercise.id}/sets`, { requestId, ...value }),
-      onDone: () => revalidateTraining(),
+      method: 'POST',
+      path: `/training/sessions/${session.id}/exercises/${exercise.id}/sets`,
+      body: { requestId, ...value },
+      label: `Set · ${exercise.snapshot.name}`,
     });
   };
 

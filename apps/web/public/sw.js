@@ -6,6 +6,11 @@
  * every `/api` response goes to the network and nothing else. Offline you get the shell and an
  * honest "no connection" state, never a stale copy of somebody's private numbers.
  *
+ * Offline training, food and social data (spec 027) is NOT kept here either. It lives in the
+ * page's own per-account IndexedDB store (`apps/web/src/lib/offline/`), which enforces a module
+ * allowlist, deletes itself on sign-out and can be cleared from Settings. This cache holds only
+ * HTML and hashed assets, which carry no account data (pages fetch it client-side).
+ *
  * Written by hand rather than generated: a workbox dependency would need justifying in writing
  * (constitution, Governance) and this is forty lines.
  *
@@ -17,7 +22,7 @@
  * Registered as `/sw.js?mode=push` in development: push works, caching is off, so a hot reload
  * never serves a stale bundle.
  */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const PUSH_ONLY = new URL(self.location.href).searchParams.get('mode') === 'push';
 const SHELL_CACHE = `life-portal-shell-${VERSION}`;
 const ASSET_CACHE = `life-portal-assets-${VERSION}`;
@@ -82,7 +87,13 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       })
-      .catch(async () => (await caches.match(request)) ?? (await caches.match('/')) ?? Response.error()),
+      .catch(async () =>
+        (await caches.match(request)) ??
+        // A visited page opened with a different query (`/nutrition?tab=you`) is still that page.
+        (request.mode === 'navigate' ? await caches.match(request, { ignoreSearch: true }) : undefined) ??
+        (request.mode === 'navigate' ? await caches.match('/') : undefined) ??
+        Response.error(),
+      ),
   );
 });
 

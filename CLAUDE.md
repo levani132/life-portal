@@ -195,6 +195,14 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   notification; don't use that flag to let any other type notify its own actor. A reminder from
   the app with no actor (`restOver`) is a `personal` type sent with `remind()`, not `notify()`. See
   `docs/modules/badges.md`.
+- **Only training, nutrition and social may keep data on the device** (spec 027). The outbox and
+  the IndexedDB cache throw for any other module; money, banking, investments and work stay
+  online-only. Adding a module there is a privacy decision for `docs/DECISIONS.md`, not a code
+  tweak. Offline writes go through `enqueueWrite()` with a client id that is sent as
+  `Idempotency-Key`; the API's global interceptor replays the stored answer, so a write that can
+  be retried must carry one. A failed send is never dropped silently, and only "no answer at all"
+  (`NetworkError`) counts as offline: an `ApiError` is the server's verdict. See
+  `docs/modules/offline.md`.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for

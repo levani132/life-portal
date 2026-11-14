@@ -25,6 +25,8 @@ import { ActivityBell, NotificationsBridge } from './notifications';
 import { PeopleSearch } from './people-search';
 import { PortalLoader } from './portal-loader';
 import { PullToRefresh } from './pull-to-refresh';
+import { useOfflineCopy } from '../lib/offline/use-offline-copy';
+import { SyncStatus } from './sync-status';
 import { ProfileView } from './social';
 import { useBadgeCheckOnStart } from '../lib/badges';
 import { TabHost, type HostTab } from './tab-host';
@@ -53,10 +55,18 @@ function Portal({ children }: { children: ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const portal = useApi<PortalState>(user ? '/portal' : null, {
+  const portalLive = useApi<PortalState>(user ? '/portal' : null, {
     revalidateOnFocus: true,
     refreshInterval: 30000,
   });
+  // Spec 027: without a connection the shell opens from the last portal state this account saw.
+  const portalCopy = useOfflineCopy('shell:portal', portalLive);
+  const portal = {
+    ...portalLive,
+    data: portalCopy.data,
+    error: portalCopy.data ? undefined : portalLive.error,
+    isLoading: portalLive.isLoading || portalCopy.looking,
+  };
   const requests = useApi<{ count: number; more: boolean }>(
     portal.data?.access.social ? '/social/requests/count' : null,
     { revalidateOnFocus: true, refreshInterval: 30000 },
@@ -120,7 +130,10 @@ function Portal({ children }: { children: ReactNode }) {
         <ScrollHeader hidden={chromeHidden} onReveal={revealChrome}>
           {/* Name in the middle, Activity on the right. New posts start from the tab bar. */}
           <div className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-2 py-2">
-            <span className="h-10" />
+            {/* Spec 027: the sync state, when there is one. Empty and the same size otherwise. */}
+            <div className="flex h-10 items-center pl-2">
+              <SyncStatus />
+            </div>
             <Link href="/" className="font-semibold tracking-tight">
               Life<span className="text-accent">Portal</span>
             </Link>

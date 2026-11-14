@@ -475,6 +475,9 @@ and this API returns one person's debts, weight and food log. Offline you get th
 honest failure, never a stale copy of private numbers. Content-hashed build assets are cache-first;
 navigations are network-first with a shell fallback.
 
+*Data at rest superseded on 2026-11-14 (issue #16): the service worker still caches no `/api`
+response, but training, food and social now keep allowlisted data in the page's IndexedDB.*
+
 **Nav:** eleven widgets do not fit on a phone. Wrapped, they took four rows and pushed the content
 below the fold; as a horizontal scroller, half of them hid behind a gesture nobody discovers. Below
 `lg` it is now a menu button opening a two-column list — one tap to any widget — and the full row
@@ -1831,3 +1834,38 @@ return the first result, which also covers the ad-hoc exercise that, once added 
 workout still has no link to. Ready-made plans are seed-owned and read-only, so applying copies
 the plan first (ids mapped by position, which `copy()` preserves) and updates the copy. That is
 the one product call flagged on the issue for the owner to overrule.
+
+---
+
+## 2026-11-14 · Some data now lives on the device, and only some (supersedes the data-at-rest half of 2026-08-20, issue #16)
+
+2026-08-20 said no private data rests on the device: the service worker caches no `/api`
+response. That still holds for the **service worker**, unchanged. What changes is that the page
+itself now keeps data in IndexedDB, because a set logged at the gym with no signal was lost when
+the app closed, and #17/#18 need training and food to work offline at all. The owner approved
+this on #16 with conditions, which are the design:
+
+- **Allowlist, enforced in code.** Only `training`, `nutrition` and `social` may store anything
+  (plus the exact key `shell:portal`, module flags with no records, without which the shell cannot
+  draw offline). Money, banking, investments and work stay online-only; the outbox and cache throw
+  for any other key, and a test asserts that money keys are refused.
+- **Opt-in by use, minimum kept.** Nothing is stored until an offline-capable screen stores it.
+  Unused cached reads go after 30 days, the refresh-token lifetime. Unsynced writes never expire.
+- **Not encrypted at rest.** Browser storage is readable by anyone using that browser profile, and
+  iOS can evict a site's storage after weeks without use. Settings says both, plainly.
+  `navigator.storage.persist()` is requested, which reduces but does not end eviction.
+- **One database per account**, deleted on logout, never replayed under another identity: a 401
+  pauses the queue until the same account signs in. A second account on the device does not see
+  the first's data.
+- **Never silently discard a write.** Logout and "Clear offline data" with anything pending show
+  the count and offer Sync now / stay / discard, the last behind a second confirmation.
+- **Idempotency on the server, not just the client.** A retry after a lost response is the normal
+  case offline, so every authenticated write may carry `Idempotency-Key`, stored per user for 7
+  days. 4xx refusals are replayed too (the write was decided); 5xx releases the key.
+- **"No answer" is not "signed out".** A token refresh that gets no answer used to clear the
+  session, which offline meant being logged out by a tunnel. Now only a refusal does.
+- **No dependency.** `idb` and `fake-indexeddb` were approved in principle; installing either
+  rewrote ~1,400 unrelated lockfile entries, and the adapter needed is four operations on two
+  stores. Hand-written, tested through an in-memory store behind the same interface.
+
+See `docs/modules/offline.md` and `specs/027-offline-foundation/`.

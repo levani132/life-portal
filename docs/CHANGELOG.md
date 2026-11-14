@@ -2,6 +2,21 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-14: Sets logged offline are kept
+
+- **A set logged without signal is no longer lost when the app closes.** It stays on your device
+  and is sent, once, when the connection returns, even after a reload. The header shows how many
+  changes are waiting ("Offline · 2 waiting", "Syncing 2", "1 needs attention", "Sign in to
+  sync"); tap it to see them, retry one, or discard one.
+- **The app opens without a connection** for pages you have visited, as the account you were
+  signed in to. Losing signal no longer signs you out.
+- **Signing out with unsent changes asks first**, with how many there are: Sync now, Stay signed
+  in, or discard them (confirmed twice). Signing out deletes this account's offline data from the
+  device.
+- **Settings → Offline data on this device** shows what is kept and how much room it takes, says
+  that it is not encrypted on the device and that iPhone may clear it after weeks unused, and has
+  "Clear offline data". Money, banking, investments and work are never stored on the device.
+
 ## 2026-11-14: Update a plan day from a workout
 
 - **After a plan workout, you can save what you changed to the plan.** If you added, removed,
