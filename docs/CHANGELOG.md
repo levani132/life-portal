@@ -2,6 +2,21 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-14: Update a plan day from a workout
+
+- **After a plan workout, you can save what you changed to the plan.** If you added, removed,
+  swapped or reordered exercises, or changed a rest or a superset, a card under the finished
+  workout offers "Update <day> in <plan>". Review shows each change, the day after and the day
+  now; nothing changes until you confirm, and "Not now" leaves the plan as it is. It is also there
+  when you open that workout from History.
+- **Only that day changes, and only what you changed.** Skipped or unfinished exercises stay in
+  the plan. A new exercise's planned sets come from the sets you logged, never their weights; an
+  exercise you kept keeps its planned sets.
+- **Ready-made plans** are saved as your own copy with that day updated.
+- **No lost edits.** If the day was edited since you opened the review, or in another tab, you are
+  asked to review again instead of it being overwritten. Your workout history, records, ranks and
+  tournaments are unchanged.
+
 ## 2026-11-14: Rank emblems and All ranks
 
 - **New rank emblems.** Each of the eight tiers has its own emblem, from a stone circle (Initiate)

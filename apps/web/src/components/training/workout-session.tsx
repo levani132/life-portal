@@ -58,6 +58,7 @@ import { RestEditor } from './rest-editor';
 import { exerciseRest, sessionFocus } from '../../lib/training-workout';
 import { SetForm, type SetFormValue } from './set-row';
 import { SetTable } from './set-table';
+import { PlanDayUpdate } from './plan-day-update';
 
 interface PendingSet {
   sessionId: string;
@@ -349,6 +350,9 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
           />
         </div>
       </section>
+
+      {/* Issue #15: a finished plan workout may offer to update its plan day. Never blocks. */}
+      {!open && session.plan && <PlanDayUpdate sessionId={session.id} />}
 
       {/* Outside the card, so it can stick while the exercises scroll (see RestTimer). */}
       {open && <RestTimer since={session.lastSetAt} seconds={focus.restSeconds} next={upNext} />}

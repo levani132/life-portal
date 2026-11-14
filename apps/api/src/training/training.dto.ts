@@ -181,6 +181,8 @@ export class PlanExerciseDto {
 
 export class PlanWorkoutDto {
   @IsOptional() @IsString() @MaxLength(100) id?: string;
+  /** Issue #15: the day's revision as loaded, so a stale save answers 409 instead of undoing an edit. */
+  @IsOptional() @IsInt() @Min(0) revision?: number;
   @IsString() @MaxLength(PLAN_LIMITS.name) name!: string;
   @IsArray() @ArrayMaxSize(PLAN_LIMITS.exercises)
   @ValidateNested({ each: true }) @Type(() => PlanExerciseDto)
@@ -201,4 +203,10 @@ export class CreatePlanDto extends ReplacePlanDto {
 
 export class CopyPlanDto {
   @IsUUID() requestId!: string;
+}
+
+/** Issue #15: apply a finished workout's changes to its plan day, at the revision reviewed. */
+export class PlanDayUpdateDto {
+  @IsUUID() requestId!: string;
+  @IsInt() @Min(0) revision!: number;
 }

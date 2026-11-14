@@ -119,6 +119,8 @@ export function planInputOf(plan: PlanDetail): PlanInput {
     ...(plan.description ? { description: plan.description } : {}),
     workouts: plan.workouts.map((workout) => ({
       id: workout.id,
+      // Issue #15: a save over a newer edit of this day answers 409 instead of undoing it.
+      revision: workout.revision,
       name: workout.name,
       exercises: workout.exercises.map((exercise) => ({
         id: exercise.id,

@@ -2,7 +2,8 @@ import { Types } from 'mongoose';
 
 /**
  * A tiny in-memory stand-in for a Mongoose model, for the training service specs. It supports
- * the query shapes those services use (equality, `$in`, `$ne`, `$lt`, `$exists`, `$or`,
+ * the query shapes those services use (equality, `$in`, `$ne`, `$lt`, `$exists`, `$or`, `$elemMatch`,
+ * `$addToSet`, `$[name]` array filters,
  * sort/limit/skip/select/lean) and unique indexes, which is what the invariants under test
  * depend on. It is not a general Mongo emulator.
  */
@@ -43,6 +44,7 @@ function matchesValue(value: unknown, condition: unknown): boolean {
         case '$lte': return value !== undefined && compare(value, arg) <= 0;
         case '$exists': return (value !== undefined) === arg;
         case '$regex': return typeof value === 'string' && new RegExp(arg as string).test(value);
+        case '$elemMatch': return Array.isArray(value) && value.some((item) => matches(item as Doc, arg as Filter));
         default: throw new Error(`fake model: unsupported operator ${op}`);
       }
     });
@@ -128,7 +130,7 @@ export class FakeModel {
     return { ...doc, toObject: () => clone(doc) };
   }
 
-  private apply(doc: Doc, update: Record<string, Record<string, unknown>>) {
+  private apply(doc: Doc, update: Record<string, Record<string, unknown>>, arrayFilters: Filter[] = []) {
     // Dotted paths ("snapshot.machineName") reach into embedded documents, as in Mongo.
     const parent = (path: string) => {
       const parts = path.split('.');
@@ -138,8 +140,24 @@ export class FakeModel {
       return { at, last };
     };
     for (const [path, value] of Object.entries(update['$set'] ?? {})) {
+      // `list.$[name].field`: every element the matching array filter selects.
+      const filtered = /^(.+)\.\$\[(\w+)\]\.(.+)$/.exec(path);
+      if (filtered) {
+        const [, list, name, field] = filtered;
+        const spec = arrayFilters.find((item) => Object.keys(item).some((key) => key.startsWith(`${name}.`)));
+        const own = Object.fromEntries(Object.entries(spec ?? {}).map(([key, arg]) => [key.slice(name.length + 1), arg]));
+        for (const item of (parent(list).at[parent(list).last] as Doc[] | undefined) ?? []) {
+          if (matches(item, own)) (item as Record<string, unknown>)[field] = clone(value);
+        }
+        continue;
+      }
       const { at, last } = parent(path);
       at[last] = clone(value);
+    }
+    for (const [path, value] of Object.entries(update['$addToSet'] ?? {})) {
+      const { at, last } = parent(path);
+      const list = ((at[last] as unknown[] | undefined) ??= []);
+      if (!list.some((item) => same(item, value))) list.push(clone(value));
     }
     for (const path of Object.keys(update['$unset'] ?? {})) {
       const { at, last } = parent(path);
@@ -151,9 +169,13 @@ export class FakeModel {
     }
   }
 
-  async updateOne(filter: Filter, update: Record<string, Record<string, unknown>>, options: { upsert?: boolean } = {}) {
+  async updateOne(
+    filter: Filter,
+    update: Record<string, Record<string, unknown>>,
+    options: { upsert?: boolean; arrayFilters?: Filter[] } = {},
+  ) {
     const doc = this.docs.find((row) => matches(row, filter));
-    if (doc) this.apply(doc, update);
+    if (doc) this.apply(doc, update, options.arrayFilters);
     else if (options.upsert) {
       // Like Mongo: the filter's plain equality fields seed the new document.
       const seeded = Object.fromEntries(Object.entries(filter).filter(([key, value]) => !key.startsWith('$') && (typeof value !== 'object' || value === null)));

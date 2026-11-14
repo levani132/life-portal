@@ -50,8 +50,8 @@ re-fills its weights from grams so a kg number is never sent as lb.
 | `exercises` | The catalogue. Shared rows have no `userId` and are written only by the seeder; private rows have one. One catalogue for everyone instead of a copy per account. |
 | `training_machines` | **Legacy (#14), read-only.** Specific machines people added before #14. Nothing creates, edits or lists them; rows are kept because past `workout_exercises.machineId` point at them. |
 | `training_profiles` | One row per user: `weightUnit`, `defaultRestSeconds`. Upserted on first read, seeding only fields the caller did not send. |
-| `training_plans` | Workout plans (spec 023). An exercise may carry `superset` (spec 025). One document per plan with `workouts[] → exercises[] → targets[]` embedded, because a plan is read and saved whole. Shared (ready-made) plans have no `userId`, a `seedKey` and `seedVersion`, and are written only by `PlanSeeder`; own plans have a `userId`. Workout and exercise `id`s are stable strings (seed keys like `push-pull-legs:push` for shared plans) because sessions point at them. `archived` marks a shared plan dropped from the seed file. |
-| `workout_sessions` | One workout: `day`, `status`, `startedAt`, `endedAt?`, `notes?`, `requestId`, and `plan? {planId, planWorkoutId, planName, workoutName}` when started from a plan (frozen). |
+| `training_plans` | Workout plans (spec 023). An exercise may carry `superset` (spec 025). One document per plan with `workouts[] → exercises[] → targets[]` embedded, because a plan is read and saved whole. Shared (ready-made) plans have no `userId`, a `seedKey` and `seedVersion`, and are written only by `PlanSeeder`; own plans have a `userId`. Workout and exercise `id`s are stable strings (seed keys like `push-pull-legs:push` for shared plans) because sessions point at them. `archived` marks a shared plan dropped from the seed file. A workout (day) has `revision?` (issue #15), bumped whenever its exercises change; absent reads as 0. |
+| `workout_sessions` | One workout: `day`, `status`, `startedAt`, `endedAt?`, `notes?`, `requestId`, and `plan? {planId, planWorkoutId, planName, workoutName, revision?}` when started from a plan (frozen; `revision` is the day's at start, issue #15). Issue #15: `removedPlanExerciseIds?` (plan exercises removed during the workout on purpose) and `planUpdate? {requestId, planId, planWorkoutId, copied, at}` (written once, when the workout updated its plan day). |
 | `workout_exercises` | An exercise within a session, in `order`, with a frozen `snapshot`; from a plan also `planned {planExerciseId, restSeconds?, note?, targets}` (frozen) and `skipped?`. Spec 025: `restSeconds?` (this workout's choice, 0–900) and `superset?` (copied from the plan, then editable). |
 | `workout_sets` | **The event row.** One performed set. Everything about progress derives from these. |
 
@@ -200,6 +200,43 @@ rest is skipped or is 0. The server keeps **one in-memory timer per person** and
 restart loses a pending alarm, and the next set sets a new one. Several open devices send the
 same time, which just replaces the timer.
 
+**Updating a plan day from a workout (issue #15).** A finished workout started from a plan may
+offer to update that day with what was done differently. `planDayUpdate` (domain,
+`training-plan-update.ts`) is a **patch onto the day as it is now**, not a copy of the workout:
+
+- *added*: an exercise added during the workout (no `planned`) with at least one logged set;
+- *removed*: only a plan exercise **removed on purpose** (`DELETE` of a planned row records it in
+  `removedPlanExerciseIds`). Finishing also drops not-done planned rows, so without that record a
+  skip and a removal would look the same; skipped and not-done exercises stay in the plan, and
+  workouts from before #15 never propose removals;
+- *replaced*: a swap. Same measure keeps the plan's targets; another measure gets targets from
+  the logged sets;
+- *moved*: the fewest plan exercises that changed place (longest increasing run). Exercises the
+  workout did not do keep their slot; added ones follow the exercise done before them;
+- *rest* / *superset*: the workout's own choice differs from the plan's.
+
+**Prescriptions never come from performance.** A kept exercise keeps its planned sets (4 sets
+done instead of 3 changes nothing); a derived target is one per *logged* set, with its type
+(warm-up, else working) and reps, time or distance, **never a weight** (`targetsFromSets`, capped
+at 20). Anything the workout did not touch, including edits made to the day after it started, is
+left exactly as it is; `editedSince` (frozen `plan.revision` ≠ the day's, or for older sessions the
+plan's `updatedAt` after `startedAt`) says so in the review.
+
+**Concurrency.** `GET /sessions/:id/plan-update` returns the day's `revision` with the changes;
+`POST` applies at that revision with a conditional update of **that day only**
+(`workouts.$[day]`, `$elemMatch` on the revision) and answers 409 `PLAN_CHANGED` when it moved.
+`PUT /plans/:id` bumps a day's revision when its exercises change and, when the client sends the
+revision it loaded (the plan editor and "Also save to plan" do), refuses with 409 `PLAN_CHANGED`
+to change a day edited since; without it, last write wins as before. A rename is not a change.
+
+**Once per workout.** `planUpdate` is written when it applies; any later `POST` (same or new
+`requestId`) returns that first result, and the preview says `applied`. A ready-made plan cannot
+be edited, so applying first copies it (`copy()` with the same `requestId`, ids mapped by
+position) and updates the copy's day; the ready-made plan is untouched. A deleted plan or day is
+`missing`; a change that would leave the plan invalid (a split superset, an exercise no longer
+available) is `invalid` with the reason; neither offers anything. Nothing else is written: the
+workout's snapshots, `planned`, sets, records, ranks and tournament entries stay as they were.
+
 **The workout bar.** `components/training/workout-bar.tsx`, inside the app header (so
 `--header-offset` counts it and the rest timer still sticks under it), on every page while a
 session is open: current exercise, time, rest countdown. It reads `sessions/current` (revalidated
@@ -328,6 +365,8 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `POST` | `/sessions` `{…, planId, planWorkoutId}` | Spec 023: both or neither; copies the workout's exercises and targets. |
 | `PATCH` | `/sessions/:id/exercises/:weId` `{skipped}` | Only for an exercise with `planned` (400 otherwise). |
 | `POST` | `/sessions/:id/exercises/:weId/swap` `{requestId, exerciseId}` | 409 `HAS_SETS` once a set is logged. |
+| `GET` | `/sessions/:id/plan-update` | Issue #15: `{status, revision?, changes, before, after, shared?, editedSince?, applied?, message?}`. Status `available`, `no_changes`, `applied`, `open`, `not_from_plan`, `missing`, `invalid`. |
+| `POST` | `/sessions/:id/plan-update` `{requestId, revision}` | Issue #15: applies to that day only → `{planId, planWorkoutId, copied}`. 409 `PLAN_CHANGED` (day moved on) or `NOTHING_TO_APPLY`; once applied, returns the first result. |
 | `PUT` | `/sessions/:id/rest-alarm` `{at: ISO \| null}` | Spec 025: 204. Sets, moves or cancels the person's rest-over push (in memory). |
 | `GET` | `/exercises/:id/rank?today=` | Issue #5b, needs `trainingRanks` (403 otherwise): `ExerciseRankView`, current and highest-ever strength rank. See Strength ranks. |
 | `GET` | `/summary?today=` | The Home card's figures (`TrainingSummary`, with `weightUnit`, read without creating a profile); also in `GET /api/dashboard`. |
@@ -673,7 +712,11 @@ never drag, because the tabs swipe; spec 023), History (past sessions,
 each opening for reading and editing) and Exercises (the catalogue with filters and a detail view,
 where own exercises can be edited or deleted). Adding an exercise to a workout is one choice (#14):
 the exercise, searched and filtered by muscle and equipment, with "Create exercise" for what the
-catalogue lacks. A workout from before #14 shows its machine on the card, read-only. Sets go through
+catalogue lacks. A workout from before #14 shows its machine on the card, read-only. A finished
+plan workout (right after Finish, and opened from History) shows `PlanDayUpdate`
+(`plan-day-update.tsx`, issue #15) under its header when there is something to update: Review opens
+the changes, the day after and the day now; "Not now" hides it on this device only (localStorage,
+wrapped in try/catch) and changes nothing. Once applied it says so in one line. Sets go through
 `lib/training-queue.ts`: each is shown at once as a pending row, sent in order, and retried on
 `online`, focus and every 5 s after a network or server error. The queue is in memory only:
 closing the app with writes still pending loses them. Weight fields use `Input` with

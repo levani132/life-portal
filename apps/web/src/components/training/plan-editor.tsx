@@ -70,6 +70,8 @@ interface DraftExercise {
 interface DraftWorkout {
   key: string;
   id?: string;
+  /** Issue #15: sent back so a save over a newer edit of this day is refused, not applied. */
+  revision?: number;
   name: string;
   exercises: DraftExercise[];
 }
@@ -102,6 +104,7 @@ function fromPlan(plan: PlanDetail, unit: WeightUnit): Draft {
     workouts: plan.workouts.map((workout) => ({
       key: key(),
       id: workout.id,
+      revision: workout.revision,
       name: workout.name,
       exercises: workout.exercises.map((exercise) => ({
         key: key(),
@@ -167,6 +170,7 @@ function toInput(draft: Draft, unit: WeightUnit): PlanInput {
     ...(draft.description.trim() ? { description: draft.description.trim() } : {}),
     workouts: draft.workouts.map((workout) => ({
       ...(workout.id ? { id: workout.id } : {}),
+      ...(workout.id && workout.revision !== undefined ? { revision: workout.revision } : {}),
       name: workout.name.trim(),
       exercises: workout.exercises.map((exercise) => {
         const rest = exercise.rest.trim() ? (parseDuration(exercise.rest) ?? unreadable) : undefined;

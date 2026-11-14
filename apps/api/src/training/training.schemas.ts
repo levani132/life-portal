@@ -143,6 +143,11 @@ class PlanWorkoutDoc {
   @Prop({ required: true }) id!: string;
   @Prop({ required: true, trim: true, maxlength: 80 }) name!: string;
   @Prop({ type: [PlanExerciseSchema], default: [] }) exercises!: PlanExerciseDoc[];
+  /**
+   * Issue #15: bumped whenever this day's exercises change, for optimistic concurrency. Absent on
+   * days never changed since; read as 0. No default, so an old row and a new one read the same.
+   */
+  @Prop({ type: Number, min: 0 }) revision?: number;
 }
 const PlanWorkoutSchema = SchemaFactory.createForClass(PlanWorkoutDoc);
 
@@ -185,6 +190,17 @@ class SessionPlanDoc {
   @Prop({ required: true }) planWorkoutId!: string;
   @Prop({ required: true }) planName!: string;
   @Prop({ required: true }) workoutName!: string;
+  /** Issue #15: the day's revision when the workout started. Absent on older sessions. */
+  @Prop({ type: Number }) revision?: number;
+}
+
+/** Issue #15: this workout updated a plan day. Written once; a retry with the same id returns it. */
+class PlanUpdateDoc {
+  @Prop({ required: true }) requestId!: string;
+  @Prop({ required: true }) planId!: string;
+  @Prop({ required: true }) planWorkoutId!: string;
+  @Prop({ required: true }) copied!: boolean;
+  @Prop({ required: true, type: Date }) at!: Date;
 }
 
 /** A plan exercise's targets, copied onto a workout exercise at start. Never edited. */
@@ -216,6 +232,12 @@ export class WorkoutSession {
    * renaming or deleting the plan never changes a past or open workout.
    */
   @Prop({ type: SessionPlanDoc }) plan?: SessionPlanDoc;
+  /**
+   * Issue #15: plan exercises removed from this workout on purpose. Finishing drops not-done
+   * planned rows too, so without this a removal and a skip would look the same afterwards.
+   */
+  @Prop({ type: [String], default: undefined }) removedPlanExerciseIds?: string[];
+  @Prop({ type: PlanUpdateDoc }) planUpdate?: PlanUpdateDoc;
 }
 
 export const WorkoutSessionSchema = SchemaFactory.createForClass(WorkoutSession);

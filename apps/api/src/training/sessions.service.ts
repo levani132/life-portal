@@ -120,6 +120,8 @@ export class SessionsService {
                 planWorkoutId: fromPlan.workout.id,
                 planName: fromPlan.plan.name,
                 workoutName: fromPlan.workout.name,
+                // Issue #15: so a later "update this day" can say the day was edited since.
+                revision: fromPlan.workout.revision ?? 0,
               },
             }
           : {}),
@@ -428,6 +430,14 @@ export class SessionsService {
     workoutExerciseId: string,
   ): Promise<{ id: string; deleted: true }> {
     const row = await this.ownedExercise(userId, sessionId, workoutExerciseId);
+    // Issue #15: a plan exercise removed on purpose, as opposed to one left undone (finishing drops
+    // those too). Recorded first, so a retried delete still records it.
+    if (row.planned) {
+      await this.sessions.updateOne(
+        { _id: sessionId, userId },
+        { $addToSet: { removedPlanExerciseIds: row.planned.planExerciseId } },
+      );
+    }
     await this.sets.deleteMany({ userId, workoutExerciseId });
     await this.exercises.deleteOne({ _id: row._id, userId });
     return { id: workoutExerciseId, deleted: true };

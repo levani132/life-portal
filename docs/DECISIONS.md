@@ -1804,3 +1804,30 @@ same body weight and work-capacity bonus, and is labelled "est" (principle 6). O
 training level, the journey shows the tiers alone: thresholds belong to an exercise, and there is
 no account-wide strength rank by design.
 
+## 2026-11-14: Updating a plan day from a workout is a patch, with per-day revisions (issue #15)
+
+**A patch onto today's day, not a copy of the workout.** Copying the workout over the day would
+undo anything edited after the workout started, and would turn this workout's performance into
+next week's prescription. `planDayUpdate` instead applies only what the workout changed (added,
+removed, swapped, moved, rest, superset) to the day as it is now; everything else stays.
+
+**Removal must be explicit.** Finishing drops planned exercises with no logged set, so after a
+workout "not done" and "removed" looked the same. Treating every missing one as a removal would
+silently shrink a plan after one short session. `removedPlanExerciseIds` records deliberate
+removals from now on; workouts logged before this never propose removals.
+
+**Never a weight, never an unlogged set.** Targets are derived only where there are none to keep
+(a new exercise, a swap to another measure): one per logged set, type plus reps, time or distance.
+A kept exercise's sets are not touched, even if more or fewer were done.
+
+**Per-day revisions, checked on both writers.** A plan-level version would make an edit to Legs
+block updating Push. The day's `revision` is bumped on content change only (a rename is not), the
+update is a conditional `$[day]` write, and the plan editor and "Also save to plan" send back the
+revision they loaded so a stale editor cannot undo an update either. Old clients that send none
+keep last-write-wins rather than breaking.
+
+**Once per workout; ready-made plans become a copy.** `planUpdate` on the session makes any repeat
+return the first result, which also covers the ad-hoc exercise that, once added to the plan, the
+workout still has no link to. Ready-made plans are seed-owned and read-only, so applying copies
+the plan first (ids mapped by position, which `copy()` preserves) and updates the copy. That is
+the one product call flagged on the issue for the owner to overrule.

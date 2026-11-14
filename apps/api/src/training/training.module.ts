@@ -26,6 +26,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { CatalogueSeeder } from './catalogue.seeder';
 import { CatalogueService } from './catalogue.service';
 import { PlanSeeder } from './plan.seeder';
+import { PlanDayUpdateService } from './plan-day-update.service';
 import { PlansService } from './plans.service';
 import { ProgressService } from './progress.service';
 import { NutritionModule } from '../nutrition/nutrition.module';
@@ -43,6 +44,7 @@ import {
   CreatePlanDto,
   CreateSetDto,
   FinishSessionDto,
+  PlanDayUpdateDto,
   ReorderDto,
   ReplacePlanDto,
   StartSessionDto,
@@ -100,6 +102,7 @@ export class TrainingController {
     private readonly alarms: RestAlarmService,
     private readonly levels: TrainingLevelService,
     private readonly ranks: TrainingRankService,
+    private readonly planUpdates: PlanDayUpdateService,
   ) {}
 
   /** The Home card's figures, for the person's `today` (spec 020 US4). */
@@ -283,6 +286,19 @@ export class TrainingController {
     return finished;
   }
 
+  /** Issue #15: what this finished workout would change in its plan day, and whether it may. */
+  @Get('sessions/:id/plan-update')
+  planUpdate(@CurrentUser('userId') userId: string, @Param('id') id: string) {
+    return this.planUpdates.preview(userId, id);
+  }
+
+  /** Issue #15: apply it, at the reviewed revision. Retry-safe: a workout updates its plan once. */
+  @Post('sessions/:id/plan-update')
+  @HttpCode(200)
+  applyPlanUpdate(@CurrentUser('userId') userId: string, @Param('id') id: string, @Body() dto: PlanDayUpdateDto) {
+    return this.planUpdates.apply(userId, id, dto);
+  }
+
   @Delete('sessions/:id')
   async remove(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     const removed = await this.sessions.remove(userId, id);
@@ -393,7 +409,7 @@ export class TrainingController {
     ]),
   ],
   controllers: [TrainingController],
-  providers: [CatalogueSeeder, PlanSeeder, PlansService, CatalogueService, ProgressService, TrainingProfileService, SessionsService, TrainingSummaryService, RestAlarmService, TrainingLevelService, TrainingRankService],
+  providers: [CatalogueSeeder, PlanSeeder, PlansService, PlanDayUpdateService, CatalogueService, ProgressService, TrainingProfileService, SessionsService, TrainingSummaryService, RestAlarmService, TrainingLevelService, TrainingRankService],
   exports: [SessionsService, TrainingSummaryService, TrainingRankService, TrainingProfileService],
 })
 export class TrainingModule {}

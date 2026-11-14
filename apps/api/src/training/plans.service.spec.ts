@@ -299,3 +299,79 @@ describe('PlansService: progress', () => {
     expect(await f.service.nextUp(ME, '2026-11-12')).toMatchObject({ planId: f.shared, planWorkoutId: 'fb:b' });
   });
 });
+
+describe('PlansService: day revisions (issue #15)', () => {
+  const asInput = (detail: Awaited<ReturnType<PlansService['detail']>>): PlanInput => ({
+    name: detail.name,
+    workouts: detail.workouts.map((workout) => ({
+      id: workout.id,
+      revision: workout.revision,
+      name: workout.name,
+      exercises: workout.exercises.map(({ id, exerciseId, restSeconds, note, superset, targets }) => ({
+        id,
+        exerciseId,
+        ...(restSeconds != null ? { restSeconds } : {}),
+        ...(note ? { note } : {}),
+        ...(superset ? { superset } : {}),
+        targets,
+      })),
+    })),
+  });
+
+  it('bumps only the revision of a day whose exercises changed; a rename does not count', async () => {
+    const f = fixture();
+    const created = await f.service.create(ME, { requestId: randomUUID(), ...f.input() });
+    expect(created.workouts.map((w) => w.revision)).toEqual([0, 0]);
+    const input = asInput(created);
+    input.workouts[0].exercises[0].restSeconds = 60;
+    input.workouts[1].name = 'Legs';
+    const saved = await f.service.replace(ME, created.id, input);
+    expect(saved.workouts.map((w) => w.revision)).toEqual([1, 0]);
+  });
+
+  it('refuses a stale save that would undo a newer edit, and allows one that leaves the day alone', async () => {
+    const f = fixture();
+    const created = await f.service.create(ME, { requestId: randomUUID(), ...f.input() });
+    const stale = asInput(created);
+    const fresh = asInput(created);
+    fresh.workouts[0].exercises[0].restSeconds = 60;
+    await f.service.replace(ME, created.id, fresh);
+    stale.workouts[0].exercises[0].restSeconds = 30;
+    expect(await message(f.service.replace(ME, created.id, stale))).toMatchObject({ code: 'PLAN_CHANGED' });
+    // The same stale editor saving only another day is fine; without revisions, last write wins.
+    const other = asInput(await f.service.detail(ME, created.id));
+    other.workouts[0].revision = 0;
+    other.workouts[1].name = 'Renamed';
+    await expect(f.service.replace(ME, created.id, other)).resolves.toBeDefined();
+    const legacy = asInput(await f.service.detail(ME, created.id));
+    delete legacy.workouts[0].revision;
+    legacy.workouts[0].exercises[0].restSeconds = 45;
+    expect((await f.service.replace(ME, created.id, legacy)).workouts[0].revision).toBe(2);
+  });
+
+  it('replaces one day at its revision and leaves the others untouched', async () => {
+    const f = fixture();
+    const created = await f.service.create(ME, { requestId: randomUUID(), ...f.input() });
+    const [day1, day2] = created.workouts;
+    await f.service.replaceDay(ME, created.id, day1.id, 0, [
+      { id: day1.exercises[1].id, exerciseId: f.plank, targets: [{ type: 'working', durationSeconds: 45 }] },
+      { exerciseId: f.bench, targets: [{ type: 'working', reps: 12 }] },
+    ]);
+    const after = await f.service.detail(ME, created.id);
+    expect(after.workouts[0].revision).toBe(1);
+    expect(after.workouts[0].exercises.map((e) => e.exerciseId)).toEqual([f.plank, f.bench]);
+    expect(after.workouts[0].exercises[0].id).toBe(day1.exercises[1].id);
+    expect(after.workouts[1]).toEqual({ ...day2, isNext: after.workouts[1].isNext });
+    // The same revision again is stale now.
+    expect(await message(f.service.replaceDay(ME, created.id, day1.id, 0, []))).toMatchObject({ code: 'PLAN_CHANGED' });
+  });
+
+  it('validates the day it replaces, and never writes a shared plan', async () => {
+    const f = fixture();
+    const created = await f.service.create(ME, { requestId: randomUUID(), ...f.input() });
+    await expect(
+      f.service.replaceDay(ME, created.id, created.workouts[0].id, 0, [{ exerciseId: f.plank, targets: [{ type: 'working', reps: 5 }] }]),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(f.service.replaceDay(ME, f.shared, 'fb:a', 0, [])).rejects.toBeInstanceOf(NotFoundException);
+  });
+});

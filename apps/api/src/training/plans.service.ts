@@ -135,6 +135,7 @@ export class PlansService {
       ...(row.copiedFrom ? { copiedFrom: { planId: row.copiedFrom.planId, name: row.copiedFrom.name } } : {}),
       workouts: row.workouts.map((workout) => ({
         id: workout.id,
+        revision: workout.revision ?? 0,
         name: workout.name,
         ...(progress.lastDoneDay[workout.id] ? { lastDoneDay: progress.lastDoneDay[workout.id] } : {}),
         isNext: workout.id === progress.nextWorkoutId,
@@ -192,14 +193,67 @@ export class PlansService {
       row.workouts.flatMap((workout) => workout.exercises.map((exercise) => [exercise.id, exercise] as const)),
     );
     const clean = await this.checked(userId, input, workoutIds, exerciseIds);
+    // Issue #15: a day whose exercises change gets a new revision. A save that carries an older
+    // revision and would change the day refuses instead of undoing the newer edit.
+    const workouts = clean.workouts.map((workout, index) => {
+      const stored = workoutIds.get(workout.id);
+      if (!stored) return workout;
+      const revision = stored.revision ?? 0;
+      if (dayKey(stored.exercises) === dayKey(workout.exercises)) return { ...workout, ...(revision ? { revision } : {}) };
+      const sent = input.workouts[index]?.revision;
+      if (sent !== undefined && sent < revision) throw planChanged(stored.name);
+      return { ...workout, revision: revision + 1 };
+    });
     await this.plans.updateOne(
       { _id: row._id, userId },
       clean.description === undefined
-        ? { $set: { name: clean.name, workouts: clean.workouts }, $unset: { description: 1 } }
-        : { $set: clean },
+        ? { $set: { name: clean.name, workouts }, $unset: { description: 1 } }
+        : { $set: { ...clean, workouts } },
       { runValidators: true },
     );
     return this.detail(userId, id);
+  }
+
+  /**
+   * Issue #15: replaces one day's exercises of an own plan, and only that day, if it is still at
+   * `revision`. Validated as a whole plan, so a day this leaves invalid is refused. 409
+   * `PLAN_CHANGED` when the day moved on since it was reviewed.
+   */
+  async replaceDay(
+    userId: string,
+    id: string,
+    workoutId: string,
+    revision: number,
+    exercises: PlanInput['workouts'][number]['exercises'],
+  ): Promise<void> {
+    const row = await this.own(userId, id);
+    const stored = row.workouts.find((workout) => workout.id === workoutId);
+    if (!stored) throw new NotFoundException(`Workout ${workoutId} not found in this plan`);
+    if ((stored.revision ?? 0) !== revision) throw planChanged(stored.name);
+    const input: PlanInput = {
+      name: row.name,
+      ...(row.description ? { description: row.description } : {}),
+      workouts: row.workouts.map((workout) => ({
+        id: workout.id,
+        name: workout.name,
+        exercises: workout.id === workoutId ? exercises : workout.exercises.map(toExerciseInput),
+      })),
+    };
+    const clean = await this.checked(
+      userId,
+      input,
+      new Map(row.workouts.map((workout) => [workout.id, workout])),
+      new Map(row.workouts.flatMap((workout) => workout.exercises.map((exercise) => [exercise.id, exercise] as const))),
+    );
+    const day = clean.workouts.find((workout) => workout.id === workoutId);
+    if (!day) throw new NotFoundException(`Workout ${workoutId} not found in this plan`);
+    const atRevision = revision === 0 ? { $or: [{ revision: 0 }, { revision: { $exists: false } }] } : { revision };
+    const result = await this.plans.updateOne(
+      { _id: row._id, userId, workouts: { $elemMatch: { id: workoutId, ...atRevision } } },
+      { $set: { 'workouts.$[day].exercises': day.exercises, 'workouts.$[day].revision': revision + 1 } },
+      { arrayFilters: [{ 'day.id': workoutId }], runValidators: true },
+    );
+    if (!result.matchedCount) throw planChanged(stored.name);
   }
 
   /** Any plan the caller can see, as a new own plan with new ids. Never linked to the original. */
@@ -325,6 +379,33 @@ export class PlansService {
 }
 
 const newId = () => new Types.ObjectId().toHexString();
+
+type StoredExercise = TrainingPlan['workouts'][number]['exercises'][number];
+
+/** A stored plan exercise as input, without Mongo's extras. */
+export function toExerciseInput(exercise: StoredExercise) {
+  return {
+    id: exercise.id,
+    exerciseId: exercise.exerciseId,
+    ...(exercise.restSeconds != null ? { restSeconds: exercise.restSeconds } : {}),
+    ...(exercise.note ? { note: exercise.note } : {}),
+    ...(exercise.superset ? { superset: exercise.superset } : {}),
+    targets: exercise.targets.map(toTarget),
+  };
+}
+
+/** A day's exercises as a comparable string: what a revision tracks (the name is not part of it). */
+function dayKey(exercises: readonly StoredExercise[]): string {
+  return JSON.stringify(exercises.map(toExerciseInput));
+}
+
+/** Issue #15: the day was changed since the caller read it. */
+export function planChanged(dayName: string) {
+  return new ConflictException({
+    code: 'PLAN_CHANGED',
+    message: `${dayName} was changed since you opened it. Review it again.`,
+  });
+}
 
 const stamp = (row: PlanRow) => (row.updatedAt ?? row.createdAt)?.getTime() ?? 0;
 

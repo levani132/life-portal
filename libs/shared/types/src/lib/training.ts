@@ -411,6 +411,12 @@ export interface PlanExerciseInput {
 
 export interface PlanWorkoutInput {
   id?: string;
+  /**
+   * Issue #15: the day's revision as the editor loaded it. Sent back, a save that would change a
+   * day edited since answers 409 `PLAN_CHANGED` instead of undoing the newer edit. Optional, so an
+   * old client keeps last-write-wins.
+   */
+  revision?: number;
   name: string;
   exercises: PlanExerciseInput[];
 }
@@ -445,6 +451,8 @@ export interface PlanExerciseDetail {
 
 export interface PlanWorkoutDetail {
   id: string;
+  /** Issue #15: bumped whenever this day's exercises change. Concurrency only; not shown. */
+  revision: number;
   name: string;
   lastDoneDay?: string;
   isNext: boolean;
@@ -481,6 +489,81 @@ export interface PlannedExercise {
   restSeconds?: number;
   note?: string;
   targets: PlanTarget[];
+}
+
+// ------------------------------------------------------------------ plan day update (issue #15)
+
+/**
+ * One change a finished workout would make to the plan day it came from. Names are for display;
+ * `planExerciseId` points into the day as it is now.
+ */
+export type PlanDayChange =
+  | { kind: 'added'; exerciseId: string; name: string; sets: number }
+  | { kind: 'removed'; planExerciseId: string; name: string }
+  | { kind: 'replaced'; planExerciseId: string; fromName: string; toName: string; targetsKept: boolean }
+  | { kind: 'moved'; planExerciseId: string; name: string; from: number; to: number }
+  | { kind: 'rest'; planExerciseId: string; name: string; from?: number; to?: number }
+  | { kind: 'superset'; planExerciseId: string; name: string; from?: string; to?: string };
+
+export type PlanDayChangeKind = PlanDayChange['kind'];
+
+/** A line of the day as it is, or would be: enough to show before and after. */
+export interface PlanDayLine {
+  name: string;
+  measure: Measure;
+  targets: PlanTarget[];
+  restSeconds?: number;
+  superset?: string;
+  /** What happened to it, on the "after" side. */
+  change?: 'added' | 'replaced' | 'moved' | 'changed';
+}
+
+export type PlanDayUpdateStatus =
+  /** There is something to apply. */
+  | 'available'
+  /** The day already matches what was done. */
+  | 'no_changes'
+  /** The workout is still open. */
+  | 'open'
+  /** This workout already updated its plan day; it does so once. */
+  | 'applied'
+  /** Not started from a plan (ad-hoc): never offered. */
+  | 'not_from_plan'
+  /** The plan or the day is gone. */
+  | 'missing'
+  /** The change would leave the day invalid (e.g. a superset split up); nothing is offered. */
+  | 'invalid';
+
+export interface PlanDayUpdatePreview {
+  status: PlanDayUpdateStatus;
+  planId?: string;
+  planWorkoutId?: string;
+  planName?: string;
+  workoutName?: string;
+  /** A ready-made plan: applying saves the caller's own copy with this day updated. */
+  shared?: boolean;
+  /** The day's revision this preview was built from. Send it back to apply. */
+  revision?: number;
+  /** The day was edited after this workout started; the changes are against today's version. */
+  editedSince?: boolean;
+  /** Set once this workout updated a plan, so the card can say so. */
+  applied?: { planId: string; planWorkoutId: string; copied: boolean };
+  message?: string;
+  changes: PlanDayChange[];
+  before: PlanDayLine[];
+  after: PlanDayLine[];
+}
+
+export interface PlanDayUpdateInput {
+  requestId: string;
+  revision: number;
+}
+
+export interface PlanDayUpdateResult {
+  planId: string;
+  planWorkoutId: string;
+  /** A ready-made plan was copied first. */
+  copied: boolean;
 }
 
 /**
