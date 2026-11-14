@@ -131,7 +131,7 @@ export class SessionsService {
       planWorkoutId?: string;
       /** Spec 028: the id the client gave it (offline). */
       id?: string;
-      /** Spec 028: when it really started (offline), clamped to the last 48 hours. */
+      /** Spec 028: when it really started (offline). Spec 034: more than 14 days ago is refused. */
       startedAt?: string;
     },
     nowMs = Date.now(),
