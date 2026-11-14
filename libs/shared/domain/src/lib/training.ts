@@ -144,6 +144,19 @@ export function normaliseSearch(text: string): string {
     .trim();
 }
 
+/**
+ * Offline exercise search (spec 028, #23): every word of the query appears somewhere in the
+ * name or one of its aliases. `searchText` is the server's `searchName` when the device has it,
+ * else the name. Looser than the server's contains-match, which suits a short device list.
+ */
+export function matchesExerciseSearch(searchText: string, query: string): boolean {
+  const haystack = normaliseSearch(searchText);
+  return normaliseSearch(query)
+    .split(' ')
+    .filter(Boolean)
+    .every((word) => haystack.includes(word));
+}
+
 /** A free-exercise-db entry, as vendored (facts only). */
 export interface CatalogueEntry {
   id: string;
@@ -201,11 +214,29 @@ export const CATALOGUE_EQUIPMENT_SUFFIX: Readonly<Record<string, 'Machine' | 'Ca
   Shotgun_Row: 'Cable',
 };
 
+/**
+ * Rows people look for by another name (#23). Search matches the name and aliases as text, so a
+ * row is only found by words it carries: the dataset's "Machine Bench Press" (the selectorised,
+ * weight-stack chest press) never matched "chest press". `name` replaces the display name (the
+ * dataset name is always kept as an alias); `aliases` adds search terms. Renaming moves nothing,
+ * for the reasons above. Look-alikes stay separate rows: Leverage Chest Press is plate-loaded.
+ */
+export const CATALOGUE_DISPLAY_NAMES: Readonly<Record<string, { name?: string; aliases: readonly string[] }>> = {
+  Machine_Bench_Press: {
+    name: 'Seated Chest Press (Machine)',
+    aliases: ['Machine Chest Press', 'Chest Press Machine', 'Selectorized Chest Press'],
+  },
+  Leverage_Chest_Press: { aliases: ['Plate-Loaded Chest Press'] },
+};
+
 /** A dataset entry's display name and search aliases: "Butterfly (Machine)", alias "Butterfly". */
 export function catalogueName(entry: Pick<CatalogueEntry, 'id' | 'name'>): { name: string; aliases: string[] } {
-  const name = entry.name.trim();
+  const dataset = entry.name.trim();
   const suffix = CATALOGUE_EQUIPMENT_SUFFIX[entry.id];
-  return suffix ? { name: `${name} (${suffix})`, aliases: [name] } : { name, aliases: [] };
+  const override = CATALOGUE_DISPLAY_NAMES[entry.id];
+  const name = override?.name ?? (suffix ? `${dataset} (${suffix})` : dataset);
+  const aliases = [...(name === dataset ? [] : [dataset]), ...(override?.aliases ?? [])];
+  return { name, aliases: [...new Set(aliases.filter((alias) => alias !== name))] };
 }
 
 export function catalogueEquipment(entry: Pick<CatalogueEntry, 'equipment'>): EquipmentType {

@@ -1,5 +1,5 @@
 import { Types } from 'mongoose';
-import { CATALOGUE_EQUIPMENT_SUFFIX } from '@life-portal/shared-domain';
+import { CATALOGUE_DISPLAY_NAMES, CATALOGUE_EQUIPMENT_SUFFIX } from '@life-portal/shared-domain';
 import catalogueFile from './catalogue/free-exercise-db.json';
 import { CatalogueSeeder, catalogueRow, type CatalogueFile } from './catalogue.seeder';
 import { CatalogueService } from './catalogue.service';
@@ -70,6 +70,28 @@ describe('CatalogueSeeder', () => {
     const ids = new Set((catalogueFile as CatalogueFile).exercises.map((e) => e.id));
     for (const listed of Object.keys(CATALOGUE_EQUIPMENT_SUFFIX)) expect(ids.has(listed)).toBe(true);
     expect((catalogueFile as CatalogueFile).version).toBeGreaterThanOrEqual(3);
+  });
+
+  it('renames the selectorised chest press in catalogue v4, keeping the row, its id and its rank key (#23)', async () => {
+    const exercises = new FakeModel();
+    const seeder = new CatalogueSeeder(exercises as never);
+    const entry = (catalogueFile as CatalogueFile).exercises.find((e) => e.id === 'Machine_Bench_Press');
+    if (!entry) throw new Error('Machine_Bench_Press is missing from the vendored catalogue');
+    exercises.docs.push({ _id: new Types.ObjectId(), seedKey: 'fedb:Machine_Bench_Press', seedVersion: 3, name: 'Machine Bench Press', aliases: [], archived: false });
+    const id = exercises.docs[0]['_id'];
+    await seeder.seed({ version: 4, source: 'test', exercises: [entry] });
+    expect(exercises.docs).toHaveLength(1);
+    expect(exercises.docs[0]).toMatchObject({
+      _id: id,
+      seedKey: 'fedb:Machine_Bench_Press',
+      name: 'Seated Chest Press (Machine)',
+      equipmentType: 'machine',
+      aliases: ['Machine Bench Press', 'Machine Chest Press', 'Chest Press Machine', 'Selectorized Chest Press'],
+    });
+    expect((catalogueFile as CatalogueFile).version).toBeGreaterThanOrEqual(4);
+    for (const listed of Object.keys(CATALOGUE_DISPLAY_NAMES)) {
+      expect((catalogueFile as CatalogueFile).exercises.some((e) => e.id === listed)).toBe(true);
+    }
   });
 
   it('keeps facts only and drops duplicated muscles', () => {

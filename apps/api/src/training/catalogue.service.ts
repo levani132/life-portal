@@ -174,6 +174,8 @@ export class CatalogueService {
     return rows.map((row) => ({
       ...this.toListItem(row),
       ...(recent.has(String(row._id)) ? { recent: true } : {}),
+      // #23: so offline search matches aliases ("machine bench press") as the server does.
+      ...(row.searchName ? { searchName: row.searchName } : {}),
     }));
   }
 

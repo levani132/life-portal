@@ -1,6 +1,9 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Types } from 'mongoose';
+import { normaliseSearch } from '@life-portal/shared-domain';
+import catalogueFile from './catalogue/free-exercise-db.json';
+import { catalogueRow, type CatalogueFile } from './catalogue.seeder';
 import { CatalogueService, rankExercises, searchNameFor } from './catalogue.service';
 import { FakeModel, fakeMedia } from './fake-model.testing';
 import { ProgressService } from './progress.service';
@@ -227,6 +230,34 @@ describe('SessionsService: no machine step (#14)', () => {
   });
 });
 
+describe('finding the seated chest press machine in the real catalogue (#23)', () => {
+  const file = catalogueFile as CatalogueFile;
+  const rows = file.exercises.map((entry) => {
+    const row = catalogueRow(entry, file.version);
+    return { id: row.seedKey, name: row.name, searchName: row.searchName };
+  });
+  /** What the server does: Mongo's contains-match on `searchName`, then `rankExercises`. */
+  const search = (q: string) => {
+    const needle = normaliseSearch(q);
+    return rankExercises(rows.filter((row) => row.searchName.includes(needle)), needle, new Set()).map((row) => row.id);
+  };
+
+  it.each(['chest press', 'Chest press', 'machine chest press', 'seated chest press', 'machine bench press', 'chest press machine'])(
+    'puts it first for "%s"',
+    (q) => {
+      expect(search(q)[0]).toBe('fedb:Machine_Bench_Press');
+    },
+  );
+
+  it('keeps the plate-loaded machine as its own row, found by "chest press" too', () => {
+    const found = search('chest press');
+    expect(found).toContain('fedb:Leverage_Chest_Press');
+    expect(found).toContain('fedb:Cable_Chest_Press');
+    expect(rows.filter((row) => row.name === 'Seated Chest Press (Machine)')).toHaveLength(1);
+    expect(search('plate loaded chest press')[0]).toBe('fedb:Leverage_Chest_Press');
+  });
+});
+
 describe('CatalogueService.offlineList (spec 028)', () => {
   it('keeps own, recently used and planned exercises, and not the rest of the catalogue', async () => {
     const f = fixture();
@@ -246,5 +277,7 @@ describe('CatalogueService.offlineList (spec 028)', () => {
     expect(list.map((item) => item.name).sort()).toEqual(['Iso row', 'Planned press', 'Used curl']);
     expect(list.find((item) => item.id === used)?.recent).toBe(true);
     expect(list.find((item) => item.id === mine.id)?.isOwn).toBe(true);
+    // #23: the device copy carries what the server searches, so aliases work offline too.
+    for (const item of list) expect(typeof item.searchName).toBe('string');
   });
 });

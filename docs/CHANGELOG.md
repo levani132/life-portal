@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-14: Find the chest press machine
+
+- **Searching "chest press", "machine chest press", "seated chest press" or "machine bench
+  press" now finds the seated chest press machine first.** It is called "Seated Chest Press
+  (Machine)". Your history and rank with it stay as they were; past workouts still show its old
+  name, "Machine Bench Press". The plate-loaded "Leverage Chest Press" is still its own exercise.
+- **Offline search also finds exercises by their other names.**
+
 ## 2026-11-14: Sync health
 
 - **For the developer: a "Sync health" page** shows how many offline changes were sent,

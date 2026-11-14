@@ -106,6 +106,12 @@ export interface ExerciseListItem {
   recent?: boolean;
   /** How load is entered for this exercise, from its rank standard (e.g. per dumbbell). */
   loadNote?: string;
+  /**
+   * #23: the name and every alias, normalised, as the server searches them. Sent only in the
+   * device copy (`/training/exercises/offline`), so offline search finds "Machine Bench Press"
+   * under its new name too. A copy saved before this has none; search falls back to `name`.
+   */
+  searchName?: string;
 }
 
 /** A signed, short-lived link to a stored photo. The storage key never leaves the API. */

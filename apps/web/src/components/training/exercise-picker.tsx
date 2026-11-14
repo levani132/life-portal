@@ -10,6 +10,7 @@ import {
   type Exercise,
   type ExerciseListItem,
 } from '@life-portal/shared-types';
+import { matchesExerciseSearch } from '@life-portal/shared-domain';
 import { EmptyState, ErrorNote, Input, Select, Spinner } from '../ui';
 import { NetworkError } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
@@ -36,12 +37,11 @@ function searchOffline(
   list: ExerciseListItem[],
   { q, muscle, equipment }: { q: string; muscle: string; equipment: string },
 ): ExerciseListItem[] {
-  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
   return list.filter(
     (exercise) =>
       (!muscle || exercise.primaryMuscles.includes(muscle as never)) &&
       (!equipment || exercise.equipmentType === equipment) &&
-      words.every((word) => exercise.name.toLowerCase().includes(word)),
+      matchesExerciseSearch(exercise.searchName ?? exercise.name, q),
   );
 }
 

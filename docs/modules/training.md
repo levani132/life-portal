@@ -295,6 +295,14 @@ the picker's filter and label. Renaming moves nothing: rank standards and plans 
 Press* (plate-loaded) and *Machine Bench Press* (selectorised) are **not** merged: merging shared
 rows would move people's history and rank standards between exercises.
 
+**Names people search by (catalogue v4, #23).** Search only finds words a row carries, and the
+dataset's *Machine Bench Press* (the selectorised, weight-stack chest press) never matched
+"chest press". `CATALOGUE_DISPLAY_NAMES` renames it **Seated Chest Press (Machine)**, with
+aliases *Machine Bench Press*, *Machine Chest Press*, *Chest Press Machine* and *Selectorized
+Chest Press*. *Leverage Chest Press* keeps its name and gains the alias *Plate-Loaded Chest Press*.
+Same row, `_id` and `seedKey`, so history, ranks and plans stay where they were. Workouts logged
+before v4 still show "Machine Bench Press" (frozen snapshot).
+
 Mapping (`catalogueMeasure`): cardio → distance and time; stretching or a static hold → time;
 no equipment or "body only" → bodyweight reps; the 16 pulls and dips in
 `BODYWEIGHT_CATALOGUE_IDS` (weighted pull-ups, bar and ring dips, muscle-ups, suspended rows…,
@@ -325,6 +333,11 @@ service then ranks every match in memory (`rankExercises`, capped at 2,000 rows,
 
 within each tier, exercises the caller logged in the last 90 days first (`recent: true`, from
 `workout_sets.distinct('exerciseId')` on `(userId, exerciseId, loggedAt)`), then by name.
+
+Offline, the picker searches the device copy with `matchesExerciseSearch`: every word of the
+query must appear in the row's `searchName`, which `/exercises/offline` includes since #23, so
+aliases work offline too. A copy saved before that has no `searchName`, so its name is searched
+instead. The device copy holds only own, recent and planned exercises, not the whole catalogue.
 
 ### Own exercises
 

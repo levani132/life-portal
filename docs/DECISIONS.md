@@ -2077,3 +2077,22 @@ other people's posts on the device is S3 and is waiting for the owner.
   write.
 - The server's day is UTC, not the person's day.
 
+## 2026-11-14 · The machine chest press is renamed, not duplicated (issue #23)
+
+**Decided:**
+- The selectorised chest press already existed as *Machine Bench Press*. Search matches only the
+  name and aliases, so "chest press" never found it.
+- Catalogue v4 renames it *Seated Chest Press (Machine)* and adds aliases in
+  `CATALOGUE_DISPLAY_NAMES`, rather than adding a new row.
+- Offline search now matches the aliases too (`searchName` in the device copy).
+- *Leverage Chest Press* (plate-loaded) stays separate, with a "Plate-Loaded Chest Press" alias.
+
+**Buys:**
+- The four searches people use all put it first, online and offline.
+- A new row would have split history and rank standards between two exercises. The rename moves
+  nothing.
+
+**Costs:**
+- Past workouts keep the old name in their frozen snapshot, so one exercise shows under two
+  names across time.
+

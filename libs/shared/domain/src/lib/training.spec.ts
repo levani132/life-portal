@@ -1,6 +1,7 @@
 import {
   CATALOGUE_EQUIPMENT_SUFFIX,
   catalogueName,
+  matchesExerciseSearch,
   legacyMachineCase,
   weekSummary,
   bestOneRepMax,
@@ -182,6 +183,28 @@ describe('catalogue mapping', () => {
     expect(catalogueName({ id: 'Pallof_Press', name: 'Pallof Press ' })).toEqual({ name: 'Pallof Press (Cable)', aliases: ['Pallof Press'] });
     expect(catalogueName({ id: 'Barbell_Squat', name: 'Barbell Squat' })).toEqual({ name: 'Barbell Squat', aliases: [] });
     for (const suffix of Object.values(CATALOGUE_EQUIPMENT_SUFFIX)) expect(['Machine', 'Cable']).toContain(suffix);
+  });
+
+  it('names the selectorised chest press so "chest press" finds it, keeping the dataset name (#23)', () => {
+    expect(catalogueName({ id: 'Machine_Bench_Press', name: 'Machine Bench Press' })).toEqual({
+      name: 'Seated Chest Press (Machine)',
+      aliases: ['Machine Bench Press', 'Machine Chest Press', 'Chest Press Machine', 'Selectorized Chest Press'],
+    });
+    // The plate-loaded machine keeps its name and stays a separate row.
+    expect(catalogueName({ id: 'Leverage_Chest_Press', name: 'Leverage Chest Press' })).toEqual({
+      name: 'Leverage Chest Press',
+      aliases: ['Plate-Loaded Chest Press'],
+    });
+  });
+
+  it('matches offline search words anywhere in the name or aliases (#23)', () => {
+    const machine = 'seated chest press machine | machine bench press | machine chest press';
+    for (const query of ['chest press', 'machine chest press', 'seated chest press', 'machine bench press', 'Chest  Press']) {
+      expect(matchesExerciseSearch(machine, query)).toBe(true);
+    }
+    expect(matchesExerciseSearch(machine, 'incline chest press')).toBe(false);
+    expect(matchesExerciseSearch('Seated Chest Press (Machine)', 'bench')).toBe(false);
+    expect(matchesExerciseSearch('Anything', '')).toBe(true);
   });
 
   it('tells a machine exercise from a free-weight one logged on a machine (#14)', () => {
