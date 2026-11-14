@@ -105,6 +105,19 @@ Module-level request ids (training's `requestId`) remain; the header is the gene
   (`lastErrorData`, e.g. `openSessionId`), so the sync sheet can offer a fix, not only Discard.
 - **Never computed on the device:** records, ranks, levels, 1RM, tournaments.
 
+## Food on top of the outbox (spec 029, issue #18)
+
+- Same pattern as training: client ids on creates (`id`, `ids`), `dependsOn` the write that
+  creates a meal, a pure overlay (`nutrition-overlay.ts`), and `settling.ts` (shared by both) to
+  keep acknowledged writes applied until the refetch lands.
+- The Food day `GET /nutrition?today=&day=` is the one read kept with a query string: one copy per
+  day within 14 days of today, plus `nutrition:day:latest` for a day never opened. At most 2,000
+  foods are kept with it; waiting meals carry their own provisional facts, so the cap never drops
+  one they need.
+- Withdrawing a meal (or weigh-in) that was never sent discards its queued create instead of
+  sending a delete.
+- `useAction` reports a `NetworkError` as "This needs a connection" for every online-only action.
+
 ## Service worker
 
 `public/sw.js` (v3) still caches only HTML navigations and hashed assets, never `/api`. A

@@ -12,6 +12,7 @@ import type {
   PostSelection,
   Estimate,
   Food,
+  FoodWithUsage,
   MealEntry,
   MealSlot,
   MealSuggestion,
@@ -58,6 +59,16 @@ import { WeekBalancePanel } from '../../components/week-balance';
 import { WeighInPanel } from '../../components/weigh-in-panel';
 import { WeightTrend } from '../../components/weight-trend';
 import { api } from '../../lib/api';
+import {
+  discardFoodWrite,
+  foodWrites,
+  isUnsaved,
+  useFoodOffline,
+  useNutritionDay,
+  useRefusedFood,
+  useUpdatedAfterSync,
+} from '../../lib/nutrition-offline';
+import { unsavedCount } from '../../lib/offline/nutrition-overlay';
 import { useAction, useApi } from '../../lib/hooks';
 import { mealContextNow } from '../../lib/local-day';
 import { newPostHref } from '../../lib/new-post';
@@ -124,7 +135,8 @@ function Nutrition() {
   }, [dayStartHour]);
 
   const key = today && day ? `/nutrition?today=${today}&day=${day}` : null;
-  const { data, error, isLoading, mutate } = useApi<NutritionOverview>(key);
+  // Spec 029: the day kept on this device, with meals still waiting to be sent applied.
+  const { data, error, isLoading, mutate } = useNutritionDay(key);
 
   // The profile decides when a day starts, which decides which day this is. One correction.
   useEffect(() => {
@@ -225,6 +237,7 @@ function Nutrition() {
             }
           />
 
+          <FoodSyncNotes overview={data} />
           <MacroTiles totals={dayTotals.totals} targets={targets} />
           {targets.available && (
             <p className="text-xs text-ink-faint">
@@ -246,6 +259,7 @@ function Nutrition() {
                   suggestions={data.suggestions.filter(
                     (row) => row.slot === slot.slot,
                   )}
+                  foods={data.foods}
                   onAdd={() => setLogging({ slot: slot.slot })}
                   onEdit={(entry) => setLogging({ slot: entry.slot, entry })}
                   onChanged={refresh}
@@ -312,7 +326,8 @@ function Nutrition() {
           entry={logging.entry}
           onLogged={(entry) => {
             refresh();
-            if (entry) setRecentEntry(entry);
+            // A meal not yet saved cannot be shared: a post needs the server's row.
+            if (entry && !isUnsaved(entry)) setRecentEntry(entry);
           }}
         />
       )}
@@ -522,6 +537,7 @@ function SlotSection({
   slot,
   day,
   suggestions,
+  foods,
   onAdd,
   onEdit,
   onChanged,
@@ -531,6 +547,7 @@ function SlotSection({
   day: string;
   /** Already filtered to this slot and ranked by the API. */
   suggestions: MealSuggestion[];
+  foods: FoodWithUsage[];
   onAdd: () => void;
   onEdit: (entry: MealEntry) => void;
   onChanged: () => void;
@@ -540,8 +557,10 @@ function SlotSection({
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
 
-  const remove = (id: string) =>
-    void run(async () => api.delete(`/nutrition/entries/${id}`)).then((ok) => {
+  const updatedAfterSync = useUpdatedAfterSync();
+  // Spec 029: kept on the device and applied at once; a meal never sent is just withdrawn.
+  const remove = (entry: MealEntry) =>
+    void run(async () => foodWrites.removeEntry(entry), { revalidate: false }).then((ok) => {
       if (ok) onChanged();
     });
 
@@ -630,12 +649,24 @@ function SlotSection({
                   {mgToG(entry.totals.proteinMg)}g C{' '}
                   {mgToG(entry.totals.carbMg)}g F {mgToG(entry.totals.fatMg)}g
                 </p>
+                {isUnsaved(entry) && (
+                  <p className="text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                    Not saved yet · on this device
+                  </p>
+                )}
+                {updatedAfterSync.has(entry.id) &&
+                  updatedAfterSync.get(entry.id) !== entry.totals.energyKcal && (
+                    <p className="text-[11px] text-ink-faint">
+                      Updated after sync: the food changed since, so it was saved at{' '}
+                      {entry.totals.energyKcal} kcal, not {updatedAfterSync.get(entry.id)}.
+                    </p>
+                  )}
               </div>
               <div className="flex shrink-0 items-center gap-3">
                 <span className="tabular text-ink-muted">
                   {entry.totals.energyKcal} kcal
                 </span>
-                {onShare && (
+                {onShare && !isUnsaved(entry) && (
                   <button
                     className="text-xs text-accent"
                     onClick={() =>
@@ -656,7 +687,7 @@ function SlotSection({
                 <button
                   type="button"
                   className="p-1 text-xs text-ink-faint hover:text-rose-300"
-                  onClick={() => remove(entry.id)}
+                  onClick={() => remove(entry)}
                   disabled={pending}
                   aria-label={`Remove ${entry.facts.name}`}
                 >
@@ -670,6 +701,7 @@ function SlotSection({
 
       <SlotSuggestions
         suggestions={suggestions}
+        foods={foods}
         day={day}
         slotLabel={SLOT_LABELS[slot.slot]}
         onChanged={onChanged}
@@ -709,11 +741,13 @@ function SlotSection({
  */
 function SlotSuggestions({
   suggestions,
+  foods,
   day,
   slotLabel,
   onChanged,
 }: {
   suggestions: MealSuggestion[];
+  foods: FoodWithUsage[];
   day: string;
   slotLabel: string;
   onChanged: () => void;
@@ -722,15 +756,13 @@ function SlotSuggestions({
 
   if (suggestions.length === 0) return null;
 
+  // Spec 029: kept on the device and shown at once; sent when there is a connection.
   const log = (suggestion: MealSuggestion) =>
-    void run(async () =>
-      api.post('/nutrition/entries', {
-        day,
-        slot: suggestion.slot,
-        foodId: suggestion.foodId,
-        amount: suggestion.amount,
-      }),
-    ).then((ok) => {
+    void run(async () => {
+      const food = foods.find((row) => row.id === suggestion.foodId);
+      if (!food) throw new Error('That food is not on this device. Log it once you are online.');
+      await foodWrites.logEntry(food, { day, slot: suggestion.slot, amount: suggestion.amount });
+    }, { revalidate: false }).then((ok) => {
       if (ok) onChanged();
     });
 
@@ -938,12 +970,15 @@ function RepeatPanel({
       if (ok) onChanged();
     });
 
+  // Spec 029: one meal per component from this device's foods; sent when there is a connection.
   const logMeal = (meal: SavedMeal) =>
-    void run(async () =>
-      api.post(`/nutrition/meals/${meal.id}/log`, {
-        day,
-        slot: meal.defaultSlot ?? 'uncategorized',
-      }),
+    void run(
+      async () =>
+        foodWrites.logSavedMeal(meal, overview.foods, {
+          day,
+          slot: meal.defaultSlot ?? 'uncategorized',
+        }),
+      { revalidate: false },
     ).then((ok) => {
       if (ok) onChanged();
     });
@@ -1419,5 +1454,49 @@ function TargetsPanel({ targets }: { targets: NutritionTargets }) {
         )}
       </div>
     </Panel>
+  );
+}
+
+/**
+ * Spec 029: what is waiting on this device, said plainly. Totals that include meals not yet saved
+ * say so; a meal the server refused (its food was deleted meanwhile, say) stays listed with the
+ * reason until it is discarded, never silently dropped.
+ */
+function FoodSyncNotes({ overview }: { overview: NutritionOverview }) {
+  const offline = useFoodOffline();
+  const refused = useRefusedFood();
+  const unsaved = unsavedCount(overview);
+  if (!offline && !refused.length && !unsaved) return null;
+  return (
+    <div className="space-y-2">
+      {(offline || unsaved > 0) && (
+        <p className="text-xs text-amber-700 dark:text-amber-400">
+          {offline ? 'No connection. ' : ''}
+          {unsaved > 0
+            ? `These totals include ${unsaved} meal${unsaved === 1 ? '' : 's'} not saved yet; they are kept on this device and sent when there is a connection.`
+            : 'Changes are kept on this device and sent when it is back.'}
+        </p>
+      )}
+      {refused.map((item) => (
+        <div
+          key={item.id}
+          className="flex flex-wrap items-center gap-2 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs"
+        >
+          <p className="min-w-0 flex-1">
+            <span className="font-medium">{item.label ?? 'A change'} was not saved.</span>{' '}
+            {item.lastError ?? 'The server refused it.'}
+          </p>
+          <button
+            type="button"
+            className="btn-ghost px-2 py-1 text-xs"
+            onClick={() => {
+              if (window.confirm('Discard this change? It is not on the server.')) void discardFoodWrite(item.id);
+            }}
+          >
+            Discard
+          </button>
+        </div>
+      ))}
+    </div>
   );
 }

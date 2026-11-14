@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   DashboardResponse,
-  FoodWithUsage,
   MealSlot,
   WidgetCard,
   PortalState,
@@ -31,6 +30,7 @@ import { api } from '../lib/api';
 import { revalidate, useApi } from '../lib/hooks';
 import { mealContextNow } from '../lib/local-day';
 import { useStartWorkout } from '../lib/training-offline';
+import { useNutritionDay } from '../lib/nutrition-offline';
 
 
 export function Dashboard() {
@@ -41,7 +41,7 @@ export function Dashboard() {
   // Play starts the plan's next workout the card names (issue #7), or an empty one.
   const { start: startWorkout, error: startError } = useStartWorkout();
   // The same key the log modal reads its rings from, so opening it costs one request.
-  const { data: food } = useApi<{ foods: FoodWithUsage[] }>(
+  const { data: food } = useNutritionDay(
     logging && data ? `/nutrition?today=${data.today}&day=${data.today}` : null,
   );
   const [editing, setEditing] = useState(false);

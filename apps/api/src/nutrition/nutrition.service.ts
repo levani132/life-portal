@@ -4,11 +4,13 @@ import type { SharedFoodDiary, SharedStat } from '@life-portal/shared-types';
 import { SocialGraphService } from '../social-graph/social-graph.module';
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { assertFreeId, withId } from '../common/client-id';
 import { isValidObjectId, Model } from 'mongoose';
 import type {
   BarcodeLookupResponse,
@@ -365,11 +367,17 @@ export class NutritionService {
     }
   }
 
-  private async findFood(userId: string, id: string) {
-    if (!isValidObjectId(id))
-      throw new NotFoundException(`Food ${id} not found`);
+  private async findFood(userId: string, id: string, purpose?: 'log') {
+    const gone = () =>
+      purpose === 'log'
+        ? new NotFoundException({
+            code: 'FOOD_GONE',
+            message: 'This food no longer exists, so the meal could not be saved. Log it again with another food, or discard it.',
+          })
+        : new NotFoundException(`Food ${id} not found`);
+    if (!isValidObjectId(id)) throw gone();
     const found = await this.foods.findOne({ userId, _id: id });
-    if (!found) throw new NotFoundException(`Food ${id} not found`);
+    if (!found) throw gone();
     return foodJson(found);
   }
 
@@ -813,9 +821,13 @@ export class NutritionService {
     userId: string,
     dto: CreateEntryDto,
   ): Promise<MealEntryDto> {
-    const food = await this.findFood(userId, dto.foodId);
+    const food = await this.findFood(userId, dto.foodId, 'log');
     const amount = this.resolveAmount(dto, food.servingSize);
+    // Spec 029: a meal logged offline arrives with the id the device gave it. The facts are
+    // still snapshotted here, from the food as it is now, never taken from the request.
+    await assertFreeId(this.entries, dto.id);
     const created = await this.entries.create({
+      ...withId(dto.id),
       userId,
       day: toDay(dto.day),
       slot: dto.slot,
@@ -1086,11 +1098,20 @@ export class NutritionService {
     const byId = new Map(
       foods.map((row) => [String(row._id), foodJson(row)]),
     );
+    // Spec 029: logged offline, each component arrives with the id the device gave it.
+    if (dto.ids && dto.ids.length !== meal.components.length) {
+      throw new ConflictException({
+        code: 'MEAL_CHANGED',
+        message: `"${meal.name}" was changed since it was logged on this device. Log it again.`,
+      });
+    }
+    for (const entryId of dto.ids ?? []) await assertFreeId(this.entries, entryId);
 
     const created = await this.entries.insertMany(
-      meal.components.map((component) => {
+      meal.components.map((component, index) => {
         const food = byId.get(component.foodId) as FoodDto;
         return {
+          ...withId(dto.ids?.[index]),
           userId,
           day: toDay(dto.day),
           slot: dto.slot ?? meal.defaultSlot ?? 'uncategorized',

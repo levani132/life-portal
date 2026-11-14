@@ -5,6 +5,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { assertFreeId, withId } from '../common/client-id';
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, Types, type Model } from 'mongoose';
 import {
@@ -61,14 +62,6 @@ export function clientTime(iso: string | undefined, floorMs: number, nowMs: numb
 }
 
 /** Spec 028: refuses an id the client chose that any row already has, whoever owns it. */
-async function assertFreeId(model: { exists(filter: { _id: string }): Promise<unknown> }, id: string | undefined) {
-  if (!id) return;
-  if (await model.exists({ _id: id })) {
-    throw new ConflictException({ code: 'ID_TAKEN', message: 'That id is already in use. Try again.' });
-  }
-}
-
-const withId = (id: string | undefined) => (id ? { _id: new Types.ObjectId(id) } : {});
 
 /**
  * Workout sessions, the exercises in them and their sets (spec 020, user story 1).

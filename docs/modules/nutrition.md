@@ -61,6 +61,12 @@ Consequences to keep in mind:
 
 Totals are never stored. Day, week, slot, queue and banked figures are all derived on read.
 
+**Offline (spec 029, issue #18).** The rule holds offline: a meal logged with no connection is
+shown with the food's facts *as this device has them*, marked "Not saved yet", and sent with its
+client `id` but never its facts. The server snapshots the food when the meal arrives; if that
+differs from what was shown (the food was corrected meanwhile), the meal says "Updated after
+sync". See Offline below.
+
 ## Endpoints
 
 All under `/api/nutrition`, all JWT-guarded and user-scoped.
@@ -76,13 +82,13 @@ All under `/api/nutrition`, all JWT-guarded and user-scoped.
 | `POST` | `/foods/import` | `{ code }` → an owned food row. |
 | `GET` | `/foods/public?q=&limit=&skip=` | List public foods from other users available to import. |
 | `POST` | `/foods/import-public/:id` | Import a public food from another user into own database. |
-| `GET`/`POST` | `/entries` | List by `?day=` or `?from=&to=` / log a meal. |
+| `GET`/`POST` | `/entries` | List by `?day=` or `?from=&to=` / log a meal. Create accepts `id` (spec 029: chosen on the device; 409 `ID_TAKEN` if any user has it). A missing food is 404 `FOOD_GONE`. |
 | `PATCH`/`DELETE` | `/entries/:id` | Correct / remove. |
 | `POST` | `/entries/repeat` | Repeat a day or a slot onto another day. |
 | `GET`/`POST` | `/meals` | Saved meals with current totals / create. |
 | `POST` | `/meals/from-day` | Save what was logged in one slot as a meal. |
 | `PATCH`/`DELETE` | `/meals/:id` | |
-| `POST` | `/meals/:id/log` | One snapshotted entry per component. |
+| `POST` | `/meals/:id/log` | One snapshotted entry per component. Optional `ids` (spec 029), one per component in order; a different count is 409 `MEAL_CHANGED`. |
 | `GET`/`PUT` | `/profile` | Returns `{ profile, targets }` — the write ships the new targets too. |
 | `GET`/`PUT` | `/weigh-ins` | List ascending / upsert keyed on day. |
 | `DELETE` | `/weigh-ins/:id` | |
@@ -351,3 +357,16 @@ food photos yet.
 `NutritionPublicationService` publishes a single food (`kind: 'food'`) even when it is archived,
 because the new post page creates an archived food for a post that is not saved to the list. The
 database kind still publishes only live foods.
+
+## Offline (spec 029, issue #18)
+
+Built on `docs/modules/offline.md`. `lib/nutrition-offline.ts` turns logging, correcting and
+removing a meal, logging a saved meal and weighing in into outbox writes (`nutrition.*` kinds) with
+ids chosen on the device; `lib/offline/nutrition-overlay.ts` applies them to the kept Food day with
+`decorateEntry` and `dayTotals`, so the totals and the week move at once and match after sync. The
+device keeps the Food day for days within 14 days of today (and the latest copy, used for a day
+never opened, with nothing eaten), with at most 2,000 foods. Public foods, product search,
+barcode and imports are never kept and say they need a connection; so do foods, saved meals, the
+cheat queue, repeating a day and the profile. A refused meal (`FOOD_GONE`, `MEAL_CHANGED`) stays on
+the day with its reason and Discard. Banked calories, the cheat countdown and suggestions stay the
+server's until it answers.

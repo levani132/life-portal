@@ -80,6 +80,8 @@ export class ImportFoodDto {
  * row does not depend on a serving size that may later be edited.
  */
 export class CreateEntryDto {
+  /** Spec 029: the id chosen on the device for a meal logged offline. Never the facts. */
+  @IsOptional() @IsMongoId() id?: string;
   @Matches(DAY, DAY_MESSAGE) day!: string;
   @IsIn(MEAL_SLOTS) slot!: string;
   @IsMongoId() foodId!: string;
@@ -140,6 +142,8 @@ export class SaveSlotAsMealDto {
 export class LogSavedMealDto {
   @Matches(DAY, DAY_MESSAGE) day!: string;
   @IsOptional() @IsIn(MEAL_SLOTS) slot?: string;
+  /** Spec 029: one device-chosen id per component, in component order. */
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsMongoId({ each: true }) ids?: string[];
 }
 
 export class UpdateProfileDto {

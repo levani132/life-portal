@@ -10,7 +10,7 @@ import type {
   FoodVisibility,
 } from '@life-portal/shared-types';
 import { factsFromInput, factsToInput, macroEnergyMismatch, mgToG } from '@life-portal/shared-domain';
-import { api } from '../lib/api';
+import { api, NetworkError } from '../lib/api';
 import { useAction } from '../lib/hooks';
 import { Field, Input, Modal, Select, Spinner } from './ui';
 import { FoodPhotoField, foodPhotoPayload, type FoodPhotoChange } from './food-photo-field';
@@ -411,11 +411,15 @@ function LookupTab({
         .then((response) => {
           if (!cancelled) setStatus(response);
         })
-        .catch(() => {
+        .catch((caught: unknown) => {
           if (!cancelled) {
             setStatus({
               available: false,
-              reason: 'The lookup could not be reached. Add the food by hand instead.',
+              // Spec 029: searching Open Food Facts is online only; nothing about it is kept.
+              reason:
+                caught instanceof NetworkError
+                  ? 'Searching products needs a connection. Your own foods still work offline; add this one by hand when you are back.'
+                  : 'The lookup could not be reached. Add the food by hand instead.',
               results: [],
             });
           }

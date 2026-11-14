@@ -209,6 +209,9 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   way. A start with an `id` while one is open is `SESSION_CONFLICT`, never a resume. Client times
   are clamped (`clientTime`). The workout on screen is the cached copy plus the outbox's writes
   (`training-overlay.ts`): keep every op idempotent, and never compute records or ranks there.
+- **Food logged offline still never sends facts** (spec 029). `POST /nutrition/entries` takes a
+  device `id` and `meal/:id/log` takes `ids`; the server snapshots at sync. The Food day
+  (`/nutrition?today=&day=`) is the one cached read with a query string (14 days, 2,000 foods).
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for

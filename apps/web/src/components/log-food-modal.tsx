@@ -19,7 +19,6 @@ import type {
   FoodWithUsage,
   MealEntry,
   MealSlot,
-  NutritionOverview,
 } from '@life-portal/shared-types';
 import { MEAL_SLOTS } from '@life-portal/shared-types';
 import {
@@ -28,11 +27,11 @@ import {
   entryTotals,
   servingsToAmount,
 } from '@life-portal/shared-domain';
-import { api } from '../lib/api';
+import { foodWrites, useNutritionDay } from '../lib/nutrition-offline';
 import { FoodCombobox } from './food-combobox';
 import { FoodForm } from './food-form';
 import { FoodThumb } from './food-thumb';
-import { useAction, useApi } from '../lib/hooks';
+import { useAction } from '../lib/hooks';
 import { MealImpact } from './meal-impact';
 import { Input, Modal } from './ui';
 
@@ -123,7 +122,8 @@ export function LogFoodModal({
   const preview =
     facts && validAmount ? entryTotals(Math.round(amount), facts) : undefined;
 
-  const overview = useApi<NutritionOverview>(
+  // Spec 029: the day as this device has it, meals still waiting to be sent included.
+  const overview = useNutritionDay(
     open && entryDay ? `/nutrition?today=${today}&day=${entryDay}` : null,
   );
   const eaten = useMemo(() => {
@@ -174,22 +174,23 @@ export function LogFoodModal({
   const submit = () => {
     if (!facts || !validAmount) return;
     let recorded: MealEntry | undefined;
+    // Spec 029: kept on the device and shown at once (marked "not saved yet" until the server
+    // has it); sent when there is a connection. The server still snapshots the food itself.
     void run(async () => {
       if (editing) {
-        await api.patch(`/nutrition/entries/${entry.id}`, {
+        await foodWrites.updateEntry(entry, {
           slot,
           day: entryDay,
           amount: Math.round(amount),
         });
-      } else {
-        recorded = await api.post<MealEntry>('/nutrition/entries', {
+      } else if (food) {
+        recorded = await foodWrites.logEntry(food, {
           day: entryDay,
           slot,
-          foodId,
           amount: Math.round(amount),
         });
       }
-    }).then((ok) => {
+    }, { revalidate: false }).then((ok) => {
       if (ok) {
         onLogged?.(recorded);
         onClose();

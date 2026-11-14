@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { PublicFood, PublicFoodsResponse } from '@life-portal/shared-types';
 import { mgToG } from '@life-portal/shared-domain';
-import { api } from '../lib/api';
+import { api, NetworkError } from '../lib/api';
 import { useAction } from '../lib/hooks';
 import { EmptyState, Input, Modal, Panel, Spinner } from './ui';
 
@@ -57,6 +57,8 @@ function PublicFoodsModal({
   const [foods, setFoods] = useState<PublicFood[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  // Spec 029: public foods are never kept on the device, so with no connection there are none.
+  const [offline, setOffline] = useState(false);
   const { run, pending, error } = useAction();
 
   useEffect(() => {
@@ -69,10 +71,12 @@ function PublicFoodsModal({
     api
       .get<PublicFoodsResponse>(`/nutrition/foods/public?${params}`)
       .then((response) => {
+        setOffline(false);
         setFoods(response.foods);
         setTotal(response.total);
       })
-      .catch(() => {
+      .catch((caught: unknown) => {
+        setOffline(caught instanceof NetworkError);
         setFoods([]);
         setTotal(0);
       })
@@ -107,9 +111,11 @@ function PublicFoodsModal({
         ) : foods.length === 0 ? (
           <EmptyState
             message={
-              query.trim()
-                ? 'No public foods match that search.'
-                : 'No public foods available yet.'
+              offline
+                ? 'Public foods need a connection. Your own foods still work offline.'
+                : query.trim()
+                  ? 'No public foods match that search.'
+                  : 'No public foods available yet.'
             }
           />
         ) : (

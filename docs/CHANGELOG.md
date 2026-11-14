@@ -2,6 +2,19 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-14: Log food without signal
+
+- **Food works offline** for days you have opened in the last two weeks, and for a new day too.
+  Log a food, a suggestion or a saved meal, correct or remove a meal, and weigh in; the day's
+  totals and the week update at once and are sent once when the connection is back.
+- **Meals not saved yet say so.** Each shows "Not saved yet", and the day says its totals include
+  them. They can be shared once saved.
+- **If a food changed while you were offline**, the meal is saved with the food's current numbers
+  and says "Updated after sync" with both figures. A meal whose food was deleted is kept on the
+  day with the reason, until you discard it.
+- **Searching products, public foods and other online-only actions say they need a connection**
+  instead of failing quietly.
+
 ## 2026-11-14: Whole workouts without signal
 
 - **A plan workout works start to finish with no connection.** Start a plan you have opened

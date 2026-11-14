@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { WeighIn } from '@life-portal/shared-types';
 import { formatDay } from '@life-portal/shared-domain';
-import { api } from '../lib/api';
+import { foodWrites } from '../lib/nutrition-offline';
 import { useAction } from '../lib/hooks';
 import { EmptyState, Field, Input, Panel } from './ui';
 
@@ -31,12 +31,14 @@ export function WeighInPanel({
       const kg = Number(weightKg);
       if (!Number.isFinite(kg) || kg <= 0) throw new Error('A weight is needed.');
       const fat = bodyFatPct.trim() === '' ? undefined : Number(bodyFatPct) / 100;
-      await api.put('/nutrition/weigh-ins', {
+      // Spec 029: kept on the device and shown at once. One weigh-in per day on the server, so
+      // sending it twice (or weighing in twice) corrects it rather than adding a second.
+      await foodWrites.putWeighIn({
         day,
         weightGrams: Math.round(kg * 1000),
-        bodyFatPct: fat,
+        ...(fat != null ? { bodyFatPct: fat } : {}),
       });
-    }).then((ok) => {
+    }, { revalidate: false }).then((ok) => {
       if (ok) {
         setWeightKg('');
         setBodyFatPct('');
@@ -44,7 +46,7 @@ export function WeighInPanel({
       }
     });
 
-  const remove = (id: string) => void run(async () => api.delete(`/nutrition/weigh-ins/${id}`));
+  const remove = (weighIn: WeighIn) => void run(async () => foodWrites.removeWeighIn(weighIn), { revalidate: false });
 
   const recent = [...weighIns].reverse().slice(0, 8);
 
@@ -105,7 +107,7 @@ export function WeighInPanel({
                 <button
                   type="button"
                   className="p-1 text-xs text-ink-faint hover:text-rose-300"
-                  onClick={() => remove(row.id)}
+                  onClick={() => remove(row)}
                   aria-label={`Remove the weigh-in from ${formatDay(row.day)}`}
                   disabled={pending}
                 >

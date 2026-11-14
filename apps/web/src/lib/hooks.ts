@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import useSWR, { mutate as globalMutate, type SWRConfiguration } from 'swr';
 import type { Currency, UserSettings } from '@life-portal/shared-types';
-import { ApiError } from './api';
+import { ApiError, NetworkError } from './api';
 import { getWithOfflineCopy } from './offline/reads';
 
 /**
@@ -93,7 +93,13 @@ export function useAction() {
         return true;
       } catch (caught) {
         setError(
-          caught instanceof ApiError ? caught.message : 'Something went wrong.',
+          caught instanceof ApiError
+            ? caught.message
+            : caught instanceof NetworkError
+              ? 'This needs a connection. Try again when you are back online.'
+              : caught instanceof Error && caught.message
+                ? caught.message
+                : 'Something went wrong.',
         );
         return false;
       } finally {

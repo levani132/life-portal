@@ -1910,3 +1910,26 @@ once, while records, ranks and tournaments stay the server's. The owner approved
   refusals (a 400 for a bad set) are still replayed. Found by the runtime check, not the tests.
 
 See `specs/028-offline-workouts/`, `docs/modules/offline.md`.
+
+## 2026-11-14 · Offline food: the server still takes the snapshot (issue #18)
+
+The snapshot rule says a meal's facts are built by the server and never accepted from a request.
+Offline, the server only sees the meal when it syncs, so the food may have been corrected in
+between (on another device, say). The owner kept the rule: the device shows the meal with the
+food as it has it, marked provisional, and sends only the id, food, amount, day and slot; the
+server snapshots at sync and its numbers win. When they differ, the meal says "Updated after sync"
+with both figures. Accepting the device's facts would let any client write arbitrary nutrition
+history, which is what the rule exists to prevent.
+
+- **A day never opened is still loggable.** The newest kept day is reused with nothing eaten, so
+  crossing midnight (or the day-start hour) in a basement does not lock Food. Its week and
+  targets are the latest copy's, which is close enough for provisional figures.
+- **2,000 foods, most recently used first.** Waiting meals carry their own facts, so trimming the
+  foods can never break one; the owner's "never evict a food a pending entry needs" holds by
+  construction rather than by bookkeeping.
+- **Withdraw, don't delete.** Removing a meal that never reached the server discards its queued
+  create (and its corrections) instead of queuing a delete the server would 404.
+- **The settling list is shared.** Training's "acknowledged but not refetched" list moved to
+  `lib/offline/settling.ts`; both modules use it.
+
+See `specs/029-offline-food/`.

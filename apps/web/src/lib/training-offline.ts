@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type {
   ExerciseListItem,
   PlanDetail,
@@ -17,7 +17,8 @@ import type {
 import { api, ApiError, NetworkError } from './api';
 import { revalidate, useApi } from './hooks';
 import { getWithOfflineCopy } from './offline/reads';
-import { enqueueWrite, onWriteDone, outbox, outboxItems, subscribeOutbox, useOutbox } from './offline/runtime';
+import { enqueueWrite, outbox, outboxItems, subscribeOutbox, useOutbox } from './offline/runtime';
+import { moduleWrites } from './offline/settling';
 import { newObjectId, plannedRowId } from './offline/planned-row-id';
 import {
   createdIds,
@@ -51,29 +52,10 @@ export const OFFLINE_EXERCISES_KEY = '/training/exercises/offline';
 
 // ------------------------------------------------------------------ what the screens read
 
-/** Acknowledged but not yet refetched: still applied, so the saved row replaces it without a gap. */
-let settling: OutboxItem[] = [];
-const settleListeners = new Set<() => void>();
-const publishSettling = () => settleListeners.forEach((listener) => listener());
-const subscribeSettling = (listener: () => void) => {
-  settleListeners.add(listener);
-  return () => settleListeners.delete(listener);
-};
-
-const isTraining = (item: OutboxItem) => item.kind.startsWith('training.');
+const writesOf = moduleWrites('training.', () => revalidateTraining());
+const isTraining = writesOf.owns;
 
 if (typeof window !== 'undefined') {
-  onWriteDone((item) => {
-    if (!isTraining(item)) return;
-    settling = [...settling, item];
-    publishSettling();
-    void revalidateTraining()
-      .catch(() => undefined)
-      .finally(() => {
-        settling = settling.filter((other) => other.id !== item.id);
-        publishSettling();
-      });
-  });
   // An online start that finds a workout already open (a stale screen, another device) with
   // nothing logged in it yet is simply dropped, and the open workout shown — what starting did
   // before spec 028. Once something was logged against it, the person decides (sync sheet).
@@ -93,15 +75,11 @@ if (typeof window !== 'undefined') {
  * acknowledged ones still settling.
  */
 export function useTrainingWrites(): TrainingWriteMeta[] {
-  const snapshot = useOutbox();
-  const settled = useSyncExternalStore(subscribeSettling, () => settling, () => settling);
-  return useMemo(() => {
-    const live = snapshot.items.filter((item) => isTraining(item) && item.state !== 'error');
-    const ids = new Set(live.map((item) => item.id));
-    return [...live, ...settled.filter((item) => !ids.has(item.id))]
-      .map(metaOf)
-      .filter((meta): meta is TrainingWriteMeta => Boolean(meta));
-  }, [snapshot, settled]);
+  const items = writesOf.useItems();
+  return useMemo(
+    () => items.map(metaOf).filter((meta): meta is TrainingWriteMeta => Boolean(meta)),
+    [items],
+  );
 }
 
 /** The plan-day update for one workout still on this device, if any (pending, or refused). */
