@@ -6,7 +6,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { isValidObjectId, type Model } from 'mongoose';
+import { isValidObjectId, Types, type Model } from 'mongoose';
 import {
   SET_VALUE_FIELDS,
   type EquipmentType,
@@ -34,6 +34,7 @@ import { CatalogueService } from './catalogue.service';
 import { PlansService, toTarget } from './plans.service';
 import { ProgressService } from './progress.service';
 import { toSet, type SetRow } from './set-row';
+import { plannedRowId } from './planned-row-id';
 import { WorkoutExercise, WorkoutSession, WorkoutSet } from './training.schemas';
 
 type SessionRow = WorkoutSession & { _id: unknown };
@@ -45,6 +46,29 @@ const PAGE_SIZE = 20;
 /** Mongo's duplicate-key error: a retried request or a race on a unique index. */
 const isDuplicateKey = (error: unknown) =>
   (error as { code?: number } | null)?.code === 11000;
+
+/** Spec 028: how far back a client-reported start may reach (a workout logged offline). */
+export const MAX_CLIENT_BACKDATE_MS = 48 * 60 * 60 * 1000;
+
+/**
+ * Spec 028: a time the client reports (a workout or set done offline, sent later), clamped so it
+ * is never in the future and never before `floorMs`. Absent or unreadable → now.
+ */
+export function clientTime(iso: string | undefined, floorMs: number, nowMs: number): Date {
+  const parsed = iso ? Date.parse(iso) : NaN;
+  if (!Number.isFinite(parsed)) return new Date(nowMs);
+  return new Date(Math.max(Math.min(parsed, nowMs), Math.min(floorMs, nowMs)));
+}
+
+/** Spec 028: refuses an id the client chose that any row already has, whoever owns it. */
+async function assertFreeId(model: { exists(filter: { _id: string }): Promise<unknown> }, id: string | undefined) {
+  if (!id) return;
+  if (await model.exists({ _id: id })) {
+    throw new ConflictException({ code: 'ID_TAKEN', message: 'That id is already in use. Try again.' });
+  }
+}
+
+const withId = (id: string | undefined) => (id ? { _id: new Types.ObjectId(id) } : {});
 
 /**
  * Workout sessions, the exercises in them and their sets (spec 020, user story 1).
@@ -90,7 +114,16 @@ export class SessionsService {
    */
   async start(
     userId: string,
-    input: { requestId: string; day: string; planId?: string; planWorkoutId?: string },
+    input: {
+      requestId: string;
+      day: string;
+      planId?: string;
+      planWorkoutId?: string;
+      /** Spec 028: the id the client gave it (offline). */
+      id?: string;
+      /** Spec 028: when it really started (offline), clamped to the last 48 hours. */
+      startedAt?: string;
+    },
     nowMs = Date.now(),
   ): Promise<SessionDetail> {
     if (Boolean(input.planId) !== Boolean(input.planWorkoutId)) {
@@ -102,17 +135,20 @@ export class SessionsService {
       return this.detailOf(userId, retried, nowMs);
     }
     const open = await this.sessions.findOne({ userId, status: 'open' }).lean<SessionRow>();
+    if (open && input.id) throw this.sessionConflict(open);
     if (open) return { ...(await this.detailOf(userId, open, nowMs)), resumed: true };
+    await assertFreeId(this.sessions, input.id);
     const fromPlan = input.planId && input.planWorkoutId
       ? await this.planWorkout(userId, input.planId, input.planWorkoutId)
       : undefined;
     try {
       const created = await this.sessions.create({
+        ...withId(input.id),
         userId,
         requestId: input.requestId,
         day: input.day,
         status: 'open',
-        startedAt: new Date(nowMs),
+        startedAt: input.startedAt ? clientTime(input.startedAt, nowMs - MAX_CLIENT_BACKDATE_MS, nowMs) : new Date(nowMs),
         ...(fromPlan
           ? {
               plan: {
@@ -132,13 +168,29 @@ export class SessionsService {
     } catch (error) {
       if (!isDuplicateKey(error)) throw error;
       // Lost a race: the same request retried, or another device opened a session first.
-      const winner =
-        (await this.sessions.findOne({ userId, requestId: input.requestId }).lean<SessionRow>()) ??
-        (await this.sessions.findOne({ userId, status: 'open' }).lean<SessionRow>());
-      if (!winner) throw error;
+      const mine = await this.sessions.findOne({ userId, requestId: input.requestId }).lean<SessionRow>();
+      const winner = mine ?? (await this.sessions.findOne({ userId, status: 'open' }).lean<SessionRow>());
+      if (!winner) {
+        if (input.id) throw new ConflictException({ code: 'ID_TAKEN', message: 'That id is already in use. Try again.' });
+        throw error;
+      }
+      // Spec 028: a workout with its own id (made offline) is never folded into another one.
+      if (!mine && input.id) throw this.sessionConflict(winner);
       const detail = await this.detailOf(userId, winner, nowMs);
       return winner.requestId === input.requestId ? detail : { ...detail, resumed: true };
     }
+  }
+
+  /**
+   * Spec 028: a workout made offline (it has its own id) while another one is open, here or on
+   * another device. Never merged and never resumed silently: the person chooses.
+   */
+  private sessionConflict(open: SessionRow) {
+    return new ConflictException({
+      code: 'SESSION_CONFLICT',
+      message: 'Another workout is already open, probably on another device.',
+      openSessionId: String(open._id),
+    });
   }
 
   async current(userId: string, nowMs = Date.now()): Promise<SessionDetail | null> {
@@ -242,6 +294,8 @@ export class SessionsService {
     id: string,
     at: 'now' | 'lastSet' = 'now',
     nowMs = Date.now(),
+    /** Spec 028: when it was really finished (offline); never before its last set. */
+    endedAtIso?: string,
   ): Promise<SessionDetail> {
     const session = await this.ownedSession(userId, id);
     if (session.status === 'finished') return this.detailOf(userId, session, nowMs);
@@ -257,7 +311,12 @@ export class SessionsService {
       });
     }
     await this.dropUnloggedPlanned(userId, id);
-    const endedAt = at === 'lastSet' ? lastSet.loggedAt : new Date(Math.max(nowMs, session.startedAt.getTime()));
+    const floor = Math.max(session.startedAt.getTime(), new Date(lastSet.loggedAt).getTime());
+    const endedAt = endedAtIso
+      ? clientTime(endedAtIso, floor, Math.max(nowMs, floor))
+      : at === 'lastSet'
+        ? lastSet.loggedAt
+        : new Date(Math.max(nowMs, session.startedAt.getTime()));
     await this.sessions.updateOne(
       { _id: session._id, userId, status: 'open' },
       { $set: { status: 'finished', endedAt } },
@@ -278,11 +337,12 @@ export class SessionsService {
   async addExercise(
     userId: string,
     sessionId: string,
-    input: { requestId: string; exerciseId: string },
+    input: { requestId: string; exerciseId: string; id?: string },
   ): Promise<SessionExercise> {
     await this.ownedSession(userId, sessionId);
     const retried = await this.exercises.findOne({ userId, requestId: input.requestId }).lean<ExerciseRow>();
     if (retried) return this.toSessionExercise(retried, []);
+    await assertFreeId(this.exercises, input.id);
     const exercise = await this.catalogue.readable(userId, input.exerciseId);
     const last = await this.exercises
       .findOne({ userId, sessionId })
@@ -291,6 +351,7 @@ export class SessionsService {
       .lean<ExerciseRow>();
     try {
       const created = await this.exercises.create({
+        ...withId(input.id),
         userId,
         sessionId,
         requestId: input.requestId,
@@ -374,12 +435,13 @@ export class SessionsService {
     userId: string,
     sessionId: string,
     workoutExerciseId: string,
-    input: { requestId: string; exerciseId: string },
+    input: { requestId: string; exerciseId: string; id?: string },
   ): Promise<SessionExercise> {
     await this.ownedSession(userId, sessionId);
     const retried = await this.exercises.findOne({ userId, requestId: input.requestId }).lean<ExerciseRow>();
     if (retried) return this.toSessionExercise(retried, []);
     const row = await this.ownedExercise(userId, sessionId, workoutExerciseId);
+    await assertFreeId(this.exercises, input.id);
     if (await this.sets.exists({ userId, workoutExerciseId })) {
       throw new ConflictException({
         code: 'HAS_SETS',
@@ -402,6 +464,7 @@ export class SessionsService {
     try {
       created = (
         await this.exercises.create({
+          ...withId(input.id),
           userId,
           sessionId,
           requestId: input.requestId,
@@ -455,6 +518,7 @@ export class SessionsService {
     const parent = await this.ownedExercise(userId, sessionId, workoutExerciseId);
     const retried = await this.sets.findOne({ userId, requestId: input.requestId }).lean<SetRow>();
     if (retried) return this.withRecords(userId, parent, retried);
+    await assertFreeId(this.sets, input.id);
     const values = pickValues(input);
     this.assertValid(parent.snapshot.measure as Measure, values, input.rpe);
     const last = await this.sets
@@ -463,7 +527,12 @@ export class SessionsService {
       .select('order')
       .lean<SetRow>();
     try {
+      // Spec 028: a set logged offline keeps the time it was done, within its workout.
+      const loggedAt = input.loggedAt
+        ? clientTime(input.loggedAt, (await this.ownedSession(userId, sessionId)).startedAt.getTime(), nowMs)
+        : new Date(nowMs);
       const created = await this.sets.create({
+        ...withId(input.id),
         userId,
         sessionId,
         workoutExerciseId,
@@ -474,7 +543,7 @@ export class SessionsService {
         ...values,
         ...(input.rpe != null ? { rpe: input.rpe } : {}),
         ...(input.restSeconds != null ? { restSeconds: input.restSeconds } : {}),
-        loggedAt: new Date(nowMs),
+        loggedAt,
       });
       return this.withRecords(userId, parent, created.toObject() as SetRow);
     } catch (error) {
@@ -571,6 +640,8 @@ export class SessionsService {
       const exercise = exercises[order];
       try {
         await this.exercises.create({
+          // Spec 028: derived, so a device that started this workout offline already knows it.
+          _id: new Types.ObjectId(plannedRowId(session.requestId, planned.id)),
           userId,
           sessionId,
           requestId: `${session.requestId}:${planned.id}`,

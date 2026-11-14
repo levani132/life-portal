@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { mutate } from 'swr';
 import { ChevronLeft, ChevronRight, Copy, Pencil, Play, Plus, Trash2 } from 'lucide-react';
-import type { PlanDetail as PlanDetailData, PlanList, PlanListItem, SessionDetail } from '@life-portal/shared-types';
+import type { PlanDetail as PlanDetailData, PlanList, PlanListItem } from '@life-portal/shared-types';
 import clsx from 'clsx';
 import { supersetRuns } from '@life-portal/shared-domain';
 import { EmptyState, ErrorNote, Spinner } from '../ui';
@@ -15,10 +15,10 @@ import {
   describeTarget,
   formatDuration,
   planKey,
-  revalidateTraining,
   useWeightUnit,
   useWorkoutDay,
 } from '../../lib/training';
+import { trainingWrites, useCurrentSession } from '../../lib/training-offline';
 import { PlanEditor } from './plan-editor';
 import { lastDoneLabel } from './plan-suggestions';
 
@@ -212,27 +212,23 @@ function PlanView({
   const [starting, setStarting] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [inProgress, setInProgress] = useState<string | null>(null);
+  const { data: current } = useCurrentSession();
 
   const start = async (planWorkoutId: string) => {
     setStarting(planWorkoutId);
     setStartError(null);
     setInProgress(null);
     try {
-      const session = await api.post<SessionDetail>('/training/sessions', {
-        requestId: crypto.randomUUID(),
-        day: workoutDay(),
-        planId: id,
-        planWorkoutId,
-      });
-      await revalidateTraining();
       // One open workout per person: a start while one is open resumes it instead (FR-017).
-      if (session.resumed) {
-        setInProgress(session.plan ? `${session.plan.workoutName} · ${session.plan.planName}` : 'Another workout');
+      if (current) {
+        setInProgress(current.plan ? `${current.plan.workoutName} · ${current.plan.planName}` : 'Another workout');
         return;
       }
+      // Spec 028: started on the device from the cached plan; sent when there is a connection.
+      await trainingWrites.start(workoutDay(), { planId: id, planWorkoutId });
       onStarted();
     } catch (caught) {
-      setStartError(caught instanceof ApiError ? caught.message : 'Could not reach the server. Try again.');
+      setStartError(caught instanceof Error ? caught.message : 'Could not start the workout.');
     } finally {
       setStarting(null);
     }

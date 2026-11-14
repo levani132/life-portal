@@ -30,7 +30,7 @@ import {
 import { api } from '../lib/api';
 import { revalidate, useApi } from '../lib/hooks';
 import { mealContextNow } from '../lib/local-day';
-import { useStartWorkout } from '../lib/training';
+import { useStartWorkout } from '../lib/training-offline';
 
 
 export function Dashboard() {

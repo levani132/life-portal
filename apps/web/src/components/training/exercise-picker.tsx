@@ -11,7 +11,9 @@ import {
   type ExerciseListItem,
 } from '@life-portal/shared-types';
 import { EmptyState, ErrorNote, Input, Select, Spinner } from '../ui';
+import { NetworkError } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
+import { OFFLINE_EXERCISES_KEY } from '../../lib/training-offline';
 import { MEASURE_LABELS, humanise } from '../../lib/training';
 import { GROUP_ORDER, GROUP_STYLES, exerciseGroup, muscleGroup } from '../../lib/training-colors';
 import { ExerciseForm } from './exercise-form';
@@ -24,6 +26,23 @@ function useDebounced(value: string, ms = 250) {
     return () => clearTimeout(timer);
   }, [value, ms]);
   return debounced;
+}
+
+/**
+ * Spec 028: with no connection the search runs over the exercises kept on this device (own,
+ * recent and those in plans). Everything else is unavailable until the connection is back.
+ */
+function searchOffline(
+  list: ExerciseListItem[],
+  { q, muscle, equipment }: { q: string; muscle: string; equipment: string },
+): ExerciseListItem[] {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  return list.filter(
+    (exercise) =>
+      (!muscle || exercise.primaryMuscles.includes(muscle as never)) &&
+      (!equipment || exercise.equipmentType === equipment) &&
+      words.every((word) => exercise.name.toLowerCase().includes(word)),
+  );
 }
 
 /** Muscles as filter chips, grouped by colour so a row of push muscles reads as one. */
@@ -57,7 +76,14 @@ export function ExerciseSearch({
   if (q) params.set('q', q);
   if (muscle) params.set('muscle', muscle);
   if (equipment) params.set('equipment', equipment);
-  const { data, error, isLoading } = useApi<ExerciseListItem[]>(`/training/exercises?${params}`);
+  const search = useApi<ExerciseListItem[]>(`/training/exercises?${params}`);
+  // Read whenever the picker is open, so the device copy is fresh for the next offline workout.
+  const saved = useApi<ExerciseListItem[]>(OFFLINE_EXERCISES_KEY, { shouldRetryOnError: false });
+  const offline = search.error instanceof NetworkError;
+  const data = offline ? (saved.data ? searchOffline(saved.data, { q, muscle, equipment }) : undefined) : search.data;
+  const error = offline ? (saved.data ? undefined : search.error) : search.error;
+  const isLoading = search.isLoading && !data;
+  const canCreate = allowCreate && !offline;
 
   return (
     <div className="space-y-3">
@@ -109,15 +135,33 @@ export function ExerciseSearch({
           </option>
         ))}
       </Select>
-      {allowCreate && (
+      {offline && saved.data && (
+        <p className="text-xs text-amber-700 dark:text-amber-400">
+          No connection: showing the exercises saved on this device (yours, recent and in your plans). Others are
+          unavailable offline.
+        </p>
+      )}
+      {canCreate && (
         <button type="button" className="btn-ghost w-full justify-center" onClick={() => setCreating(true)}>
           <Plus className="h-4 w-4" /> Create exercise{q ? ` “${query.trim()}”` : ''}
         </button>
       )}
       {isLoading && <Spinner />}
-      {error && <ErrorNote message={(error as Error).message} />}
+      {error && (
+        <ErrorNote
+          message={offline ? 'No connection, and no exercises are saved on this device yet.' : (error as Error).message}
+        />
+      )}
       {data && !data.length && (
-        <EmptyState message={q || muscle || equipment ? 'Nothing matches. Create it instead?' : 'No exercises yet.'} />
+        <EmptyState
+          message={
+            offline
+              ? 'Nothing saved on this device matches. It is unavailable until the connection is back.'
+              : q || muscle || equipment
+                ? 'Nothing matches. Create it instead?'
+                : 'No exercises yet.'
+          }
+        />
       )}
       {data && data.length > 0 && (
         <ul className="space-y-1.5">

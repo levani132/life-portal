@@ -25,6 +25,8 @@ export class ApiError extends Error {
     readonly details?: string[],
     /** The API's machine-readable `code` (e.g. `PLAN_CHANGED`), when it sent one. */
     readonly code?: string,
+    /** The whole error body, for codes that carry more (e.g. `SESSION_CONFLICT`'s `openSessionId`). */
+    readonly body?: Record<string, unknown>,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -64,7 +66,8 @@ async function parseError(response: Response): Promise<ApiError> {
   if (Array.isArray(body.message)) {
     return new ApiError(body.message[0] ?? 'Validation failed', response.status, body.message, code);
   }
-  return new ApiError(body.message ?? body.error ?? 'Request failed', response.status, undefined, code);
+  const record = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : undefined;
+  return new ApiError(body.message ?? body.error ?? 'Request failed', response.status, undefined, code, record);
 }
 
 /**

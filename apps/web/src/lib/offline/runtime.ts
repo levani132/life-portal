@@ -167,6 +167,29 @@ export const outbox = {
   count: () => session?.outbox.count() ?? 0,
 };
 
+/**
+ * The cache once the signed-in account's store is open. Reads fire as the app boots, often
+ * before `startOffline` has finished; this waits for it (briefly) instead of missing the cache.
+ */
+export async function waitForOfflineCache(timeoutMs = 3000): Promise<OfflineCache | undefined> {
+  if (session) return session.cache;
+  const deadline = Date.now() + timeoutMs;
+  while (!session && Date.now() < deadline) {
+    if (starting) {
+      await Promise.race([starting.catch(() => undefined), new Promise((r) => setTimeout(r, deadline - Date.now()))]);
+    } else {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  }
+  // Read through a call: TypeScript would keep `session` narrowed to null from the check above.
+  return offlineCache();
+}
+
+/** Every item in the signed-in account's outbox, in order (empty before sign-in). */
+export function outboxItems(): OutboxItem[] {
+  return session?.outbox.getSnapshot().items ?? [];
+}
+
 /** The signed-in account's offline cache, or undefined before sign-in. */
 export function offlineCache(): OfflineCache | undefined {
   return session?.cache;
@@ -198,4 +221,9 @@ const sessionKey = () => session?.userId ?? null;
 /** Re-renders when the signed-in account's offline store opens or closes. */
 export function useOfflineAccount(): string | null {
   return useSyncExternalStore(subscribe, sessionKey, () => null);
+}
+
+/** Called whenever the signed-in account's outbox changes (outside React). */
+export function subscribeOutbox(listener: () => void): () => void {
+  return subscribe(listener);
 }

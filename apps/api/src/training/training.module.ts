@@ -143,6 +143,15 @@ export class TrainingController {
     return this.catalogue.list(userId, { q, muscle, equipment, limit: toInt(limit), skip: toInt(skip) });
   }
 
+  /**
+   * Spec 028: the exercises a device keeps for offline use — the caller's own, those used in the
+   * last 90 days, and those in plans they can start. Not the whole catalogue.
+   */
+  @Get('exercises/offline')
+  offlineExercises(@CurrentUser('userId') userId: string) {
+    return this.catalogue.offlineList(userId);
+  }
+
   @Get('exercises/:id')
   exercise(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     return this.catalogue.get(userId, id);
@@ -281,7 +290,7 @@ export class TrainingController {
     @Param('id') id: string,
     @Body() dto: FinishSessionDto,
   ) {
-    const finished = await this.sessions.finish(userId, id, dto.at);
+    const finished = await this.sessions.finish(userId, id, dto.at, Date.now(), dto.endedAt);
     this.alarms.clear(userId);
     return finished;
   }

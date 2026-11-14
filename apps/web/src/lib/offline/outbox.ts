@@ -31,6 +31,20 @@ export function classify(error: unknown): Failure {
   return 'error';
 }
 
+/** The refusal's code and its simple string fields, kept with the item for whoever resolves it. */
+function errorExtras(error: unknown): Pick<OutboxItem, 'lastErrorCode' | 'lastErrorData'> {
+  if (!(error instanceof ApiError)) return {};
+  const data = Object.fromEntries(
+    Object.entries(error.body ?? {}).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string' && !['message', 'error', 'code'].includes(entry[0]),
+    ),
+  );
+  return {
+    ...(error.code ? { lastErrorCode: error.code } : {}),
+    ...(Object.keys(data).length ? { lastErrorData: data } : {}),
+  };
+}
+
 export const BACKOFF_BASE_MS = 1000;
 export const BACKOFF_MAX_MS = 60_000;
 
@@ -170,7 +184,7 @@ export class Outbox {
           break;
         }
         this.offline = false;
-        await this.update(item, { state: failure, lastError: message });
+        await this.update(item, { state: failure, lastError: message, ...errorExtras(error) });
         if (failure === 'auth') break;
       }
     }

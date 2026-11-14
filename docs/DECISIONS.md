@@ -1869,3 +1869,44 @@ this on #16 with conditions, which are the design:
   stores. Hand-written, tested through an in-memory store behind the same interface.
 
 See `docs/modules/offline.md` and `specs/027-offline-foundation/`.
+
+## 2026-11-14 · Offline workouts: client ids, a pure overlay, the server decides (issue #17)
+
+A workout done with no signal has to show every set at once, survive a reload and sync exactly
+once, while records, ranks and tournaments stay the server's. The owner approved the defaults on
+#17; these are the non-obvious parts:
+
+- **The device chooses ids.** A set logged offline must be editable, untickable and removable
+  before the server has seen it, and must not change identity when it has. So every create sends
+  an ObjectId-shaped `id`; the API validates the format and refuses one that *any* user already
+  has (409 `ID_TAKEN`), so a guessed id cannot reach another account's row. Rows a plan start copies
+  get ids derived from the start's `requestId` (sha256, first 24 hex), the same function on both
+  sides with a shared test vector, so the device knows them without an answer.
+- **No second store.** What the screen shows is computed: the cached server copy with the outbox's
+  writes applied in order (`training-overlay.ts`). Nothing is copied into a "local workout" that
+  could drift; a reload rebuilds the same thing. Each op is idempotent, so an acknowledged write
+  stays applied until the refetch arrives — no flicker, no double.
+- **Two open workouts are the person's call.** A start with a client id while one is open is 409
+  `SESSION_CONFLICT`, never resumed or merged: merging two sets of sets silently is how a PR gets
+  counted twice. The sync sheet offers finishing the other (at its last set) or discarding this
+  one. The exception is an online start that collides with nothing logged on it yet: that is the
+  old "a stale screen pressed Start" case, and it still just shows the open workout.
+- **Client times are clamped, not trusted.** `startedAt`, `loggedAt` and `endedAt` are accepted so
+  a workout synced an hour later is timed correctly, but clamped to now and to 48 h back, a set
+  never before its workout, a finish never before the last set. A wrong device clock can shift a
+  workout, not invent one in another week.
+- **Derived figures stay on the server.** Records, ranks, levels, 1RM and tournament results are
+  not computed on the device, even provisionally as numbers; the workout says they update once
+  synced. One code path computes them, so there is nothing to reconcile and nothing to duplicate.
+- **The plan half of a rest change stays online.** "Also save to plan" is a whole-plan `PUT`; queuing
+  it would overwrite edits made elsewhere. The workout's rest is saved offline; the plan says it
+  needs a connection. A plan-day update (#15) is different: it is conditional on the day's
+  revision, so it is queued and a `PLAN_CHANGED` refusal sends the person back to review.
+
+- **A 409 is not replayed (amends spec 027).** The idempotency layer stored every 4xx and
+  replayed it for the same key, so a write refused with `SESSION_CONFLICT` kept getting the same
+  refusal after the other workout was finished: "resolve, then Retry" could never work. A conflict
+  is about the state at the time, not the write, so a 409 now releases the key like a 5xx. Other
+  refusals (a 400 for a bad set) are still replayed. Found by the runtime check, not the tests.
+
+See `specs/028-offline-workouts/`, `docs/modules/offline.md`.

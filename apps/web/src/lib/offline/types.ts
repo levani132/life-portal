@@ -34,6 +34,10 @@ export interface OutboxItem<M = unknown> {
   /** Epoch ms; a pending item is not sent before this. */
   nextAttemptAt: number;
   lastError?: string;
+  /** Spec 028: the API's `code` for the last refusal (e.g. `SESSION_CONFLICT`). */
+  lastErrorCode?: string;
+  /** Spec 028: what that refusal carried besides its message (e.g. `openSessionId`). */
+  lastErrorData?: Record<string, string>;
   createdAt: number;
 }
 

@@ -3,12 +3,12 @@
 import { useState } from 'react';
 import clsx from 'clsx';
 import { Play } from 'lucide-react';
-import type { PlanList, PlanListItem, SessionDetail } from '@life-portal/shared-types';
+import type { PlanList, PlanListItem } from '@life-portal/shared-types';
 import { relativeDays } from '@life-portal/shared-domain';
 import { ErrorNote } from '../ui';
-import { api, ApiError } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
-import { PLANS_KEY, revalidateTraining, useWorkoutDay } from '../../lib/training';
+import { PLANS_KEY, useWorkoutDay } from '../../lib/training';
+import { trainingWrites } from '../../lib/training-offline';
 import { GROUP_STYLES, planGroup } from '../../lib/training-colors';
 
 /** `last done 3 days ago`, `last done today`, or `not done yet`. Display only. */
@@ -33,15 +33,10 @@ export function SuggestedPlans() {
     setStarting(plan.id);
     setError(null);
     try {
-      await api.post<SessionDetail>('/training/sessions', {
-        requestId: crypto.randomUUID(),
-        day: workoutDay(),
-        planId: plan.id,
-        planWorkoutId: plan.nextWorkout.id,
-      });
-      await revalidateTraining();
+      // Spec 028: started on the device from the cached plan; sent when there is a connection.
+      await trainingWrites.start(workoutDay(), { planId: plan.id, planWorkoutId: plan.nextWorkout.id });
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not reach the server. Try again.');
+      setError(caught instanceof Error ? caught.message : 'Could not start the workout.');
     } finally {
       setStarting(null);
     }

@@ -1,7 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -35,20 +35,26 @@ import {
   type SupersetPlace,
 } from '@life-portal/shared-domain';
 import { ErrorNote, Modal, Spinner, Textarea } from '../ui';
-import { api, ApiError } from '../../lib/api';
+import { ApiError } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
 import {
   describeOneRepMax,
   describeSet,
   formatDuration,
   humanise,
-  revalidateTraining,
-  useCurrentSession,
   useTrainingProfile,
   useWeightUnit,
   useWorkoutDay,
 } from '../../lib/training';
-import { clearQueueError, enqueue, useTrainingQueue } from '../../lib/training-queue';
+import {
+  discardRefusedTraining,
+  hasUnsyncedWrites,
+  OFFLINE_EXERCISES_KEY,
+  trainingWrites,
+  useCurrentSession,
+  useTrainingSync,
+  useTrainingWrites,
+} from '../../lib/training-offline';
 import { ExerciseDetail, type ExerciseDetailTab } from './exercise-detail';
 import { ExerciseSearch } from './exercise-picker';
 import { SuggestedPlans } from './plan-suggestions';
@@ -59,12 +65,6 @@ import { exerciseRest, sessionFocus } from '../../lib/training-workout';
 import { SetForm, type SetFormValue } from './set-row';
 import { SetTable } from './set-table';
 import { PlanDayUpdate } from './plan-day-update';
-
-interface PendingSet {
-  sessionId: string;
-  workoutExerciseId: string;
-  value: SetFormValue;
-}
 
 const message = (error: unknown) =>
   error instanceof ApiError ? error.message : 'Could not reach the server. Try again.';
@@ -83,6 +83,9 @@ function useNow(active: boolean) {
 /** The Workout tab: the open session, or a way to start one. */
 export function CurrentWorkout({ onBrowsePlans }: { onBrowsePlans?: () => void }) {
   const { data, error, isLoading } = useCurrentSession();
+  // Spec 028: keeps the exercises a workout may need (own, recent, in plans) on the device, so the
+  // picker and a plan started offline have them even if the picker was never opened online.
+  useApi(OFFLINE_EXERCISES_KEY, { shouldRetryOnError: false, revalidateOnFocus: false });
   const workoutDay = useWorkoutDay();
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -91,8 +94,8 @@ export function CurrentWorkout({ onBrowsePlans }: { onBrowsePlans?: () => void }
     setStarting(true);
     setStartError(null);
     try {
-      await api.post('/training/sessions', { requestId: crypto.randomUUID(), day: workoutDay() });
-      await revalidateTraining();
+      // Spec 028: stored on the device and shown at once; sent when there is a connection.
+      await trainingWrites.start(workoutDay());
     } catch (caught) {
       setStartError(message(caught));
     } finally {
@@ -149,27 +152,22 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
   const now = useNow(open);
   const planStyle = usePlanStyle(session.plan?.planId);
   const profile = useTrainingProfile();
-  const queue = useTrainingQueue();
+  const sync = useTrainingSync();
+  const writes = useTrainingWrites();
+  const unsynced = hasUnsyncedWrites(writes, session.id);
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notes, setNotes] = useState(session.notes ?? '');
   useEffect(() => setNotes(session.notes ?? ''), [session.notes]);
 
-  const pending = useMemo(
-    () =>
-      queue.jobs
-        .map((job) => job.meta as PendingSet)
-        .filter((meta) => meta.sessionId === session.id),
-    [queue.jobs, session.id],
-  );
-
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     setError(null);
     try {
+      // Spec 028: a write resolves once it is kept on the device; the server's answer (or
+      // refusal) arrives through the outbox and shows in the sync sheet.
       await fn();
-      await revalidateTraining();
       return true;
     } catch (caught) {
       setError(message(caught));
@@ -179,54 +177,42 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
     }
   };
 
-  const base = `/training/sessions/${session.id}`;
   /** One step (#14): the exercise names its equipment, so there is no "which machine?". */
   const addExercise = async (exercise: ExerciseListItem) => {
     setPicking(false);
-    await run(() =>
-      api.post(`${base}/exercises`, { requestId: crypto.randomUUID(), exerciseId: exercise.id }),
-    );
+    await run(() => trainingWrites.addExercise(session.id, exercise));
   };
 
   const discard = async () => {
     if (!window.confirm('Discard this workout and every set in it?')) return;
-    if (await run(() => api.delete(base))) onGone?.();
+    if (await run(() => trainingWrites.remove(session.id))) onGone?.();
   };
 
   const finish = async (at: 'now' | 'lastSet' = 'now') => {
-    setBusy(true);
-    setError(null);
-    try {
-      await api.post(`${base}/finish`, { at });
-      await revalidateTraining();
-    } catch (caught) {
-      if (caught instanceof ApiError && caught.status === 409) {
-        // Nothing was logged: offer to throw it away rather than keep an empty workout.
-        setBusy(false);
-        await discard();
-        return;
-      }
-      setError(message(caught));
-    } finally {
-      setBusy(false);
+    // Nothing was logged: offer to throw it away rather than keep an empty workout (the server
+    // refuses to finish one). Sets still waiting to be sent count: they are in `session`.
+    if (!session.exercises.some((exercise) => exercise.sets.length)) {
+      await discard();
+      return;
     }
+    await run(() => trainingWrites.finish(session, at));
   };
 
   const saveNotes = () => {
     if (notes === (session.notes ?? '')) return;
-    void run(() => api.patch(base, { notes }));
+    void run(() => trainingWrites.patchSession(session.id, { notes }));
   };
 
   const move = (index: number, by: -1 | 1) => {
     const ids = session.exercises.map((exercise) => exercise.id);
     const [moved] = ids.splice(index, 1);
     ids.splice(index + by, 0, moved);
-    void run(() => api.post(`${base}/exercises/order`, { ids }));
+    void run(() => trainingWrites.reorder(session.id, ids));
   };
 
   // Spec 025: which exercise is done and which is current, and the rest after the last set (the
   // exercise's own rest, 0 mid-way through a superset round). Derived on every render.
-  const focus = sessionFocus(session, pending, profile.defaultRestSeconds);
+  const focus = sessionFocus(session, [], profile.defaultRestSeconds);
   const upNext = focus.current && focus.current.id !== focus.lastId ? focus.current.snapshot.name : undefined;
 
   /** Spec 025: links or splits a superset; saves only the exercises whose key changed. */
@@ -237,7 +223,7 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
     void run(async () => {
       for (const [i, exercise] of session.exercises.entries()) {
         if (changed[i] === exercise.superset) continue;
-        await api.patch(`${base}/exercises/${exercise.id}`, { superset: changed[i] ?? null });
+        await trainingWrites.patchExercise(session.id, exercise, { superset: changed[i] ?? null });
       }
     });
   };
@@ -251,10 +237,10 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
   const planned = session.exercises.filter((exercise) => exercise.planned && !exercise.skipped);
   const plannedTotal = planned.reduce((sum, exercise) => sum + (exercise.planned?.targets.length ?? 0), 0);
   const plannedDone = planned.reduce((sum, exercise) => {
-    const logged = exercise.sets.length + pending.filter((item) => item.workoutExerciseId === exercise.id).length;
+    const logged = exercise.sets.length;
     return sum + Math.min(logged, exercise.planned?.targets.length ?? 0);
   }, 0);
-  const setCount = session.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0) + pending.length;
+  const setCount = session.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0);
 
   return (
     <div className="space-y-4">
@@ -329,22 +315,30 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
               </div>
             </div>
           )}
-          {queue.offline && (
+          {sync.offline && (
             <p className="text-xs text-amber-700 dark:text-amber-400">
-              No connection: sets are kept on this device and sent when it is back.
+              No connection: this workout is kept on this device and sent when it is back.
             </p>
           )}
-          {queue.error && (
+          {/* Spec 028: records, ranks and levels are the server's; sets not yet sent do not count. */}
+          {unsynced && (
+            <p className="text-xs text-ink-faint">
+              Records, ranks and your level update once these changes reach the server.
+            </p>
+          )}
+          {sync.error && (
             <div>
-              <ErrorNote message={queue.error} />
+              <ErrorNote message={sync.error} />
               <button
                 type="button"
                 className="mt-1 text-xs text-ink-faint underline"
                 onClick={() => {
-                  if (window.confirm('Discard the sets that could not be saved? They are not on the server.')) clearQueueError();
+                  if (window.confirm('Discard the changes the server did not accept? They are not on the server.')) {
+                    void discardRefusedTraining();
+                  }
                 }}
               >
-                Discard unsaved sets
+                Discard changes not accepted
               </button>
             </div>
           )}
@@ -379,24 +373,16 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
           state={!open ? 'idle' : focus.doneIds.has(exercise.id) ? 'done' : focus.currentId === exercise.id ? 'current' : 'idle'}
           superset={place}
           defaultRest={profile.defaultRestSeconds}
-          pending={pending.filter((item) => item.workoutExerciseId === exercise.id)}
           canMoveUp={index > 0}
           canMoveDown={index < session.exercises.length - 1}
           onMove={(by) => move(index, by)}
           onRemove={() => {
             if (window.confirm(`Remove ${exercise.snapshot.name} and its sets from this workout?`)) {
-              void run(() => api.delete(`${base}/exercises/${exercise.id}`));
+              void run(() => trainingWrites.removeExercise(session.id, exercise));
             }
           }}
-          onSkip={(skipped) => void run(() => api.patch(`${base}/exercises/${exercise.id}`, { skipped }))}
-          onSwap={(replacement) =>
-            void run(() =>
-              api.post(`${base}/exercises/${exercise.id}/swap`, {
-                requestId: crypto.randomUUID(),
-                exerciseId: replacement.id,
-              }),
-            )
-          }
+          onSkip={(skipped) => void run(() => trainingWrites.patchExercise(session.id, exercise, { skipped }))}
+          onSwap={(replacement) => void run(() => trainingWrites.swap(session.id, exercise, replacement))}
           busy={busy}
         />
         {next && (open || linked) && (
@@ -460,7 +446,6 @@ function ExerciseBlock({
   state,
   superset,
   defaultRest,
-  pending,
   canMoveUp,
   canMoveDown,
   onMove,
@@ -475,7 +460,6 @@ function ExerciseBlock({
   state: 'done' | 'current' | 'idle';
   superset?: SupersetPlace;
   defaultRest: number;
-  pending: PendingSet[];
   canMoveUp: boolean;
   canMoveDown: boolean;
   onMove: (by: -1 | 1) => void;
@@ -496,21 +480,12 @@ function ExerciseBlock({
   const estimate = exercise.oneRepMax && describeOneRepMax(exercise.oneRepMax, unit);
   /** A workout logged before #14 may name a machine; it is history, shown but never edited. */
   const machineLabel = [exercise.snapshot.machineName, exercise.snapshot.machineBrand].filter(Boolean).join(' · ');
-  const done = exercise.sets.length + pending.length;
+  const done = exercise.sets.length;
   const fromPlan = Boolean(exercise.planned);
   const canSwap = fromPlan && done === 0 && session.status === 'open';
 
-  const log = (value: SetFormValue) => {
-    const requestId = crypto.randomUUID();
-    enqueue<PendingSet>({
-      id: requestId,
-      meta: { sessionId: session.id, workoutExerciseId: exercise.id, value },
-      method: 'POST',
-      path: `/training/sessions/${session.id}/exercises/${exercise.id}/sets`,
-      body: { requestId, ...value },
-      label: `Set · ${exercise.snapshot.name}`,
-    });
-  };
+  // Spec 028: kept on the device and shown as a logged set at once, with the id it will keep.
+  const log = (value: SetFormValue) => void trainingWrites.logSet(session.id, exercise, value);
 
   const group = exerciseGroup(exercise.snapshot.primaryMuscles, measure);
   const style = GROUP_STYLES[group];
@@ -521,7 +496,7 @@ function ExerciseBlock({
   const isDone = state === 'done';
   const collapsed = isDone && !expanded;
   const rest = exerciseRest(exercise);
-  const allSets = [...exercise.sets, ...pending.map((item) => item.value)];
+  const allSets = exercise.sets;
 
   return (
     <section
@@ -690,7 +665,6 @@ function ExerciseBlock({
       )}
       <SetTable
         exercise={exercise}
-        pending={pending.map((item) => item.value)}
         onLog={log}
         onEdit={setEditing}
       />
@@ -712,7 +686,7 @@ function ExerciseBlock({
       )}
       {detail && <ExerciseDetail id={exercise.exerciseId} initialTab={detail} onClose={() => setDetail(null)} />}
       {editing && (
-        <EditSet set={editing} measure={measure} onClose={() => setEditing(null)} />
+        <EditSet sessionId={session.id} set={editing} measure={measure} onClose={() => setEditing(null)} />
       )}
     </section>
   );
@@ -729,10 +703,12 @@ function LoadHint({ exerciseId }: { exerciseId: string }) {
 }
 
 function EditSet({
+  sessionId,
   set,
   measure,
   onClose,
 }: {
+  sessionId: string;
   set: WorkoutSet;
   measure: SessionExercise['snapshot']['measure'];
   onClose: () => void;
@@ -744,7 +720,6 @@ function EditSet({
     setError(null);
     try {
       await fn();
-      await revalidateTraining();
       onClose();
     } catch (caught) {
       setError(message(caught));
@@ -756,7 +731,7 @@ function EditSet({
     // Every field the measure allows is sent, `null` for an emptied one, so clearing works.
     const body: Record<string, unknown> = { type: value.type, rpe: value.rpe ?? null };
     for (const field of setFieldsFor(measure).allowed) body[field] = value[field] ?? null;
-    return act(() => api.patch(`/training/sets/${set.id}`, body));
+    return act(() => trainingWrites.patchSet(sessionId, set.id, body));
   };
   return (
     <Modal open onClose={onClose} title="Edit set" error={error}>
@@ -765,7 +740,7 @@ function EditSet({
         type="button"
         className="btn-danger"
         disabled={pending}
-        onClick={() => void act(() => api.delete(`/training/sets/${set.id}`))}
+        onClick={() => void act(() => trainingWrites.removeSet(sessionId, set.id))}
       >
         <Trash2 className="h-4 w-4" /> Delete set
       </button>

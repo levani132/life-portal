@@ -203,6 +203,12 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   be retried must carry one. A failed send is never dropped silently, and only "no answer at all"
   (`NetworkError`) counts as offline: an `ApiError` is the server's verdict. See
   `docs/modules/offline.md`.
+- **Training creates carry the client's id** (spec 028). Start, add, swap and log-set accept an
+  `id` the device chose; the API must keep checking that no user has it (`ID_TAKEN`), and plan
+  rows keep their `plannedRowId(requestId, planExerciseId)` ids, which the web derives the same
+  way. A start with an `id` while one is open is `SESSION_CONFLICT`, never a resume. Client times
+  are clamped (`clientTime`). The workout on screen is the cached copy plus the outbox's writes
+  (`training-overlay.ts`): keep every op idempotent, and never compute records or ranks there.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for

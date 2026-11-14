@@ -5,7 +5,8 @@ import { CatalogueService } from './catalogue.service';
 import { FakeModel, fakeMedia } from './fake-model.testing';
 import { ProgressService } from './progress.service';
 import { PlansService } from './plans.service';
-import { SessionsService } from './sessions.service';
+import { MAX_CLIENT_BACKDATE_MS, SessionsService, clientTime } from './sessions.service';
+import { plannedRowId } from './planned-row-id';
 
 const ME = 'user-me';
 const OTHER = 'user-other';
@@ -420,6 +421,13 @@ describe('SessionsService: plan workouts (spec 023)', () => {
     expect(session.exercises[0].skipped).toBe(false);
   });
 
+  it('gives each planned row the id derived from the start’s requestId (spec 028)', async () => {
+    const f = planFixture();
+    const requestId = randomUUID();
+    const session = await f.start(requestId);
+    expect(session.exercises.map((e) => e.id)).toEqual([plannedRowId(requestId, 'pp:push:0'), plannedRowId(requestId, 'pp:push:1')]);
+  });
+
   it('never doubles the exercises when the start is retried', async () => {
     const f = planFixture();
     const requestId = randomUUID();
@@ -633,3 +641,83 @@ describe('Body weight with a signed external load (#5)', () => {
     expect((await f.progress.progressView(ME, f.pullUp, 'all', '2026-11-13')).earlierMeasureSets).toBeUndefined();
   });
 });
+
+
+describe('SessionsService: work done offline (spec 028)', () => {
+  const id = () => String(new Types.ObjectId());
+
+  it('keeps the ids the client chose, and returns the same rows for a retry', async () => {
+    const f = fixture();
+    const [sessionId, rowId, setId] = [id(), id(), id()];
+    const startInput = { requestId: randomUUID(), day: '2026-11-12', id: sessionId };
+    const session = await f.service.start(ME, startInput, T0);
+    expect(session.id).toBe(sessionId);
+    expect((await f.service.start(ME, startInput, min(1))).id).toBe(sessionId);
+    const addInput = { requestId: randomUUID(), exerciseId: f.bench, id: rowId };
+    expect((await f.service.addExercise(ME, sessionId, addInput)).id).toBe(rowId);
+    expect((await f.service.addExercise(ME, sessionId, addInput)).id).toBe(rowId);
+    const setInput = { requestId: randomUUID(), reps: 5, weightGrams: 60_000, id: setId };
+    expect((await f.service.addSet(ME, sessionId, rowId, setInput, min(2))).set.id).toBe(setId);
+    expect((await f.service.addSet(ME, sessionId, rowId, setInput, min(3))).set.id).toBe(setId);
+    expect(f.sets.docs).toHaveLength(1);
+  });
+
+  it('refuses an id another row already has, whoever owns it', async () => {
+    const f = fixture();
+    const theirs = await f.service.start(OTHER, { requestId: randomUUID(), day: '2026-11-12' }, T0);
+    await expect(f.service.start(ME, { requestId: randomUUID(), day: '2026-11-12', id: theirs.id }, T0)).rejects.toMatchObject({
+      response: { code: 'ID_TAKEN' },
+    });
+    const { session, exercise } = await startWithBench(f);
+    await expect(
+      f.service.addSet(ME, session.id, exercise.id, { requestId: randomUUID(), reps: 5, weightGrams: 1000, id: exercise.id }, min(1)),
+    ).resolves.toBeDefined(); // a set id may equal a row in another collection
+    await expect(
+      f.service.addExercise(ME, session.id, { requestId: randomUUID(), exerciseId: f.bench, id: exercise.id }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('never folds a workout made offline into another open one: it is a conflict', async () => {
+    const f = fixture();
+    const open = await f.service.start(ME, { requestId: randomUUID(), day: '2026-11-12' }, T0);
+    await expect(f.service.start(ME, { requestId: randomUUID(), day: '2026-11-12', id: id() }, min(5))).rejects.toMatchObject({
+      response: { code: 'SESSION_CONFLICT', openSessionId: open.id },
+    });
+    // Without an id (an online start), the open one is still resumed as before.
+    expect((await f.service.start(ME, { requestId: randomUUID(), day: '2026-11-12' }, min(6))).resumed).toBe(true);
+  });
+
+  it('keeps the times work was really done, clamped to the workout and to now', async () => {
+    const f = fixture();
+    const sessionId = id();
+    const now = min(600);
+    const session = await f.service.start(ME, { requestId: randomUUID(), day: '2026-11-12', id: sessionId, startedAt: new Date(T0).toISOString() }, now);
+    expect(session.startedAt).toBe(new Date(T0).toISOString());
+    const row = await f.service.addExercise(ME, sessionId, { requestId: randomUUID(), exerciseId: f.bench });
+    const early = await f.service.addSet(ME, sessionId, row.id, { requestId: randomUUID(), reps: 5, weightGrams: 1000, loggedAt: new Date(T0 - 60_000).toISOString() }, now);
+    expect(early.set.loggedAt).toBe(new Date(T0).toISOString());
+    const set = await f.service.addSet(ME, sessionId, row.id, { requestId: randomUUID(), reps: 5, weightGrams: 1000, loggedAt: new Date(min(20)).toISOString() }, now);
+    expect(set.set.loggedAt).toBe(new Date(min(20)).toISOString());
+    const future = await f.service.addSet(ME, sessionId, row.id, { requestId: randomUUID(), reps: 5, weightGrams: 1000, loggedAt: new Date(now + 3_600_000).toISOString() }, now);
+    expect(future.set.loggedAt).toBe(new Date(now).toISOString());
+    await f.sets.deleteOne({ _id: future.set.id });
+    const finished = await f.service.finish(ME, sessionId, 'now', now, new Date(min(10)).toISOString());
+    // Never before its last set.
+    expect(finished.endedAt).toBe(new Date(min(20)).toISOString());
+  });
+
+  it('clamps a start to the last 48 hours', () => {
+    const now = T0;
+    expect(clientTime(new Date(now - MAX_CLIENT_BACKDATE_MS - 1).toISOString(), now - MAX_CLIENT_BACKDATE_MS, now).getTime()).toBe(now - MAX_CLIENT_BACKDATE_MS);
+    expect(clientTime('nonsense', 0, now).getTime()).toBe(now);
+  });
+
+  it('derives a plan start’s rows from its requestId, the same value the browser computes', () => {
+    // The browser's `planned-row-id.ts` test uses this vector too.
+    expect(plannedRowId('7f1c9e5a-3b2d-4c8e-9f00-1a2b3c4d5e6f', 'pp:push:0')).toBe(PLANNED_VECTOR);
+    expect(plannedRowId('7f1c9e5a-3b2d-4c8e-9f00-1a2b3c4d5e6f', 'pp:push:1')).not.toBe(PLANNED_VECTOR);
+  });
+});
+
+/** sha256('lp-planned:<requestId>:<planExerciseId>'), first 24 hex digits. Shared with the web test. */
+const PLANNED_VECTOR = 'e80ee18e8ffbaeb4f40ef02d';

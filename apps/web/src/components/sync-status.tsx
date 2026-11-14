@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { outbox, useOutbox } from '../lib/offline/runtime';
 import type { OutboxItem } from '../lib/offline/types';
+import { finishOtherAndRetry, isSessionConflict } from '../lib/training-offline';
 import { Modal } from './ui';
 
 /**
@@ -105,6 +106,20 @@ const STATE_TEXT: Record<OutboxItem['state'], string> = {
 
 function SyncRow({ item }: { item: OutboxItem }) {
   const [confirm, setConfirm] = useState(false);
+  const [resolving, setResolving] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const workoutConflict = isSessionConflict(item);
+  const finishOther = async () => {
+    setResolving(true);
+    setProblem(null);
+    try {
+      await finishOtherAndRetry(item);
+    } catch (caught) {
+      setProblem(caught instanceof Error ? caught.message : 'Could not finish the other workout.');
+    } finally {
+      setResolving(false);
+    }
+  };
   const stuck = item.state === 'error' || item.state === 'conflict';
   return (
     <li className="rounded-lg border border-border p-3 text-sm">
@@ -140,6 +155,21 @@ function SyncRow({ item }: { item: OutboxItem }) {
           </button>
         </div>
       </div>
+      {/* Spec 028: two open workouts are never merged; the person picks which one stays open. */}
+      {workoutConflict && (
+        <div className="mt-2 space-y-2 rounded-md bg-amber-500/10 p-2 text-xs">
+          <p>
+            Another workout is open, probably on another device. Finish that one (at its last set) and send this one,
+            or discard this one and keep the other.
+          </p>
+          <div className="flex justify-end">
+            <button type="button" className="btn-primary px-2 py-1 text-xs" disabled={resolving} onClick={() => void finishOther()}>
+              {resolving ? 'Finishing…' : 'Finish the other, send this'}
+            </button>
+          </div>
+          {problem && <p className="text-rose-300">{problem}</p>}
+        </div>
+      )}
       {confirm && (
         <div className="mt-2 flex flex-wrap items-center justify-end gap-2 rounded-md bg-rose-500/10 p-2 text-xs">
           <span className="mr-auto">

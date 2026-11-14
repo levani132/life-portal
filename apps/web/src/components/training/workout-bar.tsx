@@ -2,13 +2,12 @@
 
 import clsx from 'clsx';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, Dumbbell, Timer } from 'lucide-react';
 import type { SessionDetail } from '@life-portal/shared-types';
 import { api } from '../../lib/api';
-import { useApi } from '../../lib/hooks';
-import { CURRENT_KEY, formatDuration, useTrainingProfile } from '../../lib/training';
-import { useTrainingQueue } from '../../lib/training-queue';
+import { formatDuration, useTrainingProfile } from '../../lib/training';
+import { useCurrentSession } from '../../lib/training-offline';
 import {
   OPEN_WORKOUT_EVENT,
   restLeft,
@@ -27,10 +26,8 @@ import {
  * right under it. Display only: everything is derived from the open session.
  */
 export function WorkoutBar({ enabled, push = false }: { enabled: boolean; push?: boolean }) {
-  const { data } = useApi<SessionDetail | undefined>(enabled ? CURRENT_KEY : null, {
-    // A workout started on another device shows up when this one comes back to the app.
-    revalidateOnFocus: true,
-  });
+  // Spec 028: the open workout as this device sees it, including one started offline.
+  const { data } = useCurrentSession(enabled);
   const onScreen = useWorkoutOnScreen();
   const open = data?.status === 'open' ? data : undefined;
   if (!enabled || !open) return null;
@@ -42,18 +39,6 @@ export function WorkoutBar({ enabled, push = false }: { enabled: boolean; push?:
   );
 }
 
-/** The open workout's sets still being sent, from the in-memory queue. */
-function usePending(sessionId: string) {
-  const queue = useTrainingQueue();
-  return useMemo(
-    () =>
-      queue.jobs
-        .map((job) => job.meta as { sessionId: string; workoutExerciseId: string })
-        .filter((meta) => meta.sessionId === sessionId),
-    [queue.jobs, sessionId],
-  );
-}
-
 /**
  * Spec 025: keeps the server's rest alarm in step with the rest shown here, so a push says "Rest
  * over" when it ends, even with the phone locked. Sent after each set, ±15 s and Skip; a rest
@@ -62,8 +47,7 @@ function usePending(sessionId: string) {
  */
 function RestAlarmSync({ session }: { session: SessionDetail }) {
   const profile = useTrainingProfile();
-  const pending = usePending(session.id);
-  const focus = sessionFocus(session, pending, profile.defaultRestSeconds);
+  const focus = sessionFocus(session, [], profile.defaultRestSeconds);
   const controls = useRestControls(session.lastSetAt);
   const total = focus.restSeconds + controls.addSeconds;
   const due = session.lastSetAt && !controls.skipped && total > 0 ? Date.parse(session.lastSetAt) + total * 1000 : null;
@@ -92,8 +76,7 @@ function Bar({ session }: { session: SessionDetail }) {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
-  const pending = usePending(session.id);
-  const focus = sessionFocus(session, pending, profile.defaultRestSeconds);
+  const focus = sessionFocus(session, [], profile.defaultRestSeconds);
   const controls = useRestControls(session.lastSetAt);
   const left = restLeft(session.lastSetAt, focus.restSeconds, controls, now);
   const resting = left !== undefined && left > 0;

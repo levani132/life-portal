@@ -40,13 +40,15 @@ const isDuplicateKey = (error: unknown) => (error as { code?: number } | null)?.
  * Without the header nothing changes, so existing clients and the token-auth ingest route are
  * untouched. With it:
  *
- * - the first request with a key runs and its result is stored (success, or a 4xx refusal);
+ * - the first request with a key runs and its result is stored (success, or a 4xx refusal other
+ *   than 409);
  * - a repeat with the same key and the same method, path and body gets that result back
  *   without running again, with `Idempotent-Replayed: true`;
  * - the same key for a different write answers 422 `IDEMPOTENCY_KEY_REUSED`;
  * - a repeat while the first is still running answers 409 `IDEMPOTENCY_IN_PROGRESS`, which the
  *   outbox treats as "try again shortly";
- * - a 5xx or a crash stores nothing, so the write can be retried.
+ * - a 409 conflict, a 5xx or a crash stores nothing, so the write can be retried (a conflict is
+ *   about the state at the time, which the person may change: spec 028).
  *
  * Keys are per user: one person's key never matches another's.
  */
@@ -92,7 +94,10 @@ export class IdempotencyInterceptor implements NestInterceptor {
       await this.finish(userId, key, { body: serialise(result) });
       return result;
     } catch (error) {
-      if (error instanceof HttpException && error.getStatus() < 500) {
+      // A 409 is decided by the state at the time (another workout open, a plan day changed): the
+      // person resolves it and sends the same write again, so it is released, not replayed
+      // (spec 028). Other refusals are about the write itself and are replayed.
+      if (error instanceof HttpException && error.getStatus() < 500 && error.getStatus() !== 409) {
         await this.finish(userId, key, { errorStatus: error.getStatus(), body: serialise(error.getResponse()) });
       } else {
         await this.keys.deleteOne({ userId, key, state: 'running' });

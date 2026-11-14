@@ -31,6 +31,9 @@ export interface CatalogueQuery {
 
 /** "Recently used" for search ranking (contract: the last 90 days). */
 export const RECENT_DAYS = 90;
+
+/** Spec 028: at most this many exercises are kept on a device for offline use. */
+export const OFFLINE_CAP = 1000;
 /** More matches than this are not ranked; the catalogue has under a thousand rows. */
 const RANK_CAP = 2000;
 
@@ -137,6 +140,40 @@ export class CatalogueService {
     return ranked.slice(skip, skip + limit).map(({ row, id }) => ({
       ...this.toListItem(row),
       ...(recent.has(id) ? { recent: true } : {}),
+    }));
+  }
+
+  /**
+   * Spec 028: what a device keeps for offline use. The caller's own exercises, those they logged
+   * in the last 90 days, and those in a plan they can start (their own and the ready-made ones).
+   * Capped, newest-used first; the picker says anything else is unavailable offline.
+   */
+  async offlineList(userId: string, nowMs = Date.now()): Promise<ExerciseListItem[]> {
+    const [recent, planIds] = await Promise.all([
+      this.recentIds(userId, nowMs),
+      this.plans
+        ? this.plans
+            .find({ archived: false, $or: [{ userId: { $exists: false } }, { userId }] })
+            .select('workouts.exercises.exerciseId')
+            .lean<{ workouts?: { exercises?: { exerciseId: string }[] }[] }[]>()
+            .then((plans) =>
+              plans.flatMap((plan) => (plan.workouts ?? []).flatMap((day) => (day.exercises ?? []).map((item) => String(item.exerciseId)))),
+            )
+        : Promise.resolve([] as string[]),
+    ]);
+    const ids = [...new Set([...recent, ...planIds])].filter((id) => isValidObjectId(id));
+    const fields = 'name searchName primaryMuscles equipmentType measure userId seedKey';
+    const [ownRows, usedRows] = await Promise.all([
+      this.exercises.find({ userId, archived: false }).select(fields).lean<ExerciseRow[]>(),
+      this.exercises.find(this.visible(userId, { archived: false, _id: { $in: ids } })).select(fields).lean<ExerciseRow[]>(),
+    ]);
+    const byId = new Map([...ownRows, ...usedRows].map((row) => [String(row._id), row]));
+    const rows = [...byId.values()]
+      .sort((a, b) => Number(recent.has(String(b._id))) - Number(recent.has(String(a._id))) || a.name.localeCompare(b.name))
+      .slice(0, OFFLINE_CAP);
+    return rows.map((row) => ({
+      ...this.toListItem(row),
+      ...(recent.has(String(row._id)) ? { recent: true } : {}),
     }));
   }
 

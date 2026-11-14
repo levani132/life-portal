@@ -70,6 +70,17 @@ describe('IdempotencyInterceptor (spec 027)', () => {
     expect(await f.call(() => 'ok').result).toBe('ok');
   });
 
+  it('does not keep a conflict (409), so the same write runs again once it is resolved (spec 028)', async () => {
+    const f = fixture();
+    await expect(f.call(() => {
+      throw new ConflictException({ code: 'SESSION_CONFLICT', message: 'Another workout is open.' });
+    }).result).rejects.toBeInstanceOf(ConflictException);
+    expect(f.keys.docs).toHaveLength(0);
+    const again = f.call(() => ({ id: 'started' }));
+    expect(await again.result).toEqual({ id: 'started' });
+    expect(again.runs()).toBe(1);
+  });
+
   it('refuses the same key for a different write', async () => {
     const f = fixture();
     await f.call(() => 'first').result;

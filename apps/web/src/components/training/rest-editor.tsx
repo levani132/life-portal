@@ -5,9 +5,10 @@ import { useState } from 'react';
 import { mutate } from 'swr';
 import { PLAN_LIMITS, type PlanDetail, type SessionDetail, type SessionExercise } from '@life-portal/shared-types';
 import { Input, Modal } from '../ui';
-import { api, ApiError } from '../../lib/api';
+import { api, ApiError, NetworkError } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
-import { PLANS_KEY, formatDuration, parseDuration, planKey, revalidateTraining } from '../../lib/training';
+import { PLANS_KEY, formatDuration, parseDuration, planKey } from '../../lib/training';
+import { trainingWrites } from '../../lib/training-offline';
 import { exerciseRest, planInputOf } from '../../lib/training-workout';
 
 const PRESETS = [30, 45, 60, 90, 120, 150, 180, 240];
@@ -45,7 +46,8 @@ export function RestEditor({
     setPending(true);
     setError(null);
     try {
-      await api.patch(`/training/sessions/${session.id}/exercises/${exercise.id}`, { restSeconds: seconds });
+      // Spec 028: this workout's rest works offline; changing the plan itself needs a connection.
+      await trainingWrites.patchExercise(session.id, exercise, { restSeconds: seconds });
       if (toPlan && inPlan && plan && exercise.planned) {
         const input = planInputOf(plan);
         for (const workout of input.workouts) {
@@ -58,10 +60,15 @@ export function RestEditor({
         const saved = await api.put<PlanDetail>(`/training/plans/${plan.id}`, input);
         await Promise.all([mutate(PLANS_KEY), mutate(planKey(plan.id), saved, { revalidate: false })]);
       }
-      await revalidateTraining();
       onClose();
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not reach the server. Try again.');
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : caught instanceof NetworkError
+            ? 'Saved for this workout. The plan can be changed once there is a connection.'
+            : 'Could not save the rest. Try again.',
+      );
     } finally {
       setPending(false);
     }

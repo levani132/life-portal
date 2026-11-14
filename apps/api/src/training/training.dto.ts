@@ -37,8 +37,10 @@ import {
 /**
  * Bounds that depend on the exercise's measure (which fields apply, their ranges) are checked
  * by `validateSetValues` in the service, so the API, the form and the tests share one table.
- * These DTOs only check shape. There is deliberately no field for `snapshot`, `loggedAt`,
- * `exerciseId` on a PATCH, or `userId` anywhere: `forbidNonWhitelisted` turns them into 400s.
+ * These DTOs only check shape. There is deliberately no field for `snapshot`, `exerciseId` on a
+ * PATCH, or `userId` anywhere: `forbidNonWhitelisted` turns them into 400s. Spec 028 added `id`
+ * (an ObjectId the client chose) on creates and `startedAt`/`loggedAt`/`endedAt` for work done
+ * offline; the service checks the id is unused and clamps the times. `loggedAt` is create-only.
  */
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const SUPERSET_KEY = /^[A-Za-z0-9_-]+$/;
@@ -49,6 +51,8 @@ export class StartSessionDto {
   /** Spec 023: start a plan's workout. Both or neither; checked in the service. */
   @IsOptional() @IsMongoId() planId?: string;
   @IsOptional() @IsString() @MinLength(1) @MaxLength(100) planWorkoutId?: string;
+  @IsOptional() @IsMongoId() id?: string;
+  @IsOptional() @IsISO8601({ strict: true }) startedAt?: string;
 }
 
 export class UpdateSessionDto {
@@ -64,6 +68,7 @@ export class RestAlarmDto {
 
 export class FinishSessionDto {
   @IsOptional() @IsIn(['now', 'lastSet']) at?: 'now' | 'lastSet';
+  @IsOptional() @IsISO8601({ strict: true }) endedAt?: string;
 }
 
 /**
@@ -73,6 +78,7 @@ export class FinishSessionDto {
 export class AddSessionExerciseDto {
   @IsUUID() requestId!: string;
   @IsMongoId() exerciseId!: string;
+  @IsOptional() @IsMongoId() id?: string;
 }
 
 export class UpdateSessionExerciseDto {
@@ -91,6 +97,7 @@ export class UpdateSessionExerciseDto {
 export class SwapSessionExerciseDto {
   @IsUUID() requestId!: string;
   @IsMongoId() exerciseId!: string;
+  @IsOptional() @IsMongoId() id?: string;
 }
 
 // ------------------------------------------------------------------ own exercises
@@ -145,6 +152,8 @@ export class UpdateSetDto {
 
 export class CreateSetDto extends UpdateSetDto {
   @IsUUID() requestId!: string;
+  @IsOptional() @IsMongoId() id?: string;
+  @IsOptional() @IsISO8601({ strict: true }) loggedAt?: string;
 }
 
 export class UpdateTrainingProfileDto {

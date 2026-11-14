@@ -3,7 +3,8 @@
 import { useCallback, useState } from 'react';
 import useSWR, { mutate as globalMutate, type SWRConfiguration } from 'swr';
 import type { Currency, UserSettings } from '@life-portal/shared-types';
-import { api, ApiError } from './api';
+import { ApiError } from './api';
+import { getWithOfflineCopy } from './offline/reads';
 
 /**
  * SWR bound to the API client.
@@ -13,7 +14,8 @@ import { api, ApiError } from './api';
  * rate limit for no benefit.
  */
 export function useApi<T>(path: string | null, config?: SWRConfiguration<T>) {
-  return useSWR<T>(path, (key: string) => api.get<T>(key), {
+  // Spec 028: the reads offline screens need are kept on the device (`offline/reads.ts`).
+  return useSWR<T>(path, (key: string) => getWithOfflineCopy<T>(key), {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
     ...config,

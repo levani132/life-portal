@@ -226,3 +226,25 @@ describe('SessionsService: no machine step (#14)', () => {
     expect(found.map((e) => [e.name, e.equipmentType])).toEqual([['Butterfly (Machine)', 'machine']]);
   });
 });
+
+describe('CatalogueService.offlineList (spec 028)', () => {
+  it('keeps own, recently used and planned exercises, and not the rest of the catalogue', async () => {
+    const f = fixture();
+    const planned = f.shared('Planned press');
+    const theirPlan = f.shared('Their plan row');
+    const used = f.shared('Used curl');
+    f.shared('Never touched');
+    const mine = await f.catalogue.create(ME, own);
+    f.plans.docs.push(
+      { _id: new Types.ObjectId(), userId: ME, archived: false, workouts: [{ id: 'd', exercises: [{ exerciseId: planned }] }] },
+      { _id: new Types.ObjectId(), userId: OTHER, archived: false, workouts: [{ id: 'd', exercises: [{ exerciseId: theirPlan }] }] },
+    );
+    const session = await f.sessions.start(ME, { requestId: randomUUID(), day: '2026-11-12' }, NOW - DAY);
+    const row = await f.sessions.addExercise(ME, session.id, { requestId: randomUUID(), exerciseId: used });
+    await f.sessions.addSet(ME, session.id, row.id, { requestId: randomUUID(), reps: 5, weightGrams: 1000 }, NOW - DAY);
+    const list = await f.catalogue.offlineList(ME, NOW);
+    expect(list.map((item) => item.name).sort()).toEqual(['Iso row', 'Planned press', 'Used curl']);
+    expect(list.find((item) => item.id === used)?.recent).toBe(true);
+    expect(list.find((item) => item.id === mine.id)?.isOwn).toBe(true);
+  });
+});

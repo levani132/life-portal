@@ -6,7 +6,9 @@ import { useState, type ReactNode } from 'react';
 import { mutate } from 'swr';
 import type { PlanDayChange, PlanDayLine, PlanDayUpdatePreview, PlanDayUpdateResult } from '@life-portal/shared-types';
 import { describeTarget, formatDuration } from '@life-portal/shared-domain';
-import { api, ApiError } from '../../lib/api';
+import { api, ApiError, NetworkError } from '../../lib/api';
+import { outbox } from '../../lib/offline/runtime';
+import { trainingWrites, usePlanUpdateItem } from '../../lib/training-offline';
 import { useApi } from '../../lib/hooks';
 import { PLANS_KEY, planKey, useWeightUnit } from '../../lib/training';
 import { Modal } from '../ui';
@@ -172,7 +174,33 @@ export function PlanDayUpdate({ sessionId }: { sessionId: string }) {
   const { data, mutate: refresh } = useApi<PlanDayUpdatePreview>(planUpdateKey(sessionId));
   const [dismissed, setDismissed] = useState(() => readDismissed().includes(sessionId));
   const [open, setOpen] = useState(false);
+  const queued = usePlanUpdateItem(sessionId);
 
+  // Spec 028: reviewed with no connection; sent with the revision it was reviewed against.
+  if (queued) {
+    const refused = queued.state === 'error' || queued.state === 'conflict';
+    return (
+      <div className="flex flex-wrap items-center gap-2 px-1 text-xs">
+        <p className={clsx('min-w-0 flex-1', refused ? 'text-rose-600 dark:text-rose-300' : 'text-ink-muted')}>
+          {refused
+            ? `The plan update was not saved: ${queued.lastError ?? 'it was refused.'}`
+            : 'The plan update is kept on this device and is sent when there is a connection.'}
+        </p>
+        {refused && (
+          <button
+            type="button"
+            className="btn-ghost px-2 py-1 text-xs"
+            onClick={() =>
+              // Re-review: drop the refused update and show the day as it is now.
+              void outbox.discard(queued.id).then(() => refresh()).then(() => setOpen(true))
+            }
+          >
+            Review again
+          </button>
+        )}
+      </div>
+    );
+  }
   if (!data) return null;
   if (data.status === 'applied' && data.applied) {
     return (
@@ -260,6 +288,12 @@ function PlanDayReview({
       ]);
       onClose();
     } catch (caught) {
+      if (caught instanceof NetworkError) {
+        // No connection: keep it, with the revision reviewed, and send it later (spec 028).
+        await trainingWrites.planUpdate(sessionId, requestId, preview.revision ?? 0, preview.workoutName);
+        onClose();
+        return;
+      }
       if (caught instanceof ApiError && caught.status === 409) {
         // The day moved on (or the workout already updated it): show what is true now.
         onChanged();

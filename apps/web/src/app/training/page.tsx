@@ -3,7 +3,7 @@
 import clsx from 'clsx';
 import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, ClipboardList, Dumbbell, History as HistoryIcon, Library, type LucideIcon } from 'lucide-react';
-import type { SessionDetail, SessionListItem, SessionPage } from '@life-portal/shared-types';
+import type { SessionListItem, SessionPage } from '@life-portal/shared-types';
 import { addDays, diffDays, formatDay, weekdayOf } from '@life-portal/shared-domain';
 import { AppShell, PageHeader } from '../../components/app-shell';
 import { ExerciseLibrary } from '../../components/training/exercise-library';
@@ -13,8 +13,8 @@ import { TrainingSettings } from '../../components/training/training-settings';
 import { CurrentWorkout, WorkoutSession } from '../../components/training/workout-session';
 import { ErrorNote, Spinner } from '../../components/ui';
 import { api } from '../../lib/api';
-import { useApi } from '../../lib/hooks';
-import { formatDuration, sessionKey, useWorkoutDay } from '../../lib/training';
+import { formatDuration, useWorkoutDay } from '../../lib/training';
+import { useHistoryPage, useSessionDetail } from '../../lib/training-offline';
 import { OPEN_WORKOUT_EVENT, setWorkoutOnScreen } from '../../lib/training-workout';
 
 const TABS: readonly { id: 'workout' | 'plans' | 'history' | 'exercises'; label: string; icon: LucideIcon }[] = [
@@ -95,7 +95,8 @@ function History() {
   const [cursor, setCursor] = useState<string | undefined>();
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState<string | null>(null);
-  const { data, error, isLoading } = useApi<SessionPage>('/training/sessions');
+  // Spec 028: with workouts kept on this device (started or changed offline) applied.
+  const { data, error, isLoading } = useHistoryPage();
   const today = useWorkoutDay()();
 
   if (openId) return <SessionView id={openId} onBack={() => setOpenId(null)} />;
@@ -240,7 +241,7 @@ function groupByWeek(sessions: SessionListItem[], today: string): Week[] {
 }
 
 function SessionView({ id, onBack }: { id: string; onBack: () => void }) {
-  const { data, error, isLoading } = useApi<SessionDetail>(sessionKey(id));
+  const { data, error, isLoading } = useSessionDetail(id);
   return (
     <div className="space-y-3">
       <button type="button" className="btn-ghost" onClick={onBack}>

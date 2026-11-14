@@ -335,16 +335,33 @@ export interface StartSessionInput {
   /** Spec 023: start from a plan's workout. Both or neither. */
   planId?: string;
   planWorkoutId?: string;
+  /**
+   * Spec 028: an id the client chose (ObjectId format), so a workout made offline keeps it. With
+   * an id, another open workout answers 409 `SESSION_CONFLICT` instead of being resumed.
+   */
+  id?: string;
+  /** Spec 028: when it started, for a workout started offline. Clamped to the last 48 hours. */
+  startedAt?: string;
+}
+
+/** Spec 028: `POST /sessions/:id/finish`. `endedAt` is when it was finished offline. */
+export interface FinishSessionInput {
+  at?: 'now' | 'lastSet';
+  endedAt?: string;
 }
 
 export interface SwapSessionExerciseInput {
   requestId: string;
   exerciseId: string;
+  /** Spec 028: the new row's id, chosen by the client. */
+  id?: string;
 }
 
 export interface AddSessionExerciseInput {
   requestId: string;
   exerciseId: string;
+  /** Spec 028: the new row's id, chosen by the client. */
+  id?: string;
 }
 
 /** A private exercise. Shared catalogue rows cannot be written. */
@@ -366,12 +383,16 @@ export type TrainingDeleteResult = { id: string; deleted: true } | { id: string;
 
 export interface SetInput extends SetValues {
   requestId: string;
+  /** Spec 028: the set's id, chosen by the client. */
+  id?: string;
+  /** Spec 028: when it was done (offline), clamped to its workout's start and now. */
+  loggedAt?: string;
   type?: SetType;
   rpe?: number;
   restSeconds?: number;
 }
 
-export type SetPatch = Partial<Omit<SetInput, 'requestId'>>;
+export type SetPatch = Partial<Omit<SetInput, 'requestId' | 'id' | 'loggedAt'>>;
 
 // ------------------------------------------------------------------ plans (spec 023)
 

@@ -71,12 +71,13 @@ POST/PUT/PATCH/DELETE is run at most once per `(userId, key)`:
 
 | Situation | Answer |
 |---|---|
-| first time | runs; a 2xx body or a 4xx refusal is stored |
+| first time | runs; a 2xx body or a 4xx refusal (other than 409) is stored |
 | same key, same method + path + body | the stored answer, header `Idempotent-Replayed: true` |
 | same key, different write | 422 `IDEMPOTENCY_KEY_REUSED` |
 | same key while the first still runs | 409 `IDEMPOTENCY_IN_PROGRESS` (the outbox retries) |
 | running for over 2 minutes | taken over (the first attempt died) |
 | a 5xx | the key is deleted, so a retry runs again |
+| a 409 conflict | the key is deleted too (spec 028): a conflict depends on the state at the time, and Retry after resolving it must run the write, not replay the refusal |
 | key not matching `^[A-Za-z0-9_:-]{8,100}$` | 422 `IDEMPOTENCY_KEY_INVALID` |
 
 Collection `idempotency_keys`: `userId`, `key`, `fingerprint` (sha256 of method, path, body),
@@ -87,6 +88,23 @@ TTL on `expiresAt` (7 days). There is no account-erasure route today; when one i
 
 Module-level request ids (training's `requestId`) remain; the header is the general mechanism.
 
+## Training on top of the outbox (spec 028, issue #17)
+
+- **Client ids.** Every create carries the id it will have (`newObjectId()`, or for a plan start's
+  rows `plannedRowId(requestId, planExerciseId)`, the same derivation as the API). The API checks
+  the format and that no user has the id (409 `ID_TAKEN`). That is what makes later writes able to
+  name a row before the server has answered (`dependsOn` the write that creates it).
+- **Shown = cached copy + writes.** `lib/offline/training-overlay.ts` applies the outbox's
+  training writes (`meta.op`) to the cached server copy, in order; each op is idempotent, so an
+  acknowledged write stays applied ("settling") until the refetch lands. Refused writes (`error`)
+  are not applied; `conflict` ones are, until the person resolves them.
+- **Cached reads.** `lib/offline/reads.ts` maps the reads a workout needs to `training:*` /
+  `nutrition:profile` cache keys; `useApi` goes through `getWithOfflineCopy()`, which answers from
+  the device copy only on `NetworkError`.
+- **Refusal details.** An item keeps `lastErrorCode` and the string fields of the error body
+  (`lastErrorData`, e.g. `openSessionId`), so the sync sheet can offer a fix, not only Discard.
+- **Never computed on the device:** records, ranks, levels, 1RM, tournaments.
+
 ## Service worker
 
 `public/sw.js` (v3) still caches only HTML navigations and hashed assets, never `/api`. A
@@ -96,7 +114,8 @@ navigation offline falls back to the same page with any query, then to `/`.
 
 - `components/sync-status.tsx`: the header pill (left of the title). Nothing when the outbox is
   empty; otherwise "N waiting", "Offline · N waiting", "Syncing N", "N need attention" or "Sign in
-  to sync". Tapping opens the list with Retry and Discard (confirmed) per item and "Sync now".
+  to sync". Tapping opens the list with Retry and Discard (confirmed) per item and "Sync now". A
+  workout refused with `SESSION_CONFLICT` also offers "Finish the other, send this" (spec 028).
 - `components/pending-logout.tsx`, `components/offline-data-settings.tsx`.
 
 ## Dependencies

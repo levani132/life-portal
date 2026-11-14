@@ -6,14 +6,14 @@ import { Check, Plus, Trash2 } from 'lucide-react';
 import type { Measure, PlanTarget, SessionExercise, SetValues, WorkoutSet } from '@life-portal/shared-types';
 import { formatDay, formatWeight, setFieldsFor } from '@life-portal/shared-domain';
 import { Modal } from '../ui';
-import { api, ApiError } from '../../lib/api';
+import { ApiError } from '../../lib/api';
+import { trainingWrites } from '../../lib/training-offline';
 import {
   RECORD_LABELS,
   SET_TYPE_LABELS,
   SET_TYPE_SHORT,
   describeTarget,
   prefillFor,
-  revalidateTraining,
   useWeightUnit,
 } from '../../lib/training';
 import {
@@ -76,13 +76,11 @@ const INPUT = 'px-1 text-center font-semibold tabular-nums';
  */
 export function SetTable({
   exercise,
-  pending,
   onLog,
   onEdit,
 }: {
   exercise: SessionExercise;
   /** Sets ticked but not yet answered by the server, in order. */
-  pending: SetFormValue[];
   onLog: (value: SetFormValue) => void;
   /** Opens the full editor for a logged set (type, RPE, delete). */
   onEdit: (set: WorkoutSet) => void;
@@ -90,10 +88,10 @@ export function SetTable({
   const unit = useWeightUnit();
   const measure = exercise.snapshot.measure;
   const columns = setColumns(measure, unit);
-  const done = exercise.sets.length + pending.length;
+  const done = exercise.sets.length;
   const targetCount = exercise.planned?.targets.length ?? 0;
   // From a plan (spec 023): the open targets still to do, after any sets waiting to be sent.
-  const suggestions = exercise.skipped ? [] : exercise.openTargets.slice(pending.length);
+  const suggestions = exercise.skipped ? [] : exercise.openTargets;
 
   /** What the person typed into rows not yet ticked, by row position. Untouched rows are derived. */
   const [edits, setEdits] = useState<Record<number, SetFields>>({});
@@ -102,7 +100,7 @@ export function SetTable({
   const [problem, setProblem] = useState<{ position: number; text: string } | null>(null);
   const [options, setOptions] = useState<number | null>(null);
 
-  const lastLogged: SetValues | undefined = pending.length ? pending[pending.length - 1] : exercise.sets[exercise.sets.length - 1];
+  const lastLogged: SetValues | undefined = exercise.sets[exercise.sets.length - 1];
   const previous = exercise.previous?.sets;
   let above: SetValues | undefined = lastLogged;
   const drafts = exercise.skipped
@@ -159,16 +157,16 @@ export function SetTable({
 
   /** Un-ticking a logged set deletes it and puts its numbers back in an open row. */
   const untick = async (set: WorkoutSet, fields: SetFields) => {
-    const position = exercise.sets.length - 1 + pending.length;
+    const position = exercise.sets.length - 1;
     const reopensTarget = !exercise.skipped && exercise.sets.length - 1 < targetCount;
-    await api.delete(`/training/sets/${set.id}`);
+    // Spec 028: kept on the device and applied at once; sent when there is a connection.
+    await trainingWrites.removeSet(exercise.sessionId, set.id);
     setEdits((current) => ({ ...current, [position]: fields }));
-    await revalidateTraining();
     if (!reopensTarget) setExtra((count) => count + 1);
   };
 
   const optionsRow = drafts.find((draft) => draft.position === options);
-  const empty = !exercise.sets.length && !pending.length && !drafts.length;
+  const empty = !exercise.sets.length && !drafts.length;
 
   return (
     <div>
@@ -188,20 +186,12 @@ export function SetTable({
           <LoggedRow
             key={set.id}
             index={index + 1}
+            sessionId={exercise.sessionId}
             set={set}
             measure={measure}
             columns={columns}
             onEdit={() => onEdit(set)}
             onUntick={(fields) => untick(set, fields)}
-          />
-        ))}
-        {pending.map((value, index) => (
-          <Row
-            key={`pending-${index}`}
-            index={exercise.sets.length + index + 1}
-            fields={fieldsFor(measure, value, unit)}
-            columns={columns}
-            state="saving"
           />
         ))}
         {drafts.map((draft, index) => (
@@ -254,6 +244,7 @@ export function SetTable({
 /** A logged set: its numbers stay editable in place and save when the row is left. */
 function LoggedRow({
   index,
+  sessionId,
   set,
   measure,
   columns,
@@ -261,6 +252,7 @@ function LoggedRow({
   onUntick,
 }: {
   index: number;
+  sessionId: string;
   set: WorkoutSet;
   measure: Measure;
   columns: SetColumn[];
@@ -300,8 +292,7 @@ function LoggedRow({
     saving.current = true;
     try {
       // Every field the measure allows is sent, `null` for an emptied one, so clearing works.
-      await api.patch(`/training/sets/${set.id}`, Object.fromEntries(allowed.map((field) => [field, value[field] ?? null])));
-      await revalidateTraining();
+      await trainingWrites.patchSet(sessionId, set.id, Object.fromEntries(allowed.map((field) => [field, value[field] ?? null])));
     } catch (caught) {
       setProblem(message(caught));
     } finally {

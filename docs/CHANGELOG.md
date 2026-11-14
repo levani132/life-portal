@@ -2,6 +2,21 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-14: Whole workouts without signal
+
+- **A plan workout works start to finish with no connection.** Start a plan you have opened
+  before, log, edit and untick sets, add, swap, skip and reorder exercises, change rests, write
+  notes and finish. Everything shows at once, survives closing the app, and is sent once when the
+  connection is back.
+- **The exercise picker works offline** with your own exercises, the ones you used recently and the
+  ones in your plans; anything else says it is unavailable offline.
+- **Two workouts open at once** (one started on another device) are never merged: the sync sheet
+  lets you finish the other one and send this one, or discard this one.
+- **Records, ranks and your level update once the workout reaches the server**, and the workout
+  says so while changes are waiting.
+- **"Update plan day" can be confirmed offline.** If the day changed in the meantime you are asked
+  to review it again.
+
 ## 2026-11-14: Sets logged offline are kept
 
 - **A set logged without signal is no longer lost when the app closes.** It stays on your device

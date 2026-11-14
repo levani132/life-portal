@@ -340,20 +340,21 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | --- | --- | --- |
 | `GET`/`PUT` | `/profile` | Upserted on first read. |
 | `GET` | `/exercises?q=&muscle=&equipment=&limit=&skip=` | Shared + own, not archived, by name. |
+| `GET` | `/exercises/offline` | Spec 028: up to 1000 exercises for the device copy — own, used in the last 90 days, and in visible non-archived plans; recent first. Declared before `/exercises/:id`. |
 | `GET` | `/exercises/:id` | Includes attribution on shared rows, signed `image.url` on own ones. |
 | `GET` | `/exercises/:id/history?before=` | Sessions newest first, 20 a page, each with sets (with record marks), best set, volume, 1RM; `records` over every set. |
 | `GET` | `/exercises/:id/progress?range=3m\|1y\|all&today=` | The statistics view (issue #6): one point per session in the range, up to `today`, thinned to 200; `metrics`, `sessionsInRange`, `totalSessions`, `lastDay`, `trend`, `nextRecord`, `records`. Range defaults to `3m`; anything else is a 400. |
 | `POST` | `/exercises` | A private exercise. |
 | `PATCH`/`DELETE` | `/exercises/:id` | Own rows only (shared → 404). Measure locked once logged (409). Delete archives a logged one. |
-| `POST` | `/sessions` `{requestId, day}` | Returns the open session with `resumed: true` instead of a second one. |
+| `POST` | `/sessions` `{requestId, day, id?, startedAt?}` | Returns the open session with `resumed: true` instead of a second one. With a client `id` (spec 028) it is 409 `SESSION_CONFLICT` `{openSessionId}` instead, and 409 `ID_TAKEN` if any user has that id. `startedAt` is clamped (≤ now, ≥ 48 h back). Plan rows get ids derived from `requestId` (see Web). |
 | `GET` | `/sessions/current` | 204 when none is open. |
 | `GET` | `/sessions?cursor=` | 20 a page, newest day first. |
 | `GET`/`PATCH`/`DELETE` | `/sessions/:id` | Detail includes each exercise's `previous` sets. Delete removes its exercises and sets. |
-| `POST` | `/sessions/:id/finish` `{at?: now\|lastSet}` | 409 `EMPTY_SESSION` when it has no sets. |
-| `POST` | `/sessions/:id/exercises` `{requestId, exerciseId}` | Builds the snapshot. No `machineId` since #14. |
+| `POST` | `/sessions/:id/finish` `{at?: now\|lastSet, endedAt?}` | 409 `EMPTY_SESSION` when it has no sets. `endedAt` (spec 028) is clamped to ≥ the start and the last set, ≤ now. |
+| `POST` | `/sessions/:id/exercises` `{requestId, exerciseId, id?}` | Builds the snapshot. No `machineId` since #14. `id`: spec 028 client id. |
 | `POST` | `/sessions/:id/exercises/order` `{ids}` | The complete id array. |
 | `PATCH`/`DELETE` | `/sessions/:id/exercises/:weId` | `{notes?, restSeconds?, superset?}` (`null` clears the rest or superset; spec 025); delete removes its sets. |
-| `POST` | `/sessions/:id/exercises/:weId/sets` | Validated against the snapshot's measure. Returns `{set, records}`; bodyweight and assisted sets carry `effectiveLoad` when a weigh-in exists. |
+| `POST` | `/sessions/:id/exercises/:weId/sets` | Optional `id` and `loggedAt` (spec 028; clamped between the workout's start and now). Validated against the snapshot's measure. Returns `{set, records}`; bodyweight and assisted sets carry `effectiveLoad` when a weigh-in exists. |
 | `PATCH`/`DELETE` | `/sets/:setId` | `null` clears an optional field. PATCH returns `{set, records}`. |
 | `GET` | `/plans` | `{shared, own}`; shared in seed-file order, archived left out (spec 023). |
 | `GET` | `/plans/suggested` | `?today=YYYY-MM-DD` (400 otherwise): up to 3 `PlanListItem`s used in the 28 days to `today`, most recent first. Declared before `/plans/:id`. |
@@ -364,7 +365,7 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `DELETE` | `/plans/:id` | Own plans only. Sessions started from it are unchanged. |
 | `POST` | `/sessions` `{…, planId, planWorkoutId}` | Spec 023: both or neither; copies the workout's exercises and targets. |
 | `PATCH` | `/sessions/:id/exercises/:weId` `{skipped}` | Only for an exercise with `planned` (400 otherwise). |
-| `POST` | `/sessions/:id/exercises/:weId/swap` `{requestId, exerciseId}` | 409 `HAS_SETS` once a set is logged. |
+| `POST` | `/sessions/:id/exercises/:weId/swap` `{requestId, exerciseId, id?}` | 409 `HAS_SETS` once a set is logged. |
 | `GET` | `/sessions/:id/plan-update` | Issue #15: `{status, revision?, changes, before, after, shared?, editedSince?, applied?, message?}`. Status `available`, `no_changes`, `applied`, `open`, `not_from_plan`, `missing`, `invalid`. |
 | `POST` | `/sessions/:id/plan-update` `{requestId, revision}` | Issue #15: applies to that day only → `{planId, planWorkoutId, copied}`. 409 `PLAN_CHANGED` (day moved on) or `NOTHING_TO_APPLY`; once applied, returns the first result. |
 | `PUT` | `/sessions/:id/rest-alarm` `{at: ISO \| null}` | Spec 025: 204. Sets, moves or cancels the person's rest-over push (in memory). |
@@ -716,11 +717,19 @@ catalogue lacks. A workout from before #14 shows its machine on the card, read-o
 plan workout (right after Finish, and opened from History) shows `PlanDayUpdate`
 (`plan-day-update.tsx`, issue #15) under its header when there is something to update: Review opens
 the changes, the day after and the day now; "Not now" hides it on this device only (localStorage,
-wrapped in try/catch) and changes nothing. Once applied it says so in one line. Sets go through
-`lib/training-queue.ts`, which rides the durable outbox (`docs/modules/offline.md`, spec 027):
-each is shown at once as a pending row, kept on the device until the server acknowledges it,
-sent in order with its `requestId` as `Idempotency-Key`, and retried with backoff. Closing the app
-no longer loses unsent sets. A refused set stays until "Discard unsaved sets" (confirmed). Weight fields use `Input` with
+wrapped in try/catch) and changes nothing. Once applied it says so in one line. **Workouts work offline (spec 028, issue #17).** Every workout write goes
+through `trainingWrites` in `lib/training-offline.ts`, which puts it in the durable outbox
+(`docs/modules/offline.md`) with the ids it creates, chosen on the device. What the screen shows is
+the cached server copy with the outbox's writes applied (`lib/offline/training-overlay.ts`, pure),
+so a set appears as logged at once, a reload shows the same workout, and the server's copy replaces
+it without a flicker or a double. Starting a plan uses the cached plan; its rows' ids are derived
+from the start's `requestId` exactly as the API derives them. A refused write is listed in the sync
+sheet; "Discard changes not accepted" on the workout drops them (confirmed). Two open workouts are
+resolved in the sync sheet ("Finish the other, send this", or Discard), never merged. Records,
+ranks, levels and 1RM are never computed on the device; the workout says they update once synced.
+The exercise picker falls back to `GET /exercises/offline`'s device copy and says the rest are
+unavailable offline. A plan-day update (#15) confirmed offline is sent later with its revision; a
+`PLAN_CHANGED` refusal shows "Review again". Weight fields use `Input` with
 `inputMode="decimal"`, so a comma from a Georgian keyboard works.
 
 **Colour system (spec 024, display only).** Training is colourful by derivation, never by stored
