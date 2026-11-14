@@ -217,9 +217,11 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   edit and never by bookkeeping (reorder, finish). A stale edit is 409 `STALE_EDIT` with `current`;
   the person picks in the sync sheet. A resolved write is `Outbox.replace()`d with a new id, since
   an idempotency key belongs to one body. Deleting what is already gone succeeds.
-- **Social writes are queued too, but no post is kept for reading** (spec 031). Likes, reposts
-  and comments go through `lib/social-offline.ts`; keeping other people's posts on the device is
-  S3 of #20 and waits for the owner. A like/unlike pair cancels only when `!maybeSent`.
+- **Social writes are queued too; only your own posts are kept for reading** (specs 031, 033).
+  Likes, reposts and comments go through `lib/social-offline.ts`. `offline/own-posts.ts` filters
+  what `reads.ts` keeps: own posts and your own profile header without widgets. Never keep
+  another person's post, a repost, or a photo: the owner chose that on #20, so changing it is a
+  privacy decision. A like/unlike pair cancels only when `!maybeSent`.
 - **A post draft is one `social.post` outbox item holding its photo blobs** (spec 032). The runtime
   sends it with `post-draft-send.ts`, not as one request. Never store an upload link in it; never
   put a video in it. Uploaded ids are saved with `send(item, save)` so a retry neither uploads

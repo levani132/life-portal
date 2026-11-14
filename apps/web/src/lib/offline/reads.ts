@@ -1,6 +1,7 @@
 import { addDays } from '@life-portal/shared-domain';
-import type { NutritionOverview } from '@life-portal/shared-types';
-import { api, NetworkError } from '../api';
+import type { FoodPost, NutritionOverview, PostPage, SocialProfile } from '@life-portal/shared-types';
+import { api, ApiError, NetworkError } from '../api';
+import { keptOwnPage, keptOwnPost, keptOwnProfile } from './own-posts';
 import { capFoods, emptyDayFrom } from './nutrition-overlay';
 import { waitForOfflineCache } from './runtime';
 
@@ -26,6 +27,34 @@ const READS: [RegExp, (match: RegExpMatchArray) => string][] = [
   // Spec 029: the Food day, one copy per day viewed.
   [NUTRITION_DAY, (m) => `nutrition:day:${m[2]}`],
 ];
+
+/**
+ * Spec 033 (issue #20 S3): reads kept only in part, through a filter. The person's own posts
+ * only: `keep` returns what may be kept, or `undefined`, and then any older copy is removed too.
+ * A refusal from the server (the post deleted, say) removes the copy as well.
+ */
+const FILTERED: [RegExp, (match: RegExpMatchArray) => string, (data: unknown) => unknown][] = [
+  [/^\/posts\/([0-9a-f]{24})$/, (m) => `social:post:${m[1]}`, (data) => keptOwnPost(data as FoodPost)],
+  [
+    /^\/posts\?authorId=([0-9a-f]{24})&preview=([a-z]+)$/,
+    (m) => `social:own-posts:${m[1]}:${m[2]}`,
+    (data) => keptOwnPage(data as PostPage),
+  ],
+  // The own profile's header (the day is only for its food diary, which is not kept).
+  [
+    /^\/social\/me\?preview=(normal|friend|stranger)&today=\d{4}-\d{2}-\d{2}$/,
+    (m) => `social:me:${m[1]}`,
+    (data) => keptOwnProfile(data as SocialProfile),
+  ],
+];
+
+function filteredRead(path: string): { key: string; keep: (data: unknown) => unknown } | undefined {
+  for (const [pattern, key, keep] of FILTERED) {
+    const match = path.match(pattern);
+    if (match) return { key: key(match), keep };
+  }
+  return undefined;
+}
 
 /** Days of Food kept on the device, counting back from today (owner's choice on #18). */
 export const NUTRITION_DAYS_KEPT = 14;
@@ -62,10 +91,18 @@ export const isDeviceCopy = (path: string) => fromDevice.has(path);
  * never hidden behind an old copy.
  */
 export async function getWithOfflineCopy<T>(path: string): Promise<T> {
-  const key = offlineReadKey(path);
+  const filtered = filteredRead(path);
+  const key = offlineReadKey(path) ?? filtered?.key;
   try {
     const data = await api.get<T>(path);
     fromDevice.delete(path);
+    if (filtered) {
+      const kept = filtered.keep(data);
+      void waitForOfflineCache()
+        .then((cache) => (kept === undefined ? cache?.remove(filtered.key) : cache?.put(filtered.key, kept)))
+        .catch(() => undefined);
+      return data;
+    }
     const day = path.match(NUTRITION_DAY);
     if (day) {
       void waitForOfflineCache()
@@ -76,6 +113,11 @@ export async function getWithOfflineCopy<T>(path: string): Promise<T> {
     }
     return data;
   } catch (error) {
+    // The server's verdict on a kept post (deleted, or no longer the person's): forget the copy.
+    if (filtered && error instanceof ApiError)
+      void waitForOfflineCache()
+        .then((cache) => cache?.remove(filtered.key))
+        .catch(() => undefined);
     if (!key || !(error instanceof NetworkError)) throw error;
     const cache = await waitForOfflineCache();
     let kept = await cache?.get<T>(key).catch(() => undefined);

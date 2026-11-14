@@ -47,6 +47,8 @@ export function PostEngagement({
   // connection; the figures shown include them, marked as not sent until the server has them.
   const writes = useSocialWrites();
   const offline = useOffline();
+  // Spec 033: with no connection (a kept own post, say) the counts are just absent, not an error.
+  const statsFailed = !!stats.error && !stats.data && !(stats.error instanceof NetworkError);
   const value = stats.data ? overlayEngagement(stats.data, post.id, writes) : undefined;
   async function toggle(op: 'like' | 'repost') {
     if (!value || busy) return;
@@ -70,7 +72,7 @@ export function PostEngagement({
   const toggleRepost = () => toggle('repost');
   return (
     <div
-      className={`mt-3 ${commentsOpen || error || stats.error ? '' : '-mb-4 sm:-mb-5'}`}
+      className={`mt-3 ${commentsOpen || error || statsFailed ? '' : '-mb-4 sm:-mb-5'}`}
     >
       {value?.likeCount || value?.commentCount ? (
         <div
@@ -131,7 +133,7 @@ export function PostEngagement({
       {value?.unsent && !(value.likeCount || value.commentCount) && (
         <p className="mb-1 text-xs text-amber-300">Not sent yet</p>
       )}
-      {(error || (stats.error && !stats.data)) && (
+      {(error || statsFailed) && (
         <ErrorNote message={error || (stats.error as Error).message} />
       )}
       {commentsOpen && (

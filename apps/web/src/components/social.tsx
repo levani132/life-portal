@@ -50,6 +50,7 @@ import { Avatar } from './avatar';
 import { DropdownMenu, type DropdownItem } from './dropdown-menu';
 import { useAuth } from '../lib/auth-context';
 import { prepareAvatar, uploadMedia } from '../lib/media';
+import { useOfflineCopy } from '../lib/offline/use-offline-copy';
 import { requestNotificationOffer } from './notifications';
 import { messagingAvailable, openConversation } from './messages';
 
@@ -383,7 +384,9 @@ export function ProfileView({ userId }: { userId?: string }) {
   const [preview, setPreview] = useState<Preview>('normal');
   const [tab, setTab] = useState<'posts' | 'badges' | 'about'>('posts');
   const [openBadge, setOpenBadge] = useState<BadgeId | null>(null);
-  const portal = useApi<PortalState>('/portal');
+  // Spec 033: offline, the shell's kept portal state still says the Posts tab exists.
+  const portalLive = useApi<PortalState>('/portal');
+  const portal = { data: useOfflineCopy('shell:portal', portalLive).data };
   const path = own
     ? `/social/me?preview=${preview}`
     : `/social/profiles/${userId}`;

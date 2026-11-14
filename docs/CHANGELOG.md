@@ -2,6 +2,11 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-14: Your posts, offline
+
+- **Your own profile and posts open with no connection**, as last seen. Nobody else's posts are
+  kept on your phone, and signing out removes yours too.
+
 ## 2026-11-14: Post without signal
 
 - **Write a post with no connection and tap "Post later".** It is kept on this phone and posted

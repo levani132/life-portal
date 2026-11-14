@@ -2009,3 +2009,23 @@ other people's posts on the device is S3 and is waiting for the owner.
 - Discarding the meal a draft depends on discards the draft too.
 - Limits follow the owner's answer on #20: photos only, at most 4 per draft, 50 MB in all.
 
+## 2026-11-14 · Only your own posts are kept for reading offline (issue #20 S3)
+
+**Decided:**
+- The owner chose option (a) on #20: keep only the signed-in person's own posts, never other
+  people's posts or photos.
+- Copies are filtered when kept (`offline/own-posts.ts`): an own post, the first page of the own
+  profile, and the own profile header with its widgets dropped.
+- A refusal from the server, or an answer with nothing to keep, removes the copy.
+
+**Buys:**
+- The person's own content opens offline.
+- Nothing of anyone else's sits on a device that may be lost, shared or unencrypted.
+- A shared widget showing money never reaches the device through the profile header.
+
+**Costs:**
+- Offline, the feed and other people's profiles still need a connection.
+- Photos show only if the browser still has them. No image is copied, and signed links expire
+  within 2 hours.
+- Caching other people's content would need its own explicitly approved decision.
+

@@ -148,6 +148,19 @@ Module-level request ids (training's `requestId`) remain; the header is the gene
   being posted (with progress), not accepted (Retry, Discard), or posted (with a link). A draft
   is the person's own content, which is the only thing S3's interim rule allows on the device.
 
+## Your own posts, readable offline (spec 033, issue #20 S3)
+
+- **Owner's choice (a) on #20:** only the signed-in person's own posts are kept for reading, and
+  never anyone else's posts or photos.
+- **What is kept.** `offline/reads.ts` keeps filtered copies (`offline/own-posts.ts`) of three
+  reads:
+  - an own post (`/posts/<id>`, kept only when `isOwner` and not a repost);
+  - the first page of the person's profile, with own posts only;
+  - the own profile header, with its widgets dropped, since a shared widget can show money.
+- **How copies go away.** An answer with nothing to keep, or a refusal from the server, removes the
+  copy. No photo is copied: the kept signed links expire within 2 hours. Logout and "Delete
+  offline data" delete it all with the account's database.
+
 ## Edits from two devices (spec 030, issue #19)
 
 - **Row versions.** Sets, workout exercises, workouts, meals and weigh-ins carry `version` (missing
