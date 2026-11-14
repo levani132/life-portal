@@ -198,6 +198,29 @@ Module-level request ids (training's `requestId`) remain; the header is the gene
   `Idempotency-Key` belongs to one body (`IDEMPOTENCY_KEY_REUSED` otherwise). Its dependents move
   onto the new id.
 
+## Lost writes and other accounts (spec 034, issue #21)
+
+`lib/offline/device-meta.ts` keeps, in localStorage under `lp.offline.meta:<userId>`, a count of
+that account's unsent writes and when it was written. Counts and times only, never content. The
+outbox reports its new count through `track` *before* a write leaves the store, so the count can
+lag low but never runs high by mistake.
+
+- **Eviction warning, best effort.** If an account's durable database opens with fewer writes
+  than its count says, the browser deleted them: the sync sheet says how many were lost, with
+  "I understand". The memory fallback (IndexedDB unavailable) is not durable and is never
+  compared. **Limits:** a browser that clears localStorage together with IndexedDB leaves nothing
+  to compare. iOS Safari does exactly that when it evicts a site's data (after about seven days
+  without a visit in a browser tab, or under storage pressure), so on iOS the warning will
+  usually *not* appear. The installed home-screen app is exempt from the seven-day rule but not
+  from storage pressure. Losses there are silent; the only protection is to sync soon.
+- **Other accounts on this device.** The sync sheet shows how many writes other accounts left
+  here, a total only: never whose, never what, and nothing can be sent or deleted from this
+  account. They wait for their own sign-in. The total updates when another tab changes it.
+- **Identity guard.** A write is sent only with a token whose `sub` is the account that queued it
+  (`mayReplayAs`); a token for someone else is treated as signed out (`auth` state), so signing
+  in as B without signing A out never replays A's work as B.
+- "Delete offline data" also removes the account's count.
+
 ## Service worker
 
 `public/sw.js` (v3) still caches only HTML navigations and hashed assets, never `/api`. A
@@ -207,7 +230,7 @@ navigation offline falls back to the same page with any query, then to `/`.
 
 - `components/sync-status.tsx`: the header pill (left of the title). Nothing when the outbox is
   empty; otherwise "N waiting", "Offline · N waiting", "Syncing N", "N need attention" or "Sign in
-  to sync". Tapping opens the list with Retry and Discard (confirmed) per item and "Sync now". A
+  to sync"; "N changes lost" or "Other account" when only a notice remains. Tapping opens the list with Retry and Discard (confirmed) per item and "Sync now". A
   workout refused with `SESSION_CONFLICT` also offers "Finish the other, send this" (spec 028).
   An edit refused with `STALE_EDIT` or `ROW_DELETED` shows yours against theirs and the choices
   above instead of Retry (spec 030).

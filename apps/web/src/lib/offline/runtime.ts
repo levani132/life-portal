@@ -1,7 +1,8 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import { request } from '../api';
+import { ApiError, request, tokens } from '../api';
+import { clearMeta, lostWrites, mayReplayAs, otherAccountsPending, readMeta, writeMeta } from './device-meta';
 import { OfflineCache } from './cache';
 import { deleteIdb, idbAvailable, openIdb } from './idb-store';
 import { memoryDb } from './memory-store';
@@ -42,10 +43,43 @@ function notify() {
   listeners.forEach((listener) => listener());
 }
 
-const send = (item: OutboxItem, save: (body: unknown) => Promise<void>) =>
-  item.kind === POST_DRAFT_KIND
+/**
+ * Sends one write as `userId`. Spec 034: never under another identity — if the token in hand was
+ * issued for another account (someone signed in as B while A's writes were still open here), the
+ * write is answered like a 401 and waits in `auth` until A signs in again.
+ */
+const sendAs = (userId: string) => (item: OutboxItem, save: (body: unknown) => Promise<void>) => {
+  if (!mayReplayAs(userId, tokens.access ?? tokens.refresh))
+    return Promise.reject(new ApiError('Signed in as another account.', 401));
+  return item.kind === POST_DRAFT_KIND
     ? sendPostDraft(item, save)
     : request(item.path, { method: item.method, body: item.body, headers: { 'Idempotency-Key': item.id } });
+};
+
+// ------------------------------------------------------------- notices (spec 034)
+
+export interface OfflineNotices {
+  /** Writes this account had on the device that the browser deleted before they were sent. */
+  lost: number;
+  /** Writes other accounts left on this device: a count only. */
+  otherAccounts: number;
+}
+const NO_NOTICES: OfflineNotices = { lost: 0, otherAccounts: 0 };
+let notices = NO_NOTICES;
+const setNotices = (next: Partial<OfflineNotices>) => {
+  notices = { ...notices, ...next };
+  notify();
+};
+const localStore = () => (typeof window !== 'undefined' ? window.localStorage : undefined);
+
+export function useOfflineNotices(): OfflineNotices {
+  return useSyncExternalStore(subscribeOutbox, () => notices, () => NO_NOTICES);
+}
+
+/** The person read the eviction warning. */
+export function dismissLostWrites(): void {
+  setNotices({ lost: 0 });
+}
 
 function crossTabLock(userId: string) {
   return <T,>(fn: () => Promise<T>): Promise<T> => {
@@ -58,9 +92,18 @@ async function open(userId: string): Promise<Session> {
   const durable = idbAvailable();
   const db = durable ? await openIdb(userId).catch(() => memoryDb()) : memoryDb();
   const channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(`lp-outbox:${userId}`) : undefined;
+  const storage = localStore();
+  // Spec 034: only a real database can be compared with what this device remembered.
+  const remembered = durable && storage ? readMeta(userId, storage) : undefined;
+  let tracked = -1;
   const outbox = new Outbox({
     store: db.outbox,
-    send,
+    send: sendAs(userId),
+    track: (count) => {
+      if (!durable || !storage || count === tracked) return;
+      tracked = count;
+      writeMeta(userId, count, Date.now(), storage);
+    },
     lock: crossTabLock(userId),
     announce: () => channel?.postMessage('changed'),
     onDone: (item, result) => doneListeners.forEach((listener) => listener(item, result)),
@@ -87,9 +130,26 @@ async function open(userId: string): Promise<Session> {
     window.clearInterval(interval);
   };
 
+  const others = () => setNotices({ otherAccounts: storage ? otherAccountsPending(userId, storage) : 0 });
+  window.addEventListener('storage', others);
+  const stopNotices = () => window.removeEventListener('storage', others);
+
   await outbox.load();
+  const lost = lostWrites(remembered, outbox.count());
+  setNotices({ lost, otherAccounts: storage ? otherAccountsPending(userId, storage) : 0 });
   await cache.prune().catch(() => 0);
-  return { userId, db, outbox, cache, durable, channel, stopTriggers };
+  return {
+    userId,
+    db,
+    outbox,
+    cache,
+    durable,
+    channel,
+    stopTriggers: () => {
+      stopTriggers();
+      stopNotices();
+    },
+  };
 }
 
 /** Opens (or keeps) the store for this account. Another account's store is closed first. */
@@ -123,6 +183,7 @@ export async function endOffline(): Promise<void> {
   session.channel?.close();
   session.db.close();
   session = null;
+  notices = NO_NOTICES;
   notify();
 }
 
@@ -130,6 +191,8 @@ export async function endOffline(): Promise<void> {
 export async function deleteOfflineData(userId: string): Promise<void> {
   if (session?.userId === userId) await endOffline();
   await deleteIdb(userId);
+  const storage = localStore();
+  if (storage) clearMeta(userId, storage);
 }
 
 async function ready(): Promise<Session> {

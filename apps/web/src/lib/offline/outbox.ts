@@ -97,6 +97,11 @@ export interface OutboxOptions {
   /** Tells other tabs the store changed (BroadcastChannel). */
   announce?: () => void;
   onDone?: (item: OutboxItem, result: unknown) => void;
+  /**
+   * Spec 034: how many writes the store holds, told after every change and *before* an item is
+   * removed, so a count kept elsewhere is never higher than the store except after eviction.
+   */
+  track?: (count: number) => void;
 }
 
 export class Outbox {
@@ -181,6 +186,7 @@ export class Outbox {
       };
       try {
         const result = await this.options.send(item, save);
+        this.options.track?.(this.items.length - 1);
         await this.options.store.remove(item.id);
         this.items = this.items.filter((other) => other.id !== item.id);
         this.offline = false;
@@ -334,6 +340,7 @@ export class Outbox {
         }
       }
     }
+    this.options.track?.(this.items.length - doomed.size);
     for (const doomedId of doomed) await this.options.store.remove(doomedId);
     this.items = this.items.filter((item) => !doomed.has(item.id));
     this.options.announce?.();
@@ -357,6 +364,7 @@ export class Outbox {
   };
 
   private publish() {
+    this.options.track?.(this.items.length);
     this.snapshot = {
       items: this.items,
       syncing: this.draining !== null,

@@ -3,7 +3,7 @@
 import clsx from 'clsx';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { outbox, outboxItems, useOutbox } from '../lib/offline/runtime';
+import { dismissLostWrites, outbox, outboxItems, useOfflineNotices, useOutbox } from '../lib/offline/runtime';
 import type { OutboxItem } from '../lib/offline/types';
 import { conflictOf, combinedText, diffFields, type Conflict } from '../lib/offline/conflicts';
 import { canLogAgain, keepMine, keepTheirs, logAgain, saveCombined, type Undo } from '../lib/sync-conflicts';
@@ -26,29 +26,36 @@ export function SyncStatus() {
   // Spec 030: a weigh-in choice can be put back once, while the sheet is open.
   const [undo, setUndo] = useState<{ text: string; run: Undo } | null>(null);
   const items = snapshot.items;
-  if (!items.length && !open) return null;
+  // Spec 034: writes the browser deleted, and other accounts' writes (a count only).
+  const notices = useOfflineNotices();
+  const noticed = notices.lost > 0 || notices.otherAccounts > 0;
+  if (!items.length && !noticed && !open) return null;
 
   const auth = items.some((item) => item.state === 'auth');
   const attention = items.filter(
     (item) => item.state === 'error' || item.state === 'conflict' || item.state === 'held' || item.state === 'incompatible',
   ).length;
-  const label = auth
-    ? 'Sign in to sync'
-    : attention
-      ? `${attention} need${attention === 1 ? 's' : ''} attention`
-      : snapshot.syncing
-        ? `Syncing ${items.length}`
-        : snapshot.offline
-          ? `Offline · ${items.length} waiting`
-          : `${items.length} waiting`;
+  const label = notices.lost
+    ? `${notices.lost} change${notices.lost === 1 ? '' : 's'} lost`
+    : auth
+      ? 'Sign in to sync'
+      : attention
+        ? `${attention} need${attention === 1 ? 's' : ''} attention`
+        : snapshot.syncing
+          ? `Syncing ${items.length}`
+          : snapshot.offline
+            ? `Offline · ${items.length} waiting`
+            : items.length
+              ? `${items.length} waiting`
+              : 'Other account';
   const tone =
-    auth || attention
+    notices.lost || auth || attention
       ? 'border-rose-500/50 text-rose-300'
       : 'border-amber-500/50 text-amber-300';
 
   return (
     <>
-      {items.length > 0 && (
+      {(items.length > 0 || noticed) && (
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -89,9 +96,32 @@ export function SyncStatus() {
                 </button>
               </div>
             )}
+            {notices.lost > 0 && (
+              <div className="mb-2 space-y-2 rounded-md bg-rose-500/10 p-2 text-sm">
+                <p>
+                  {notices.lost === 1 ? '1 change' : `${notices.lost} changes`} saved on this device{' '}
+                  {notices.lost === 1 ? 'is' : 'are'} gone. Your browser cleared this site’s storage before{' '}
+                  {notices.lost === 1 ? 'it' : 'they'} could be sent, so {notices.lost === 1 ? 'it' : 'they'} can’t be
+                  recovered. Browsers, iOS especially, may do this to sites not used for a while; it can’t always be
+                  prevented or even noticed.
+                </p>
+                <div className="flex justify-end">
+                  <button type="button" className="btn-ghost px-2 py-1 text-xs" onClick={dismissLostWrites}>
+                    I understand
+                  </button>
+                </div>
+              </div>
+            )}
+            {notices.otherAccounts > 0 && (
+              <p className="mb-2 rounded-md bg-amber-500/10 p-2 text-sm">
+                This device also has {notices.otherAccounts === 1 ? '1 unsent change' : `${notices.otherAccounts} unsent changes`}{' '}
+                from another account. {notices.otherAccounts === 1 ? 'It is' : 'They are'} sent only when that account signs
+                in here.
+              </p>
+            )}
             {items.length === 0 ? (
               <p className="text-sm text-ink-muted">
-                Everything has reached the server.
+                Everything from this account has reached the server.
               </p>
             ) : (
               <>
