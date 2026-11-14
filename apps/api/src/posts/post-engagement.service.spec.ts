@@ -33,6 +33,7 @@ function fixture() {
     updateOne: jest.fn(async (..._args: unknown[]) => ({ matchedCount: 1 })),
     findOne: jest.fn(() => ({ lean: async () => row })),
     find: jest.fn(() => chain),
+    exists: jest.fn(async (..._args: unknown[]): Promise<unknown> => null),
   };
   const posts = {
     detail: jest.fn(async () => ({ isOwner: false })),
@@ -208,4 +209,35 @@ it('notifies the post owner once for a new like or comment, never for repeats', 
       },
     ],
   ]);
+});
+
+describe('engagement queued offline (spec 031)', () => {
+  const id = 'b'.repeat(24);
+  it('keeps the id the device chose for a new comment, and refuses one already taken', async () => {
+    const f = fixture();
+    await f.service.add('reader', 'post', 'Hi', 'request', id);
+    const insert = (f.comments.updateOne.mock.calls[0][1] as { $setOnInsert: { _id: unknown } }).$setOnInsert;
+    expect(String(insert._id)).toBe(id);
+    // Another row (anyone's) already has that id, and this is not a retry.
+    f.comments.exists.mockImplementation(async (filter: unknown) => ((filter as { _id?: string })._id === id ? { _id: id } : null));
+    await expect(f.service.add('reader', 'post', 'Hi', 'other-request', id)).rejects.toMatchObject({
+      response: { code: 'ID_TAKEN' },
+    });
+  });
+
+  it('lets a retry of the same comment through even though its id now exists', async () => {
+    const f = fixture();
+    f.comments.exists.mockImplementation(async () => ({ _id: id }));
+    await expect(f.service.add('reader', 'post', 'Hi', 'request', id)).resolves.toMatchObject({ text: 'Hello' });
+  });
+
+  it('counts removing a comment that is already removed as done, and still 404s a stranger’s', async () => {
+    const f = fixture();
+    f.comments.updateOne.mockResolvedValue({ matchedCount: 0 });
+    f.comments.exists.mockResolvedValueOnce({ _id: id });
+    await expect(f.service.remove('reader', 'post', id)).resolves.toEqual({ success: true });
+    expect(f.comments.exists).toHaveBeenLastCalledWith(expect.objectContaining({ deleted: true, userId: 'reader' }));
+    f.comments.exists.mockResolvedValueOnce(null);
+    await expect(f.service.remove('reader', 'post', id)).rejects.toBeInstanceOf(NotFoundException);
+  });
 });

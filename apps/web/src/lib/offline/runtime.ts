@@ -192,6 +192,11 @@ export function outboxItems(): OutboxItem[] {
   return session?.outbox.getSnapshot().items ?? [];
 }
 
+/** Whether the outbox is sending right now (spec 031: a write being sent cannot be withdrawn). */
+export function outboxSyncing(): boolean {
+  return session?.outbox.getSnapshot().syncing ?? false;
+}
+
 /** The signed-in account's offline cache, or undefined before sign-in. */
 export function offlineCache(): OfflineCache | undefined {
   return session?.cache;

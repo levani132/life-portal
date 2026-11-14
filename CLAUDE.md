@@ -217,6 +217,9 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   edit and never by bookkeeping (reorder, finish). A stale edit is 409 `STALE_EDIT` with `current`;
   the person picks in the sync sheet. A resolved write is `Outbox.replace()`d with a new id, since
   an idempotency key belongs to one body. Deleting what is already gone succeeds.
+- **Social writes are queued too, but no post is kept for reading** (spec 031). Likes, reposts
+  and comments go through `lib/social-offline.ts`; keeping other people's posts on the device is
+  S3 of #20 and waits for the owner. A like/unlike pair cancels only when `!maybeSent`.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for

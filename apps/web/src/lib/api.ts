@@ -100,7 +100,11 @@ async function refreshSession(): Promise<'ok' | 'refused' | 'unreachable'> {
 
 /** No answer from the server at all (offline, DNS, a dropped connection). Never an `ApiError`. */
 export class NetworkError extends Error {
-  constructor(message = 'No connection.') {
+  constructor(
+    message = 'No connection.',
+    /** Spec 031: the browser was offline, so the request never left the device. */
+    readonly notSent = false,
+  ) {
     super(message);
     this.name = 'NetworkError';
   }
@@ -139,6 +143,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     if (access) headers['Authorization'] = `Bearer ${access}`;
   }
 
+  // Spec 031: with no network at all, say so without trying, so the outbox knows nothing was sent.
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new NetworkError(undefined, true);
   let response: Response;
   try {
     response = await fetch(`${API_URL}${path}`, {

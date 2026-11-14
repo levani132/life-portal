@@ -8,6 +8,7 @@ import {
   IsIn,
   IsInt,
   IsMongoId,
+  IsOptional,
   IsString,
   IsUUID,
   Matches,
@@ -167,5 +168,7 @@ export class AddPostCommentDto {
   @MaxLength(1000)
   text!: string;
   @IsUUID() requestId!: string;
+  /** Spec 031: the id the device chose, so it can show and withdraw the comment before sync. */
+  @IsOptional() @IsMongoId() id?: string;
 }
 

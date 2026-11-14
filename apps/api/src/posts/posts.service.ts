@@ -64,6 +64,13 @@ const PAGE_SIZE = 10;
 const SCAN_BATCH = 25;
 const SCAN_LIMIT = 100;
 
+/**
+ * A post the caller cannot read now: deleted, made private, blocked or reported. One answer for
+ * all of them, so it never tells one from another. `POST_GONE` lets a device drop a like or a
+ * repost queued offline for it (spec 031).
+ */
+export const postGone = () => new NotFoundException({ code: 'POST_GONE', message: 'Post not found.' });
+
 @Injectable()
 export class PostsService {
   constructor(
@@ -93,7 +100,7 @@ export class PostsService {
     return rows.map((row) => row.createdAt.toISOString().slice(0, 10));
   }
   private id(id: string) {
-    if (!isValidObjectId(id)) throw new NotFoundException('Post not found.');
+    if (!isValidObjectId(id)) throw postGone();
     return id;
   }
   private async enabled(userId: string): Promise<boolean> {
@@ -294,7 +301,7 @@ export class PostsService {
       .findOne({ _id: id, deleted: { $ne: true }, ...ORIGINAL })
       .lean();
     const author = row ? await this.readable(viewerId, row) : null;
-    if (!row || !author) throw new NotFoundException('Post not found.');
+    if (!row || !author) throw postGone();
     return { row, author };
   }
   async detail(userId: string, id: string) {

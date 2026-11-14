@@ -1,4 +1,4 @@
-import { ApiError } from '../api';
+import { ApiError, NetworkError } from '../api';
 import { offlineModuleOf, type OutboxItem, type OutboxState, type OutboxStore, type WriteMethod } from './types';
 
 /**
@@ -182,6 +182,7 @@ export class Outbox {
             attempts: item.attempts + 1,
             nextAttemptAt: this.now() + backoff(item.attempts + 1, this.random()),
             lastError: message,
+            ...(error instanceof NetworkError && error.notSent ? {} : { maybeSent: true }),
           });
           break;
         }

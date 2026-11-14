@@ -15,6 +15,7 @@ import type {
 import type { ActivityRow } from '@life-portal/shared-domain';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PostsService } from './posts.service';
+import { assertFreeId, withId } from '../common/client-id';
 import { SocialService } from '../social/social.module';
 import { SocialGraphService } from '../social-graph/social-graph.module';
 
@@ -246,17 +247,20 @@ export class PostEngagementService implements OnModuleInit {
       ...(rows.length > 20 ? { nextCursor: String(rows[19]._id) } : {}),
     };
   }
-  async add(userId: string, postId: string, text: string, requestId: string) {
+  async add(userId: string, postId: string, text: string, requestId: string, id?: string) {
     const post = await this.posts.detail(userId, postId);
     const value = text.trim();
     if (!value || value.length > 1000)
       throw new BadRequestException('Write a comment of 1–1,000 characters.');
     const actor = await this.social.own(userId);
     const filter = { postId, userId, requestId };
+    // Spec 031: a comment written offline carries the id the device gave it. A retry finds its
+    // own row by `requestId`; a new one must not take an id anyone already has.
+    if (id && !(await this.comments.exists(filter))) await assertFreeId(this.comments, id);
     try {
       const result = await this.comments.updateOne(
         filter,
-        { $setOnInsert: { ...filter, text: value, deleted: false } },
+        { $setOnInsert: { ...filter, ...withId(id), text: value, deleted: false } },
         { upsert: true },
       );
       // A retried requestId returns the original comment and must not notify again.
@@ -286,7 +290,16 @@ export class PostEngagementService implements OnModuleInit {
       },
       { $set: { deleted: true, text: '' } },
     );
-    if (!result.matchedCount) throw new NotFoundException('Comment not found.');
+    if (!result.matchedCount) {
+      // Spec 031: removing a comment already removed (a retry, or another device) is done.
+      const gone = await this.comments.exists({
+        _id: commentId,
+        postId,
+        deleted: true,
+        ...(!post.isOwner ? { userId } : {}),
+      });
+      if (!gone) throw new NotFoundException('Comment not found.');
+    }
     return { success: true };
   }
 }

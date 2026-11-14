@@ -2,6 +2,16 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-14: Like and comment without signal
+
+- **Likes, reposts and comments work with no connection** on posts already on screen. They show
+  at once, say "Not sent yet", and are sent when you are back online. Liking and unliking while
+  offline sends nothing at all.
+- **If the post went away meanwhile**, a like or repost is dropped; a comment waits in the sync
+  sheet with its text so you can copy it.
+- **A post you have open no longer turns into "unavailable" when the signal drops**: that message
+  now appears only when the server says so.
+
 ## 2026-11-14: Edits from two devices are never lost
 
 - **If you change the same set, note, meal or weigh-in on two devices**, the second change is no

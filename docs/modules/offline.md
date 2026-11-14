@@ -118,6 +118,18 @@ Module-level request ids (training's `requestId`) remain; the header is the gene
   sending a delete.
 - `useAction` reports a `NetworkError` as "This needs a connection" for every online-only action.
 
+## Social on top of the outbox (spec 031, issue #20 S1)
+
+- Likes, reposts and comments on a post already on screen are writes kept on the device
+  (`social.like`, `social.repost`, `social.comment`, `social.comment.remove`); the post shows the
+  server's figures with them applied, "Not sent yet". Comments carry a device-chosen id.
+- A like/unlike (or repost/undo) pair with no connection cancels out, but only for a write that
+  never left the device: `api.ts` throws `NetworkError(notSent)` without fetching when the
+  browser is offline, and the outbox sets `maybeSent` on any other transient failure.
+- `POST_GONE` (the post is gone or no longer readable) drops a like, repost or comment removal
+  quietly; a comment stays in the sync sheet with its text. No For You metrics are recorded
+  offline. No post is kept for reading: S3 waits for the owner's privacy decision.
+
 ## Edits from two devices (spec 030, issue #19)
 
 - **Row versions.** Sets, workout exercises, workouts, meals and weigh-ins carry `version` (missing

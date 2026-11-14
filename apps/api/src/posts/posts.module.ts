@@ -186,7 +186,7 @@ class PostsController {
     @Param('id') id: string,
     @Body() dto: AddPostCommentDto,
   ) {
-    return this.engagement.add(userId, id, dto.text, dto.requestId);
+    return this.engagement.add(userId, id, dto.text, dto.requestId, dto.id);
   }
   @Delete(':id/comments/:commentId') removeComment(
     @CurrentUser('userId') userId: string,

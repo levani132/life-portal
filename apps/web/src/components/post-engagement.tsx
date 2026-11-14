@@ -11,7 +11,7 @@ import type {
   PostEngagement as Engagement,
 } from '@life-portal/shared-types';
 import { canRepost } from '@life-portal/shared-domain';
-import { api } from '../lib/api';
+import { api, NetworkError } from '../lib/api';
 import { revalidate, useApi } from '../lib/hooks';
 import { PostRelativeTime } from './post-header-controls';
 import { ErrorNote } from './ui';
@@ -19,6 +19,9 @@ import { requestNotificationOffer } from './notifications';
 import { messagingAvailable } from './messages';
 import { PostShareSheet } from './post-share-sheet';
 import { usePostMetrics } from '../lib/feed-metrics';
+import { useAuth } from '../lib/auth-context';
+import { overlayComments, overlayEngagement, type ShownComment } from '../lib/offline/social-overlay';
+import { socialWrites, useOffline, useSocialWrites } from '../lib/social-offline';
 
 export function PostEngagement({
   post,
@@ -32,9 +35,7 @@ export function PostEngagement({
     refreshInterval: 30000,
     revalidateOnFocus: true,
   });
-  const [optimistic, setOptimistic] = useState<Engagement | null>(null);
   const [busy, setBusy] = useState(false);
-  const locked = useRef(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [error, setError] = useState('');
   const [shareOpen, setShareOpen] = useState(false);
@@ -42,58 +43,31 @@ export function PostEngagement({
   const portal = useApi<PortalState>('/portal');
   const canSend = messagingAvailable(portal.data?.access);
   const recordMetric = usePostMetrics();
-  const value = optimistic ?? stats.data;
-  async function like() {
-    if (!value || locked.current) return;
-    locked.current = true;
+  // Spec 031: likes, reposts and comments are kept on the device and sent when there is a
+  // connection; the figures shown include them, marked as not sent until the server has them.
+  const writes = useSocialWrites();
+  const offline = useOffline();
+  const value = stats.data ? overlayEngagement(stats.data, post.id, writes) : undefined;
+  async function toggle(op: 'like' | 'repost') {
+    if (!value || busy) return;
     setBusy(true);
     setError('');
-    const liked = !value.liked;
-    setOptimistic({
-      ...value,
-      liked,
-      likeCount: Math.max(0, value.likeCount + (liked ? 1 : -1)),
-    });
+    const on = op === 'like' ? !value.liked : !value.reposted;
     try {
-      const result = liked
-        ? await api.put<Engagement>(`/posts/${post.id}/like`, {})
-        : await api.delete<Engagement>(`/posts/${post.id}/like`);
-      if (liked) recordMetric?.('like');
-      await stats.mutate(result, false);
+      await socialWrites.toggle(op, post.id, on, post.title);
+      // No For You measurement offline (owner's rule, #20).
+      if (on && !offline) recordMetric?.(op);
+      // The feed is refreshed when the sheet closes: a repost card replaces this one (it is keyed
+      // by the repost), which would unmount the open sheet under the finger.
+      if (op === 'repost') feedStale.current = true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not update your like.');
+      setError(e instanceof Error ? e.message : `Could not update your ${op}.`);
     } finally {
-      setOptimistic(null);
-      locked.current = false;
       setBusy(false);
     }
   }
-  async function toggleRepost() {
-    if (!value || locked.current) return;
-    locked.current = true;
-    setError('');
-    const reposted = !value.reposted;
-    setOptimistic({
-      ...value,
-      reposted,
-      repostCount: Math.max(0, value.repostCount + (reposted ? 1 : -1)),
-    });
-    try {
-      const result = reposted
-        ? await api.put<Engagement>(`/posts/${post.id}/repost`, {})
-        : await api.delete<Engagement>(`/posts/${post.id}/repost`);
-      if (reposted) recordMetric?.('repost');
-      await stats.mutate(result, false);
-      // The feed is refreshed when the sheet closes: a repost card replaces this one (it is keyed
-      // by the repost), which would unmount the open sheet under the finger.
-      feedStale.current = true;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not update your repost.');
-    } finally {
-      setOptimistic(null);
-      locked.current = false;
-    }
-  }
+  const like = () => toggle('like');
+  const toggleRepost = () => toggle('repost');
   return (
     <div
       className={`mt-3 ${commentsOpen || error || stats.error ? '' : '-mb-4 sm:-mb-5'}`}
@@ -107,6 +81,7 @@ export function PostEngagement({
             {value.likeCount
               ? `${value.likeCount.toLocaleString()} ${value.likeCount === 1 ? 'like' : 'likes'}`
               : ''}
+            {value.unsent && <span className="ml-2 text-amber-300">Not sent yet</span>}
           </span>
           {value.commentCount > 0 && (
             <button
@@ -153,7 +128,10 @@ export function PostEngagement({
           Share
         </button>
       </div>
-      {(error || stats.error) && (
+      {value?.unsent && !(value.likeCount || value.commentCount) && (
+        <p className="mb-1 text-xs text-amber-300">Not sent yet</p>
+      )}
+      {(error || (stats.error && !stats.data)) && (
         <ErrorNote message={error || (stats.error as Error).message} />
       )}
       {commentsOpen && (
@@ -218,14 +196,18 @@ function PostComments({
     field.style.height = '40px';
     field.style.height = `${Math.min(118, Math.max(40, field.scrollHeight + 2))}px`;
   }, [text]);
-  const requestId = useRef<string | null>(null);
   const locked = useRef(false);
   const recordMetric = usePostMetrics();
-  const comments = [
-    ...new Map(
-      [...older, ...(result.data?.comments ?? [])].map((row) => [row.id, row]),
-    ).values(),
-  ]
+  const writes = useSocialWrites();
+  const offline = useOffline();
+  const { user } = useAuth();
+  const me = { userId: user?.id ?? '', displayName: 'You', username: '' };
+  const comments: ShownComment[] = overlayComments(
+    [...new Map([...older, ...(result.data?.comments ?? [])].map((row) => [row.id, row])).values()],
+    postId,
+    writes,
+    me,
+  )
     .filter((row) => !deleted.includes(row.id))
     .sort((a, b) => a.id.localeCompare(b.id));
   const next = cursor === null ? result.data?.nextCursor : cursor || undefined;
@@ -234,20 +216,11 @@ function PostComments({
     locked.current = true;
     setPending(true);
     setError('');
-    requestId.current ??= crypto.randomUUID();
     try {
-      const created = await api.post<PostComment>(`/posts/${postId}/comments`, {
-        text: text.trim(),
-        requestId: requestId.current,
-      });
-      setOlder((rows) => [
-        ...rows.filter((row) => row.id !== created.id),
-        created,
-      ]);
+      // Spec 031: kept on the device with its own id and shown at once, marked as not sent.
+      await socialWrites.comment(postId, text.trim());
       setText('');
-      requestId.current = null;
-      recordMetric?.('comment');
-      await result.mutate().catch(() => undefined);
+      if (!offline) recordMetric?.('comment');
       onChanged();
       requestNotificationOffer('comment');
     } catch (e) {
@@ -325,7 +298,11 @@ function PostComments({
                 {comment.text}
               </p>
               <span className="mt-1 block text-[10px] text-ink-faint">
-                <PostRelativeTime date={comment.createdAt} />
+                {comment.unsent ? (
+                  <span className="text-amber-300">Not sent yet</span>
+                ) : (
+                  <PostRelativeTime date={comment.createdAt} />
+                )}
               </span>
             </div>
             {comment.canDelete && (
@@ -338,9 +315,9 @@ function PostComments({
                   setDeleting(comment.id);
                   setError('');
                   try {
-                    await api.delete(`/posts/${postId}/comments/${comment.id}`);
+                    // A comment not sent yet is withdrawn; a saved one is deleted once online.
+                    await socialWrites.removeComment(postId, comment.id);
                     setDeleted((ids) => [...ids, comment.id]);
-                    await result.mutate().catch(() => undefined);
                     onChanged();
                   } catch (e) {
                     setError(
@@ -359,8 +336,11 @@ function PostComments({
           </li>
         ))}
       </ul>
-      {(error || result.error) && (
-        <ErrorNote message={error || (result.error as Error).message} />
+      {result.error instanceof NetworkError && !error ? (
+        // Not a failure the person can act on: their own comments still post when it's back.
+        <p className="text-xs text-ink-muted">Other comments load when you’re back online.</p>
+      ) : (
+        (error || result.error) && <ErrorNote message={error || (result.error as Error).message} />
       )}
       <form
         className="flex items-end gap-2"
@@ -379,10 +359,7 @@ function PostComments({
           value={text}
           disabled={pending}
           className="field min-w-0 flex-1 resize-none overflow-y-auto text-sm leading-5"
-          onChange={(event) => {
-            setText(event.target.value);
-            requestId.current = null;
-          }}
+          onChange={(event) => setText(event.target.value)}
           onKeyDown={(event) => {
             if (
               event.key === 'Enter' &&

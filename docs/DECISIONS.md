@@ -1965,3 +1965,22 @@ key with a new `baseVersion` would be `IDEMPOTENCY_KEY_REUSED`. A resolved write
 **Why deletes no longer 404.** Two devices deleting the same row is not an error the person can
 do anything about. The delete still only matches the caller's own rows, so answering "deleted" for
 an id that is someone else's reveals nothing and changes nothing.
+
+## 2026-11-14 · Offline likes and comments; a like/unlike pair cancels only if it never left (issue #20 S1)
+
+**Context.** The owner split offline social into S1 (likes, reposts, comments), S2 (drafts) and
+S3 (reading kept posts, deferred until a privacy policy for other people's posts is confirmed).
+
+**Decision.** S1 rides the outbox like training and food. Comments take a device-chosen id. A
+"post not readable" 404 carries `POST_GONE`, so a queued like or repost on it is dropped quietly,
+while a comment (the person's own words) waits in the sync sheet with its text.
+
+**Why cancelling needs `maybeSent`.** The owner wants a like/unlike made offline to send nothing.
+But a like whose answer was lost may already be on the server; withdrawing its unlike would leave
+the server liked and the screen not. So `api.ts` refuses without fetching when the browser says it
+is offline (`NetworkError(notSent)`), and the outbox marks any other transient failure
+`maybeSent`. Only a write that provably never left is withdrawn; otherwise both are sent, which
+ends in the same state, at the cost of the author possibly seeing a notification.
+
+**Why no posts are kept.** Interactions need a post on screen, which is enough for S1. Keeping
+other people's posts on the device is S3 and is waiting for the owner.

@@ -7,6 +7,7 @@ import { outbox, useOutbox } from '../lib/offline/runtime';
 import type { OutboxItem } from '../lib/offline/types';
 import { conflictOf, combinedText, diffFields, type Conflict } from '../lib/offline/conflicts';
 import { canLogAgain, keepMine, keepTheirs, logAgain, saveCombined, type Undo } from '../lib/sync-conflicts';
+import { refusedCommentText } from '../lib/social-offline';
 import { finishOtherAndRetry, isSessionConflict } from '../lib/training-offline';
 import { Modal, Textarea } from './ui';
 
@@ -145,6 +146,7 @@ function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: st
   };
   const stuck = item.state === 'error' || item.state === 'conflict';
   const clash = conflictOf(item);
+  const comment = refusedCommentText(item);
   return (
     <li className="rounded-lg border border-border p-3 text-sm">
       <div className="flex items-start justify-between gap-2">
@@ -198,6 +200,13 @@ function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: st
         </div>
       )}
       {clash && <ClashChoice item={item} clash={clash} onUndo={onUndo} />}
+      {/* Spec 031: a comment on a post that is gone keeps its text here, to copy before discarding. */}
+      {comment && (
+        <div className="mt-2 space-y-1 rounded-md bg-amber-500/10 p-2 text-xs">
+          <p>{item.lastErrorCode === 'POST_GONE' ? 'This post is no longer available, so your comment was not posted.' : 'Your comment:'}</p>
+          <p className="select-text whitespace-pre-wrap break-words rounded border border-border bg-surface p-2 text-sm">{comment}</p>
+        </div>
+      )}
       {confirm && (
         <div className="mt-2 flex flex-wrap items-center justify-end gap-2 rounded-md bg-rose-500/10 p-2 text-xs">
           <span className="mr-auto">

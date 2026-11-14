@@ -43,6 +43,12 @@ export interface OutboxItem<M = unknown> {
    * can compare it with their own. It is the person's own row, kept in their own store.
    */
   lastErrorCurrent?: Record<string, unknown>;
+  /**
+   * Spec 031: an attempt may have reached the server (its answer was lost, or the server failed).
+   * Unset while every attempt failed with the device offline. A write that may have arrived is
+   * never withdrawn silently.
+   */
+  maybeSent?: boolean;
   createdAt: number;
 }
 

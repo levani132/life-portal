@@ -274,4 +274,15 @@ describe('OfflineCache (spec 027)', () => {
     expect(f.received.slice(-2)).toEqual(['a2', 'later']);
     expect(f.db.outboxRows.size).toBe(0);
   });
+
+  it('remembers whether a write may have reached the server (spec 031)', async () => {
+    const f = fixture();
+    f.setAnswer(() => new NetworkError(undefined, true));
+    await f.outbox.enqueue(f.write('offline'));
+    await f.outbox.drain();
+    expect(f.outbox.getSnapshot().items[0].maybeSent).toBeUndefined();
+    f.setAnswer(() => new NetworkError());
+    await f.advance(60_000);
+    expect(f.outbox.getSnapshot().items[0].maybeSent).toBe(true);
+  });
 });

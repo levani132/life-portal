@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { FoodPost } from '@life-portal/shared-types';
 import { PostEngagement } from './post-engagement';
 import { api } from '../lib/api';
+import { socialWrites } from '../lib/social-offline';
 import { PostAudienceControl } from './post-header-controls';
 import { shareHeads } from './post-share-sheet';
 const stats = {
@@ -22,8 +23,21 @@ jest.mock('../lib/hooks', () => ({
 jest.mock('../lib/social-hooks', () => ({
   useSocialApi: () => ({ data: { people: [] }, isLoading: false }),
 }));
+jest.mock('../lib/auth-context', () => ({
+  useAuth: () => ({ user: { id: 'reader' } }),
+}));
+jest.mock('../lib/social-offline', () => ({
+  socialWrites: {
+    toggle: jest.fn(async () => undefined),
+    comment: jest.fn(async () => 'c'.repeat(24)),
+    removeComment: jest.fn(async () => undefined),
+  },
+  useSocialWrites: () => [],
+  useOffline: () => false,
+}));
 jest.mock('../lib/api', () => ({
   api: { put: jest.fn(), delete: jest.fn(), post: jest.fn(), patch: jest.fn() },
+  NetworkError: class NetworkError extends Error {},
 }));
 const post = { id: 'post', title: 'Oats', audience: 'friends' } as FoodPost;
 beforeEach(() => {
@@ -34,57 +48,31 @@ beforeEach(() => {
   });
   comments.mutate.mockResolvedValue(undefined);
 });
-it('saves a like and rolls back an unsuccessful unlike', async () => {
-  (api.put as jest.Mock).mockResolvedValue({
-    liked: true,
-    likeCount: 1,
-    commentCount: 0,
-  });
-  (api.delete as jest.Mock).mockRejectedValue(new Error('Connection failed'));
+it('queues a like and shows it as not sent yet', async () => {
   const view = render(<PostEngagement post={post} />);
   fireEvent.click(screen.getByRole('button', { name: 'Like' }));
-  await waitFor(() => expect(screen.getByText('1 like')).toBeTruthy());
   await waitFor(() =>
-    expect(
-      screen.getByRole('button', { name: 'Like' }).hasAttribute('disabled'),
-    ).toBe(false),
+    expect(socialWrites.toggle).toHaveBeenCalledWith('like', 'post', true, 'Oats'),
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Like' }));
-  await screen.findByText('Connection failed');
-  expect(
-    screen.getByRole('button', { name: 'Like' }).getAttribute('aria-pressed'),
-  ).toBe('true');
-  expect(screen.getByText('1 like')).toBeTruthy();
+  expect(api.put).not.toHaveBeenCalled();
   view.unmount();
 });
-it('preserves a failed comment draft and reuses its request ID on retry', async () => {
-  (api.post as jest.Mock)
-    .mockRejectedValueOnce(new Error('Connection failed'))
-    .mockResolvedValueOnce({
-      id: 'a'.repeat(24),
-      text: 'Hello',
-      author: { userId: 'reader', displayName: 'Reader', username: 'reader' },
-      createdAt: '2026-11-02T00:00:00Z',
-      canDelete: true,
-    });
+it('queues a comment with the text and clears the draft', async () => {
   const view = render(<PostEngagement post={post} />);
   fireEvent.click(screen.getByRole('button', { name: 'Comment' }));
   fireEvent.change(screen.getByLabelText('Write a comment'), {
     target: { value: 'Hello' },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Post comment' }));
-  await screen.findByText('Connection failed');
-  expect(
-    (screen.getByLabelText('Write a comment') as HTMLTextAreaElement).value,
-  ).toBe('Hello');
-  fireEvent.click(screen.getByRole('button', { name: 'Post comment' }));
-  await screen.findByText('Hello');
-  expect((api.post as jest.Mock).mock.calls[0][1].requestId).toBe(
-    (api.post as jest.Mock).mock.calls[1][1].requestId,
+  await waitFor(() =>
+    expect(socialWrites.comment).toHaveBeenCalledWith('post', 'Hello'),
   );
-  expect(
-    (screen.getByLabelText('Write a comment') as HTMLTextAreaElement).value,
-  ).toBe('');
+  await waitFor(() =>
+    expect(
+      (screen.getByLabelText('Write a comment') as HTMLTextAreaElement).value,
+    ).toBe(''),
+  );
+  expect(api.post).not.toHaveBeenCalled();
   view.unmount();
 });
 it('copies a permission-preserving post link when native sharing is unavailable', async () => {
