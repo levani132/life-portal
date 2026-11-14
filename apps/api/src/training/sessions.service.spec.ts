@@ -3,7 +3,6 @@ import { randomUUID } from 'node:crypto';
 import { Types } from 'mongoose';
 import { CatalogueService } from './catalogue.service';
 import { FakeModel, fakeMedia } from './fake-model.testing';
-import { MachinesService } from './machines.service';
 import { ProgressService } from './progress.service';
 import { PlansService } from './plans.service';
 import { SessionsService } from './sessions.service';
@@ -18,10 +17,8 @@ function fixture() {
   const sessions = new FakeModel([['userId', 'requestId'], ['userId', '?status=open']]);
   const workoutExercises = new FakeModel([['userId', 'requestId']]);
   const sets = new FakeModel([['userId', 'requestId']]);
-  const machineRows = new FakeModel();
   const media = fakeMedia();
   const catalogue = new CatalogueService(exercises as never, workoutExercises as never, sets as never, media as never);
-  const machines = new MachinesService(machineRows as never, workoutExercises as never, catalogue, media as never);
   const weighIns: { day: string; weightGrams: number }[] = [];
   const nutrition = { weighInsUpTo: async (_userId: string, day: string) => weighIns.filter((w) => w.day <= day) };
   const progress = new ProgressService(sessions as never, workoutExercises as never, sets as never, catalogue, nutrition as never);
@@ -30,7 +27,6 @@ function fixture() {
     workoutExercises as never,
     sets as never,
     catalogue,
-    machines,
     progress,
   );
   const bench = new Types.ObjectId();
@@ -41,7 +37,7 @@ function fixture() {
     { _id: pullUp, name: 'Pullups', searchName: 'pullups', primaryMuscles: ['lats'], secondaryMuscles: [], equipmentType: 'bodyweight', measure: 'bodyweight_reps', seedKey: 'fedb:pullups', archived: false, aliases: [] },
     { _id: secret, userId: OTHER, name: 'Their machine press', searchName: 'their machine press', primaryMuscles: ['chest'], secondaryMuscles: [], equipmentType: 'machine', measure: 'weight_reps', archived: false, aliases: [] },
   );
-  return { service, progress, weighIns, machines, machineRows, exercises, sessions, workoutExercises, sets, bench: String(bench), pullUp: String(pullUp), secret: String(secret) };
+  return { service, progress, weighIns, exercises, sessions, workoutExercises, sets, bench: String(bench), pullUp: String(pullUp), secret: String(secret) };
 }
 
 async function startWithBench(f: ReturnType<typeof fixture>, at = T0) {
@@ -384,7 +380,6 @@ describe('SessionsService: plan workouts (spec 023)', () => {
       f.workoutExercises as never,
       f.sets as never,
       new CatalogueService(f.exercises as never, f.workoutExercises as never, f.sets as never, fakeMedia() as never),
-      f.machines,
       f.progress,
       plans,
     );

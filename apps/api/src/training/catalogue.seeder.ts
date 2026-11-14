@@ -5,6 +5,7 @@ import {
   catalogueEquipment,
   catalogueMeasure,
   catalogueMuscles,
+  catalogueName,
   normaliseSearch,
   type CatalogueEntry,
 } from '@life-portal/shared-domain';
@@ -25,14 +26,15 @@ export const seedKeyFor = (entry: Pick<CatalogueEntry, 'id'>) => `fedb:${entry.i
 /** The shared row a dataset entry becomes. Facts only: no images, no instructions (R1). */
 export function catalogueRow(entry: CatalogueEntry, version: number) {
   const primary = catalogueMuscles(entry.primaryMuscles);
+  const { name, aliases } = catalogueName(entry);
   const known = <T extends string>(list: readonly T[], value: string | null) =>
     value && (list as readonly string[]).includes(value) ? (value as T) : undefined;
   return {
     seedKey: seedKeyFor(entry),
     seedVersion: version,
-    name: entry.name.trim(),
-    aliases: [] as string[],
-    searchName: normaliseSearch(entry.name),
+    name,
+    aliases,
+    searchName: [name, ...aliases].map(normaliseSearch).join(' | '),
     primaryMuscles: primary,
     secondaryMuscles: catalogueMuscles(entry.secondaryMuscles).filter(
       (muscle) => !primary.includes(muscle),

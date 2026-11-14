@@ -66,16 +66,17 @@ export class FinishSessionDto {
   @IsOptional() @IsIn(['now', 'lastSet']) at?: 'now' | 'lastSet';
 }
 
+/**
+ * There is no `machineId` (#14): the exercise names its equipment. An old client that still sends
+ * one gets a 400 from `forbidNonWhitelisted` rather than having it silently dropped.
+ */
 export class AddSessionExerciseDto {
   @IsUUID() requestId!: string;
   @IsMongoId() exerciseId!: string;
-  @IsOptional() @IsMongoId() machineId?: string;
 }
 
 export class UpdateSessionExerciseDto {
   @IsOptional() @IsString() @MaxLength(500) notes?: string;
-  /** `null` clears the machine. */
-  @IsOptional() @ValidateIf((_, value) => value !== null) @IsMongoId() machineId?: string | null;
   /** Spec 023: only for an exercise that came from a plan. */
   @IsOptional() @IsBoolean() skipped?: boolean;
   /** Spec 025: this workout's rest after a set of it; `null` goes back to the plan or default. */
@@ -90,10 +91,9 @@ export class UpdateSessionExerciseDto {
 export class SwapSessionExerciseDto {
   @IsUUID() requestId!: string;
   @IsMongoId() exerciseId!: string;
-  @IsOptional() @IsMongoId() machineId?: string;
 }
 
-// ------------------------------------------------------------------ own exercises and machines
+// ------------------------------------------------------------------ own exercises
 // Create and update are separate classes on purpose: a subclass cannot drop the parent's
 // `@IsOptional()`, so "required on create" would silently become optional.
 
@@ -124,23 +124,6 @@ export class UpdateExerciseDto {
   @IsOptional() @IsIn(MEASURES) measure?: Measure;
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) @MaxLength(500, { each: true })
   instructions?: string[];
-  @IsOptional() @IsMongoId() imageMediaId?: string;
-  @IsOptional() @IsBoolean() removeImage?: boolean;
-}
-
-export class CreateMachineDto {
-  @IsString() @MinLength(1) @MaxLength(120) name!: string;
-  @IsOptional() @IsString() @MaxLength(80) brand?: string;
-  @IsIn(EQUIPMENT_TYPES) equipmentType!: EquipmentType;
-  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsMongoId({ each: true }) exerciseIds?: string[];
-  @IsOptional() @IsMongoId() imageMediaId?: string;
-}
-
-export class UpdateMachineDto {
-  @IsOptional() @IsString() @MinLength(1) @MaxLength(120) name?: string;
-  @IsOptional() @IsString() @MaxLength(80) brand?: string;
-  @IsOptional() @IsIn(EQUIPMENT_TYPES) equipmentType?: EquipmentType;
-  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsMongoId({ each: true }) exerciseIds?: string[];
   @IsOptional() @IsMongoId() imageMediaId?: string;
   @IsOptional() @IsBoolean() removeImage?: boolean;
 }

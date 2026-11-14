@@ -27,7 +27,6 @@ import { CatalogueSeeder } from './catalogue.seeder';
 import { CatalogueService } from './catalogue.service';
 import { PlanSeeder } from './plan.seeder';
 import { PlansService } from './plans.service';
-import { MachinesService } from './machines.service';
 import { ProgressService } from './progress.service';
 import { NutritionModule } from '../nutrition/nutrition.module';
 import { TrainingProfileService } from './profile.service';
@@ -42,7 +41,6 @@ import {
   CopyPlanDto,
   CreateExerciseDto,
   CreatePlanDto,
-  CreateMachineDto,
   CreateSetDto,
   FinishSessionDto,
   ReorderDto,
@@ -50,7 +48,6 @@ import {
   StartSessionDto,
   SwapSessionExerciseDto,
   UpdateExerciseDto,
-  UpdateMachineDto,
   UpdateSessionDto,
   UpdateSessionExerciseDto,
   RestAlarmDto,
@@ -97,7 +94,6 @@ export class TrainingController {
     private readonly catalogue: CatalogueService,
     private readonly profiles: TrainingProfileService,
     private readonly sessions: SessionsService,
-    private readonly machines: MachinesService,
     private readonly progress: ProgressService,
     private readonly summaries: TrainingSummaryService,
     private readonly plans: PlansService,
@@ -197,37 +193,6 @@ export class TrainingController {
   @Delete('exercises/:id')
   deleteExercise(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     return this.catalogue.remove(userId, id);
-  }
-
-  // ---------------------------------------------------------------- machines
-
-  @Get('machines')
-  listMachines(@CurrentUser('userId') userId: string, @Query('exerciseId') exerciseId?: string) {
-    return this.machines.list(userId, exerciseId || undefined);
-  }
-
-  @Get('machines/:id')
-  machine(@CurrentUser('userId') userId: string, @Param('id') id: string) {
-    return this.machines.get(userId, id);
-  }
-
-  @Post('machines')
-  createMachine(@CurrentUser('userId') userId: string, @Body() dto: CreateMachineDto) {
-    return this.machines.create(userId, dto);
-  }
-
-  @Patch('machines/:id')
-  updateMachine(
-    @CurrentUser('userId') userId: string,
-    @Param('id') id: string,
-    @Body() dto: UpdateMachineDto,
-  ) {
-    return this.machines.update(userId, id, dto);
-  }
-
-  @Delete('machines/:id')
-  deleteMachine(@CurrentUser('userId') userId: string, @Param('id') id: string) {
-    return this.machines.remove(userId, id);
   }
 
   // ---------------------------------------------------------------- plans (spec 023)
@@ -428,7 +393,7 @@ export class TrainingController {
     ]),
   ],
   controllers: [TrainingController],
-  providers: [CatalogueSeeder, PlanSeeder, PlansService, CatalogueService, MachinesService, ProgressService, TrainingProfileService, SessionsService, TrainingSummaryService, RestAlarmService, TrainingLevelService, TrainingRankService],
+  providers: [CatalogueSeeder, PlanSeeder, PlansService, CatalogueService, ProgressService, TrainingProfileService, SessionsService, TrainingSummaryService, RestAlarmService, TrainingLevelService, TrainingRankService],
   exports: [SessionsService, TrainingSummaryService, TrainingRankService, TrainingProfileService],
 })
 export class TrainingModule {}

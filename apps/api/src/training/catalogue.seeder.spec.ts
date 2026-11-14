@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import { CATALOGUE_EQUIPMENT_SUFFIX } from '@life-portal/shared-domain';
 import catalogueFile from './catalogue/free-exercise-db.json';
 import { CatalogueSeeder, catalogueRow, type CatalogueFile } from './catalogue.seeder';
 import { CatalogueService } from './catalogue.service';
@@ -53,6 +54,22 @@ describe('CatalogueSeeder', () => {
     expect(exercises.docs.find((doc) => doc['seedKey'] === 'fedb:Weighted_Pull_Ups')).toMatchObject({ _id: id, measure: 'bodyweight_reps', seedVersion: 2 });
     expect(exercises.docs.find((doc) => doc['seedKey'] === 'fedb:Sled_Row')).toMatchObject({ measure: 'weight_reps' });
     expect((catalogueFile as CatalogueFile).version).toBeGreaterThanOrEqual(2);
+  });
+
+  it('renames machine rows whose names hide the equipment in catalogue v3, keeping the row and history (#14)', async () => {
+    const exercises = new FakeModel();
+    const seeder = new CatalogueSeeder(exercises as never);
+    const butterfly = { id: 'Butterfly', name: 'Butterfly', force: 'push', level: 'beginner', mechanic: 'isolation', equipment: 'machine', primaryMuscles: ['chest'], secondaryMuscles: [], category: 'strength' };
+    exercises.docs.push({ _id: new Types.ObjectId(), seedKey: 'fedb:Butterfly', seedVersion: 2, name: 'Butterfly', aliases: [], archived: false });
+    const id = exercises.docs[0]['_id'];
+    await seeder.seed({ version: 3, source: 'test', exercises: [butterfly] });
+    expect(exercises.docs[0]).toMatchObject({ _id: id, name: 'Butterfly (Machine)', aliases: ['Butterfly'], searchName: 'butterfly machine | butterfly' });
+    // Idempotent: a second boot writes nothing.
+    expect(await seeder.seed({ version: 3, source: 'test', exercises: [butterfly] })).toEqual({ upserted: 0, skipped: true });
+    // The ids the rename list names all exist in the vendored file, and its version moved past 2.
+    const ids = new Set((catalogueFile as CatalogueFile).exercises.map((e) => e.id));
+    for (const listed of Object.keys(CATALOGUE_EQUIPMENT_SUFFIX)) expect(ids.has(listed)).toBe(true);
+    expect((catalogueFile as CatalogueFile).version).toBeGreaterThanOrEqual(3);
   });
 
   it('keeps facts only and drops duplicated muscles', () => {

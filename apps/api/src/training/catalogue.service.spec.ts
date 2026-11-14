@@ -3,7 +3,6 @@ import { randomUUID } from 'node:crypto';
 import { Types } from 'mongoose';
 import { CatalogueService, rankExercises, searchNameFor } from './catalogue.service';
 import { FakeModel, fakeMedia } from './fake-model.testing';
-import { MachinesService } from './machines.service';
 import { ProgressService } from './progress.service';
 import { SessionsService } from './sessions.service';
 
@@ -18,14 +17,12 @@ function fixture() {
   const exercises = new FakeModel();
   const workoutExercises = new FakeModel([['userId', 'requestId']]);
   const sets = new FakeModel([['userId', 'requestId']]);
-  const machineRows = new FakeModel();
   const media = fakeMedia();
   const plans = new FakeModel();
   const catalogue = new CatalogueService(exercises as never, workoutExercises as never, sets as never, media as never, plans as never);
-  const machines = new MachinesService(machineRows as never, workoutExercises as never, catalogue, media as never);
   const sessionRows = new FakeModel([['userId', 'requestId'], ['userId', '?status=open']]);
   const progress = new ProgressService(sessionRows as never, workoutExercises as never, sets as never, catalogue, { weighInsUpTo: async () => [] } as never);
-  const sessions = new SessionsService(sessionRows as never, workoutExercises as never, sets as never, catalogue, machines, progress);
+  const sessions = new SessionsService(sessionRows as never, workoutExercises as never, sets as never, catalogue, progress);
   const shared = (name: string, extra: Record<string, unknown> = {}) => {
     const _id = new Types.ObjectId();
     exercises.docs.push({
@@ -34,7 +31,7 @@ function fixture() {
     });
     return String(_id);
   };
-  return { catalogue, machines, sessions, plans, exercises, workoutExercises, sets, machineRows, media, shared };
+  return { catalogue, sessions, plans, exercises, workoutExercises, sets, media, shared };
 }
 
 const own = {
@@ -192,63 +189,40 @@ describe('CatalogueService: own exercises', () => {
   });
 });
 
-describe('MachinesService', () => {
-  it('keeps machines private and checks the exercises they serve', async () => {
+describe('SessionsService: no machine step (#14)', () => {
+  it('adds an exercise with no machine part in its snapshot', async () => {
     const f = fixture();
-    const bench = f.shared('Bench press');
-    const theirs = await f.catalogue.create(OTHER, own);
-    await expect(f.machines.create(ME, { name: 'Chest press', equipmentType: 'machine', exerciseIds: [theirs.id] }))
-      .rejects.toBeInstanceOf(NotFoundException);
-    const machine = await f.machines.create(ME, { name: 'Chest press', brand: ' Technogym ', equipmentType: 'machine', exerciseIds: [bench, bench] });
-    expect(machine).toMatchObject({ brand: 'Technogym', exerciseIds: [bench] });
-    expect(await f.machines.list(OTHER)).toEqual([]);
-    expect((await f.machines.list(ME, bench)).map((m) => m.name)).toEqual(['Chest press']);
-    await expect(f.machines.update(OTHER, machine.id, { name: 'Mine' })).rejects.toBeInstanceOf(NotFoundException);
-    expect((await f.machines.update(ME, machine.id, { brand: '' })).brand).toBeUndefined();
+    const press = f.shared('Butterfly (Machine)', { equipmentType: 'machine', aliases: ['Butterfly'] });
+    const session = await f.sessions.start(ME, { requestId: randomUUID(), day: '2026-11-12' }, NOW);
+    const added = await f.sessions.addExercise(ME, session.id, { requestId: randomUUID(), exerciseId: press });
+    expect(added.machineId).toBeUndefined();
+    expect(added.snapshot).toEqual({ name: 'Butterfly (Machine)', equipmentType: 'machine', measure: 'weight_reps', primaryMuscles: ['chest'] });
   });
 
-  it('deletes an unused machine and archives one a workout names', async () => {
+  it('keeps a workout logged on a machine before #14 as it was, and a PATCH leaves it alone', async () => {
     const f = fixture();
     const bench = f.shared('Bench press');
-    const unused = await f.machines.create(ME, { name: 'A', equipmentType: 'machine' });
-    expect(await f.machines.remove(ME, unused.id)).toEqual({ id: unused.id, deleted: true });
-
-    const used = await f.machines.create(ME, { name: 'B', equipmentType: 'machine' });
     const session = await f.sessions.start(ME, { requestId: randomUUID(), day: '2026-11-12' }, NOW);
-    await f.sessions.addExercise(ME, session.id, { requestId: randomUUID(), exerciseId: bench, machineId: used.id });
-    expect(await f.machines.remove(ME, used.id)).toEqual({ id: used.id, archived: true });
-    expect(await f.machines.list(ME)).toEqual([]);
-  });
-});
+    const added = await f.sessions.addExercise(ME, session.id, { requestId: randomUUID(), exerciseId: bench });
+    // A row as the old picker wrote it: the machine id and its frozen name and brand.
+    const row = f.workoutExercises.docs.find((doc) => String(doc['_id']) === added.id) as Record<string, unknown>;
+    row['machineId'] = new Types.ObjectId().toHexString();
+    row['snapshot'] = { ...(row['snapshot'] as object), machineName: 'Chest press', machineBrand: 'Technogym' };
 
-describe('SessionsService: machines in a workout', () => {
-  it('names the machine in the snapshot, and only a PATCH of the machine changes that part', async () => {
-    const f = fixture();
-    const bench = f.shared('Bench press');
-    const a = await f.machines.create(ME, { name: 'Chest press', brand: 'Technogym', equipmentType: 'machine' });
-    const b = await f.machines.create(ME, { name: 'Plate press', equipmentType: 'machine' });
-    const session = await f.sessions.start(ME, { requestId: randomUUID(), day: '2026-11-12' }, NOW);
-    const added = await f.sessions.addExercise(ME, session.id, { requestId: randomUUID(), exerciseId: bench, machineId: a.id });
-    expect(added).toMatchObject({ machineId: a.id, snapshot: { name: 'Bench press', machineName: 'Chest press', machineBrand: 'Technogym' } });
-
-    // Renaming the machine later does not rewrite the workout.
-    await f.machines.update(ME, a.id, { name: 'Renamed' });
-    const switched = await f.sessions.updateExercise(ME, session.id, added.id, { machineId: b.id });
-    expect(switched.snapshot).toMatchObject({ name: 'Bench press', machineName: 'Plate press' });
-    expect(switched.snapshot.machineBrand).toBeUndefined();
-
-    const cleared = await f.sessions.updateExercise(ME, session.id, added.id, { machineId: null });
-    expect(cleared.machineId).toBeUndefined();
-    expect(cleared.snapshot.machineName).toBeUndefined();
+    const patched = await f.sessions.updateExercise(ME, session.id, added.id, { notes: 'felt good' });
+    expect(patched).toMatchObject({
+      exerciseId: bench,
+      machineId: row['machineId'],
+      notes: 'felt good',
+      snapshot: { name: 'Bench press', machineName: 'Chest press', machineBrand: 'Technogym' },
+    });
   });
 
-  it('rejects someone else’s machine', async () => {
+  it('finds a renamed catalogue exercise by its dataset name', async () => {
     const f = fixture();
-    const bench = f.shared('Bench press');
-    const theirs = await f.machines.create(OTHER, { name: 'Theirs', equipmentType: 'machine' });
-    const session = await f.sessions.start(ME, { requestId: randomUUID(), day: '2026-11-12' }, NOW);
-    await expect(
-      f.sessions.addExercise(ME, session.id, { requestId: randomUUID(), exerciseId: bench, machineId: theirs.id }),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    f.shared('Butterfly (Machine)', { equipmentType: 'machine', aliases: ['Butterfly'], searchName: searchNameFor('Butterfly (Machine)', ['Butterfly']) });
+    f.shared('Dumbbell Flyes', { equipmentType: 'dumbbell' });
+    const found = await f.catalogue.list(ME, { q: 'butterfly' }, NOW);
+    expect(found.map((e) => [e.name, e.equipmentType])).toEqual([['Butterfly (Machine)', 'machine']]);
   });
 });

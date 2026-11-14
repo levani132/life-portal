@@ -1,7 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import {
   CATALOGUE_CREDIT,
@@ -9,14 +9,12 @@ import {
   MUSCLES,
   type Exercise,
   type ExerciseListItem,
-  type Machine,
 } from '@life-portal/shared-types';
 import { EmptyState, ErrorNote, Input, Select, Spinner } from '../ui';
 import { useApi } from '../../lib/hooks';
 import { MEASURE_LABELS, humanise } from '../../lib/training';
 import { GROUP_ORDER, GROUP_STYLES, exerciseGroup, muscleGroup } from '../../lib/training-colors';
 import { ExerciseForm } from './exercise-form';
-import { MachineForm } from './machine-form';
 
 /** Debounced so typing "bench" sends one request, not five. */
 function useDebounced(value: string, ms = 250) {
@@ -33,13 +31,13 @@ const MUSCLE_CHIPS = [...MUSCLES].sort(
   (a, b) => GROUP_ORDER.indexOf(muscleGroup(a)) - GROUP_ORDER.indexOf(muscleGroup(b)),
 );
 
-/** Equipment where "which machine?" is worth asking. */
-const MACHINE_LIKE = new Set(['machine', 'cable', 'smith_machine']);
-
 /**
  * Searches the catalogue (shared exercises plus the person's own). The server ranks: names that
  * start with the query first, then exercises used in the last 90 days, then by name. Filters
  * narrow by main muscle and equipment; "Create exercise" covers what the catalogue lacks.
+ *
+ * Picking is the whole choice (#14): an exercise's name says its equipment ("Butterfly
+ * (Machine)"), and equipment is a filter and a label here, never a second question.
  */
 export function ExerciseSearch({
   onPick,
@@ -174,86 +172,6 @@ export function ExerciseSearch({
           initialName={query.trim()}
           onClose={() => setCreating(false)}
           onSaved={(saved: Exercise) => onPick?.(saved)}
-        />
-      )}
-    </div>
-  );
-}
-
-/**
- * "Which machine?" for one exercise: machines linked to it first, then the person's others of the
- * same kind. Skipped (answers `null` at once) when the person has no machines and the exercise is
- * not done on one, so free-weight logging stays one tap.
- */
-export function MachineChoice({
-  exercise,
-  currentId,
-  onChoose,
-}: {
-  exercise: Pick<ExerciseListItem, 'id' | 'name' | 'equipmentType'>;
-  currentId?: string;
-  onChoose: (machineId: string | null) => void;
-}) {
-  const { data, error, isLoading } = useApi<Machine[]>('/training/machines');
-  const [creating, setCreating] = useState(false);
-  const machines = useMemo(() => {
-    const all = data ?? [];
-    const linked = all.filter((machine) => machine.exerciseIds.includes(exercise.id));
-    const others = all.filter(
-      (machine) => !machine.exerciseIds.includes(exercise.id) && machine.equipmentType === exercise.equipmentType,
-    );
-    return { linked, others };
-  }, [data, exercise.id, exercise.equipmentType]);
-  const skip = data !== undefined && !data.length && !MACHINE_LIKE.has(exercise.equipmentType) && currentId === undefined;
-  // Once only: a second call would add the exercise to the workout twice.
-  const skipped = useRef(false);
-  useEffect(() => {
-    if (!skip || skipped.current) return;
-    skipped.current = true;
-    onChoose(null);
-  }, [skip, onChoose]);
-
-  if (isLoading || skip) return <Spinner />;
-  const row = (machine: Machine) => (
-    <li key={machine.id}>
-      <button type="button" className="flex w-full items-center gap-3 py-2.5 text-left" onClick={() => onChoose(machine.id)}>
-        {machine.image ? (
-          <img src={machine.image.url} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
-        ) : (
-          <span className="h-10 w-10 shrink-0 rounded-lg border border-border bg-surface" />
-        )}
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-medium">
-            {machine.name}
-            {machine.id === currentId && <span className="ml-2 text-xs text-accent">current</span>}
-          </span>
-          {machine.brand && <span className="block truncate text-xs text-ink-faint">{machine.brand}</span>}
-        </span>
-      </button>
-    </li>
-  );
-  return (
-    <div className="space-y-3">
-      {error && <ErrorNote message={(error as Error).message} />}
-      <button type="button" className="btn-ghost w-full justify-center" onClick={() => onChoose(null)}>
-        No specific machine
-      </button>
-      {machines.linked.length > 0 && <ul className="divide-y divide-border">{machines.linked.map(row)}</ul>}
-      {machines.others.length > 0 && (
-        <>
-          <p className="label">Other {humanise(exercise.equipmentType).toLowerCase()} machines</p>
-          <ul className="divide-y divide-border">{machines.others.map(row)}</ul>
-        </>
-      )}
-      <button type="button" className="btn-ghost w-full justify-center" onClick={() => setCreating(true)}>
-        <Plus className="h-4 w-4" /> New machine
-      </button>
-      {creating && (
-        <MachineForm
-          open
-          linked={[{ id: exercise.id, name: exercise.name }]}
-          onClose={() => setCreating(false)}
-          onSaved={(saved) => onChoose(saved.id)}
         />
       )}
     </div>

@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import { Types } from 'mongoose';
 import { CatalogueService } from './catalogue.service';
 import { FakeModel, fakeMedia } from './fake-model.testing';
-import { MachinesService } from './machines.service';
 import { ProgressService } from './progress.service';
 import { SessionsService } from './sessions.service';
 import { TrainingProfileService } from './profile.service';
@@ -20,10 +19,9 @@ function fixture() {
   const sets = new FakeModel([['userId', 'requestId']]);
   const media = fakeMedia();
   const catalogue = new CatalogueService(exercises as never, workoutExercises as never, sets as never, media as never);
-  const machines = new MachinesService(new FakeModel() as never, workoutExercises as never, catalogue, media as never);
   const nutrition = { weighInsUpTo: async () => [] };
   const progress = new ProgressService(sessions as never, workoutExercises as never, sets as never, catalogue, nutrition as never);
-  const service = new SessionsService(sessions as never, workoutExercises as never, sets as never, catalogue, machines, progress);
+  const service = new SessionsService(sessions as never, workoutExercises as never, sets as never, catalogue, progress);
   const profileRows = new FakeModel();
   // The plan pick itself is `PlansService.nextUp`, tested in plans.service.spec.ts.
   const plans = { nextUp: jest.fn().mockResolvedValue(undefined) };

@@ -1,4 +1,7 @@
 import {
+  CATALOGUE_EQUIPMENT_SUFFIX,
+  catalogueName,
+  legacyMachineCase,
   weekSummary,
   bestOneRepMax,
   bestSetOf,
@@ -174,6 +177,21 @@ describe('normaliseSearch', () => {
 });
 
 describe('catalogue mapping', () => {
+  it('names the equipment where the dataset name does not, keeping the old name as an alias (#14)', () => {
+    expect(catalogueName({ id: 'Butterfly', name: 'Butterfly' })).toEqual({ name: 'Butterfly (Machine)', aliases: ['Butterfly'] });
+    expect(catalogueName({ id: 'Pallof_Press', name: 'Pallof Press ' })).toEqual({ name: 'Pallof Press (Cable)', aliases: ['Pallof Press'] });
+    expect(catalogueName({ id: 'Barbell_Squat', name: 'Barbell Squat' })).toEqual({ name: 'Barbell Squat', aliases: [] });
+    for (const suffix of Object.values(CATALOGUE_EQUIPMENT_SUFFIX)) expect(['Machine', 'Cable']).toContain(suffix);
+  });
+
+  it('tells a machine exercise from a free-weight one logged on a machine (#14)', () => {
+    expect(legacyMachineCase('machine')).toBe('same_exercise');
+    expect(legacyMachineCase('cable')).toBe('same_exercise');
+    expect(legacyMachineCase('smith_machine')).toBe('same_exercise');
+    expect(legacyMachineCase('barbell')).toBe('free_weight_on_machine');
+    expect(legacyMachineCase('bodyweight')).toBe('free_weight_on_machine');
+  });
+
   it('maps cardio to distance and time', () => {
     expect(catalogueMeasure({ category: 'cardio', equipment: 'machine', force: null })).toBe(
       'distance_duration',

@@ -1757,3 +1757,31 @@ the content, taken from `v1-rc1` before the promotion.
 - **The group view reads `method` and `standardsVersion` from the frozen copy.** It used to read
   today's rank view, so a later release could have changed how a finished season's scores were
   labelled.
+
+## 2026-11-14: One exercise picker; private machines retired without a migration (issue #14)
+
+**An exercise names its equipment, and there is no machine step.** Adding an exercise was two
+choices (the exercise, then which of your machines), and the machine was a private record with a
+name, brand and photo. The machine added nothing the exercise could not say, and it was a second
+catalogue to keep. Now picking an exercise adds it; equipment is a filter and a label. The
+`/training/machines` routes and every `machineId` input are gone (an old client sending one gets
+a 400 from `forbidNonWhitelisted`, rather than having its choice silently dropped).
+
+**No data was migrated, on purpose.** Every history query, record, statistic, rank and tournament
+figure was already keyed on `exerciseId`; the machine sat on top as an attribute. So nothing needed
+re-pointing. Past workouts keep `machineId` and the frozen machine name, shown read-only, and
+`training_machines` rows stay because those ids point at them. Rewriting history to "canonical"
+exercises would have meant guessing what a free-text machine name meant.
+
+**The ambiguous case stays as it was.** A free-weight exercise logged with a machine attached (a
+barbell squat on a Smith machine) is really another movement. Ranks already left those sets out of
+the free-weight standard, and they still do, so no rank or tournament score moves. They are
+not re-pointed to a machine exercise, because that would silently add sets to another rank;
+`npm run training:machines-audit` lists them for an explicit decision instead.
+
+**Naming over merging.** Catalogue v3 adds "(Machine)" or "(Cable)" to the 19 machine and cable
+rows whose dataset names hide it, keeping the old name as an alias. Look-alike rows (plate-loaded
+*Leverage Chest Press*, selectorised *Machine Bench Press*) are not merged: merging shared rows
+moves people's history and rank standards between exercises, which is the silent combining the
+issue rules out.
+

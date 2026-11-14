@@ -31,7 +31,6 @@ import {
   validateSetValues,
 } from '@life-portal/shared-domain';
 import { CatalogueService } from './catalogue.service';
-import { MachinesService } from './machines.service';
 import { PlansService, toTarget } from './plans.service';
 import { ProgressService } from './progress.service';
 import { toSet, type SetRow } from './set-row';
@@ -66,7 +65,6 @@ export class SessionsService {
     @InjectModel(WorkoutExercise.name) private readonly exercises: Model<WorkoutExercise>,
     @InjectModel(WorkoutSet.name) private readonly sets: Model<WorkoutSet>,
     private readonly catalogue: CatalogueService,
-    private readonly machines: MachinesService,
     private readonly progress: ProgressService,
     @Optional() private readonly plans?: PlansService,
   ) {}
@@ -278,13 +276,12 @@ export class SessionsService {
   async addExercise(
     userId: string,
     sessionId: string,
-    input: { requestId: string; exerciseId: string; machineId?: string },
+    input: { requestId: string; exerciseId: string },
   ): Promise<SessionExercise> {
     await this.ownedSession(userId, sessionId);
     const retried = await this.exercises.findOne({ userId, requestId: input.requestId }).lean<ExerciseRow>();
     if (retried) return this.toSessionExercise(retried, []);
     const exercise = await this.catalogue.readable(userId, input.exerciseId);
-    const machine = input.machineId ? await this.machines.owned(userId, input.machineId) : undefined;
     const last = await this.exercises
       .findOne({ userId, sessionId })
       .sort({ order: -1 })
@@ -297,10 +294,9 @@ export class SessionsService {
         requestId: input.requestId,
         order: (last?.order ?? -1) + 1,
         exerciseId: String(exercise._id),
-        ...(machine ? { machineId: String(machine._id) } : {}),
         // The one deliberate copy: what the exercise was called and how it was measured when it
         // was done. Built here, never from the request.
-        snapshot: snapshotOf(exercise, machine),
+        snapshot: snapshotOf(exercise),
       });
       return this.toSessionExercise(created.toObject() as ExerciseRow, []);
     } catch (error) {
@@ -315,7 +311,7 @@ export class SessionsService {
     userId: string,
     sessionId: string,
     workoutExerciseId: string,
-    patch: { notes?: string; machineId?: string | null; skipped?: boolean; restSeconds?: number | null; superset?: string | null },
+    patch: { notes?: string; skipped?: boolean; restSeconds?: number | null; superset?: string | null },
   ): Promise<SessionExercise> {
     const row = await this.ownedExercise(userId, sessionId, workoutExerciseId);
     const set: Record<string, unknown> = {};
@@ -337,19 +333,6 @@ export class SessionsService {
     if (patch.notes !== undefined) {
       if (patch.notes.trim()) set['notes'] = patch.notes.trim();
       else unset['notes'] = 1;
-    }
-    if (patch.machineId !== undefined) {
-      // Which machine was used is a correction the person may make later, so the machine part
-      // of the snapshot is the one part a PATCH sets. The exercise part is never refreshed.
-      if (patch.machineId === null) {
-        Object.assign(unset, { machineId: 1, 'snapshot.machineName': 1, 'snapshot.machineBrand': 1 });
-      } else {
-        const machine = await this.machines.owned(userId, patch.machineId);
-        set['machineId'] = String(machine._id);
-        set['snapshot.machineName'] = machine.name;
-        if (machine.brand) set['snapshot.machineBrand'] = machine.brand;
-        else unset['snapshot.machineBrand'] = 1;
-      }
     }
     if (Object.keys(set).length || Object.keys(unset).length) {
       await this.exercises.updateOne(
@@ -389,7 +372,7 @@ export class SessionsService {
     userId: string,
     sessionId: string,
     workoutExerciseId: string,
-    input: { requestId: string; exerciseId: string; machineId?: string },
+    input: { requestId: string; exerciseId: string },
   ): Promise<SessionExercise> {
     await this.ownedSession(userId, sessionId);
     const retried = await this.exercises.findOne({ userId, requestId: input.requestId }).lean<ExerciseRow>();
@@ -402,7 +385,6 @@ export class SessionsService {
       });
     }
     const exercise = await this.catalogue.readable(userId, input.exerciseId);
-    const machine = input.machineId ? await this.machines.owned(userId, input.machineId) : undefined;
     const planned = row.planned
       ? {
           planExerciseId: row.planned.planExerciseId,
@@ -423,8 +405,7 @@ export class SessionsService {
           requestId: input.requestId,
           order: row.order,
           exerciseId: String(exercise._id),
-          ...(machine ? { machineId: String(machine._id) } : {}),
-          snapshot: snapshotOf(exercise, machine),
+          snapshot: snapshotOf(exercise),
           ...(planned ? { planned } : {}),
           // A swap keeps the exercise's place: its superset and the rest chosen for it.
           ...(row.restSeconds != null ? { restSeconds: row.restSeconds } : {}),
@@ -754,7 +735,8 @@ export class SessionsService {
       id: String(row._id),
       sessionId: row.sessionId,
       exerciseId: row.exerciseId,
-      machineId: row.machineId,
+      // Legacy (before #14): read back as logged, never written any more.
+      ...(row.machineId ? { machineId: row.machineId } : {}),
       order: row.order,
       snapshot: {
         name: row.snapshot.name,
@@ -775,18 +757,17 @@ export class SessionsService {
   }
 }
 
-/** What an exercise was when it was added to a workout. Built here, never from a request. */
-function snapshotOf(
-  exercise: { name: string; equipmentType: string; measure: string; primaryMuscles: string[] },
-  machine?: { name: string; brand?: string },
-) {
+/**
+ * What an exercise was when it was added to a workout. Built here, never from a request. Since #14
+ * there is no machine part: the exercise's name says its equipment. Rows logged earlier keep
+ * their `machineName`/`machineBrand` as history.
+ */
+function snapshotOf(exercise: { name: string; equipmentType: string; measure: string; primaryMuscles: string[] }) {
   return {
     name: exercise.name,
     equipmentType: exercise.equipmentType,
     measure: exercise.measure,
     primaryMuscles: exercise.primaryMuscles,
-    ...(machine ? { machineName: machine.name } : {}),
-    ...(machine?.brand ? { machineBrand: machine.brand } : {}),
   };
 }
 

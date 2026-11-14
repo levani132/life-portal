@@ -11,7 +11,7 @@ phases and must be computable from what this module records.
 **Spec:** `specs/020-training-logging/` (spec, plan, research R1–R11, data model, API contract)
 
 **Status (2026-11-12):** built: the catalogue, workout logging and history (MVP, T001–T021), and
-search ranking, private exercises and machines (US2, T022–T028), and progress: per-exercise
+search ranking and private exercises (US2, T022–T028; private machines were retired in #14), and progress: per-exercise
 history, personal records and labelled 1RM estimates (US3, T029–T034), and the Home card (US4,
 T035–T037), and units and effective loads (US5, T038–T040). Phase 1 is complete apart from the
 polish tasks (T041–T044).
@@ -48,7 +48,7 @@ re-fills its weights from grams so a kg number is never sent as lb.
 | Collection | Purpose (and why it exists) |
 | --- | --- |
 | `exercises` | The catalogue. Shared rows have no `userId` and are written only by the seeder; private rows have one. One catalogue for everyone instead of a copy per account. |
-| `training_machines` | Specific machines, private to their creator (US2). The dataset only knows generic equipment. |
+| `training_machines` | **Legacy (#14), read-only.** Specific machines people added before #14. Nothing creates, edits or lists them; rows are kept because past `workout_exercises.machineId` point at them. |
 | `training_profiles` | One row per user: `weightUnit`, `defaultRestSeconds`. Upserted on first read, seeding only fields the caller did not send. |
 | `training_plans` | Workout plans (spec 023). An exercise may carry `superset` (spec 025). One document per plan with `workouts[] → exercises[] → targets[]` embedded, because a plan is read and saved whole. Shared (ready-made) plans have no `userId`, a `seedKey` and `seedVersion`, and are written only by `PlanSeeder`; own plans have a `userId`. Workout and exercise `id`s are stable strings (seed keys like `push-pull-legs:push` for shared plans) because sessions point at them. `archived` marks a shared plan dropped from the seed file. |
 | `workout_sessions` | One workout: `day`, `status`, `startedAt`, `endedAt?`, `notes?`, `requestId`, and `plan? {planId, planWorkoutId, planName, workoutName}` when started from a plan (frozen). |
@@ -71,15 +71,18 @@ on `(userId, exerciseId, loggedAt)`.
 
 ## The snapshot rule (second instance, after `meal_entries`)
 
-`workout_exercises.snapshot` holds `{name, equipmentType, measure, primaryMuscles, machineName?,
-machineBrand?}` as they were when the exercise was added. Renaming or correcting a catalogue row
+`workout_exercises.snapshot` holds `{name, equipmentType, measure, primaryMuscles}` as they were
+when the exercise was added (rows from before #14 may also carry `machineName?`/`machineBrand?`). Renaming or correcting a catalogue row
 never rewrites a past workout. The service builds it; DTOs have no field for it
 (`forbidNonWhitelisted` turns one into a 400); `exerciseId` is not editable.
 
-The one part a PATCH may set is the **machine**: `PATCH …/exercises/:weId {machineId}` sets
-`machineId` and copies that machine's current name and brand into the snapshot (`null` clears all
-three). Which machine was used is a correction to what happened, not a refresh of the catalogue,
-so renaming the machine later still leaves past workouts alone. The exercise part is never
+**No machine part since #14.** Before #14 a person could attach one of their private machines
+(`machineId`, with its name and brand copied into the snapshot) and correct it with a PATCH. Now
+an exercise names its equipment ("Butterfly (Machine)"), so adding is one choice and the API has no
+`machineId` field (an old client sending one gets a 400). Rows logged earlier keep `machineId` and
+the frozen machine name as history: shown read-only ("On Chest press · Technogym"), never written,
+and still read by ranks (see Strength ranks). Nothing was migrated, because every history, record,
+statistic, rank and tournament figure was already keyed on `exerciseId`. The exercise part is never
 refreshed. A set's `exerciseId` is copied from its workout exercise at creation, as an immutable
 reference for history queries.
 
@@ -238,6 +241,16 @@ has no job runner. It costs one count query when the stored rows already carry t
 `version`; otherwise it bulk-upserts by `seedKey`. It never writes a row with a `userId` and never
 deletes. **To change the catalogue, edit the file and bump `version`.**
 
+**Names say the equipment (catalogue v3, #14).** With no separate machine choice, the name alone has
+to tell variants apart. The dataset already does for most rows ("Machine Bench Press", "Cable
+Crossover", "Leverage Iso Row"); the 19 machine and cable rows whose names do not are listed in
+`CATALOGUE_EQUIPMENT_SUFFIX` and shown as "Butterfly (Machine)", "Pallof Press (Cable)"
+(`catalogueName`), with the dataset name kept as a search alias. Equipment stays an attribute for
+the picker's filter and label. Renaming moves nothing: rank standards and plans are keyed by
+`seedKey`, and past workouts keep their snapshot name. Look-alike rows such as *Leverage Chest
+Press* (plate-loaded) and *Machine Bench Press* (selectorised) are **not** merged: merging shared
+rows would move people's history and rank standards between exercises.
+
 Mapping (`catalogueMeasure`): cardio → distance and time; stretching or a static hold → time;
 no equipment or "body only" → bodyweight reps; the 16 pulls and dips in
 `BODYWEIGHT_CATALOGUE_IDS` (weighted pull-ups, bar and ring dips, muscle-ups, suspended rows…,
@@ -269,23 +282,18 @@ service then ranks every match in memory (`rankExercises`, capped at 2,000 rows,
 within each tier, exercises the caller logged in the last 90 days first (`recent: true`, from
 `workout_sets.distinct('exerciseId')` on `(userId, exerciseId, loggedAt)`), then by name.
 
-### Own exercises and machines
+### Own exercises
 
-A person can create exercises (private rows in `exercises`) and machines (`training_machines`,
-always private in this phase). Both may carry a photo, copied by `MediaService.copyForTraining`
-from an upload under `training/<userId>/<exercises|machines>/`, exactly as a food's; responses carry
+A person can create exercises (private rows in `exercises`). One may carry a photo, copied by `MediaService.copyForTraining`
+from an upload under `training/<userId>/exercises/`, exactly as a food's; responses carry
 a signed `image.url`, never the key. If the photo cannot be copied on create, the new row is
 removed again so a retry starts clean.
 
 - **Delete** removes the row (and its photo) when no workout refers to it, and **archives** it
-  when one does (`{id, archived: true}`): hidden from search and machine lists, still readable by
+  when one does (`{id, archived: true}`): hidden from search, still readable by
   id for the history that names it.
 - **Measure is locked** once an exercise is in any workout: changing it is a 409
   `MEASURE_LOCKED`, because past sets were validated against the old measure.
-- A machine's `exerciseIds` (≤ 20) must all be readable by its owner. When adding an exercise to
-  a workout, the picker offers machines linked to it first, then the person's other machines of
-  the same equipment type; it skips the question when the person has no machines and the
-  exercise is not machine, cable or Smith machine work.
 
 ## Endpoints
 
@@ -300,16 +308,14 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `GET` | `/exercises/:id/progress?range=3m\|1y\|all&today=` | The statistics view (issue #6): one point per session in the range, up to `today`, thinned to 200; `metrics`, `sessionsInRange`, `totalSessions`, `lastDay`, `trend`, `nextRecord`, `records`. Range defaults to `3m`; anything else is a 400. |
 | `POST` | `/exercises` | A private exercise. |
 | `PATCH`/`DELETE` | `/exercises/:id` | Own rows only (shared → 404). Measure locked once logged (409). Delete archives a logged one. |
-| `GET` | `/machines?exerciseId=` | Own, not archived. |
-| `GET`/`POST`/`PATCH`/`DELETE` | `/machines`, `/machines/:id` | Like exercises: archive when a workout names it. |
 | `POST` | `/sessions` `{requestId, day}` | Returns the open session with `resumed: true` instead of a second one. |
 | `GET` | `/sessions/current` | 204 when none is open. |
 | `GET` | `/sessions?cursor=` | 20 a page, newest day first. |
 | `GET`/`PATCH`/`DELETE` | `/sessions/:id` | Detail includes each exercise's `previous` sets. Delete removes its exercises and sets. |
 | `POST` | `/sessions/:id/finish` `{at?: now\|lastSet}` | 409 `EMPTY_SESSION` when it has no sets. |
-| `POST` | `/sessions/:id/exercises` `{requestId, exerciseId, machineId?}` | Builds the snapshot, with the machine's name and brand. |
+| `POST` | `/sessions/:id/exercises` `{requestId, exerciseId}` | Builds the snapshot. No `machineId` since #14. |
 | `POST` | `/sessions/:id/exercises/order` `{ids}` | The complete id array. |
-| `PATCH`/`DELETE` | `/sessions/:id/exercises/:weId` | `{notes?, machineId?, restSeconds?, superset?}` (`null` clears the machine, rest or superset; spec 025); delete removes its sets. |
+| `PATCH`/`DELETE` | `/sessions/:id/exercises/:weId` | `{notes?, restSeconds?, superset?}` (`null` clears the rest or superset; spec 025); delete removes its sets. |
 | `POST` | `/sessions/:id/exercises/:weId/sets` | Validated against the snapshot's measure. Returns `{set, records}`; bodyweight and assisted sets carry `effectiveLoad` when a weigh-in exists. |
 | `PATCH`/`DELETE` | `/sets/:setId` | `null` clears an optional field. PATCH returns `{set, records}`. |
 | `GET` | `/plans` | `{shared, own}`; shared in seed-file order, archived left out (spec 023). |
@@ -321,7 +327,7 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `DELETE` | `/plans/:id` | Own plans only. Sessions started from it are unchanged. |
 | `POST` | `/sessions` `{…, planId, planWorkoutId}` | Spec 023: both or neither; copies the workout's exercises and targets. |
 | `PATCH` | `/sessions/:id/exercises/:weId` `{skipped}` | Only for an exercise with `planned` (400 otherwise). |
-| `POST` | `/sessions/:id/exercises/:weId/swap` `{requestId, exerciseId, machineId?}` | 409 `HAS_SETS` once a set is logged. |
+| `POST` | `/sessions/:id/exercises/:weId/swap` `{requestId, exerciseId}` | 409 `HAS_SETS` once a set is logged. |
 | `PUT` | `/sessions/:id/rest-alarm` `{at: ISO \| null}` | Spec 025: 204. Sets, moves or cancels the person's rest-over push (in memory). |
 | `GET` | `/exercises/:id/rank?today=` | Issue #5b, needs `trainingRanks` (403 otherwise): `ExerciseRankView`, current and highest-ever strength rank. See Strength ranks. |
 | `GET` | `/summary?today=` | The Home card's figures (`TrainingSummary`, with `weightUnit`, read without creating a profile); also in `GET /api/dashboard`. |
@@ -468,8 +474,8 @@ always next to the name as text.
 **Which sets count.** Working, drop and failure sets (not warm-ups) of 1–12 reps for `e1rm`, any
 reps for `reps`; in finished sessions on or before `today`; logged under the measure the standard
 assumes. A **free-weight** standard does not count sets with a specific machine attached
-(`workout_exercises.machineId`); a **machine or cable** standard does (`machine: true`), since
-that is the exercise. For `e1rm`, a **weigh-in on or before the set's day and at most 90 days
+(`workout_exercises.machineId`, only on workouts from before #14, which stay unranked as they
+were); a **machine or cable** standard does (`machine: true`), since that is the exercise. For `e1rm`, a **weigh-in on or before the set's day and at most 90 days
 older** (`RANK_BODY_WEIGHT_MAX_AGE_DAYS`); without one the set is not ranked and the view asks for a
 weigh-in. A set more than 1.5× where Legend starts is taken as a logging error and left out
 (`excluded.implausible`). Only the exact catalogue rows below (by `seedKey`) are ranked; own
@@ -649,9 +655,9 @@ Plans (ready-made and own plans; a plan's workouts each with Start; Copy on ever
 Delete on own ones, with `plan-editor.tsx` editing a whole plan and reordering by up/down buttons,
 never drag, because the tabs swipe; spec 023), History (past sessions,
 each opening for reading and editing) and Exercises (the catalogue with filters and a detail view,
-where own exercises can be edited or deleted, and My machines). Adding an exercise to a workout is
-two steps: the exercise (with "Create exercise" for what the catalogue lacks), then which machine
-(with "New machine"); a workout exercise's machine can be changed from its card. Sets go through
+where own exercises can be edited or deleted). Adding an exercise to a workout is one choice (#14):
+the exercise, searched and filtered by muscle and equipment, with "Create exercise" for what the
+catalogue lacks. A workout from before #14 shows its machine on the card, read-only. Sets go through
 `lib/training-queue.ts`: each is shown at once as a pending row, sent in order, and retried on
 `online`, focus and every 5 s after a network or server error. The queue is in memory only:
 closing the app with writes still pending loses them. Weight fields use `Input` with
@@ -687,7 +693,7 @@ renders nothing when there is no rest to show, so no empty bar stays pinned.
 
 There is no account deletion feature yet (as for messages and notifications). When one is added,
 it must remove the user's `workout_sessions`, `workout_exercises`, `workout_sets`,
-`training_profiles` (including the rank standards choice), own `training_plans`, private `exercises` and `training_machines`, and the photos those two
+`training_profiles` (including the rank standards choice), own `training_plans`, private `exercises` and the legacy `training_machines`, and the photos those two
 reference in storage. Shared catalogue rows and ready-made plans have no `userId` and stay.
 
 ## Verification
@@ -697,8 +703,12 @@ catalogue mapping), `apps/api/src/training/sessions.service.spec.ts` (one open s
 the race, retries, snapshots, measure validation, finish rules, history paging, cascades, 404s for
 other users) and `catalogue.seeder.spec.ts` (idempotent seed, user rows untouched, version bumps,
 facts-only file) `catalogue.service.spec.ts` (ranking tiers, recent use, filters, aliases,
-privacy, 404 on shared rows, measure lock, delete-or-archive, photo rollback, machines and the
-machine part of the snapshot). Progress: the domain spec (Epley bounds, loads per measure,
+privacy, 404 on shared rows, measure lock, delete-or-archive, photo rollback, no machine part in a
+new snapshot, a pre-#14 machine row kept as it was, renamed rows found by their dataset name).
+`npm run training:machines-audit` is a read-only report of what still refers to a machine, split
+by `legacyMachineCase`: `same_exercise` (a machine or cable exercise; nothing to decide) and
+`free_weight_on_machine` (e.g. a barbell squat logged on a Smith machine; kept unranked as before,
+listed for an explicit decision). Progress: the domain spec (Epley bounds, loads per measure,
 weigh-in on or before, records per kind, warm-ups, fallback after removal, pace) and the
 `ProgressService` block in `sessions.service.spec.ts` (marks in set responses and detail,
 history paging, deletion and lowering moving records, weigh-in loads, other users). The specs run on `fake-model.testing.ts`, an in-memory stand-in for the query

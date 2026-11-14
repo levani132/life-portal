@@ -219,11 +219,11 @@ export class MediaService {
     return this.copyImage(userId, mediaId, `foods/${userId}/${foodId}-`);
   }
 
-  /** A photo of a private exercise or machine (spec 020), copied like a food's. */
+  /** A photo of a private exercise (spec 020), copied like a food's. */
   async copyForTraining(
     userId: string,
     mediaId: string,
-    kind: 'exercises' | 'machines',
+    kind: 'exercises',
     ownerId: string,
   ): Promise<{ key: string; width: number; height: number }> {
     return this.copyImage(userId, mediaId, `training/${userId}/${kind}/${ownerId}-`, false);

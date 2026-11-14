@@ -2,6 +2,15 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-14: Pick an exercise, not a machine
+
+- **Adding an exercise is one tap.** There is no "Which machine?" step any more: an exercise's
+  name says its equipment, and you can filter by equipment in the search.
+- **Machine exercises whose names hid it now say so**, e.g. "Butterfly (Machine)", "Leg
+  Extensions (Machine)", "Pallof Press (Cable)". Searching the old name still finds them.
+- **My machines is gone** from the Exercises tab. Workouts you logged on a machine still show it,
+  and your history, records and ranks are unchanged.
+
 ## 2026-11-13: Sets are ticked off in the row; exercise details in tabs
 
 - **In a workout, each set is one row: its numbers, and a tick at the end.** Planned sets are

@@ -50,7 +50,7 @@ import {
 } from '../../lib/training';
 import { clearQueueError, enqueue, useTrainingQueue } from '../../lib/training-queue';
 import { ExerciseDetail, type ExerciseDetailTab } from './exercise-detail';
-import { ExerciseSearch, MachineChoice } from './exercise-picker';
+import { ExerciseSearch } from './exercise-picker';
 import { SuggestedPlans } from './plan-suggestions';
 import { GROUP_STYLES, exerciseGroup, usePlanStyle } from '../../lib/training-colors';
 import { RestTimer } from './rest-timer';
@@ -150,8 +150,6 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
   const profile = useTrainingProfile();
   const queue = useTrainingQueue();
   const [picking, setPicking] = useState(false);
-  /** Step two of adding: the exercise is chosen, the machine is not yet. */
-  const [chosen, setChosen] = useState<ExerciseListItem | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notes, setNotes] = useState(session.notes ?? '');
@@ -181,15 +179,11 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
   };
 
   const base = `/training/sessions/${session.id}`;
-  const addExercise = async (exercise: ExerciseListItem, machineId: string | null) => {
+  /** One step (#14): the exercise names its equipment, so there is no "which machine?". */
+  const addExercise = async (exercise: ExerciseListItem) => {
     setPicking(false);
-    setChosen(null);
     await run(() =>
-      api.post(`${base}/exercises`, {
-        requestId: crypto.randomUUID(),
-        exerciseId: exercise.id,
-        ...(machineId ? { machineId } : {}),
-      }),
+      api.post(`${base}/exercises`, { requestId: crypto.randomUUID(), exerciseId: exercise.id }),
     );
   };
 
@@ -436,18 +430,11 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
 
       <Modal
         open={picking}
-        onClose={() => {
-          setPicking(false);
-          setChosen(null);
-        }}
-        title={chosen ? 'Which machine?' : 'Add exercise'}
+        onClose={() => setPicking(false)}
+        title="Add exercise"
         wide
       >
-        {chosen ? (
-          <MachineChoice exercise={chosen} onChoose={(machineId) => void addExercise(chosen, machineId)} />
-        ) : (
-          <ExerciseSearch onPick={setChosen} autoFocus />
-        )}
+        <ExerciseSearch onPick={(exercise) => void addExercise(exercise)} autoFocus />
       </Modal>
     </div>
   );
@@ -485,7 +472,6 @@ function ExerciseBlock({
 }) {
   const measure = exercise.snapshot.measure;
   const [editing, setEditing] = useState<WorkoutSet | null>(null);
-  const [choosingMachine, setChoosingMachine] = useState(false);
   /** The exercise's details (how it is done, progress, rank, history), opened on a tab. */
   const [detail, setDetail] = useState<ExerciseDetailTab | null>(null);
   const [swapping, setSwapping] = useState(false);
@@ -494,20 +480,8 @@ function ExerciseBlock({
   const [expanded, setExpanded] = useState(false);
   const unit = useWeightUnit();
   const estimate = exercise.oneRepMax && describeOneRepMax(exercise.oneRepMax, unit);
-  const [machineError, setMachineError] = useState<string | null>(null);
+  /** A workout logged before #14 may name a machine; it is history, shown but never edited. */
   const machineLabel = [exercise.snapshot.machineName, exercise.snapshot.machineBrand].filter(Boolean).join(' · ');
-
-  const setMachine = async (machineId: string | null) => {
-    setChoosingMachine(false);
-    setMachineError(null);
-    if (machineId === (exercise.machineId ?? null)) return;
-    try {
-      await api.patch(`/training/sessions/${session.id}/exercises/${exercise.id}`, { machineId });
-      await revalidateTraining();
-    } catch (caught) {
-      setMachineError(caught instanceof ApiError ? caught.message : 'Could not change the machine.');
-    }
-  };
   const done = exercise.sets.length + pending.length;
   const fromPlan = Boolean(exercise.planned);
   const canSwap = fromPlan && done === 0 && session.status === 'open';
@@ -627,14 +601,7 @@ function ExerciseBlock({
       <>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-1">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-          <button
-            type="button"
-            className="text-xs text-ink-muted underline decoration-dotted underline-offset-2 hover:text-ink"
-            onClick={() => setChoosingMachine(true)}
-            disabled={busy}
-          >
-            {machineLabel ? `Machine: ${machineLabel}` : 'Choose machine'}
-          </button>
+          {machineLabel && <span className="text-xs text-ink-faint">On {machineLabel}</span>}
           <button
             type="button"
             className="inline-flex items-center gap-1 text-xs text-ink-muted underline decoration-dotted underline-offset-2 hover:text-ink"
@@ -677,14 +644,6 @@ function ExerciseBlock({
           </button>
         </div>
       </div>
-      {machineError && <ErrorNote message={machineError} />}
-      <Modal open={choosingMachine} onClose={() => setChoosingMachine(false)} title="Which machine?">
-        <MachineChoice
-          exercise={{ id: exercise.exerciseId, name: exercise.snapshot.name, equipmentType: exercise.snapshot.equipmentType }}
-          currentId={exercise.machineId ?? ''}
-          onChoose={(machineId) => void setMachine(machineId)}
-        />
-      </Modal>
       <Modal open={swapping} onClose={() => setSwapping(false)} title={`Swap ${exercise.snapshot.name}`} wide>
         <ExerciseSearch
           autoFocus

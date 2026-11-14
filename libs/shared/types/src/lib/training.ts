@@ -127,17 +127,6 @@ export interface Exercise extends ExerciseListItem {
   image?: TrainingImage;
 }
 
-/** A specific machine, private to its creator in this phase. */
-export interface Machine {
-  id: string;
-  name: string;
-  brand?: string;
-  equipmentType: EquipmentType;
-  exerciseIds: string[];
-  archived: boolean;
-  image?: TrainingImage;
-}
-
 export interface TrainingProfile {
   weightUnit: WeightUnit;
   defaultRestSeconds: number;
@@ -155,6 +144,10 @@ export interface ExerciseSnapshot {
   equipmentType: EquipmentType;
   measure: Measure;
   primaryMuscles: Muscle[];
+  /**
+   * Only on workouts logged before #14, when a private machine could be attached. History, shown
+   * read-only; nothing writes these any more.
+   */
   machineName?: string;
   machineBrand?: string;
 }
@@ -273,6 +266,7 @@ export interface SessionExercise {
   id: string;
   sessionId: string;
   exerciseId: string;
+  /** Legacy (before #14), read-only: the private machine this was logged on. */
   machineId?: string;
   order: number;
   snapshot: ExerciseSnapshot;
@@ -346,13 +340,11 @@ export interface StartSessionInput {
 export interface SwapSessionExerciseInput {
   requestId: string;
   exerciseId: string;
-  machineId?: string;
 }
 
 export interface AddSessionExerciseInput {
   requestId: string;
   exerciseId: string;
-  machineId?: string;
 }
 
 /** A private exercise. Shared catalogue rows cannot be written. */
@@ -369,17 +361,7 @@ export interface ExerciseInput {
 
 export type ExercisePatch = Partial<ExerciseInput> & { removeImage?: boolean };
 
-export interface MachineInput {
-  name: string;
-  brand?: string;
-  equipmentType: EquipmentType;
-  exerciseIds?: string[];
-  imageMediaId?: string;
-}
-
-export type MachinePatch = Partial<MachineInput> & { removeImage?: boolean };
-
-/** `DELETE` of an exercise or machine: removed, or archived because a workout refers to it. */
+/** `DELETE` of an own exercise: removed, or archived because a workout refers to it. */
 export type TrainingDeleteResult = { id: string; deleted: true } | { id: string; archived: true };
 
 export interface SetInput extends SetValues {

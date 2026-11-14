@@ -74,7 +74,12 @@ ExerciseSchema.index({ searchName: 1 });
 
 // ------------------------------------------------------------------ machines
 
-/** A specific machine, private to its creator in this phase (research R10). */
+/**
+ * A specific machine, private to its creator (research R10). **Legacy since #14:** nothing creates,
+ * edits or lists these any more, because an exercise names its equipment. Rows are kept, never
+ * deleted, because past `workout_exercises.machineId` point at them; account deletion must still
+ * remove them. `npm run training:machines-audit` reports what refers to them.
+ */
 @Schema({ ...baseSchemaOptions, collection: 'training_machines' })
 export class TrainingMachine {
   @Prop({ required: true }) userId!: string;
@@ -229,6 +234,7 @@ class ExerciseSnapshotDoc {
   @Prop({ required: true }) equipmentType!: string;
   @Prop({ required: true }) measure!: string;
   @Prop({ type: [String], default: [] }) primaryMuscles!: string[];
+  /** Legacy (before #14): the machine it was logged on, frozen. Never written any more. */
   @Prop() machineName?: string;
   @Prop() machineBrand?: string;
 }
@@ -246,6 +252,7 @@ export class WorkoutExercise {
   @Prop({ required: true }) requestId!: string;
   @Prop({ required: true, default: 0 }) order!: number;
   @Prop({ required: true }) exerciseId!: string;
+  /** Legacy (before #14): a `training_machines` id. Still read by ranks; never written. */
   @Prop() machineId?: string;
   @Prop({ required: true, type: ExerciseSnapshotDoc }) snapshot!: ExerciseSnapshotDoc;
   @Prop({ trim: true, maxlength: 500 }) notes?: string;

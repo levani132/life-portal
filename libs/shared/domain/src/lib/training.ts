@@ -172,6 +172,42 @@ const EQUIPMENT_MAP: Record<string, EquipmentType> = {
   other: 'other',
 };
 
+/**
+ * Catalogue rows whose dataset name does not say their equipment, and the equipment to add (#14).
+ * Since there is no separate machine choice, the name alone has to tell "Butterfly" (a machine)
+ * from a dumbbell fly. Only machine and cable rows that need it are listed; the dataset name stays
+ * as a search alias. Rank standards and ready-made plans are keyed by `seedKey`, and past workouts
+ * keep their frozen snapshot name, so renaming moves nothing.
+ */
+export const CATALOGUE_EQUIPMENT_SUFFIX: Readonly<Record<string, 'Machine' | 'Cable'>> = {
+  Butterfly: 'Machine',
+  Chair_Squat: 'Machine',
+  Glute_Ham_Raise: 'Machine',
+  Leg_Extensions: 'Machine',
+  Lunge_Sprint: 'Machine',
+  Lying_Leg_Curls: 'Machine',
+  'Lying_T-Bar_Row': 'Machine',
+  Reverse_Hyperextension: 'Machine',
+  Seated_Calf_Raise: 'Machine',
+  Seated_Leg_Curl: 'Machine',
+  'Single-Leg_Leg_Extension': 'Machine',
+  Standing_Calf_Raises: 'Machine',
+  Standing_Leg_Curl: 'Machine',
+  Thigh_Abductor: 'Machine',
+  Thigh_Adductor: 'Machine',
+  Pallof_Press: 'Cable',
+  Pallof_Press_With_Rotation: 'Cable',
+  Pull_Through: 'Cable',
+  Shotgun_Row: 'Cable',
+};
+
+/** A dataset entry's display name and search aliases: "Butterfly (Machine)", alias "Butterfly". */
+export function catalogueName(entry: Pick<CatalogueEntry, 'id' | 'name'>): { name: string; aliases: string[] } {
+  const name = entry.name.trim();
+  const suffix = CATALOGUE_EQUIPMENT_SUFFIX[entry.id];
+  return suffix ? { name: `${name} (${suffix})`, aliases: [name] } : { name, aliases: [] };
+}
+
 export function catalogueEquipment(entry: Pick<CatalogueEntry, 'equipment'>): EquipmentType {
   return (entry.equipment && EQUIPMENT_MAP[entry.equipment]) || 'other';
 }
@@ -226,6 +262,22 @@ export function catalogueMeasure(
   if (entry.equipment === 'body only' || entry.equipment === null) return 'bodyweight_reps';
   if (entry.id && BODYWEIGHT_CATALOGUE_IDS.has(entry.id)) return 'bodyweight_reps';
   return 'weight_reps';
+}
+
+/**
+ * How a workout exercise logged on a private machine before #14 relates to the one-picker model.
+ * `same_exercise`: the exercise is itself machine, cable or Smith work, so the machine only named
+ * the gym's model and the exercise already says everything. `free_weight_on_machine`: a
+ * free-weight or bodyweight exercise with a machine attached (a "Barbell Squat" on a Smith
+ * machine), which is really another movement. Neither is rewritten: the second kind stays
+ * unranked as before, and the audit lists it for an explicit decision.
+ */
+export type LegacyMachineCase = 'same_exercise' | 'free_weight_on_machine';
+
+const MACHINE_EQUIPMENT: ReadonlySet<string> = new Set(['machine', 'cable', 'smith_machine']);
+
+export function legacyMachineCase(equipmentType: string): LegacyMachineCase {
+  return MACHINE_EQUIPMENT.has(equipmentType) ? 'same_exercise' : 'free_weight_on_machine';
 }
 
 export function isEquipmentType(value: string): value is EquipmentType {
