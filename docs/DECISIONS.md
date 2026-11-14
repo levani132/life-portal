@@ -2029,3 +2029,26 @@ other people's posts on the device is S3 and is waiting for the owner.
   within 2 hours.
 - Caching other people's content would need its own explicitly approved decision.
 
+## 2026-11-14 · Offline writes have limits in time, version and account (issue #21)
+
+**Decided:**
+- Device times are kept for 14 days. An older workout start is refused (`CLIENT_TIME_TOO_OLD`);
+  the person may move the whole workout to now after seeing both times, or discard it.
+- A write queued more than 30 days ago is `held` until the person confirms it.
+- Stored offline records carry `schema`. An outbox record this version cannot read is
+  `incompatible`: kept exactly as stored, never sent, discarded only with confirmation. A cache
+  entry of another schema is simply dropped.
+- Per-account unsent counts in localStorage, counts only, to notice eviction and to tell a person
+  that other accounts have work waiting. A write never leaves with another account's token.
+
+**Buys:**
+- History is never silently rewritten, and a stale or foreign write is never sent by surprise.
+- An app update cannot destroy unsent work; a future version can still send it.
+- On a shared device, nobody sees or sends anyone else's work.
+
+**Costs:**
+- A workout synced after more than 14 days needs a decision instead of just arriving.
+- The eviction warning is best effort: iOS clears localStorage with IndexedDB, so it rarely fires
+  there. Silent loss on iOS remains possible.
+- An `incompatible` item sits in the sheet until a newer version sends it or the person discards it.
+

@@ -2,6 +2,16 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-14: Safer offline changes
+
+- **A workout synced more than two weeks late** is no longer saved with a wrong date silently:
+  you see when it was recorded and when it would be saved, and choose.
+- **Changes waiting more than 30 days** wait for you to tap "Send anyway".
+- **App updates never throw away unsent changes**; one the app cannot read stays saved until you
+  discard it.
+- **If your browser deleted unsent changes**, you are told how many, when it can tell (iPhones
+  usually cannot). Other accounts' unsent changes on this device are only counted, never shown.
+
 ## 2026-11-14: Your posts, offline
 
 - **Your own profile and posts open with no connection**, as last seen. Nobody else's posts are

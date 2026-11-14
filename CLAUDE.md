@@ -226,6 +226,11 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   sends it with `post-draft-send.ts`, not as one request. Never store an upload link in it; never
   put a video in it. Uploaded ids are saved with `send(item, save)` so a retry neither uploads
   again nor doubles the post (`requestId`).
+- **Offline writes have limits** (spec 034). A workout start more than 14 days old is 422
+  `CLIENT_TIME_TOO_OLD`; moving it to today is the person's confirmed choice, never automatic. A
+  write queued 30+ days ago is `held`. Outbox records carry `schema`: one this version cannot read
+  is `incompatible` and must stay byte-for-byte in storage (never `put` it). A write is never sent
+  with another account's token (`mayReplayAs`). `lp.offline.meta:*` holds counts only.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for
