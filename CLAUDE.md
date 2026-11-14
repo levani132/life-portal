@@ -220,6 +220,10 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
 - **Social writes are queued too, but no post is kept for reading** (spec 031). Likes, reposts
   and comments go through `lib/social-offline.ts`; keeping other people's posts on the device is
   S3 of #20 and waits for the owner. A like/unlike pair cancels only when `!maybeSent`.
+- **A post draft is one `social.post` outbox item holding its photo blobs** (spec 032). The runtime
+  sends it with `post-draft-send.ts`, not as one request. Never store an upload link in it; never
+  put a video in it. Uploaded ids are saved with `send(item, save)` so a retry neither uploads
+  again nor doubles the post (`requestId`).
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for

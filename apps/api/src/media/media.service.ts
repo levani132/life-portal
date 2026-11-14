@@ -131,7 +131,9 @@ export class MediaService {
     const attached: AttachedMedia[] = [];
     for (const id of ids) {
       const row = byId.get(id);
-      if (!row) throw new BadRequestException('One of the photos can no longer be used.');
+      // Spec 032: coded, so a post draft sent later can upload the photo again.
+      if (!row)
+        throw new BadRequestException({ code: 'MEDIA_GONE', message: 'One of the photos can no longer be used.' });
       const [file, poster] = await Promise.all([
         this.storage.head(row.key),
         row.posterKey ? this.storage.head(row.posterKey) : null,

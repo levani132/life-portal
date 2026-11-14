@@ -79,7 +79,11 @@ export interface OutboxSnapshot {
 
 export interface OutboxOptions {
   store: OutboxStore;
-  send: (item: OutboxItem) => Promise<unknown>;
+  /**
+   * Sends one item. `save` keeps a new body for it under the same id while it is being sent
+   * (spec 032: a post draft records each photo once uploaded, so a retry does not upload it again).
+   */
+  send: (item: OutboxItem, save: (body: unknown) => Promise<void>) => Promise<unknown>;
   now?: () => number;
   random?: () => number;
   setTimer?: (fn: () => void, ms: number) => unknown;
@@ -158,10 +162,15 @@ export class Outbox {
     this.items = await this.options.store.all();
     this.publish();
     for (;;) {
-      const item = this.next();
-      if (!item) break;
+      const next = this.next();
+      if (!next) break;
+      let item = next;
+      const save = async (body: unknown) => {
+        await this.update(item, { body });
+        item = { ...item, body };
+      };
       try {
-        const result = await this.options.send(item);
+        const result = await this.options.send(item, save);
         await this.options.store.remove(item.id);
         this.items = this.items.filter((other) => other.id !== item.id);
         this.offline = false;

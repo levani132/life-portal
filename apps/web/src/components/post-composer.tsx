@@ -26,11 +26,14 @@ import {
   type PostSelection,
 } from '@life-portal/shared-types';
 import { clampAspect, postHasContent, publicationMacros } from '@life-portal/shared-domain';
-import { api } from '../lib/api';
+import { api, NetworkError } from '../lib/api';
 import { revalidate, useApi } from '../lib/hooks';
 import { mealContextNow } from '../lib/local-day';
 import { prepareImage, uploadMedia, type PreparedMedia } from '../lib/media';
 import { splitPostDraft } from '../lib/post-draft';
+import { draftProblem } from '../lib/offline/post-drafts';
+import { keepPostDraft } from '../lib/post-drafts';
+import { useOffline } from '../lib/social-offline';
 import { CameraView } from './post-camera';
 import { PostFoodPicker, type PickedFood } from './post-food-picker';
 import {
@@ -61,7 +64,8 @@ const SLOT_LABELS: Record<MealSlot, string> = {
 interface Attachment {
   localId: string;
   media: PreparedMedia;
-  status: 'uploading' | 'done' | 'failed';
+  /** `waiting`: no connection; it is uploaded when the post is published (spec 032). */
+  status: 'uploading' | 'done' | 'failed' | 'waiting';
   progress: number;
   id?: string;
   error?: string;
@@ -111,6 +115,9 @@ export function PostComposer({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [requestId] = useState(() => crypto.randomUUID());
+  // Spec 032: the last request got no answer, so a post is kept on the device instead.
+  const [noConnection, setNoConnection] = useState(false);
+  const deviceOffline = useOffline();
   const titleInput = useRef<HTMLTextAreaElement>(null);
   const captionInput = useRef<HTMLTextAreaElement>(null);
   const library = useRef<HTMLInputElement>(null);
@@ -138,8 +145,11 @@ export function PostComposer({
         if (active) setPreview(result);
       })
       .catch((e: unknown) => {
-        if (active)
-          setPreviewError(e instanceof Error ? e.message : 'Could not prepare this food.');
+        if (!active) return;
+        if (e instanceof NetworkError) {
+          setNoConnection(true);
+          setPreviewError('No connection. Its numbers are taken when the post is published.');
+        } else setPreviewError(e instanceof Error ? e.message : 'Could not prepare this food.');
       });
     return () => {
       active = false;
@@ -175,6 +185,11 @@ export function PostComposer({
       .then((id) => update(item.localId, { status: 'done', progress: 1, id }))
       .catch((e: unknown) => {
         if ((e as Error).name === 'AbortError') return;
+        if (e instanceof NetworkError) {
+          setNoConnection(true);
+          update(item.localId, { status: 'waiting', progress: 0 });
+          return;
+        }
         update(item.localId, {
           status: 'failed',
           error: e instanceof Error ? e.message : 'Upload failed.',
@@ -187,15 +202,16 @@ export function PostComposer({
         setError(`A post can have up to ${MAX_POST_MEDIA} photos and videos.`);
         return;
       }
+      const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
       const item: Attachment = {
         localId: crypto.randomUUID(),
         media,
-        status: 'uploading',
+        status: offline ? 'waiting' : 'uploading',
         progress: 0,
         abort: new AbortController(),
       };
       setAttachments((items) => [...items, item]);
-      startUpload(item);
+      if (!offline) startUpload(item);
       // A full-screen camera steps back so the capture is visible in the post.
       setCamera((state) => (state === 'full' ? 'half' : state));
     },
@@ -243,6 +259,34 @@ export function PostComposer({
     hasContent && uploadsSettled && (!food || !!preview) && draft.caption.length <= 1000 && !pending;
   const mediaIds = () => attachments.map((item) => item.id!).filter(Boolean);
 
+  // Spec 032: with no connection the post is kept on this device and published later.
+  const keepForLater = deviceOffline || noConnection || attachments.some((item) => item.status === 'waiting');
+  const keepProblem = draftProblem(attachments.map((item) => ({ kind: item.media.kind, bytes: item.media.blob.size })));
+  const canKeep =
+    hasContent && !newFood && !keepProblem && draft.caption.length <= 1000 && !pending && !uploading;
+
+  async function keepDraft() {
+    if (!canKeep) return;
+    setPending(true);
+    setError(null);
+    try {
+      await keepPostDraft({
+        requestId,
+        title: draft.title,
+        caption: draft.caption,
+        audience,
+        ...(food ? { source: food.source } : {}),
+        // Photos already uploaded keep their ids, so a post that did reach the server is not doubled.
+        photos: attachments.map((item) => ({ ...item.media, ...(item.status === 'done' && item.id ? { mediaId: item.id } : {}) })),
+      });
+      done('/');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not keep this post.');
+    } finally {
+      setPending(false);
+    }
+  }
+
   async function createPost(postSource?: PostSelection, hash?: string) {
     let previewHash = hash;
     if (postSource && !previewHash)
@@ -268,6 +312,11 @@ export function PostComposer({
       const post = await createPost(food && preview ? food.source : undefined, preview?.previewHash);
       done(`/posts/${post.id}`);
     } catch (e) {
+      if (e instanceof NetworkError) {
+        setNoConnection(true);
+        setError('No connection. Tap “Post later” to keep it on this device and post it when you’re back online.');
+        return;
+      }
       setError(e instanceof Error ? e.message : 'Could not publish.');
     } finally {
       setPending(false);
@@ -413,14 +462,25 @@ export function PostComposer({
           {newFood ? (
             <span className="h-10 w-16" />
           ) : (
-            <button
-              type="button"
-              className="rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
-              disabled={!ready}
-              onClick={() => void publish()}
-            >
-              {pending ? 'Sharing…' : uploading ? 'Uploading…' : 'Share'}
-            </button>
+            keepForLater ? (
+              <button
+                type="button"
+                className="rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+                disabled={!canKeep}
+                onClick={() => void keepDraft()}
+              >
+                {pending ? 'Saving…' : 'Post later'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+                disabled={!ready}
+                onClick={() => void publish()}
+              >
+                {pending ? 'Sharing…' : uploading ? 'Uploading…' : 'Share'}
+              </button>
+            )
           )}
         </header>
 
@@ -429,6 +489,14 @@ export function PostComposer({
             <div className="px-4 pt-3">
               <ErrorNote message={error} />
             </div>
+          )}
+          {keepForLater && !error && (
+            <p className="px-4 pt-3 text-xs text-amber-300">
+              {newFood
+                ? 'A new food needs a connection to save. Pick one from Food to post it later.'
+                : (keepProblem ??
+                  'No connection. “Post later” keeps it on this device and posts it when you’re back online. Nobody sees it before then.')}
+            </p>
           )}
           <fieldset disabled={pending} className="space-y-1 px-4 pt-3">
             {!captionOnly && (
@@ -792,7 +860,12 @@ function AttachmentTile({
           0:{String(Math.round((item.media.durationMs ?? 0) / 1000)).padStart(2, '0')}
         </span>
       )}
-      {item.status !== 'done' && (
+      {item.status === 'waiting' && (
+        <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+          Uploads later
+        </span>
+      )}
+      {item.status !== 'done' && item.status !== 'waiting' && (
         <span className="absolute inset-0 flex items-center justify-center bg-black/35">
           {item.status === 'uploading' ? (
             <ProgressRing value={item.progress} />

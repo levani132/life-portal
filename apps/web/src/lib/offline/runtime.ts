@@ -6,6 +6,8 @@ import { OfflineCache } from './cache';
 import { deleteIdb, idbAvailable, openIdb } from './idb-store';
 import { memoryDb } from './memory-store';
 import { Outbox, type EnqueueInput, type OutboxSnapshot } from './outbox';
+import { sendPostDraft } from './post-draft-send';
+import { POST_DRAFT_KIND } from './post-drafts';
 import type { OfflineDb, OutboxItem } from './types';
 
 /**
@@ -40,8 +42,10 @@ function notify() {
   listeners.forEach((listener) => listener());
 }
 
-const send = (item: OutboxItem) =>
-  request(item.path, { method: item.method, body: item.body, headers: { 'Idempotency-Key': item.id } });
+const send = (item: OutboxItem, save: (body: unknown) => Promise<void>) =>
+  item.kind === POST_DRAFT_KIND
+    ? sendPostDraft(item, save)
+    : request(item.path, { method: item.method, body: item.body, headers: { 'Idempotency-Key': item.id } });
 
 function crossTabLock(userId: string) {
   return <T,>(fn: () => Promise<T>): Promise<T> => {

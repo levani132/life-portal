@@ -130,6 +130,24 @@ Module-level request ids (training's `requestId`) remain; the header is the gene
   quietly; a comment stays in the sync sheet with its text. No For You metrics are recorded
   offline. No post is kept for reading: S3 waits for the owner's privacy decision.
 
+## Post drafts (spec 032, issue #20 S2)
+
+- **One outbox item per draft.** A post written with no connection is one outbox item, kind
+  `social.post`, holding its photos as blobs. Photos only (already re-encoded, so no GPS): at most
+  4 and 50 MB per draft. A video, or a new food typed in the composer, needs a connection.
+- **Its own sender.** The runtime sends a `social.post` item with `offline/post-draft-send.ts`
+  instead of one request. That sender:
+  1. asks for upload links now (they are never stored);
+  2. uploads each photo, saving its `mediaId` onto the item through `send(item, save)`;
+  3. previews the food;
+  4. creates the post with the draft's `requestId`, so a repeat returns the same post.
+  If the server no longer has a photo (`MEDIA_GONE`), the sender uploads it again, once.
+- **Meals first.** A draft of something eaten waits for every meal write still on the device.
+  Discarding that meal discards the draft too, since it could not be published.
+- **Visible states.** `components/post-drafts.tsx` shows each draft above the feed: a draft,
+  being posted (with progress), not accepted (Retry, Discard), or posted (with a link). A draft
+  is the person's own content, which is the only thing S3's interim rule allows on the device.
+
 ## Edits from two devices (spec 030, issue #19)
 
 - **Row versions.** Sets, workout exercises, workouts, meals and weigh-ins carry `version` (missing

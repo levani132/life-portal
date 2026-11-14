@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-14: Post without signal
+
+- **Write a post with no connection and tap "Post later".** It is kept on this phone and posted
+  when you are back online. Above your feed it says whether it is a draft, being posted, not
+  accepted, or posted.
+- **Up to 4 photos and 50 MB.** Videos and new foods still need a connection.
+- **A meal you logged offline is saved first**, so the post shows its real numbers.
+
 ## 2026-11-14: Like and comment without signal
 
 - **Likes, reposts and comments work with no connection** on posts already on screen. They show

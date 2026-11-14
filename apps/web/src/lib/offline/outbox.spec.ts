@@ -285,4 +285,32 @@ describe('OfflineCache (spec 027)', () => {
     await f.advance(60_000);
     expect(f.outbox.getSnapshot().items[0].maybeSent).toBe(true);
   });
+  it('keeps what a send saved, even when that send then fails (spec 032)', async () => {
+    const db = memoryDb();
+    const bodies: unknown[] = [];
+    let attempt = 0;
+    const outbox = new Outbox({
+      store: db.outbox,
+      now: () => 0,
+      random: () => 1,
+      setTimer: () => undefined,
+      send: async (item, save) => {
+        bodies.push(item.body);
+        attempt += 1;
+        if (attempt === 1) {
+          await save({ photos: ['uploaded'] });
+          throw new NetworkError();
+        }
+        return { ok: true };
+      },
+    });
+    await outbox.enqueue({ id: 'draft', kind: 'social.post', method: 'POST', path: '/posts', body: { photos: [] } });
+    await outbox.drain();
+    expect(outbox.getSnapshot().items[0]).toMatchObject({ body: { photos: ['uploaded'] }, attempts: 1, maybeSent: true });
+    expect([...db.outboxRows.values()][0].body).toEqual({ photos: ['uploaded'] });
+    await outbox.retry('draft');
+    await outbox.drain();
+    expect(bodies).toEqual([{ photos: [] }, { photos: ['uploaded'] }]);
+    expect(db.outboxRows.size).toBe(0);
+  });
 });

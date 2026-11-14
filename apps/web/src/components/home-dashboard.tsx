@@ -1,5 +1,6 @@
 'use client';
 
+import { PostDrafts } from './post-drafts';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -163,6 +164,8 @@ export function Dashboard() {
         </WidgetCarousel>
       )}
 
+      {/* Spec 032: posts written offline, before they are published. */}
+      {canReadPosts && <PostDrafts />}
       {canReadPosts && portal.data?.access.forYou && <HomeFeed />}
       {canReadPosts && !portal.data?.access.forYou && (
         <section

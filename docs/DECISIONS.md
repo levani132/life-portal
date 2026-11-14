@@ -1984,3 +1984,28 @@ ends in the same state, at the cost of the author possibly seeing a notification
 
 **Why no posts are kept.** Interactions need a post on screen, which is enough for S1. Keeping
 other people's posts on the device is S3 and is waiting for the owner.
+
+## 2026-11-14 · A post draft is one outbox item that holds its photos (issue #20 S2)
+
+**Decided:**
+- A post written with no connection is kept as a single outbox item (`social.post`) whose body
+  holds the photos themselves. The runtime sends it with its own sender, which performs the
+  several requests a post needs.
+- The outbox's `send` gained `save(body)`, so each uploaded photo's id is written onto the item as
+  soon as it lands.
+- Upload links are asked for at publish time and never stored.
+- `POST /posts` relies on the draft's `requestId` rather than an Idempotency-Key, because the
+  body may legitimately change: a photo the server lost (`MEDIA_GONE`) is uploaded again, once.
+
+**Buys:**
+- Drafts get the outbox's ordering, retries, auth handling, the sync sheet and `dependsOn` for
+  free. A draft of a meal logged offline simply waits for that meal.
+- A retry never uploads a photo twice, and never creates a second post: `requestId` makes a
+  repeat return the same post, and the composer copies the ids of photos already uploaded.
+
+**Costs:**
+- Up to 50 MB sits in the outbox while it waits.
+- A large upload holds back the writes queued after it.
+- Discarding the meal a draft depends on discards the draft too.
+- Limits follow the owner's answer on #20: photos only, at most 4 per draft, 50 MB in all.
+

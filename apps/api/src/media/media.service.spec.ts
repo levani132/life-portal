@@ -71,6 +71,10 @@ describe('MediaService', () => {
     const f = fixture();
     f.media.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
     await expect(f.service.reserve('owner', 'request', [f.id])).rejects.toThrow(/no longer be used/);
+    // Spec 032: coded, so a post draft sent later knows to upload its photo again.
+    await expect(f.service.reserve('owner', 'request', [f.id])).rejects.toMatchObject({
+      response: { code: 'MEDIA_GONE' },
+    });
   });
   it('rate limits upload links and validates limits before signing', async () => {
     const f = fixture();

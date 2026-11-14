@@ -8,6 +8,8 @@ import type { OutboxItem } from '../lib/offline/types';
 import { conflictOf, combinedText, diffFields, type Conflict } from '../lib/offline/conflicts';
 import { canLogAgain, keepMine, keepTheirs, logAgain, saveCombined, type Undo } from '../lib/sync-conflicts';
 import { refusedCommentText } from '../lib/social-offline';
+// Spec 032: registers the "posted" note for drafts published while any page is open.
+import '../lib/post-drafts';
 import { finishOtherAndRetry, isSessionConflict } from '../lib/training-offline';
 import { Modal, Textarea } from './ui';
 
