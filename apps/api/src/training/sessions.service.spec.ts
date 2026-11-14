@@ -708,10 +708,26 @@ describe('SessionsService: work done offline (spec 028)', () => {
     expect(finished.endedAt).toBe(new Date(min(20)).toISOString());
   });
 
-  it('clamps a start to the last 48 hours', () => {
+  it('clamps a start into the window and never into the future', () => {
     const now = T0;
     expect(clientTime(new Date(now - MAX_CLIENT_BACKDATE_MS - 1).toISOString(), now - MAX_CLIENT_BACKDATE_MS, now).getTime()).toBe(now - MAX_CLIENT_BACKDATE_MS);
     expect(clientTime('nonsense', 0, now).getTime()).toBe(now);
+  });
+
+  it('keeps a start recorded 13 days ago as it is, and refuses one 15 days back without moving it (spec 034)', async () => {
+    const f = fixture();
+    const day = 24 * 60 * 60 * 1000;
+    const now = T0 + 30 * day;
+    expect(MAX_CLIENT_BACKDATE_MS).toBe(14 * day);
+    const thirteen = new Date(now - 13 * day).toISOString();
+    const kept = await f.service.start(ME, { requestId: randomUUID(), day: '2026-11-01', id: new Types.ObjectId().toHexString(), startedAt: thirteen }, now);
+    expect(kept.startedAt).toBe(thirteen);
+    await f.service.remove(ME, kept.id);
+    const fifteen = new Date(now - 15 * day).toISOString();
+    await expect(
+      f.service.start(ME, { requestId: randomUUID(), day: '2026-10-30', id: new Types.ObjectId().toHexString(), startedAt: fifteen }, now),
+    ).rejects.toMatchObject({ response: { code: 'CLIENT_TIME_TOO_OLD', recordedAt: fifteen } });
+    expect(await f.sessions.countDocuments({ userId: ME })).toBe(0);
   });
 
   it('derives a plan start’s rows from its requestId, the same value the browser computes', () => {

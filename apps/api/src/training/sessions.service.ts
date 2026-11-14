@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
   Optional,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { assertFreeId, withId } from '../common/client-id';
 import { InjectModel } from '@nestjs/mongoose';
@@ -49,8 +50,23 @@ const PAGE_SIZE = 20;
 const isDuplicateKey = (error: unknown) =>
   (error as { code?: number } | null)?.code === 11000;
 
-/** Spec 028: how far back a client-reported start may reach (a workout logged offline). */
-export const MAX_CLIENT_BACKDATE_MS = 48 * 60 * 60 * 1000;
+/**
+ * Spec 028, widened by spec 034 (issue #21): how far back a workout recorded offline may start.
+ * Within it the device's time is kept as recorded; an older one is refused, never moved.
+ */
+export const MAX_CLIENT_BACKDATE_MS = 14 * 24 * 60 * 60 * 1000;
+
+/**
+ * Spec 034: a start older than the window. Refused with the time as recorded, so the device can
+ * show it and the person can choose to save the workout with today's date instead.
+ */
+export function clientTimeTooOld(recordedAt: string) {
+  return new UnprocessableEntityException({
+    code: 'CLIENT_TIME_TOO_OLD',
+    message: 'This workout was recorded more than 14 days ago.',
+    recordedAt,
+  });
+}
 
 /**
  * Spec 028: a time the client reports (a workout or set done offline, sent later), clamped so it
@@ -128,6 +144,9 @@ export class SessionsService {
       await this.finishPlanStart(userId, retried);
       return this.detailOf(userId, retried, nowMs);
     }
+    const recorded = input.startedAt ? Date.parse(input.startedAt) : NaN;
+    if (Number.isFinite(recorded) && recorded < nowMs - MAX_CLIENT_BACKDATE_MS)
+      throw clientTimeTooOld(input.startedAt as string);
     const open = await this.sessions.findOne({ userId, status: 'open' }).lean<SessionRow>();
     if (open && input.id) throw this.sessionConflict(open);
     if (open) return { ...(await this.detailOf(userId, open, nowMs)), resumed: true };

@@ -130,6 +130,16 @@ export async function finishOtherAndRetry(item: OutboxItem): Promise<void> {
   await revalidateTraining();
 }
 
+/**
+ * Spec 034: saves a workout refused as recorded too long ago with the times the person confirmed
+ * (`movedToToday`). Each write is replaced in place, dependents before the start, so none of
+ * them can be sent with the old times.
+ */
+export async function saveMovedWorkout(writes: readonly { id: string; body: unknown; meta: unknown }[]): Promise<void> {
+  for (const write of writes) await outbox.replace(write.id, { id: crypto.randomUUID(), body: write.body, meta: write.meta });
+  await revalidateTraining();
+}
+
 /** Gives up the training writes the server refused. Explicit: the person pressed Discard. */
 export async function discardRefusedTraining(): Promise<void> {
   for (const item of outboxItems()) {

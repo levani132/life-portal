@@ -3,14 +3,16 @@
 import clsx from 'clsx';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { outbox, useOutbox } from '../lib/offline/runtime';
+import { outbox, outboxItems, useOutbox } from '../lib/offline/runtime';
 import type { OutboxItem } from '../lib/offline/types';
 import { conflictOf, combinedText, diffFields, type Conflict } from '../lib/offline/conflicts';
 import { canLogAgain, keepMine, keepTheirs, logAgain, saveCombined, type Undo } from '../lib/sync-conflicts';
 import { refusedCommentText } from '../lib/social-offline';
 // Spec 032: registers the "posted" note for drafts published while any page is open.
 import '../lib/post-drafts';
-import { finishOtherAndRetry, isSessionConflict } from '../lib/training-offline';
+import { finishOtherAndRetry, isSessionConflict, saveMovedWorkout } from '../lib/training-offline';
+import { useWorkoutDay } from '../lib/training';
+import { movedToToday, tooOldStart } from '../lib/offline/too-old';
 import { Modal, Textarea } from './ui';
 
 /**
@@ -149,6 +151,7 @@ function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: st
   const stuck = item.state === 'error' || item.state === 'conflict';
   const clash = conflictOf(item);
   const comment = refusedCommentText(item);
+  const tooOld = tooOldStart(item);
   return (
     <li className="rounded-lg border border-border p-3 text-sm">
       <div className="flex items-start justify-between gap-2">
@@ -168,7 +171,7 @@ function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: st
         </div>
         <div className="flex shrink-0 gap-1">
           {/* Sending a clashing edit again would only clash again: the person chooses below. */}
-          {!clash && (
+          {!clash && !tooOld && (
             <button
               type="button"
               className="btn-ghost px-2 py-1 text-xs"
@@ -202,6 +205,7 @@ function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: st
         </div>
       )}
       {clash && <ClashChoice item={item} clash={clash} onUndo={onUndo} />}
+      {tooOld && <TooOldChoice item={item} recordedAt={tooOld.recordedAt} />}
       {/* Spec 031: a comment on a post that is gone keeps its text here, to copy before discarding. */}
       {comment && (
         <div className="mt-2 space-y-1 rounded-md bg-amber-500/10 p-2 text-xs">
@@ -231,6 +235,64 @@ function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: st
         </div>
       )}
     </li>
+  );
+}
+
+const when = (iso: string) =>
+  new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+
+/**
+ * Spec 034: a workout recorded more than 14 days ago. The server keeps device times only within
+ * 14 days and never moves one silently, so the person sees the time as recorded and the one it
+ * would be saved with, and confirms. Its sets and finish move with it, keeping their spacing.
+ */
+function TooOldChoice({ item, recordedAt }: { item: OutboxItem; recordedAt: string }) {
+  const workoutDay = useWorkoutDay();
+  const [proposal, setProposal] = useState<ReturnType<typeof movedToToday>>();
+  const [saving, setSaving] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const propose = () => setProposal(movedToToday(outboxItems(), item, new Date().toISOString(), workoutDay()));
+  const save = async () => {
+    if (!proposal) return;
+    setSaving(true);
+    setProblem(null);
+    try {
+      await saveMovedWorkout(proposal.writes);
+    } catch (caught) {
+      setProblem(caught instanceof Error ? caught.message : 'Could not save the workout.');
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="mt-2 space-y-2 rounded-md bg-amber-500/10 p-2 text-xs">
+      <p>
+        This workout was recorded on <strong>{when(recordedAt)}</strong>, more than 14 days ago, so it can’t be saved
+        with that date. You can save it with today’s date instead, or discard it.
+      </p>
+      {proposal ? (
+        <div className="space-y-2 rounded border border-border bg-surface p-2">
+          <p>Recorded: {when(recordedAt)}</p>
+          <p>
+            Will be saved as: <strong>{when(proposal.startedAt)}</strong>. Its sets keep their spacing, so it ends now.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button type="button" className="btn-ghost px-2 py-1 text-xs" disabled={saving} onClick={() => setProposal(undefined)}>
+              Cancel
+            </button>
+            <button type="button" className="btn-primary px-2 py-1 text-xs" disabled={saving} onClick={() => void save()}>
+              {saving ? 'Saving…' : 'Save with today’s date'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex justify-end">
+          <button type="button" className="btn-primary px-2 py-1 text-xs" onClick={propose}>
+            Save with today’s date…
+          </button>
+        </div>
+      )}
+      {problem && <p className="text-rose-300">{problem}</p>}
+    </div>
   );
 }
 
