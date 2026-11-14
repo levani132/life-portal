@@ -227,6 +227,8 @@ export class WorkoutSession {
   @Prop({ required: true, type: Date }) startedAt!: Date;
   @Prop({ type: Date }) endedAt?: Date;
   @Prop({ trim: true, maxlength: 2000 }) notes?: string;
+  /** Spec 030: edits so far (missing = 0), for stale-edit checks (`common/row-version.ts`). */
+  @Prop({ type: Number, min: 0 }) version?: number;
   /**
    * Spec 023: the plan workout it was started from, with the names as they were then. Frozen:
    * renaming or deleting the plan never changes a past or open workout.
@@ -278,6 +280,8 @@ export class WorkoutExercise {
   @Prop() machineId?: string;
   @Prop({ required: true, type: ExerciseSnapshotDoc }) snapshot!: ExerciseSnapshotDoc;
   @Prop({ trim: true, maxlength: 500 }) notes?: string;
+  /** Spec 030: edits so far (missing = 0), for stale-edit checks (`common/row-version.ts`). */
+  @Prop({ type: Number, min: 0 }) version?: number;
   /**
    * Spec 023: the plan's targets for this exercise, copied at start: the snapshot rule applied to
    * suggestions. Built by the server, never accepted from a request, never refreshed.
@@ -320,6 +324,8 @@ export class WorkoutSet {
   @Prop({ min: 1, max: 10 }) rpe?: number;
   @Prop(optionalInt(0, 3600)) restSeconds?: number;
   @Prop({ required: true, type: Date }) loggedAt!: Date;
+  /** Spec 030: edits so far (missing = 0), for stale-edit checks (`common/row-version.ts`). */
+  @Prop({ type: Number, min: 0 }) version?: number;
 }
 
 export const WorkoutSetSchema = SchemaFactory.createForClass(WorkoutSet);

@@ -154,6 +154,8 @@ export class MealEntry {
   /** Set when the entry came from the cheat-day queue. */
   @Prop({ index: true }) cheatMealId?: string;
   @Prop({ maxlength: 300 }) note?: string;
+  /** Spec 030: edits so far (missing = 0), for stale-edit checks (`common/row-version.ts`). */
+  @Prop({ type: Number, min: 0 }) version?: number;
 }
 
 export const MealEntrySchema = SchemaFactory.createForClass(MealEntry);
@@ -269,6 +271,8 @@ export class WeighIn {
   /** Decimal, e.g. `0.18`. The one input that switches the basal-rate equation. */
   @Prop({ min: 0.03, max: 0.6 }) bodyFatPct?: number;
   @Prop({ maxlength: 300 }) note?: string;
+  /** Spec 030: edits so far (missing = 0), for stale-edit checks (`common/row-version.ts`). */
+  @Prop({ type: Number, min: 0 }) version?: number;
 }
 
 export const WeighInSchema = SchemaFactory.createForClass(WeighIn);

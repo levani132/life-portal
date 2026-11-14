@@ -19,9 +19,25 @@ export type LocalEntry = Omit<MealEntry, 'totals' | 'servings' | 'userId' | 'cre
 export type NutritionWriteMeta =
   | { op: 'entry.add'; entry: LocalEntry }
   | { op: 'meal.log'; mealId: string; entries: LocalEntry[] }
-  | { op: 'entry.patch'; entryId: string; patch: { day?: string; slot?: MealSlot; amount?: number; note?: string } }
+  | {
+      op: 'entry.patch';
+      entryId: string;
+      patch: { day?: string; slot?: MealSlot; amount?: number; note?: string };
+      /** Spec 030: the version the correction was made against. */
+      baseVersion?: number;
+      /** Spec 030: the meal as it was, to log it again if another device deleted it. */
+      was?: LocalEntry;
+    }
   | { op: 'entry.remove'; entryId: string }
-  | { op: 'weighin.put'; day: string; weightGrams: number; bodyFatPct?: number; note?: string }
+  | {
+      op: 'weighin.put';
+      day: string;
+      weightGrams: number;
+      bodyFatPct?: number;
+      note?: string;
+      /** Spec 030: the day's weigh-in version this device saw (0: none). */
+      baseVersion?: number;
+    }
   | { op: 'weighin.remove'; weighInId: string; day: string };
 
 /** A meal on screen. `unsaved` while it (or a change to it) has not reached the server. */
@@ -73,6 +89,7 @@ function applyEntries(base: MealEntry[], writes: readonly OverlayWrite[]): Shown
         if (meta.patch.slot) next.slot = meta.patch.slot;
         if (meta.patch.amount != null) next.amount = meta.patch.amount;
         if (meta.patch.note != null) next.note = meta.patch.note;
+        if (meta.baseVersion !== undefined) next.version = Math.max(current.version ?? 0, meta.baseVersion + 1);
         // The snapshot is never refreshed by a correction, here or on the server.
         rows.set(meta.entryId, shown(next, unsaved || Boolean(current.unsaved)));
         break;
@@ -98,6 +115,7 @@ function applyWeighIns(base: WeighIn[], writes: readonly OverlayWrite[]): WeighI
         weightGrams: meta.weightGrams,
         ...(meta.bodyFatPct != null ? { bodyFatPct: meta.bodyFatPct } : {}),
         ...(meta.note != null ? { note: meta.note } : {}),
+        ...(meta.baseVersion !== undefined ? { version: Math.max(existing?.version ?? 0, meta.baseVersion + 1) } : {}),
       } as WeighIn);
       if (meta.bodyFatPct == null) delete (byDay.get(meta.day) as Partial<WeighIn>).bodyFatPct;
     }

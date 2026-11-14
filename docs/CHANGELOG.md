@@ -2,6 +2,16 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-14: Edits from two devices are never lost
+
+- **If you change the same set, note, meal or weigh-in on two devices**, the second change is no
+  longer saved over the first. The sync sheet shows yours next to the saved one and you choose:
+  keep yours, keep theirs, or for notes combine both (you see and edit the result first).
+- **A weigh-in recorded on another device for the same day is never overwritten** without asking,
+  and the choice can be undone.
+- **Something deleted on another device** while you changed it here can be discarded or added
+  again with your change. Deleting something that is already gone just works.
+
 ## 2026-11-14: Log food without signal
 
 - **Food works offline** for days you have opened in the last two weeks, and for a new day too.

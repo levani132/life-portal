@@ -37,7 +37,7 @@ function matchesValue(value: unknown, condition: unknown): boolean {
   if (condition && typeof condition === 'object' && !(condition instanceof Date) && !(condition instanceof Types.ObjectId) && !Array.isArray(condition)) {
     return Object.entries(condition as Record<string, unknown>).every(([op, arg]) => {
       switch (op) {
-        case '$in': return (arg as unknown[]).some((item) => same(value, item));
+        case '$in': return (arg as unknown[]).some((item) => (item === null ? value == null : same(value, item)));
         case '$ne': return !same(value, arg);
         case '$lt': return value !== undefined && compare(value, arg) < 0;
         case '$gte': return value !== undefined && compare(value, arg) >= 0;

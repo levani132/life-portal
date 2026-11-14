@@ -1933,3 +1933,35 @@ history, which is what the rule exists to prevent.
   `lib/offline/settling.ts`; both modules use it.
 
 See `specs/029-offline-food/`.
+
+## 2026-11-14 · Edits carry the version they were made against; nothing is merged on its own (issue #19)
+
+**Context.** Since #17/#18 edits can be queued on several devices and arrive hours apart. Every
+`PATCH` was last-write-wins: correcting a set on the phone and on the laptop kept whichever
+arrived last, silently.
+
+**Decision.** A counter `version` on every row a device can edit (sets, workout exercises,
+workouts, meals, weigh-ins), bumped with `$inc` by each edit, and an optional `baseVersion` on
+each edit. A mismatch is 409 `STALE_EDIT` with the current row; the update is also filtered on
+the version, so a race between the check and the write is caught. The owner chose the policies:
+numbers are mine-or-theirs by explicit choice; a note may be combined only through a preview the
+person edits and confirms; a weigh-in is never overwritten without a choice (and the choice can
+be undone); deleting what is already gone succeeds; editing a deleted row is `ROW_DELETED`,
+recoverable by discarding or adding it again.
+
+**Why a counter, not `updatedAt`.** Clocks differ across devices and Mongo's `updatedAt` moves on
+bookkeeping writes. A counter only moves on edits, and only the server increments it.
+
+**Why bookkeeping does not bump it.** Reordering exercises, finishing a workout or recording a
+plan update cannot clash with a note or a rest time; bumping on them would turn harmless
+concurrent actions into conflicts the person has to resolve.
+
+**Why unchecked edits still work.** The MCP tools and Shortcuts edit without a version, as do
+writes queued by an older build. They keep last-write-wins, which is what they had.
+
+**Why "keep mine" gets a new outbox id.** The idempotency fingerprint covers the body; the same
+key with a new `baseVersion` would be `IDEMPOTENCY_KEY_REUSED`. A resolved write is a new request.
+
+**Why deletes no longer 404.** Two devices deleting the same row is not an error the person can
+do anything about. The delete still only matches the caller's own rows, so answering "deleted" for
+an id that is someone else's reveals nothing and changes nothing.

@@ -118,6 +118,25 @@ Module-level request ids (training's `requestId`) remain; the header is the gene
   sending a delete.
 - `useAction` reports a `NetworkError` as "This needs a connection" for every online-only action.
 
+## Edits from two devices (spec 030, issue #19)
+
+- **Row versions.** Sets, workout exercises, workouts, meals and weigh-ins carry `version` (missing
+  = 0), bumped by every edit (`apps/api/src/common/row-version.ts`). Every edit from the web sends
+  `baseVersion`, the version of the row as shown; the overlays advance it for queued edits
+  (`max(version, base + 1)`), so a second edit of a row is made against what the first produces.
+  A later edit of a row also `dependsOn` the earlier one, so it never overtakes it.
+- **Refusals.** A stale edit is 409 `STALE_EDIT` with `current`, the row as it is now, kept as the
+  item's `lastErrorCurrent`. An edit of a row deleted elsewhere is 409 `ROW_DELETED`. Deleting a
+  row already gone succeeds. An edit without `baseVersion` is not checked (MCP, Shortcuts).
+- **Choices** (`lib/offline/conflicts.ts`, pure; `lib/sync-conflicts.ts`): Keep mine (the same
+  edit against `current.version`, edits stacked on it rebased after it), Keep theirs (discard; the
+  stacked edits go too), Combine notes (a preview of both, edited and confirmed), and for a
+  deleted set, meal or weigh-in Add it again (a new row with the change). A weigh-in choice can be
+  undone while the sheet is open. Nothing is merged on its own.
+- **`Outbox.replace(id, …)`** sends a resolved write in the old one's place with a new id: an
+  `Idempotency-Key` belongs to one body (`IDEMPOTENCY_KEY_REUSED` otherwise). Its dependents move
+  onto the new id.
+
 ## Service worker
 
 `public/sw.js` (v3) still caches only HTML navigations and hashed assets, never `/api`. A
@@ -129,6 +148,8 @@ navigation offline falls back to the same page with any query, then to `/`.
   empty; otherwise "N waiting", "Offline · N waiting", "Syncing N", "N need attention" or "Sign in
   to sync". Tapping opens the list with Retry and Discard (confirmed) per item and "Sync now". A
   workout refused with `SESSION_CONFLICT` also offers "Finish the other, send this" (spec 028).
+  An edit refused with `STALE_EDIT` or `ROW_DELETED` shows yours against theirs and the choices
+  above instead of Retry (spec 030).
 - `components/pending-logout.tsx`, `components/offline-data-settings.tsx`.
 
 ## Dependencies

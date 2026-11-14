@@ -32,8 +32,9 @@ export function classify(error: unknown): Failure {
 }
 
 /** The refusal's code and its simple string fields, kept with the item for whoever resolves it. */
-function errorExtras(error: unknown): Pick<OutboxItem, 'lastErrorCode' | 'lastErrorData'> {
+function errorExtras(error: unknown): Pick<OutboxItem, 'lastErrorCode' | 'lastErrorData' | 'lastErrorCurrent'> {
   if (!(error instanceof ApiError)) return {};
+  const current = (error.body as { current?: unknown } | undefined)?.current;
   const data = Object.fromEntries(
     Object.entries(error.body ?? {}).filter(
       (entry): entry is [string, string] => typeof entry[1] === 'string' && !['message', 'error', 'code'].includes(entry[0]),
@@ -42,6 +43,7 @@ function errorExtras(error: unknown): Pick<OutboxItem, 'lastErrorCode' | 'lastEr
   return {
     ...(error.code ? { lastErrorCode: error.code } : {}),
     ...(Object.keys(data).length ? { lastErrorData: data } : {}),
+    ...(current && typeof current === 'object' ? { lastErrorCurrent: current as Record<string, unknown> } : {}),
   };
 }
 
@@ -231,6 +233,41 @@ export class Outbox {
     const item = this.items.find((other) => other.id === id);
     if (!item) return;
     await this.update(item, { state: 'pending', nextAttemptAt: 0 });
+    void this.drain();
+  }
+
+  /**
+   * Spec 030: the person resolved a refused write by changing it ("keep mine" against the row as
+   * it is now, or a combined note). The changed write gets a new id, because an idempotency key
+   * belongs to one request body, and keeps its place in the order; writes that waited for the old
+   * one wait for the new one. The refusal's details go with the old one.
+   */
+  async replace(id: string, input: Pick<EnqueueInput, 'body' | 'meta' | 'label'> & { id: string }): Promise<void> {
+    await this.load();
+    const item = this.items.find((other) => other.id === id);
+    if (!item || this.items.some((other) => other.id === input.id)) return;
+    const { lastError: _error, lastErrorCode: _code, lastErrorData: _data, lastErrorCurrent: _current, ...rest } = item;
+    const next: OutboxItem = {
+      ...rest,
+      ...input,
+      state: 'pending',
+      attempts: 0,
+      nextAttemptAt: 0,
+    };
+    await this.options.store.put(next);
+    await this.options.store.remove(id);
+    const rewired: OutboxItem[] = [];
+    for (const other of this.items) {
+      if (other.id === id) continue;
+      if (other.dependsOn?.includes(id)) {
+        const moved = { ...other, dependsOn: other.dependsOn.map((dep) => (dep === id ? input.id : dep)) };
+        await this.options.store.put(moved);
+        rewired.push(moved);
+      } else rewired.push(other);
+    }
+    this.items = [...rewired, next].sort((a, b) => a.seq - b.seq);
+    this.options.announce?.();
+    this.publish();
     void this.drain();
   }
 

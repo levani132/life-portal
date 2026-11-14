@@ -36,7 +36,7 @@ for oil and +40% for syrup. A food is measured in one unit and stays in it.
 | `meal_entries` | **The event row.** One food, one day, one slot, an amount, and a frozen `facts` snapshot. Everything the widget shows derives from these. |
 | `saved_meals` | Named groups of foods and amounts ("my oatmeal bowl"), logged in one action. Components *reference* foods. |
 | `nutrition_profiles` | Intent: sex, height, birth date, activity, goal, cheat days, day-start hour, optional measured basal rate, optional manual target overrides. One row per user, upserted on first read. |
-| `weigh_ins` | Dated measurements: `weightGrams` and optional `bodyFatPct`. Unique on `{userId, day}`. The latest is the current weight. |
+| `weigh_ins` | Dated measurements: `weightGrams` and optional `bodyFatPct`. Unique on `{userId, day}`. The latest is the current weight. `version?` (spec 030): see below. |
 | `cheat_meals` | The cheat-day priority queue: a `foodId`, an `amount`, an `order`, and `eaten`. |
 
 ## The snapshot rule (the one deliberate copy in this codebase)
@@ -367,6 +367,16 @@ ids chosen on the device; `lib/offline/nutrition-overlay.ts` applies them to the
 device keeps the Food day for days within 14 days of today (and the latest copy, used for a day
 never opened, with nothing eaten), with at most 2,000 foods. Public foods, product search,
 barcode and imports are never kept and say they need a connection; so do foods, saved meals, the
-cheat queue, repeating a day and the profile. A refused meal (`FOOD_GONE`, `MEAL_CHANGED`) stays on
+cheat queue, repeating a day and the profile.
+
+Spec 030 (issue #19): `meal_entries` and `weigh_ins` carry `version?` (missing = 0), bumped by
+every edit. `PATCH /entries/:id` and `PUT /weigh-ins` accept `baseVersion`; a stale one is 409
+`STALE_EDIT` with `current`, so a meal corrected or a weigh-in recorded on another device is never
+overwritten without a choice. For a weigh-in `baseVersion: 0` means "none for that day"; a new
+one starts at version 1. An edit of a deleted row is 409 `ROW_DELETED`; deleting a meal or a
+weigh-in already gone succeeds. Without `baseVersion` (MCP tools, Shortcuts) nothing is checked.
+The snapshot rule is unchanged: a correction never refreshes `facts`.
+
+A refused meal (`FOOD_GONE`, `MEAL_CHANGED`) stays on
 the day with its reason and Discard. Banked calories, the cheat countdown and suggestions stay the
 server's until it answers.

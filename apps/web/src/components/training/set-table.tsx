@@ -292,7 +292,7 @@ function LoggedRow({
     saving.current = true;
     try {
       // Every field the measure allows is sent, `null` for an emptied one, so clearing works.
-      await trainingWrites.patchSet(sessionId, set.id, Object.fromEntries(allowed.map((field) => [field, value[field] ?? null])));
+      await trainingWrites.patchSet(sessionId, set, Object.fromEntries(allowed.map((field) => [field, value[field] ?? null])));
     } catch (caught) {
       setProblem(message(caught));
     } finally {

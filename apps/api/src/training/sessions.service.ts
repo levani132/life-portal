@@ -35,6 +35,7 @@ import { CatalogueService } from './catalogue.service';
 import { PlansService, toTarget } from './plans.service';
 import { ProgressService } from './progress.service';
 import { toSet, type SetRow } from './set-row';
+import { assertBase, atVersion, BUMP, rowDeleted, staleEdit } from '../common/row-version';
 import { plannedRowId } from './planned-row-id';
 import { WorkoutExercise, WorkoutSession, WorkoutSet } from './training.schemas';
 
@@ -257,10 +258,16 @@ export class SessionsService {
   async update(
     userId: string,
     id: string,
-    patch: { day?: string; notes?: string },
+    patch: { day?: string; notes?: string; baseVersion?: number },
     nowMs = Date.now(),
   ): Promise<SessionDetail> {
-    const session = await this.ownedSession(userId, id);
+    const base = patch.baseVersion;
+    const session = await assertBase(
+      await this.findOwned<SessionRow>(this.sessions, userId, id),
+      base,
+      (row) => this.detailOf(userId, row as SessionRow, nowMs),
+      () => new NotFoundException(`Workout ${id} not found`),
+    );
     const set: Record<string, unknown> = {};
     const unset: Record<string, 1> = {};
     if (patch.day !== undefined) set['day'] = patch.day;
@@ -269,11 +276,12 @@ export class SessionsService {
       else unset['notes'] = 1;
     }
     if (Object.keys(set).length || Object.keys(unset).length) {
-      await this.sessions.updateOne(
-        { _id: session._id, userId },
-        { ...(Object.keys(set).length ? { $set: set } : {}), ...(Object.keys(unset).length ? { $unset: unset } : {}) },
+      const result = await this.sessions.updateOne(
+        { _id: session._id, userId, ...atVersion(base) },
+        { ...(Object.keys(set).length ? { $set: set } : {}), ...(Object.keys(unset).length ? { $unset: unset } : {}), ...BUMP },
         { runValidators: true },
       );
+      if (!result.matchedCount) await this.raceLost(this.sessions, userId, id, (row) => this.detailOf(userId, row as SessionRow, nowMs));
     }
     return this.detail(userId, id, nowMs);
   }
@@ -317,8 +325,11 @@ export class SessionsService {
     return this.detail(userId, id, nowMs);
   }
 
+  /** Spec 030: deleting a workout already gone (from another device) counts as done. */
   async remove(userId: string, id: string): Promise<{ id: string; deleted: true }> {
-    const session = await this.ownedSession(userId, id);
+    if (!isValidObjectId(id)) throw new NotFoundException(`Workout ${id} not found`);
+    const session = await this.sessions.findOne({ _id: id, userId }).lean<SessionRow>();
+    if (!session) return { id, deleted: true };
     await this.sets.deleteMany({ userId, sessionId: id });
     await this.exercises.deleteMany({ userId, sessionId: id });
     await this.sessions.deleteOne({ _id: session._id, userId });
@@ -367,9 +378,19 @@ export class SessionsService {
     userId: string,
     sessionId: string,
     workoutExerciseId: string,
-    patch: { notes?: string; skipped?: boolean; restSeconds?: number | null; superset?: string | null },
+    patch: { notes?: string; skipped?: boolean; restSeconds?: number | null; superset?: string | null; baseVersion?: number },
   ): Promise<SessionExercise> {
-    const row = await this.ownedExercise(userId, sessionId, workoutExerciseId);
+    const base = patch.baseVersion;
+    const present = async (found: ExerciseRow) =>
+      this.toSessionExercise(found, await this.sets.find({ userId, workoutExerciseId }).sort({ order: 1 }).lean<SetRow[]>());
+    const row = await assertBase(
+      isValidObjectId(sessionId) && isValidObjectId(workoutExerciseId)
+        ? await this.exercises.findOne({ _id: workoutExerciseId, userId, sessionId }).lean<ExerciseRow>()
+        : null,
+      base,
+      present,
+      () => new NotFoundException(`Exercise ${workoutExerciseId} not found in this workout`),
+    );
     const set: Record<string, unknown> = {};
     const unset: Record<string, 1> = {};
     if (patch.skipped !== undefined) {
@@ -391,10 +412,11 @@ export class SessionsService {
       else unset['notes'] = 1;
     }
     if (Object.keys(set).length || Object.keys(unset).length) {
-      await this.exercises.updateOne(
-        { _id: row._id, userId },
-        { ...(Object.keys(set).length ? { $set: set } : {}), ...(Object.keys(unset).length ? { $unset: unset } : {}) },
+      const result = await this.exercises.updateOne(
+        { _id: row._id, userId, ...atVersion(base) },
+        { ...(Object.keys(set).length ? { $set: set } : {}), ...(Object.keys(unset).length ? { $unset: unset } : {}), ...BUMP },
       );
+      if (!result.matchedCount) await this.raceLost(this.exercises, userId, workoutExerciseId, (found) => present(found as ExerciseRow));
     }
     const [updated, sets] = await Promise.all([
       this.exercises.findOne({ _id: row._id, userId }).lean<ExerciseRow>(),
@@ -485,7 +507,12 @@ export class SessionsService {
     sessionId: string,
     workoutExerciseId: string,
   ): Promise<{ id: string; deleted: true }> {
-    const row = await this.ownedExercise(userId, sessionId, workoutExerciseId);
+    // Spec 030: one already gone (deleted on another device, or with its workout) counts as done.
+    if (!isValidObjectId(sessionId) || !isValidObjectId(workoutExerciseId)) {
+      throw new NotFoundException(`Exercise ${workoutExerciseId} not found in this workout`);
+    }
+    const row = await this.exercises.findOne({ _id: workoutExerciseId, userId, sessionId }).lean<ExerciseRow>();
+    if (!row) return { id: workoutExerciseId, deleted: true };
     // Issue #15: a plan exercise removed on purpose, as opposed to one left undone (finishing drops
     // those too). Recorded first, so a retried delete still records it.
     if (row.planned) {
@@ -562,9 +589,19 @@ export class SessionsService {
    * Corrects a set's own values. `null` clears an optional field. The parent exercise's snapshot
    * decides what is valid, and is never touched.
    */
-  async updateSet(userId: string, setId: string, patch: SetPatch): Promise<SetResult> {
-    const row = await this.ownedSet(userId, setId);
-    const parent = await this.exercises.findOne({ _id: row.workoutExerciseId, userId }).lean<ExerciseRow>();
+  async updateSet(userId: string, setId: string, patch: SetPatch & { baseVersion?: number }): Promise<SetResult> {
+    const base = patch.baseVersion;
+    const found = await this.findOwned<SetRow>(this.sets, userId, setId);
+    const parent = found
+      ? await this.exercises.findOne({ _id: (found as SetRow).workoutExerciseId, userId }).lean<ExerciseRow>()
+      : null;
+    // A set whose exercise is gone is as deleted as the set.
+    const row = await assertBase(
+      parent ? (found as SetRow | null) : null,
+      base,
+      (current) => this.withRecords(userId, parent as ExerciseRow, current),
+      () => new NotFoundException(`Set ${setId} not found`),
+    );
     if (!parent) throw new NotFoundException(`Set ${setId} not found`);
     const merged = { ...pickValues(row), ...pickValues(patch, true) };
     const rpe = patch.rpe === undefined ? row.rpe : (patch.rpe ?? undefined);
@@ -579,19 +616,21 @@ export class SessionsService {
     }
     if ('type' in unset) delete unset['type'];
     if (Object.keys(set).length || Object.keys(unset).length) {
-      await this.sets.updateOne(
-        { _id: row._id, userId },
-        { ...(Object.keys(set).length ? { $set: set } : {}), ...(Object.keys(unset).length ? { $unset: unset } : {}) },
+      const result = await this.sets.updateOne(
+        { _id: row._id, userId, ...atVersion(base) },
+        { ...(Object.keys(set).length ? { $set: set } : {}), ...(Object.keys(unset).length ? { $unset: unset } : {}), ...BUMP },
         { runValidators: true },
       );
+      if (!result.matchedCount) await this.raceLost(this.sets, userId, setId, (current) => this.withRecords(userId, parent, current as SetRow));
     }
     const updated = await this.sets.findOne({ _id: row._id, userId }).lean<SetRow>();
     return this.withRecords(userId, parent, updated ?? row);
   }
 
+  /** Spec 030: deleting a set already gone (from another device) counts as done. */
   async removeSet(userId: string, setId: string): Promise<{ id: string; deleted: true }> {
-    const row = await this.ownedSet(userId, setId);
-    await this.sets.deleteOne({ _id: row._id, userId });
+    if (!isValidObjectId(setId)) throw new NotFoundException(`Set ${setId} not found`);
+    await this.sets.deleteOne({ _id: setId, userId });
     return { id: setId, deleted: true };
   }
 
@@ -692,6 +731,25 @@ export class SessionsService {
     }
   }
 
+  /** The caller's row with this id, or null (an invalid id is no row). */
+  private async findOwned<T>(model: { findOne(filter: object): { lean<R>(): Promise<R | null> } }, userId: string, id: string): Promise<T | null> {
+    return isValidObjectId(id) ? model.findOne({ _id: id, userId }).lean<T>() : null;
+  }
+
+  /**
+   * Spec 030: a checked edit that matched nothing lost a race with another device between the
+   * check and the write. Says which way: deleted, or changed (with the row as it is now).
+   */
+  private async raceLost(
+    model: { findOne(filter: object): { lean<R>(): Promise<R | null> } },
+    userId: string,
+    id: string,
+    present: (row: unknown) => unknown,
+  ): Promise<never> {
+    const now = await model.findOne({ _id: id, userId }).lean<object>();
+    throw now ? staleEdit(await present(now)) : rowDeleted();
+  }
+
   private async ownedSession(userId: string, id: string): Promise<SessionRow> {
     if (!isValidObjectId(id)) throw new NotFoundException(`Workout ${id} not found`);
     const row = await this.sessions.findOne({ _id: id, userId }).lean<SessionRow>();
@@ -705,13 +763,6 @@ export class SessionsService {
     }
     const row = await this.exercises.findOne({ _id: id, userId, sessionId }).lean<ExerciseRow>();
     if (!row) throw new NotFoundException(`Exercise ${id} not found in this workout`);
-    return row;
-  }
-
-  private async ownedSet(userId: string, id: string): Promise<SetRow> {
-    if (!isValidObjectId(id)) throw new NotFoundException(`Set ${id} not found`);
-    const row = await this.sets.findOne({ _id: id, userId }).lean<SetRow>();
-    if (!row) throw new NotFoundException(`Set ${id} not found`);
     return row;
   }
 
@@ -738,6 +789,7 @@ export class SessionsService {
       startedAt,
       endedAt: session.endedAt?.toISOString(),
       notes: session.notes,
+      ...(session.version ? { version: session.version } : {}),
       durationSeconds: sessionDurationSeconds({ startedAt, endedAt: session.endedAt?.toISOString(), lastSetAt }),
       isStale: isStaleSession({ status, startedAt, lastSetAt }, nowMs),
       lastSetAt,
@@ -821,6 +873,7 @@ export class SessionsService {
         machineBrand: row.snapshot.machineBrand,
       },
       notes: row.notes,
+      ...(row.version ? { version: row.version } : {}),
       sets: sets.map(toSet),
       ...(planned ? { planned } : {}),
       skipped: Boolean(row.skipped),

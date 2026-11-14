@@ -212,6 +212,11 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
 - **Food logged offline still never sends facts** (spec 029). `POST /nutrition/entries` takes a
   device `id` and `meal/:id/log` takes `ids`; the server snapshots at sync. The Food day
   (`/nutrition?today=&day=`) is the one cached read with a query string (14 days, 2,000 foods).
+- **Edits carry `baseVersion`; nothing is merged on its own** (spec 030). Sets, workout
+  exercises, workouts, meals and weigh-ins have `version` (missing = 0), bumped by `$inc` on each
+  edit and never by bookkeeping (reorder, finish). A stale edit is 409 `STALE_EDIT` with `current`;
+  the person picks in the sync sheet. A resolved write is `Outbox.replace()`d with a new id, since
+  an idempotency key belongs to one body. Deleting what is already gone succeeds.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for

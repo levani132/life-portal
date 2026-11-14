@@ -55,6 +55,13 @@ re-fills its weights from grams so a kg number is never sent as lb.
 | `workout_exercises` | An exercise within a session, in `order`, with a frozen `snapshot`; from a plan also `planned {planExerciseId, restSeconds?, note?, targets}` (frozen) and `skipped?`. Spec 025: `restSeconds?` (this workout's choice, 0–900) and `superset?` (copied from the plan, then editable). |
 | `workout_sets` | **The event row.** One performed set. Everything about progress derives from these. |
 
+Spec 030 (issue #19): sessions, workout exercises and sets carry `version?` (missing = 0), bumped
+by every edit of what the person set (notes, day, rest, superset, skipped, a set's values), not by
+reordering, finishing or plan bookkeeping. `PATCH` accepts `baseVersion`: a stale one is 409
+`STALE_EDIT` with `current`, a missing row is 409 `ROW_DELETED` (404 without `baseVersion`). A
+`DELETE` of a set, workout exercise or workout already gone answers `{id, deleted: true}`.
+See `docs/modules/offline.md`.
+
 Sessions, exercises and sets are three collections, not one document with arrays, so two devices
 logging into one workout never overwrite each other, and per-exercise history is an index scan
 on `(userId, exerciseId, loggedAt)`.

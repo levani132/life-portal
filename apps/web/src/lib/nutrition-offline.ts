@@ -15,6 +15,7 @@ import {
   type ShownEntry,
 } from './offline/nutrition-overlay';
 import { enqueueWrite, outbox, outboxItems, useOutbox } from './offline/runtime';
+import { earlierEditsOf } from './offline/conflicts';
 import { moduleWrites } from './offline/settling';
 import type { OutboxItem, WriteMethod } from './offline/types';
 import { decorateEntry } from '@life-portal/shared-domain';
@@ -146,13 +147,15 @@ async function write(
   dependsOn: string[] = [],
   id: string = crypto.randomUUID(),
 ): Promise<void> {
+  // Spec 030: a second edit of a row is made on top of the first, so it never overtakes it.
+  const after = [...dependsOn, ...earlierEditsOf(outboxItems(), { kind: `nutrition.${meta.op}`, meta })];
   await enqueueWrite({
     id,
     kind: `nutrition.${meta.op}`,
     ...request,
     meta,
     label,
-    ...(dependsOn.length ? { dependsOn } : {}),
+    ...(after.length ? { dependsOn: after } : {}),
   });
 }
 
@@ -190,10 +193,27 @@ export const foodWrites = {
     return asShown(entry);
   },
 
+  /** Spec 030: made against the version shown, so a change made meanwhile elsewhere is not lost. */
   updateEntry(entry: MealEntry, patch: { day?: string; slot?: MealSlot; amount?: number; note?: string }): Promise<void> {
+    const baseVersion = entry.version ?? 0;
     return write(
-      { op: 'entry.patch', entryId: entry.id, patch },
-      { method: 'PATCH', path: `/nutrition/entries/${entry.id}`, body: patch },
+      {
+        op: 'entry.patch',
+        entryId: entry.id,
+        patch,
+        baseVersion,
+        was: {
+          id: entry.id,
+          day: entry.day,
+          slot: entry.slot,
+          foodId: entry.foodId,
+          amount: entry.amount,
+          unit: entry.unit,
+          facts: entry.facts,
+          ...(entry.note ? { note: entry.note } : {}),
+        },
+      },
+      { method: 'PATCH', path: `/nutrition/entries/${entry.id}`, body: { ...patch, baseVersion } },
       `Correct meal · ${entry.facts.name}`,
       creatorsOf([entry.id]),
     );
@@ -219,6 +239,23 @@ export const foodWrites = {
     );
   },
 
+  /**
+   * Spec 030: a meal deleted on another device while this one corrected it, logged again as a new
+   * meal (a new id) with the correction. The server snapshots the food as it is now.
+   */
+  logAgain(was: LocalEntry, patch: { day?: string; slot?: MealSlot; amount?: number; note?: string }): Promise<void> {
+    const entry: LocalEntry = { ...was, ...patch, id: newObjectId() };
+    return write(
+      { op: 'entry.add', entry },
+      {
+        method: 'POST',
+        path: '/nutrition/entries',
+        body: { id: entry.id, day: entry.day, slot: entry.slot, foodId: entry.foodId, amount: entry.amount, ...(entry.note ? { note: entry.note } : {}) },
+      },
+      `Meal · ${entry.facts.name}`,
+    );
+  },
+
   /** One meal per component, with ids chosen here, from this device's copy of the foods. */
   async logSavedMeal(meal: SavedMeal, foods: Food[], input: { day: string; slot?: MealSlot }): Promise<void> {
     const byId = new Map(foods.map((food) => [food.id, food]));
@@ -239,11 +276,19 @@ export const foodWrites = {
     );
   },
 
-  /** One weigh-in per day on the server, so a replay or a second weigh-in the same day corrects it. */
-  putWeighIn(input: { day: string; weightGrams: number; bodyFatPct?: number; note?: string }): Promise<void> {
+  /**
+   * One weigh-in per day on the server, so a replay or a second weigh-in the same day corrects it.
+   * Spec 030: sent with the version of the day's weigh-in shown here (0: none), so one made on
+   * another device meanwhile is never overwritten; the person chooses in the sync sheet.
+   */
+  putWeighIn(
+    input: { day: string; weightGrams: number; bodyFatPct?: number; note?: string },
+    shown?: { version?: number },
+  ): Promise<void> {
+    const baseVersion = shown?.version ?? 0;
     return write(
-      { op: 'weighin.put', ...input },
-      { method: 'PUT', path: '/nutrition/weigh-ins', body: input },
+      { op: 'weighin.put', ...input, baseVersion },
+      { method: 'PUT', path: '/nutrition/weigh-ins', body: { ...input, baseVersion } },
       `Weigh-in · ${input.day}`,
     );
   },

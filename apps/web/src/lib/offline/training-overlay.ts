@@ -48,6 +48,8 @@ export type TrainingWriteMeta =
       sessionId: string;
       workoutExerciseId: string;
       patch: { skipped?: boolean; restSeconds?: number | null; superset?: string | null; notes?: string };
+      /** Spec 030: the version the edit was made against (absent on writes queued before it). */
+      baseVersion?: number;
     }
   | { op: 'exercise.order'; sessionId: string; ids: string[] }
   | {
@@ -58,9 +60,17 @@ export type TrainingWriteMeta =
       loggedAt: string;
       value: SetValues & { type?: SetType; rpe?: number; restSeconds?: number };
     }
-  | { op: 'set.patch'; sessionId: string; setId: string; patch: SetPatch }
+  | {
+      op: 'set.patch';
+      sessionId: string;
+      setId: string;
+      patch: SetPatch;
+      baseVersion?: number;
+      /** Spec 030: the set as it was, to log it again if another device deleted it. */
+      was?: { workoutExerciseId: string; value: SetValues & { type?: SetType; rpe?: number; restSeconds?: number } };
+    }
   | { op: 'set.remove'; sessionId: string; setId: string }
-  | { op: 'session.patch'; sessionId: string; patch: { notes?: string; day?: string } }
+  | { op: 'session.patch'; sessionId: string; patch: { notes?: string; day?: string }; baseVersion?: number }
   | { op: 'session.finish'; sessionId: string; endedAt: string }
   | { op: 'session.remove'; sessionId: string }
   | { op: 'plan-update'; sessionId: string };
@@ -171,6 +181,15 @@ function applyPatch<T extends object>(target: T, patch: Record<string, unknown>)
 }
 
 /**
+ * Spec 030: the version a row has once an edit made against `base` is applied. Taking the larger
+ * of the two keeps it right both before the server has the edit and after the refetch, so a
+ * second edit queued behind the first is made against the version the first will produce.
+ */
+export function versionAfter<T extends { version?: number }>(row: T, base: number | undefined): T {
+  return base === undefined ? row : { ...row, version: Math.max(row.version ?? 0, base + 1) };
+}
+
+/**
  * One write applied to one workout. Returns `null` when the write deletes it. Writes for another
  * workout leave it as it is. Every case is idempotent.
  */
@@ -198,7 +217,7 @@ export function applyWrite(session: SessionDetail | null, meta: TrainingWriteMet
     case 'exercise.remove':
       return { ...session, exercises: session.exercises.filter((exercise) => exercise.id !== meta.workoutExerciseId) };
     case 'exercise.patch':
-      return mapExercise(session, meta.workoutExerciseId, (exercise) => applyPatch(exercise, meta.patch));
+      return mapExercise(session, meta.workoutExerciseId, (exercise) => versionAfter(applyPatch(exercise, meta.patch), meta.baseVersion));
     case 'exercise.order': {
       const byId = new Map(session.exercises.map((exercise) => [exercise.id, exercise]));
       if (meta.ids.length !== byId.size || meta.ids.some((id) => !byId.has(id))) return session;
@@ -221,11 +240,11 @@ export function applyWrite(session: SessionDetail | null, meta: TrainingWriteMet
       });
     }
     case 'set.patch':
-      return mapSet(session, meta.setId, (set) => applyPatch(set, meta.patch as Record<string, unknown>));
+      return mapSet(session, meta.setId, (set) => versionAfter(applyPatch(set, meta.patch as Record<string, unknown>), meta.baseVersion));
     case 'set.remove':
       return mapSet(session, meta.setId, () => undefined);
     case 'session.patch':
-      return applyPatch(session, meta.patch);
+      return versionAfter(applyPatch(session, meta.patch), meta.baseVersion);
     case 'session.finish':
       if (session.status === 'finished') return session;
       // Unlogged planned exercises are dropped on finish, as the server does.

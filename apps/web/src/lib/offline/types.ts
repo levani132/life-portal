@@ -38,6 +38,11 @@ export interface OutboxItem<M = unknown> {
   lastErrorCode?: string;
   /** Spec 028: what that refusal carried besides its message (e.g. `openSessionId`). */
   lastErrorData?: Record<string, string>;
+  /**
+   * Spec 030: the row as the server has it now, sent with a `STALE_EDIT` refusal, so the person
+   * can compare it with their own. It is the person's own row, kept in their own store.
+   */
+  lastErrorCurrent?: Record<string, unknown>;
   createdAt: number;
 }
 

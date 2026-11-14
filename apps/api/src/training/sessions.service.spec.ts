@@ -236,14 +236,16 @@ describe('SessionsService: finishing, history and deletion', () => {
     const { session, exercise } = await startWithBench(f);
     const { set } = await f.service.addSet(ME, session.id, exercise.id, { requestId: randomUUID(), reps: 5, weightGrams: 60_000 }, min(1));
     await expect(f.service.detail(OTHER, session.id)).rejects.toBeInstanceOf(NotFoundException);
-    await expect(f.service.remove(OTHER, session.id)).rejects.toBeInstanceOf(NotFoundException);
+    // Spec 030: a delete of a row that is not the caller's is a no-op answered like "already gone".
+    await expect(f.service.remove(OTHER, session.id)).resolves.toEqual({ id: session.id, deleted: true });
     await expect(
       f.service.addSet(OTHER, session.id, exercise.id, { requestId: randomUUID(), reps: 5, weightGrams: 1 }),
     ).rejects.toBeInstanceOf(NotFoundException);
     await expect(f.service.updateSet(OTHER, set.id, { reps: 1 })).rejects.toBeInstanceOf(NotFoundException);
-    await expect(f.service.removeSet(OTHER, set.id)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(f.service.removeSet(OTHER, set.id)).resolves.toEqual({ id: set.id, deleted: true });
     await expect(f.service.detail(ME, 'not-an-id')).rejects.toBeInstanceOf(NotFoundException);
     expect(f.sets.docs).toHaveLength(1);
+    expect(f.sessions.docs).toHaveLength(1);
   });
 
   it('reorders only with the complete set of ids', async () => {
@@ -721,3 +723,93 @@ describe('SessionsService: work done offline (spec 028)', () => {
 
 /** sha256('lp-planned:<requestId>:<planExerciseId>'), first 24 hex digits. Shared with the web test. */
 const PLANNED_VECTOR = 'e80ee18e8ffbaeb4f40ef02d';
+
+describe('SessionsService: edits from two devices (spec 030)', () => {
+  async function withSet() {
+    const f = fixture();
+    const { session, exercise } = await startWithBench(f);
+    const { set } = await f.service.addSet(ME, session.id, exercise.id, { requestId: randomUUID(), reps: 5, weightGrams: 60_000 }, min(1));
+    return { f, session, exercise, set };
+  }
+  const codeOf = async (promise: Promise<unknown>) => {
+    try {
+      await promise;
+      return 'ok';
+    } catch (error) {
+      return ((error as ConflictException).getResponse() as { code?: string }).code ?? (error as Error).constructor.name;
+    }
+  };
+
+  it('bumps a set’s version on every edit, and refuses an edit made against an older one', async () => {
+    const { f, set } = await withSet();
+    expect(set.version).toBeUndefined();
+    const first = await f.service.updateSet(ME, set.id, { reps: 6, baseVersion: 0 });
+    expect(first.set).toMatchObject({ reps: 6, version: 1 });
+    // The other device still thinks it is at version 0.
+    const stale = f.service.updateSet(ME, set.id, { reps: 8, baseVersion: 0 });
+    await expect(stale).rejects.toBeInstanceOf(ConflictException);
+    try {
+      await f.service.updateSet(ME, set.id, { reps: 8, baseVersion: 0 });
+    } catch (error) {
+      const body = (error as ConflictException).getResponse() as { code: string; current: { set: { reps: number; version: number } } };
+      expect(body.code).toBe('STALE_EDIT');
+      expect(body.current.set).toMatchObject({ reps: 6, version: 1 });
+    }
+    expect(f.sets.docs[0]['reps']).toBe(6);
+    // Keeping mine: sent again against the version it now has.
+    await expect(f.service.updateSet(ME, set.id, { reps: 8, baseVersion: 1 })).resolves.toMatchObject({ set: { reps: 8, version: 2 } });
+  });
+
+  it('still accepts an edit without a version, and still bumps it', async () => {
+    const { f, set } = await withSet();
+    await f.service.updateSet(ME, set.id, { reps: 7 });
+    expect(f.sets.docs[0]['version']).toBe(1);
+  });
+
+  it('answers ROW_DELETED to a checked edit of a deleted row, and 404 to an unchecked one', async () => {
+    const { f, session, exercise, set } = await withSet();
+    await f.service.removeSet(ME, set.id);
+    expect(await codeOf(f.service.updateSet(ME, set.id, { reps: 9, baseVersion: 0 }))).toBe('ROW_DELETED');
+    expect(await codeOf(f.service.updateSet(ME, set.id, { reps: 9 }))).toBe('NotFoundException');
+    await f.service.removeExercise(ME, session.id, exercise.id);
+    expect(await codeOf(f.service.updateExercise(ME, session.id, exercise.id, { notes: 'x', baseVersion: 0 }))).toBe('ROW_DELETED');
+    await f.service.remove(ME, session.id);
+    expect(await codeOf(f.service.update(ME, session.id, { notes: 'x', baseVersion: 0 }))).toBe('ROW_DELETED');
+  });
+
+  it('counts deleting what is already gone as done', async () => {
+    const { f, session, exercise, set } = await withSet();
+    await f.service.removeSet(ME, set.id);
+    await expect(f.service.removeSet(ME, set.id)).resolves.toEqual({ id: set.id, deleted: true });
+    await f.service.removeExercise(ME, session.id, exercise.id);
+    await expect(f.service.removeExercise(ME, session.id, exercise.id)).resolves.toEqual({ id: exercise.id, deleted: true });
+    await f.service.remove(ME, session.id);
+    await expect(f.service.remove(ME, session.id)).resolves.toEqual({ id: session.id, deleted: true });
+  });
+
+  it('checks exercise and workout notes the same way, with the current row in the refusal', async () => {
+    const { f, session, exercise } = await withSet();
+    await f.service.updateExercise(ME, session.id, exercise.id, { notes: 'Elbows in', baseVersion: 0 });
+    try {
+      await f.service.updateExercise(ME, session.id, exercise.id, { notes: 'Pause at the bottom', baseVersion: 0 });
+      throw new Error('accepted a stale edit');
+    } catch (error) {
+      const body = (error as ConflictException).getResponse() as { code: string; current: { notes: string; version: number; sets: unknown[] } };
+      expect(body).toMatchObject({ code: 'STALE_EDIT', current: { notes: 'Elbows in', version: 1 } });
+      expect(body.current.sets).toHaveLength(1);
+    }
+    await f.service.update(ME, session.id, { notes: 'Felt strong', baseVersion: 0 });
+    expect(await codeOf(f.service.update(ME, session.id, { notes: 'Tired', baseVersion: 0 }))).toBe('STALE_EDIT');
+    await expect(f.service.update(ME, session.id, { notes: 'Tired', baseVersion: 1 })).resolves.toMatchObject({ notes: 'Tired', version: 2 });
+  });
+
+  it('does not let reordering or finishing turn an edit into a conflict', async () => {
+    const { f, session, exercise, set } = await withSet();
+    const pull = await f.service.addExercise(ME, session.id, { requestId: randomUUID(), exerciseId: f.pullUp });
+    await f.service.reorderExercises(ME, session.id, [pull.id, exercise.id]);
+    await f.service.finish(ME, session.id, 'now', min(5));
+    await expect(f.service.updateExercise(ME, session.id, exercise.id, { notes: 'ok', baseVersion: 0 })).resolves.toMatchObject({ version: 1 });
+    await expect(f.service.update(ME, session.id, { notes: 'ok', baseVersion: 0 })).resolves.toMatchObject({ version: 1 });
+    await expect(f.service.updateSet(ME, set.id, { reps: 4, baseVersion: 0 })).resolves.toBeDefined();
+  });
+});

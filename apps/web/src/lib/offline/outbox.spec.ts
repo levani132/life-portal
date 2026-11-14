@@ -254,4 +254,24 @@ describe('OfflineCache (spec 027)', () => {
     expect(await cache.get('nutrition:foods')).toEqual(['a']);
     expect(await cache.get('social:drafts')).toBeUndefined();
   });
+
+  it('keeps the row a STALE_EDIT refusal carried, and a resolved write replaces it in place (spec 030)', async () => {
+    const f = fixture();
+    f.setAnswer((item) =>
+      item.id === 'a'
+        ? new ApiError('changed', 409, undefined, 'STALE_EDIT', { code: 'STALE_EDIT', current: { reps: 6, version: 1 } })
+        : { ok: true },
+    );
+    await f.outbox.enqueue(f.write('a', { body: { reps: 8, baseVersion: 0 } }));
+    await f.outbox.enqueue(f.write('later', { dependsOn: ['a'] }));
+    await f.outbox.drain();
+    const refused = f.outbox.getSnapshot().items.find((item) => item.id === 'a');
+    expect(refused).toMatchObject({ state: 'conflict', lastErrorCode: 'STALE_EDIT', lastErrorCurrent: { reps: 6, version: 1 } });
+    expect(states(f.outbox)).toEqual(['a:conflict', 'later:pending']);
+
+    await f.outbox.replace('a', { id: 'a2', body: { reps: 8, baseVersion: 1 } });
+    await f.outbox.drain();
+    expect(f.received.slice(-2)).toEqual(['a2', 'later']);
+    expect(f.db.outboxRows.size).toBe(0);
+  });
 });

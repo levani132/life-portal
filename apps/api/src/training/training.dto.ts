@@ -56,6 +56,8 @@ export class StartSessionDto {
 }
 
 export class UpdateSessionDto {
+  /** Spec 030: the version this device last saw; a stale one is refused with `STALE_EDIT`. */
+  @IsOptional() @IsInt() @Min(0) baseVersion?: number;
   @IsOptional() @Matches(DAY, { message: 'day must be a calendar date in YYYY-MM-DD form' })
   day?: string;
   @IsOptional() @IsString() @MaxLength(2000) notes?: string;
@@ -82,6 +84,8 @@ export class AddSessionExerciseDto {
 }
 
 export class UpdateSessionExerciseDto {
+  /** Spec 030: the version this device last saw; a stale one is refused with `STALE_EDIT`. */
+  @IsOptional() @IsInt() @Min(0) baseVersion?: number;
   @IsOptional() @IsString() @MaxLength(500) notes?: string;
   /** Spec 023: only for an exercise that came from a plan. */
   @IsOptional() @IsBoolean() skipped?: boolean;
@@ -140,6 +144,8 @@ export class ReorderDto {
 }
 
 export class UpdateSetDto {
+  /** Spec 030: the version this device last saw; a stale one is refused with `STALE_EDIT`. */
+  @IsOptional() @IsInt() @Min(0) baseVersion?: number;
   @IsOptional() @IsIn(SET_TYPES) type?: (typeof SET_TYPES)[number];
   @IsOptional() @IsInt() reps?: number | null;
   @IsOptional() @IsInt() weightGrams?: number | null;

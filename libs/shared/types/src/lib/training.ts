@@ -252,6 +252,8 @@ export interface WorkoutSet extends SetValues {
   rpe?: number;
   restSeconds?: number;
   loggedAt: string;
+  /** Spec 030: how many times it was edited; sent back as `baseVersion` with an edit. */
+  version?: number;
   /** Records this set set when it was done (computed on read; empty or absent for most sets). */
   records?: RecordKind[];
   /**
@@ -271,6 +273,8 @@ export interface SessionExercise {
   order: number;
   snapshot: ExerciseSnapshot;
   notes?: string;
+  /** Spec 030: how many times it was edited; sent back as `baseVersion` with an edit. */
+  version?: number;
   sets: WorkoutSet[];
   /** The caller's sets of this exercise from their most recent earlier session. */
   previous?: { sessionId: string; day: string; sets: WorkoutSet[] };
@@ -309,6 +313,8 @@ export interface SessionDetail {
   startedAt: string;
   endedAt?: string;
   notes?: string;
+  /** Spec 030: how many times it was edited; sent back as `baseVersion` with an edit. */
+  version?: number;
   /** Derived: to `endedAt`, or to the last activity while open. */
   durationSeconds: number;
   /** Derived: open, and nothing happened in it for more than 12 hours. */

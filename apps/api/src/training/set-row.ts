@@ -19,5 +19,6 @@ export function toSet(row: SetRow): WorkoutSetDto {
     rpe: row.rpe,
     restSeconds: row.restSeconds,
     loggedAt: row.loggedAt.toISOString(),
+    ...(row.version ? { version: row.version } : {}),
   };
 }

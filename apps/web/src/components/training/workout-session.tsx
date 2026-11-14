@@ -200,7 +200,7 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
 
   const saveNotes = () => {
     if (notes === (session.notes ?? '')) return;
-    void run(() => trainingWrites.patchSession(session.id, { notes }));
+    void run(() => trainingWrites.patchSession(session, { notes }));
   };
 
   const move = (index: number, by: -1 | 1) => {
@@ -731,7 +731,7 @@ function EditSet({
     // Every field the measure allows is sent, `null` for an emptied one, so clearing works.
     const body: Record<string, unknown> = { type: value.type, rpe: value.rpe ?? null };
     for (const field of setFieldsFor(measure).allowed) body[field] = value[field] ?? null;
-    return act(() => trainingWrites.patchSet(sessionId, set.id, body));
+    return act(() => trainingWrites.patchSet(sessionId, set, body));
   };
   return (
     <Modal open onClose={onClose} title="Edit set" error={error}>

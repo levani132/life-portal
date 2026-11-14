@@ -163,6 +163,8 @@ export const outbox = {
   retryAll: async () => (await ready()).outbox.retryAll(),
   resumeAuth: async () => (await ready()).outbox.resumeAuth(),
   discard: async (id: string) => (await ready()).outbox.discard(id),
+  /** Spec 030: a refused write changed by the person's choice, sent again in its place. */
+  replace: async (id: string, input: Parameters<Outbox['replace']>[1]) => (await ready()).outbox.replace(id, input),
   /** Writes still on this device and not acknowledged, in any state. */
   count: () => session?.outbox.count() ?? 0,
 };

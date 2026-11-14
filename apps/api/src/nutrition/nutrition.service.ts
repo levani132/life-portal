@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { assertFreeId, withId } from '../common/client-id';
+import { assertBase, atVersion, BUMP, rowDeleted, staleEdit, versionOf } from '../common/row-version';
 import { isValidObjectId, Model } from 'mongoose';
 import type {
   BarcodeLookupResponse,
@@ -109,6 +110,8 @@ const DEFAULT_PROFILE = {
  * snapshot on a meal entry, which records what was true when the meal was eaten rather than
  * caching a derivation — the reasoning is in `docs/DECISIONS.md`.
  */
+const isDuplicateKey = (error: unknown) => (error as { code?: number } | null)?.code === 11000;
+
 @Injectable()
 export class NutritionService {
   private readonly logger = new Logger(NutritionService.name);
@@ -721,7 +724,13 @@ export class NutritionService {
     return rows.map((row) => row.toJSON() as unknown as WeighInDto);
   }
 
-  /** One weigh-in per day: stepping on the scale twice corrects it rather than stacking rows. */
+  /**
+   * One weigh-in per day: stepping on the scale twice corrects it rather than stacking rows.
+   *
+   * Spec 030: with `baseVersion` the device says which weigh-in it saw for that day (0: none). If
+   * another device weighed in or corrected it since, the measurement is not overwritten: 409
+   * `STALE_EDIT` with the stored one, and the person chooses.
+   */
   async upsertWeighIn(
     userId: string,
     today: string,
@@ -735,23 +744,43 @@ export class NutritionService {
     if (dto.bodyFatPct != null) patch['bodyFatPct'] = dto.bodyFatPct;
     else unset['bodyFatPct'] = '';
     if (dto.note != null) patch['note'] = dto.note;
+    const update = { $set: patch, ...BUMP, ...(Object.keys(unset).length ? { $unset: unset } : {}) };
 
-    const saved = await this.weighIns.findOneAndUpdate(
-      { userId, day },
-      { $set: patch, ...(Object.keys(unset).length ? { $unset: unset } : {}) },
-      { new: true, upsert: true, runValidators: true },
-    );
-    return saved.toJSON() as unknown as WeighInDto;
+    if (dto.baseVersion === undefined) {
+      const saved = await this.weighIns.findOneAndUpdate({ userId, day }, update, {
+        new: true,
+        upsert: true,
+        runValidators: true,
+      });
+      return saved.toJSON() as unknown as WeighInDto;
+    }
+    const existing = await this.weighIns.findOne({ userId, day });
+    if (existing && versionOf(existing) !== dto.baseVersion) throw staleEdit(existing.toJSON());
+    if (!existing && dto.baseVersion > 0) throw rowDeleted();
+    try {
+      // Upserts only while the day is still as the device saw it; `$inc` makes a new one version 1.
+      const saved = await this.weighIns.findOneAndUpdate(
+        { userId, day, ...atVersion(dto.baseVersion) },
+        update,
+        { new: true, upsert: dto.baseVersion === 0, runValidators: true },
+      );
+      if (saved) return saved.toJSON() as unknown as WeighInDto;
+    } catch (error) {
+      // Another device created the day's weigh-in between the read and the write.
+      if (!isDuplicateKey(error)) throw error;
+    }
+    const now = await this.weighIns.findOne({ userId, day });
+    throw now ? staleEdit(now.toJSON()) : rowDeleted();
   }
 
+  /** Spec 030: deleting a weigh-in already gone (from another device) counts as done. */
   async removeWeighIn(
     userId: string,
     id: string,
   ): Promise<{ id: string; deleted: true }> {
     if (!isValidObjectId(id))
       throw new NotFoundException(`Weigh-in ${id} not found`);
-    const deleted = await this.weighIns.findOneAndDelete({ userId, _id: id });
-    if (!deleted) throw new NotFoundException(`Weigh-in ${id} not found`);
+    await this.weighIns.deleteOne({ userId, _id: id });
     return { id, deleted: true };
   }
 
@@ -854,8 +883,12 @@ export class NutritionService {
   ): Promise<MealEntryDto> {
     if (!isValidObjectId(id))
       throw new NotFoundException(`Entry ${id} not found`);
-    const existing = await this.entries.findOne({ userId, _id: id });
-    if (!existing) throw new NotFoundException(`Entry ${id} not found`);
+    const existing = await assertBase(
+      await this.entries.findOne({ userId, _id: id }),
+      dto.baseVersion,
+      (row) => this.serializeEntry(row),
+      () => new NotFoundException(`Entry ${id} not found`),
+    );
 
     const patch: Record<string, unknown> = {};
     if (dto.day) patch['day'] = toDay(dto.day);
@@ -866,22 +899,27 @@ export class NutritionService {
     }
 
     const updated = await this.entries.findOneAndUpdate(
-      { userId, _id: id },
-      { $set: patch },
+      { userId, _id: id, ...atVersion(dto.baseVersion) },
+      { $set: patch, ...BUMP },
       { new: true, runValidators: true },
     );
-    if (!updated) throw new NotFoundException(`Entry ${id} not found`);
+    if (!updated) {
+      // Changed or deleted between the check and the write.
+      const now = await this.entries.findOne({ userId, _id: id });
+      if (dto.baseVersion === undefined) throw new NotFoundException(`Entry ${id} not found`);
+      throw now ? staleEdit(this.serializeEntry(now)) : rowDeleted();
+    }
     return this.serializeEntry(updated);
   }
 
+  /** Spec 030: deleting a meal already gone (from another device) counts as done. */
   async removeEntry(
     userId: string,
     id: string,
   ): Promise<{ id: string; deleted: true }> {
     if (!isValidObjectId(id))
       throw new NotFoundException(`Entry ${id} not found`);
-    const deleted = await this.entries.findOneAndDelete({ userId, _id: id });
-    if (!deleted) throw new NotFoundException(`Entry ${id} not found`);
+    await this.entries.deleteOne({ userId, _id: id });
     return { id, deleted: true };
   }
 

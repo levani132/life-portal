@@ -168,6 +168,8 @@ export interface MealEntry extends Timestamped {
   /** Set when the entry came from the cheat-day queue. */
   cheatMealId?: Id;
   note?: string;
+  /** Spec 030: how many times it was edited; sent back as `baseVersion` with an edit. */
+  version?: number;
   /** Derived from `amount` and `facts`. */
   totals: EntryTotals;
   /** Servings this amount works out to, for display. */
@@ -338,6 +340,8 @@ export interface WeighIn extends Timestamped {
   /** Decimal, e.g. `0.18` for 18%. The one input that switches the basal-rate equation. */
   bodyFatPct?: number;
   note?: string;
+  /** Spec 030: how many times it was edited; sent back as `baseVersion` with an edit. */
+  version?: number;
 }
 
 // ------------------------------------------------------------------ targets

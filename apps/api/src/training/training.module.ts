@@ -395,7 +395,7 @@ export class TrainingController {
     @Param('setId') setId: string,
     @Body() dto: UpdateSetDto,
   ) {
-    return this.sessions.updateSet(userId, setId, dto as SetPatch);
+    return this.sessions.updateSet(userId, setId, dto as SetPatch & { baseVersion?: number });
   }
 
   @Delete('sets/:setId')

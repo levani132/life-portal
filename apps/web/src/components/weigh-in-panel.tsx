@@ -33,11 +33,15 @@ export function WeighInPanel({
       const fat = bodyFatPct.trim() === '' ? undefined : Number(bodyFatPct) / 100;
       // Spec 029: kept on the device and shown at once. One weigh-in per day on the server, so
       // sending it twice (or weighing in twice) corrects it rather than adding a second.
-      await foodWrites.putWeighIn({
-        day,
-        weightGrams: Math.round(kg * 1000),
-        ...(fat != null ? { bodyFatPct: fat } : {}),
-      });
+      await foodWrites.putWeighIn(
+        {
+          day,
+          weightGrams: Math.round(kg * 1000),
+          ...(fat != null ? { bodyFatPct: fat } : {}),
+        },
+        // Spec 030: the weigh-in this device shows for that day, if any.
+        weighIns.find((row) => row.day === day),
+      );
     }, { revalidate: false }).then((ok) => {
       if (ok) {
         setWeightKg('');

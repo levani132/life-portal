@@ -5,8 +5,10 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { outbox, useOutbox } from '../lib/offline/runtime';
 import type { OutboxItem } from '../lib/offline/types';
+import { conflictOf, combinedText, diffFields, type Conflict } from '../lib/offline/conflicts';
+import { canLogAgain, keepMine, keepTheirs, logAgain, saveCombined, type Undo } from '../lib/sync-conflicts';
 import { finishOtherAndRetry, isSessionConflict } from '../lib/training-offline';
-import { Modal } from './ui';
+import { Modal, Textarea } from './ui';
 
 /**
  * The header's sync pill (spec 027, issue #16). It says only what is true: nothing at all while
@@ -16,6 +18,8 @@ import { Modal } from './ui';
 export function SyncStatus() {
   const snapshot = useOutbox();
   const [open, setOpen] = useState(false);
+  // Spec 030: a weigh-in choice can be put back once, while the sheet is open.
+  const [undo, setUndo] = useState<{ text: string; run: Undo } | null>(null);
   const items = snapshot.items;
   if (!items.length && !open) return null;
 
@@ -58,9 +62,28 @@ export function SyncStatus() {
         createPortal(
           <Modal
             open
-            onClose={() => setOpen(false)}
+            onClose={() => {
+              setOpen(false);
+              setUndo(null);
+            }}
             title="Changes on this device"
           >
+            {undo && (
+              <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-border bg-surface p-2 text-xs">
+                <span>{undo.text}</span>
+                <button
+                  type="button"
+                  className="btn-ghost px-2 py-1 text-xs"
+                  onClick={() => {
+                    const { run } = undo;
+                    setUndo(null);
+                    void run();
+                  }}
+                >
+                  Undo
+                </button>
+              </div>
+            )}
             {items.length === 0 ? (
               <p className="text-sm text-ink-muted">
                 Everything has reached the server.
@@ -75,7 +98,7 @@ export function SyncStatus() {
                 </p>
                 <ul className="space-y-2">
                   {items.map((item) => (
-                    <SyncRow key={item.id} item={item} />
+                    <SyncRow key={item.id} item={item} onUndo={setUndo} />
                   ))}
                 </ul>
                 <div className="flex justify-end">
@@ -104,7 +127,7 @@ const STATE_TEXT: Record<OutboxItem['state'], string> = {
   conflict: 'Changed elsewhere',
 };
 
-function SyncRow({ item }: { item: OutboxItem }) {
+function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: string; run: Undo } | null) => void }) {
   const [confirm, setConfirm] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -121,6 +144,7 @@ function SyncRow({ item }: { item: OutboxItem }) {
     }
   };
   const stuck = item.state === 'error' || item.state === 'conflict';
+  const clash = conflictOf(item);
   return (
     <li className="rounded-lg border border-border p-3 text-sm">
       <div className="flex items-start justify-between gap-2">
@@ -139,13 +163,16 @@ function SyncRow({ item }: { item: OutboxItem }) {
           </p>
         </div>
         <div className="flex shrink-0 gap-1">
-          <button
-            type="button"
-            className="btn-ghost px-2 py-1 text-xs"
-            onClick={() => void outbox.retry(item.id)}
-          >
-            Retry
-          </button>
+          {/* Sending a clashing edit again would only clash again: the person chooses below. */}
+          {!clash && (
+            <button
+              type="button"
+              className="btn-ghost px-2 py-1 text-xs"
+              onClick={() => void outbox.retry(item.id)}
+            >
+              Retry
+            </button>
+          )}
           <button
             type="button"
             className="btn-ghost px-2 py-1 text-xs text-rose-300"
@@ -170,6 +197,7 @@ function SyncRow({ item }: { item: OutboxItem }) {
           {problem && <p className="text-rose-300">{problem}</p>}
         </div>
       )}
+      {clash && <ClashChoice item={item} clash={clash} onUndo={onUndo} />}
       {confirm && (
         <div className="mt-2 flex flex-wrap items-center justify-end gap-2 rounded-md bg-rose-500/10 p-2 text-xs">
           <span className="mr-auto">
@@ -192,5 +220,129 @@ function SyncRow({ item }: { item: OutboxItem }) {
         </div>
       )}
     </li>
+  );
+}
+
+/**
+ * Spec 030: an edit that clashed with another device. Nothing is merged on its own: numbers are
+ * mine or theirs, a note can be combined through a preview the person edits and confirms, and a
+ * row deleted elsewhere is either dropped or added again with this change.
+ */
+function ClashChoice({
+  item,
+  clash,
+  onUndo,
+}: {
+  item: OutboxItem;
+  clash: Conflict;
+  onUndo: (undo: { text: string; run: Undo } | null) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [combining, setCombining] = useState<string | null>(null);
+  const act = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    setProblem(null);
+    try {
+      await fn();
+    } catch (caught) {
+      setProblem(caught instanceof Error ? caught.message : 'Could not do that.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (clash.type === 'deleted') {
+    return (
+      <div className="mt-2 space-y-2 rounded-md bg-amber-500/10 p-2 text-xs">
+        <p>This was deleted on another device after you changed it here.</p>
+        <div className="flex flex-wrap justify-end gap-2">
+          <button type="button" className="btn-ghost px-2 py-1 text-xs" disabled={busy} onClick={() => void act(() => outbox.discard(item.id))}>
+            Discard my change
+          </button>
+          {canLogAgain(clash) && (
+            <button type="button" className="btn-primary px-2 py-1 text-xs" disabled={busy} onClick={() => void act(() => logAgain(item))}>
+              Add it again
+            </button>
+          )}
+        </div>
+        {problem && <p className="text-rose-300">{problem}</p>}
+      </div>
+    );
+  }
+
+  const diffs = diffFields(clash);
+  const text = diffs.find((diff) => diff.text);
+  const textField = clash.edit.textField;
+  const mineText = textField ? clash.edit.patch[textField] : undefined;
+  const theirsText = textField ? clash.theirs[textField] : undefined;
+  const weighIn = clash.edit.kind === 'weighin';
+  const decide = (keep: 'mine' | 'theirs') =>
+    void act(async () => {
+      const undo = keep === 'mine' ? await keepMine(item) : await keepTheirs(item);
+      onUndo(undo ? { text: keep === 'mine' ? 'Kept your weigh-in.' : 'Kept the other weigh-in.', run: undo } : null);
+    });
+
+  return (
+    <div className="mt-2 space-y-2 rounded-md bg-amber-500/10 p-2 text-xs">
+      <p>{weighIn ? 'Another device recorded a weigh-in for this day too. Which one is right?' : 'This was changed on another device too. Which version should stay?'}</p>
+      <table className="w-full table-fixed text-left">
+        <thead className="text-ink-faint">
+          <tr>
+            <th className="w-1/4 font-normal" />
+            <th className="font-normal">Yours (this device)</th>
+            <th className="font-normal">Theirs (saved)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {diffs.map((diff) => (
+            <tr key={diff.field} className="align-top">
+              <td className="text-ink-faint">{diff.label}</td>
+              <td className="whitespace-pre-wrap break-words pr-2">{diff.mine}</td>
+              <td className="whitespace-pre-wrap break-words">{diff.theirs}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {combining !== null ? (
+        <div className="space-y-2">
+          <p className="text-ink-muted">Both notes, combined. Edit it, then save: this replaces the saved note.</p>
+          <Textarea rows={4} value={combining} onChange={(event) => setCombining(event.target.value)} />
+          <div className="flex justify-end gap-2">
+            <button type="button" className="btn-ghost px-2 py-1 text-xs" disabled={busy} onClick={() => setCombining(null)}>
+              Back
+            </button>
+            <button
+              type="button"
+              className="btn-primary px-2 py-1 text-xs"
+              disabled={busy || !combining.trim()}
+              onClick={() => void act(() => saveCombined(item, combining.trim()))}
+            >
+              Save combined note
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap justify-end gap-2">
+          {text && (
+            <button
+              type="button"
+              className="btn-ghost px-2 py-1 text-xs"
+              disabled={busy}
+              onClick={() => setCombining(combinedText(theirsText, mineText))}
+            >
+              Combine notes…
+            </button>
+          )}
+          <button type="button" className="btn-ghost px-2 py-1 text-xs" disabled={busy} onClick={() => decide('theirs')}>
+            Keep theirs
+          </button>
+          <button type="button" className="btn-primary px-2 py-1 text-xs" disabled={busy} onClick={() => decide('mine')}>
+            Keep mine
+          </button>
+        </div>
+      )}
+      {problem && <p className="text-rose-300">{problem}</p>}
+    </div>
   );
 }

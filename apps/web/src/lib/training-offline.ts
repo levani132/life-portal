@@ -11,6 +11,7 @@ import type {
   SessionListItem,
   SessionPage,
   SetPatch,
+  WorkoutSet,
   SetValues,
   SetType,
 } from '@life-portal/shared-types';
@@ -30,6 +31,7 @@ import {
   type OfflineRow,
   type TrainingWriteMeta,
 } from './offline/training-overlay';
+import { earlierEditsOf } from './offline/conflicts';
 import type { OutboxItem, WriteMethod } from './offline/types';
 import { CURRENT_KEY, planKey, revalidateTraining, sessionKey, useWorkoutDay } from './training';
 
@@ -220,7 +222,11 @@ async function write(
   const dependsOn =
     meta.op === 'plan-update'
       ? outboxItems().filter((item) => metaOf(item)?.sessionId === meta.sessionId).map((item) => item.id)
-      : creatorsOf(referencedIds(meta));
+      : [
+          ...creatorsOf(referencedIds(meta)),
+          // Spec 030: a second edit of a row is made on top of the first, so it never overtakes it.
+          ...earlierEditsOf(outboxItems(), { kind: `training.${meta.op}`, meta }),
+        ];
   await enqueueWrite({
     id,
     kind: `training.${meta.op}`,
@@ -229,6 +235,15 @@ async function write(
     label,
     ...(dependsOn.length ? { dependsOn } : {}),
   });
+}
+
+/** A set's own values, as a new set would be logged with them. */
+function setValueOf(set: Partial<WorkoutSet>): SetValues & { type?: SetType; rpe?: number; restSeconds?: number } {
+  return Object.fromEntries(
+    (['reps', 'weightGrams', 'assistGrams', 'durationSeconds', 'distanceMeters', 'type', 'rpe', 'restSeconds'] as const)
+      .filter((field) => set[field] != null)
+      .map((field) => [field, set[field]]),
+  ) as SetValues & { type?: SetType; rpe?: number; restSeconds?: number };
 }
 
 const base = (sessionId: string) => `/training/sessions/${sessionId}`;
@@ -365,14 +380,16 @@ export const trainingWrites = {
     );
   },
 
+  /** Spec 030: every edit is made against the version shown (`STALE_EDIT` if it moved on). */
   patchExercise(
     sessionId: string,
-    exercise: Pick<SessionExercise, 'id' | 'snapshot'>,
+    exercise: Pick<SessionExercise, 'id' | 'snapshot' | 'version'>,
     patch: { skipped?: boolean; restSeconds?: number | null; superset?: string | null; notes?: string },
   ): Promise<void> {
+    const baseVersion = exercise.version ?? 0;
     return write(
-      { op: 'exercise.patch', sessionId, workoutExerciseId: exercise.id, patch },
-      { method: 'PATCH', path: `${base(sessionId)}/exercises/${exercise.id}`, body: patch },
+      { op: 'exercise.patch', sessionId, workoutExerciseId: exercise.id, patch, baseVersion },
+      { method: 'PATCH', path: `${base(sessionId)}/exercises/${exercise.id}`, body: { ...patch, baseVersion } },
       `Change ${exercise.snapshot.name}`,
     );
   },
@@ -405,10 +422,20 @@ export const trainingWrites = {
     );
   },
 
-  patchSet(sessionId: string, setId: string, patch: SetPatch): Promise<void> {
+  patchSet(sessionId: string, set: Pick<WorkoutSet, 'id' | 'version'>, patch: SetPatch): Promise<void> {
+    const baseVersion = set.version ?? 0;
+    const { id: _id, version: _version, workoutExerciseId, ...was } = set as WorkoutSet;
     return write(
-      { op: 'set.patch', sessionId, setId, patch },
-      { method: 'PATCH', path: `/training/sets/${setId}`, body: patch },
+      {
+        op: 'set.patch',
+        sessionId,
+        setId: set.id,
+        patch,
+        baseVersion,
+        // Spec 030: enough to log the set again if it was deleted on another device meanwhile.
+        ...(workoutExerciseId ? { was: { workoutExerciseId, value: setValueOf(was as WorkoutSet) } } : {}),
+      },
+      { method: 'PATCH', path: `/training/sets/${set.id}`, body: { ...patch, baseVersion } },
       'Correct a set',
     );
   },
@@ -431,8 +458,13 @@ export const trainingWrites = {
     );
   },
 
-  patchSession(sessionId: string, patch: { notes?: string; day?: string }): Promise<void> {
-    return write({ op: 'session.patch', sessionId, patch }, { method: 'PATCH', path: base(sessionId), body: patch }, 'Workout notes');
+  patchSession(session: Pick<SessionDetail, 'id' | 'version'>, patch: { notes?: string; day?: string }): Promise<void> {
+    const baseVersion = session.version ?? 0;
+    return write(
+      { op: 'session.patch', sessionId: session.id, patch, baseVersion },
+      { method: 'PATCH', path: base(session.id), body: { ...patch, baseVersion } },
+      'Workout notes',
+    );
   },
 
   /** Finishes at now, or at the last set. The time is this device's, sent with it. */

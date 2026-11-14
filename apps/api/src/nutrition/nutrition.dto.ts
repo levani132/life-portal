@@ -91,6 +91,8 @@ export class CreateEntryDto {
 }
 
 export class UpdateEntryDto {
+  /** Spec 030: the version this device last saw; a stale one is refused with `STALE_EDIT`. */
+  @IsOptional() @IsInt() @Min(0) baseVersion?: number;
   @IsOptional() @Matches(DAY, DAY_MESSAGE) day?: string;
   @IsOptional() @IsIn(MEAL_SLOTS) slot?: string;
   @IsOptional() @IsInt() @Min(1) @Max(MAX_AMOUNT) amount?: number;
@@ -185,6 +187,8 @@ export class UpdateProfileDto {
 }
 
 export class UpsertWeighInDto {
+  /** Spec 030: the version this device last saw for that day (0: none); a stale one is refused with `STALE_EDIT`. */
+  @IsOptional() @IsInt() @Min(0) baseVersion?: number;
   @IsOptional() @Matches(DAY, DAY_MESSAGE) day?: string;
   @IsInt() @Min(20_000) @Max(400_000) weightGrams!: number;
   @IsOptional() @IsNumber() @Min(0.03) @Max(0.6) bodyFatPct?: number;
