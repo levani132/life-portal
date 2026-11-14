@@ -54,6 +54,7 @@ npm run dev:web
 npm run seed         # Idempotent. Seeds the owner, the loan, the ESPP plan, the four boards.
 npm run check        # typecheck + lint + test across the workspace — the quality gate
 npm test
+npm run test:integration   # real API + Mongo; needs INTEGRATION_MONGODB_URI (docs/runbooks/offline-sync.md)
 npm run build        # builds both apps
 ```
 
@@ -231,6 +232,10 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   write queued 30+ days ago is `held`. Outbox records carry `schema`: one this version cannot read
   is `incompatible` and must stay byte-for-byte in storage (never `put` it). A write is never sent
   with another account's token (`mayReplayAs`). `lp.offline.meta:*` holds counts only.
+- **Sync-health counters hold no person** (spec 035). `sync_health_daily` is day, metric,
+  bounded key, count: refusal keys come from `SYNC_REFUSAL_CODES` or `http_<status>`, ages are
+  buckets. Never add an account, path, body or value to it. `npm run test:integration` creates and
+  drops `lp-int-*` databases: never point `INTEGRATION_MONGODB_URI` at real data.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for

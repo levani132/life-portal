@@ -2052,3 +2052,28 @@ other people's posts on the device is S3 and is waiting for the owner.
   there. Silent loss on iOS remains possible.
 - An `incompatible` item sits in the sheet until a newer version sends it or the person discards it.
 
+## 2026-11-14 · Sync is tested against real Mongo, and measured without content (issue #22)
+
+**Decided:**
+- Integration tests boot the real API in the test process against a throwaway database, and
+  drive the web app's own outbox and send function against it. No new dependencies; plain
+  `fetch`.
+- They run in their own CI job and command, never in `npm run check`, which stays fast and
+  database-free.
+- Sync-health counters live in the idempotency interceptor. Each holds a day, a metric, a
+  bounded key and a count, with refusal codes allowlisted and ages bucketed. No opt-out, since
+  nothing about a person is stored. Developer only, 90 days.
+
+**Buys:**
+- Unique indexes, TTLs and concurrent retries are tested where they actually behave (the
+  concurrent-retry test would pass against a fake model even if the index were missing).
+- A rise in `STALE_EDIT` or `CLIENT_TIME_TOO_OLD` after a release is visible without opening
+  anyone's data.
+
+**Costs:**
+- With very few accounts, a day's counts can still mirror one person's activity; the page says
+  so.
+- Only writes with an `Idempotency-Key` are counted, which is the outbox's traffic, not every
+  write.
+- The server's day is UTC, not the person's day.
+

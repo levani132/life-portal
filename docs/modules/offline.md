@@ -221,6 +221,28 @@ lag low but never runs high by mistake.
   in as B without signing A out never replays A's work as B.
 - "Delete offline data" also removes the account's count.
 
+## Integration tests and sync health (spec 035, issue #22)
+
+- **`npm run test:integration`** (`integration/`) boots the real API in-process with
+  `configureApp()` (shared with `main.ts`) against `INTEGRATION_MONGODB_URI`. Each file creates
+  and drops `lp-int-<random>`; the harness refuses any other database name.
+  - Server scenarios: `sync-server.integration.ts`.
+  - The web app's own `Outbox` and `sendAs` (`offline/send.ts`) against the live API:
+    `sync-client.integration.ts`.
+  - It is not part of `npm run check`. CI runs it in `.github/workflows/integration.yml`.
+- **Sync health.** `IdempotencyInterceptor` counts every write that carries an
+  `Idempotency-Key` into `sync_health_daily`: `{day, metric, key, count, expiresAt}`, with a
+  90-day TTL. The count is never awaited and never throws.
+  - **Metrics:**
+    - `writes`;
+    - `replays` (a replayed refusal counts only as a replay);
+    - `refusals`, keyed by `syncRefusalKey()`: an allowlisted code, else `http_<status>`;
+    - `age`, a `syncAgeBucket()` of the `X-Queued-Age` header the outbox sends. The raw value is
+      never stored.
+  - **Never stored:** no account, hash, path, body or value.
+  - **Reading it:** `GET /sync-health?range=7|30|90` and `/settings/sync-health`, developer only.
+  - **Troubleshooting:** `docs/runbooks/offline-sync.md`.
+
 ## Service worker
 
 `public/sw.js` (v3) still caches only HTML navigations and hashed assets, never `/api`. A

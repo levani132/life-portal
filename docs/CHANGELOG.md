@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-14: Sync health
+
+- **For the developer: a "Sync health" page** shows how many offline changes were sent,
+  replayed or refused (by reason), and how long they waited. Only daily counts are kept, for 90
+  days. They hold nothing about who or what.
+
 ## 2026-11-14: Safer offline changes
 
 - **A workout synced more than two weeks late** is no longer saved with a wrong date silently:
