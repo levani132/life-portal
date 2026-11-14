@@ -30,7 +30,7 @@ export function SyncStatus() {
 
   const auth = items.some((item) => item.state === 'auth');
   const attention = items.filter(
-    (item) => item.state === 'error' || item.state === 'conflict',
+    (item) => item.state === 'error' || item.state === 'conflict' || item.state === 'held',
   ).length;
   const label = auth
     ? 'Sign in to sync'
@@ -130,6 +130,7 @@ const STATE_TEXT: Record<OutboxItem['state'], string> = {
   auth: 'Waiting for sign-in',
   error: 'Not accepted',
   conflict: 'Changed elsewhere',
+  held: 'Waiting for you',
 };
 
 function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: string; run: Undo } | null) => void }) {
@@ -171,7 +172,7 @@ function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: st
         </div>
         <div className="flex shrink-0 gap-1">
           {/* Sending a clashing edit again would only clash again: the person chooses below. */}
-          {!clash && !tooOld && (
+          {!clash && !tooOld && item.state !== 'held' && (
             <button
               type="button"
               className="btn-ghost px-2 py-1 text-xs"
@@ -206,6 +207,20 @@ function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: st
       )}
       {clash && <ClashChoice item={item} clash={clash} onUndo={onUndo} />}
       {tooOld && <TooOldChoice item={item} recordedAt={tooOld.recordedAt} />}
+      {/* Spec 034: queued more than 30 days ago; sent only if the person still wants it. */}
+      {item.state === 'held' && (
+        <div className="mt-2 space-y-2 rounded-md bg-amber-500/10 p-2 text-xs">
+          <p>
+            Saved on this device on <strong>{when(new Date(item.createdAt).toISOString())}</strong>, more than 30 days
+            ago, and not sent yet. Send it now, or discard it.
+          </p>
+          <div className="flex justify-end">
+            <button type="button" className="btn-primary px-2 py-1 text-xs" onClick={() => void outbox.confirm(item.id)}>
+              Send anyway
+            </button>
+          </div>
+        </div>
+      )}
       {/* Spec 031: a comment on a post that is gone keeps its text here, to copy before discarding. */}
       {comment && (
         <div className="mt-2 space-y-1 rounded-md bg-amber-500/10 p-2 text-xs">

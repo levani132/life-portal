@@ -47,6 +47,9 @@ function errorExtras(error: unknown): Pick<OutboxItem, 'lastErrorCode' | 'lastEr
   };
 }
 
+/** Spec 034: a write queued longer ago than this is held until the person confirms it. */
+export const HOLD_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
+
 export const BACKOFF_BASE_MS = 1000;
 export const BACKOFF_MAX_MS = 60_000;
 
@@ -160,6 +163,11 @@ export class Outbox {
     }
     // Under the lock, the store is the truth: another tab may have sent or added items.
     this.items = await this.options.store.all();
+    // Spec 034: a write from more than 30 days ago may no longer be what the person wants.
+    for (const item of this.items) {
+      if (item.state === 'pending' && !item.sendConfirmed && item.createdAt < this.now() - HOLD_AFTER_MS)
+        await this.update(item, { state: 'held' });
+    }
     this.publish();
     for (;;) {
       const next = this.next();
@@ -281,6 +289,15 @@ export class Outbox {
     void this.drain();
   }
 
+  /** Spec 034: the person chose to send a held write ("Send anyway"). */
+  async confirm(id: string): Promise<void> {
+    await this.load();
+    const item = this.items.find((other) => other.id === id);
+    if (!item || item.state !== 'held') return;
+    await this.update(item, { state: 'pending', sendConfirmed: true, nextAttemptAt: 0 });
+    void this.drain();
+  }
+
   /** Every waiting item now: the "Sync now" button. */
   async retryAll(): Promise<void> {
     await this.load();
@@ -319,7 +336,7 @@ export class Outbox {
     this.timer = undefined;
   }
 
-  count(states: OutboxState[] = ['pending', 'error', 'conflict', 'auth']): number {
+  count(states: OutboxState[] = ['pending', 'error', 'conflict', 'auth', 'held']): number {
     return this.items.filter((item) => states.includes(item.state)).length;
   }
 

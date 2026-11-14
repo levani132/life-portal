@@ -9,8 +9,9 @@ export type WriteMethod = 'POST' | 'PUT' | 'PATCH' | 'DELETE';
  * - `error`: the server refused it (a 4xx other than a conflict). Needs the person: retry or discard.
  * - `conflict`: the server answered 409; the thing changed elsewhere. Needs the person.
  * - `auth`: the session ended. Waits, under this account only, until the same account signs in.
+ * - `held`: queued more than 30 days ago (spec 034). Not sent until the person confirms it.
  */
-export type OutboxState = 'pending' | 'error' | 'conflict' | 'auth';
+export type OutboxState = 'pending' | 'error' | 'conflict' | 'auth' | 'held';
 
 /** One write, kept on the device until the server acknowledges it. */
 export interface OutboxItem<M = unknown> {
@@ -49,6 +50,8 @@ export interface OutboxItem<M = unknown> {
    * never withdrawn silently.
    */
   maybeSent?: boolean;
+  /** Spec 034: the person confirmed sending it although it was queued more than 30 days ago. */
+  sendConfirmed?: boolean;
   createdAt: number;
 }
 

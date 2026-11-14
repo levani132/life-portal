@@ -35,6 +35,10 @@ the UI draws while pending), `dependsOn?`, `label?`, `state`, `attempts`, `nextA
 - 401 → `auth`; everything pauses until `resumeAuth()`, which `AuthProvider` calls only after the
   server confirmed the same account.
 - An item leaves the store only after a 2xx. "Saved" in the UI means acknowledged.
+- **Spec 034, held writes.** A write queued more than 30 days ago (`HOLD_AFTER_MS`) is moved to
+  `held` when a run starts, along with every item still waiting on it. "Sync now" does not send it.
+  It goes only when the person taps **Send anyway** in the sync sheet (`confirm()`, which sets
+  `sendConfirmed`), or it is discarded.
 - Cross-tab: the run holds the Web Lock `lp-outbox:<userId>` and reloads the store under it;
   changes are announced on a `BroadcastChannel` of the same name.
 - Sync triggers (`runtime.ts`): enqueue, `online`, `focus`, `visibilitychange` to visible, and a

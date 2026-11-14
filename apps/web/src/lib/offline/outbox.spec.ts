@@ -1,7 +1,7 @@
 import { ApiError, NetworkError } from '../api';
 import { CACHE_TTL_MS, OfflineCache } from './cache';
 import { memoryDb } from './memory-store';
-import { backoff, classify, Outbox, type EnqueueInput } from './outbox';
+import { backoff, classify, HOLD_AFTER_MS, Outbox, type EnqueueInput } from './outbox';
 import type { OutboxItem } from './types';
 
 /** A server that records what it got and answers from a script. */
@@ -312,5 +312,27 @@ describe('OfflineCache (spec 027)', () => {
     await outbox.drain();
     expect(bodies).toEqual([{ photos: [] }, { photos: ['uploaded'] }]);
     expect(db.outboxRows.size).toBe(0);
+  });
+  it('holds a write queued more than 30 days ago until the person confirms it (spec 034)', async () => {
+    const f = fixture();
+    f.setAnswer(() => new NetworkError(undefined, true));
+    await f.outbox.enqueue(f.write('old'));
+    await f.outbox.enqueue(f.write('after', { dependsOn: ['old'] }));
+    await f.outbox.drain();
+    expect(f.received).toEqual(['old']);
+    f.setAnswer(() => ({ ok: true }));
+    await f.advance(HOLD_AFTER_MS + 1);
+    expect(states(f.outbox)).toEqual(['old:held', 'after:held']);
+    expect(f.received).toEqual(['old']);
+    // "Sync now" does not send it either.
+    await f.outbox.retryAll();
+    expect(f.received).toEqual(['old']);
+    await f.outbox.confirm('old');
+    await f.outbox.drain();
+    expect(f.received).toEqual(['old', 'old']);
+    expect(states(f.outbox)).toEqual(['after:held']);
+    await f.outbox.confirm('after');
+    await f.outbox.drain();
+    expect(f.db.outboxRows.size).toBe(0);
   });
 });
