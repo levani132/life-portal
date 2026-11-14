@@ -1,14 +1,12 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import { ApiError, request, tokens } from '../api';
-import { clearMeta, lostWrites, mayReplayAs, otherAccountsPending, readMeta, writeMeta } from './device-meta';
+import { clearMeta, lostWrites, otherAccountsPending, readMeta, writeMeta } from './device-meta';
 import { OfflineCache } from './cache';
 import { deleteIdb, idbAvailable, openIdb } from './idb-store';
 import { memoryDb } from './memory-store';
 import { Outbox, type EnqueueInput, type OutboxSnapshot } from './outbox';
-import { sendPostDraft } from './post-draft-send';
-import { POST_DRAFT_KIND } from './post-drafts';
+import { sendAs } from './send';
 import type { OfflineDb, OutboxItem } from './types';
 
 /**
@@ -42,19 +40,6 @@ let unsubscribe: (() => void) | undefined;
 function notify() {
   listeners.forEach((listener) => listener());
 }
-
-/**
- * Sends one write as `userId`. Spec 034: never under another identity — if the token in hand was
- * issued for another account (someone signed in as B while A's writes were still open here), the
- * write is answered like a 401 and waits in `auth` until A signs in again.
- */
-const sendAs = (userId: string) => (item: OutboxItem, save: (body: unknown) => Promise<void>) => {
-  if (!mayReplayAs(userId, tokens.access ?? tokens.refresh))
-    return Promise.reject(new ApiError('Signed in as another account.', 401));
-  return item.kind === POST_DRAFT_KIND
-    ? sendPostDraft(item, save)
-    : request(item.path, { method: item.method, body: item.body, headers: { 'Idempotency-Key': item.id } });
-};
 
 // ------------------------------------------------------------- notices (spec 034)
 
