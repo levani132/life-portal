@@ -19,3 +19,4 @@ export * from './lib/messages';
 export * from './lib/training';
 export * from './lib/badges';
 export * from './lib/tournaments';
+export * from './lib/sync-health';

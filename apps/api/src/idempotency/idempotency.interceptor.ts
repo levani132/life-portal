@@ -2,6 +2,7 @@ import {
   ConflictException,
   HttpException,
   Injectable,
+  Optional,
   UnprocessableEntityException,
   type CallHandler,
   type ExecutionContext,
@@ -11,9 +12,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import { createHash } from 'node:crypto';
 import type { Model } from 'mongoose';
 import { from, lastValueFrom, type Observable } from 'rxjs';
+import { syncAgeBucket, syncRefusalKey } from '@life-portal/shared-domain';
+import { SyncHealthService } from '../sync-health/sync-health.service';
 import { IdempotencyKey } from './idempotency.schema';
 
 export const IDEMPOTENCY_HEADER = 'idempotency-key';
+/** Issue #22: seconds the write waited on the device. Only ever bucketed, never stored. */
+export const QUEUED_AGE_HEADER = 'x-queued-age';
 const KEY_PATTERN = /^[A-Za-z0-9_:-]{8,100}$/;
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 /** A replay window comfortably longer than an offline outbox keeps retrying. */
@@ -57,7 +62,11 @@ export class IdempotencyInterceptor implements NestInterceptor {
   /** The clock, replaceable in tests. */
   now: () => number = Date.now;
 
-  constructor(@InjectModel(IdempotencyKey.name) private readonly keys: Model<IdempotencyKey>) {}
+  constructor(
+    @InjectModel(IdempotencyKey.name) private readonly keys: Model<IdempotencyKey>,
+    /** Issue #22: content-free counters of what keyed writes met. Optional so unit tests skip it. */
+    @Optional() private readonly health?: SyncHealthService,
+  ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     if (context.getType() !== 'http') return next.handle();
@@ -74,7 +83,28 @@ export class IdempotencyInterceptor implements NestInterceptor {
       });
     }
     const response = http.getResponse<{ setHeader(name: string, value: string): void }>();
-    return from(this.run(userId, key, fingerprintOf(request), next, response));
+    const age = request.headers[QUEUED_AGE_HEADER];
+    const tally = { replayed: false };
+    return from(this.counted(tally, Array.isArray(age) ? age[0] : age, this.run(userId, key, fingerprintOf(request), next, response, tally)));
+  }
+
+  /**
+   * Issue #22: counts what the write met — replayed, refused (by code) and how long it waited —
+   * after the answer is decided. A replayed refusal counts as a replay, not a second refusal.
+   */
+  private async counted(tally: { replayed: boolean }, age: string | undefined, answer: Promise<unknown>): Promise<unknown> {
+    let refusal: string | undefined;
+    try {
+      return await answer;
+    } catch (error) {
+      if (error instanceof HttpException && error.getStatus() < 500 && !tally.replayed) {
+        const body = error.getResponse();
+        refusal = syncRefusalKey(error.getStatus(), typeof body === 'object' && body ? (body as { code?: unknown }).code : undefined);
+      }
+      throw error;
+    } finally {
+      this.health?.record({ replayed: tally.replayed, refusal, age: syncAgeBucket(age) }, new Date(this.now()));
+    }
   }
 
   private async run(
@@ -83,9 +113,11 @@ export class IdempotencyInterceptor implements NestInterceptor {
     fingerprint: string,
     next: CallHandler,
     response: { setHeader(name: string, value: string): void },
+    tally: { replayed: boolean } = { replayed: false },
   ): Promise<unknown> {
     const claimed = await this.claim(userId, key, fingerprint);
     if (claimed !== true) {
+      tally.replayed = true;
       response.setHeader('Idempotent-Replayed', 'true');
       return replay(claimed);
     }

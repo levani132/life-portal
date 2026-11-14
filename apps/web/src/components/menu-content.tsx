@@ -61,6 +61,7 @@ export function MenuContent() {
     ...(data?.cohort === 'developer'
       ? [
           { href: '/settings/access', label: 'Feature access', icon: Flag },
+          { href: '/settings/sync-health', label: 'Sync health', icon: Flag },
           ...(data.access.foodPosts &&
           data.access.social &&
           data.access.nutrition

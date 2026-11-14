@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { MongooseModule } from '@nestjs/mongoose';
+import { SyncHealthModule } from '../sync-health/sync-health.module';
 import { IdempotencyInterceptor } from './idempotency.interceptor';
 import { IdempotencyKey, IdempotencyKeySchema } from './idempotency.schema';
 
@@ -11,7 +12,7 @@ import { IdempotencyKey, IdempotencyKeySchema } from './idempotency.schema';
  */
 @Global()
 @Module({
-  imports: [MongooseModule.forFeature([{ name: IdempotencyKey.name, schema: IdempotencyKeySchema }])],
+  imports: [MongooseModule.forFeature([{ name: IdempotencyKey.name, schema: IdempotencyKeySchema }]), SyncHealthModule],
   providers: [{ provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor }],
 })
 export class IdempotencyModule {}
