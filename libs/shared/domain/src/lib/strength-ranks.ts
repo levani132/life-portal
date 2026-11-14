@@ -5,9 +5,11 @@ import {
   type Measure,
   type RankBasis,
   type RankBenchmark,
+  type RankDivision,
   type RankMethod,
   type RankPosition,
   type RankStandards,
+  type RankTier,
 } from '@life-portal/shared-types';
 import { addDays } from './dates';
 import { effectiveLoadGrams, estimateOneRepMax, type BodyWeight, type ProgressSet } from './training';
@@ -744,3 +746,60 @@ export function exerciseRank(input: RankInput, versions: readonly BenchmarkVersi
 
 /** "Veteran II" */
 export const rankLabel = (position: Pick<RankPosition, 'tier' | 'division'>) => `${position.tier} ${position.division}`;
+
+// ------------------------------------------------------------------ rank journey (#13), display
+
+/** One tier of the rank journey: its three division starts and where the member stands. */
+export interface RankLadderRung {
+  tier: RankTier;
+  /** 0 (Initiate) to 7 (Legend). */
+  index: number;
+  /** Where III, II and I start, in score units. */
+  starts: [number, number, number];
+  /** `current`: the member's current tier. `reached`: at or below the best tier ever reached. */
+  state: 'current' | 'reached' | 'locked';
+  /** The division its emblem shows: the one held or reached there, I below that, III when locked. */
+  division: RankDivision;
+}
+
+/**
+ * The eight tiers for the rank journey, **Legend first** (you climb up). Purely a reading of the
+ * existing view: thresholds come from `milestoneStarts(tierStarts)`, nothing is scored here, and a
+ * tier counts as reached when the current or highest-ever rank is in it or above it.
+ */
+export function rankLadder(
+  tierStarts: readonly number[],
+  current?: Pick<RankPosition, 'milestone'>,
+  highest?: Pick<RankPosition, 'milestone'>,
+): RankLadderRung[] {
+  const starts = milestoneStarts(tierStarts);
+  const top = Math.max(current?.milestone ?? -1, highest?.milestone ?? -1);
+  const topTier = top < 0 ? -1 : Math.floor(top / 3);
+  const currentTier = current ? Math.floor(current.milestone / 3) : -1;
+  return RANK_TIERS.map((tier, index): RankLadderRung => {
+    const own = [starts[index * 3], starts[index * 3 + 1], starts[index * 3 + 2]] as [number, number, number];
+    if (index === currentTier && current) {
+      return { tier, index, starts: own, state: 'current', division: RANK_DIVISIONS[current.milestone % 3] };
+    }
+    if (index <= topTier) {
+      const division = index === topTier ? RANK_DIVISIONS[top % 3] : 'I';
+      return { tier, index, starts: own, state: 'reached', division };
+    }
+    return { tier, index, starts: own, state: 'locked', division: 'III' };
+  }).reverse();
+}
+
+/**
+ * About how much heavier the estimated one-rep max must be to reach the next division, in grams:
+ * the score formula run backwards for `nextScore`, assuming the same body weight and the same
+ * work-capacity bonus as the ranked workout. An estimate, shown as one; `undefined` for a reps
+ * standard, at Legend I, or without the body weight the score was scaled with.
+ */
+export function oneRepMaxToNextGrams(position: RankPosition, standards: RankStandards): number | undefined {
+  const { nextScore, basis } = position;
+  if (nextScore === undefined || !basis.bodyWeightGrams || !basis.oneRepMaxGrams) return undefined;
+  const reference = RANK_REFERENCE_BODY_WEIGHT_GRAMS[standards];
+  const bonus = 1 + (basis.bonusPercent ?? 0) / 100;
+  const needed = ((nextScore / bonus) * reference) / 1000 / Math.pow(reference / basis.bodyWeightGrams, RANK_ALLOMETRIC_EXPONENT);
+  return Math.max(0, Math.ceil(needed - basis.oneRepMaxGrams));
+}

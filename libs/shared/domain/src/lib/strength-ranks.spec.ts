@@ -5,6 +5,8 @@ import {
   canonicalRankVersion,
   exerciseRank as rankWith,
   milestoneStarts,
+  oneRepMaxToNextGrams,
+  rankLadder,
   rankLabel,
   rankLoadNote,
   rankPosition,
@@ -486,5 +488,54 @@ describe('frozen v1 (owner approval, #5)', () => {
     expect(canonicalRankVersion('v1-rc1')).toBe('v1');
     expect(canonicalRankVersion('v1')).toBe('v1');
     expect(canonicalRankVersion('v2')).toBe('v2');
+  });
+});
+
+describe('rank journey (#13)', () => {
+  const BENCH = [0, 550, 850, 1100, 1400, 1650, 1900, 2150];
+  const basis = { setId: 's', sessionId: 'w', day: '2026-11-10', reps: 1 };
+
+  it('lists the eight tiers Legend first, with each tier\'s three division starts', () => {
+    const ladder = rankLadder(BENCH);
+    expect(ladder.map((rung) => rung.tier)).toEqual([...RANK_TIERS].reverse());
+    expect(ladder.at(-1)?.starts).toEqual([0, 183, 367]);
+    expect(ladder.find((rung) => rung.tier === 'Achiever')?.starts).toEqual([1100, 1200, 1300]);
+    expect(ladder.every((rung) => rung.state === 'locked' && rung.division === 'III')).toBe(true);
+  });
+
+  it('marks the current tier, everything up to the best ever as reached, the rest locked', () => {
+    // Current Achiever II (milestone 10); best ever Veteran III (12).
+    const ladder = rankLadder(BENCH, { milestone: 10 }, { milestone: 12 });
+    const by = (tier: string) => ladder.find((rung) => rung.tier === tier);
+    expect(by('Achiever')).toMatchObject({ state: 'current', division: 'II' });
+    expect(by('Veteran')).toMatchObject({ state: 'reached', division: 'III' });
+    expect(by('Challenger')).toMatchObject({ state: 'reached', division: 'I' });
+    expect(by('Elite')).toMatchObject({ state: 'locked', division: 'III' });
+    // Inactive: only a best ever, so nothing is current.
+    expect(rankLadder(BENCH, undefined, { milestone: 4 }).filter((rung) => rung.state === 'current')).toEqual([]);
+  });
+
+  it('runs the score formula backwards for the 1RM still needed, never below zero', () => {
+    const at = (bodyWeightGrams: number, oneRepMaxGrams: number, nextScore: number, bonusPercent?: number) =>
+      oneRepMaxToNextGrams(
+        { milestone: 10, tier: 'Achiever', division: 'II', score: 0, nextScore, progress: 0, basis: { ...basis, bodyWeightGrams, oneRepMaxGrams, ...(bonusPercent ? { bonusPercent } : {}) } },
+        'men',
+      );
+    // At the 80 kg reference, 1.30x is a 104 kg one-rep max.
+    expect(at(80_000, 101_600, 1300)).toBe(2_400);
+    // Heavier lifters need more absolute load for the same score (allometric, exponent 2/3).
+    expect(at(100_000, 101_600, 1300)!).toBeGreaterThan(at(80_000, 101_600, 1300)!);
+    // The workout's work-capacity bonus is assumed again, so less load is needed.
+    expect(at(80_000, 101_600, 1300, 5)!).toBeLessThan(2_400);
+    expect(at(80_000, 120_000, 1300)).toBe(0);
+    // Round trip: the 1RM it asks for scores the next division.
+    const gap = at(93_000, 100_000, 1300)!;
+    expect(Math.round((((100_000 + gap) * Math.pow(80_000 / 93_000, 2 / 3)) * 1000) / 80_000)).toBeGreaterThanOrEqual(1300);
+  });
+
+  it('has no load estimate for reps, Legend I or a set without a body weight', () => {
+    const position = { milestone: 23, tier: 'Legend' as const, division: 'I' as const, score: 2500, progress: 1000, basis: { ...basis, bodyWeightGrams: 80_000, oneRepMaxGrams: 200_000 } };
+    expect(oneRepMaxToNextGrams(position, 'men')).toBeUndefined();
+    expect(oneRepMaxToNextGrams({ ...position, nextScore: 30, basis }, 'men')).toBeUndefined();
   });
 });

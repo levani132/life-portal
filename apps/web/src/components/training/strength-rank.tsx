@@ -1,15 +1,14 @@
 'use client';
 
-import clsx from 'clsx';
 import Link from 'next/link';
 import { useState } from 'react';
 import type {
+  Exercise,
   ExerciseRankView,
   PortalState,
   RankBenchmark,
   RankPosition,
   RankStandards,
-  RankTier,
   TrainingLevel,
   TrainingProfile,
   WeightUnit,
@@ -18,7 +17,9 @@ import { formatDay, rankLabel } from '@life-portal/shared-domain';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
 import { PROFILE_KEY, formatWeight } from '../../lib/training';
-import { ErrorNote } from '../ui';
+import { ErrorNote, Modal } from '../ui';
+import { RankEmblem } from './rank-emblem';
+import { RankJourney } from './rank-journey';
 
 /**
  * Strength rank for one exercise (issue #5b) inside its statistics view (#6): the current rank
@@ -27,44 +28,14 @@ import { ErrorNote } from '../ui';
  * other members. Only with `trainingRanks`.
  */
 
-const TIER_STYLE: Record<RankTier, string> = {
-  Initiate: 'from-slate-400 to-slate-600',
-  Explorer: 'from-emerald-400 to-emerald-700',
-  Challenger: 'from-sky-400 to-sky-700',
-  Achiever: 'from-indigo-400 to-indigo-700',
-  Veteran: 'from-violet-400 to-violet-700',
-  Elite: 'from-amber-300 to-amber-600',
-  Master: 'from-rose-400 to-rose-700',
-  Legend: 'from-yellow-200 via-amber-400 to-orange-600',
-};
-
 /** "1.25× body weight" or "25 reps". */
 export function formatRankScore(score: number, benchmark: Pick<RankBenchmark, 'method'>) {
   return benchmark.method === 'reps' ? `${score} ${score === 1 ? 'rep' : 'reps'}` : `${(score / 1000).toFixed(2)}× body weight`;
 }
 
-/** A hexagon in the tier's colours with one to three pips for III, II, I. The label is always text too. */
+/** The tier's emblem (#13) with one to three pips for III, II, I. The label is always text too. */
 export function RankBadge({ position, size = 'md', muted = false }: { position: Pick<RankPosition, 'tier' | 'division' | 'milestone'>; size?: 'sm' | 'md'; muted?: boolean }) {
-  const pips = (position.milestone % 3) + 1;
-  return (
-    <span
-      aria-hidden
-      className={clsx(
-        'relative inline-flex shrink-0 items-center justify-center bg-gradient-to-br text-white',
-        TIER_STYLE[position.tier],
-        size === 'md' ? 'h-12 w-11' : 'h-8 w-7',
-        muted && 'opacity-50 grayscale',
-      )}
-      style={{ clipPath: 'polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)' }}
-    >
-      <span className={clsx('font-bold', size === 'md' ? 'text-sm' : 'text-[10px]')}>{position.tier[0]}</span>
-      <span className="absolute bottom-[18%] flex gap-0.5">
-        {Array.from({ length: pips }, (_, i) => (
-          <span key={i} className={clsx('rounded-full bg-white', size === 'md' ? 'h-1 w-1' : 'h-0.5 w-0.5')} />
-        ))}
-      </span>
-    </span>
-  );
+  return <RankEmblem tier={position.tier} division={position.division} size={size === 'md' ? 44 : 28} muted={muted} />;
 }
 
 export function StrengthRank({ exerciseId, today }: { exerciseId: string; today: string }) {
@@ -72,19 +43,32 @@ export function StrengthRank({ exerciseId, today }: { exerciseId: string; today:
   const enabled = !!portal.data?.access.trainingRanks;
   const rank = useApi<ExerciseRankView>(enabled ? `/training/exercises/${exerciseId}/rank?today=${today}` : null);
   const profile = useApi<TrainingProfile>(enabled ? PROFILE_KEY : null);
+  const [journey, setJourney] = useState(false);
+  const exercise = useApi<Exercise>(journey ? `/training/exercises/${exerciseId}` : null);
   const unit: WeightUnit = profile.data?.weightUnit ?? 'kg';
   if (!enabled || !rank.data) return rank.error ? <ErrorNote message={(rank.error as Error).message} /> : null;
   const view = rank.data;
   if (view.reason === 'no_benchmark') {
     return (
       <p className="text-xs text-ink-faint">
-        No strength rank for this exercise: ranks cover a few standard free-weight and bodyweight lifts.
+        No strength rank for this exercise: it has no published standard. Your own exercises, cardio, stretches and some
+        movements are not ranked.
       </p>
     );
   }
   return (
     <section aria-label="Strength rank" className="rounded-xl border border-border p-3 text-sm">
-      <h4 className="label">Strength rank</h4>
+      <div className="flex items-baseline justify-between gap-2">
+        <h4 className="label">Strength rank</h4>
+        {view.benchmark && (
+          <button type="button" className="text-xs font-semibold text-accent" onClick={() => setJourney(true)}>
+            All ranks
+          </button>
+        )}
+      </div>
+      <Modal open={journey} onClose={() => setJourney(false)} title={exercise.data ? `Ranks · ${exercise.data.name}` : 'Ranks'} wide>
+        <RankJourney exerciseName={exercise.data?.name} view={view} unit={unit} tournaments={!!portal.data?.access.tournaments} />
+      </Modal>
       {view.reason === 'needs_standards' ? (
         <ChooseStandards onChosen={() => void rank.mutate()} />
       ) : view.reason === 'needs_body_weight' ? (

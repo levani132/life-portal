@@ -2,6 +2,17 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-14: Rank emblems and All ranks
+
+- **New rank emblems.** Each of the eight tiers has its own emblem, from a stone circle (Initiate)
+  to a gold-rayed sun (Legend). Pips under it show the division: one for III, two for II, three
+  for I.
+- **All ranks.** On an exercise's rank, "All ranks" shows every tier with where its III, II and I
+  start for that exercise, where you are, how far to the next division (with an estimate of the
+  extra weight), and how ranks differ from your level and from tournaments. "All strength ranks"
+  on your training level shows the tiers.
+- Ranks, thresholds and tournaments themselves are unchanged.
+
 ## 2026-11-14: Pick an exercise, not a machine
 
 - **Adding an exercise is one tap.** There is no "Which machine?" step any more: an exercise's

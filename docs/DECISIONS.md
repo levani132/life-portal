@@ -1785,3 +1785,22 @@ rows whose dataset names hide it, keeping the old name as an alias. Look-alike r
 moves people's history and rank standards between exercises, which is the silent combining the
 issue rules out.
 
+## 2026-11-14: Rank emblems and the rank journey (issue #13)
+
+**Signed off before building.** The emblems were shown as a concept sheet first and the owner
+approved the direction and five defaults: the silhouettes and materials, pips for III/II/I, Legend
+at the top of the ladder scrolled to the member, motion only on Legend's rays (none under reduced
+motion), and entry points on each exercise's rank card and the training level.
+
+**A shape per tier, not a colour per tier.** The old badge was one hexagon in eight gradients with
+the tier's initial, which leaned on colour. Each emblem now has its own silhouette and glyph, and
+the division is a count of filled pips with the empty ones outlined, so both read in greyscale.
+The rank stays written as text everywhere, so emblems are `aria-hidden` unless labelled.
+
+**The journey only reads the rank view.** `rankLadder` and `oneRepMaxToNextGrams` are pure
+functions over the view the API already returns; frozen v1 thresholds, scoring and tournament
+rules are untouched. The "load still needed" figure runs the score formula backwards, assuming the
+same body weight and work-capacity bonus, and is labelled "est" (principle 6). Opened from the
+training level, the journey shows the tiers alone: thresholds belong to an exercise, and there is
+no account-wide strength rank by design.
+

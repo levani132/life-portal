@@ -603,6 +603,22 @@ improvement) and reminders are built. See
 [tournaments](tournaments.md). The lock uses `TrainingRankService.rankFor`, which computes a rank
 for any standards and only from sets saved before a given instant; scoring uses `strengthBest`. Population-based calibration is optional future research.
 
+**Emblems and the rank journey (#13, display only).** `rank-emblem.tsx` draws the eight tiers
+as original SVG emblems, signed off on a concept sheet: each tier has its own silhouette and glyph
+(Initiate stone circle, Explorer bronze diamond, Challenger silver heater shield, Achiever gold
+hexagon, Veteran emerald laurel shield, Elite sapphire winged octagon, Master crowned amethyst
+shield, Legend obsidian sun with rays), so tiers differ without colour. The division is the number
+of filled pips (III one, II two, I three, empty slots outlined), and the rank is always also
+written as text, so an emblem is decorative unless labelled. Locked tiers are greyed, faded and
+carry a lock. Only Legend's rays move, only on the one large emblem, and only under
+`motion-safe`. `rank-journey.tsx` is the "All ranks" view: opened from an exercise's rank card
+(it names the exercise, shows the current or highest rank, progress, an "est"-labelled 1RM still
+needed from `oneRepMaxToNextGrams`, and every tier's III · II · I thresholds from `rankLadder`,
+Legend first and scrolled to the member) or from the training level ("All strength ranks": the
+tiers alone, since thresholds belong to an exercise), plus how ranks differ from levels and, with
+`tournaments`, from tournaments. Both helpers are pure readings of the rank view: no scoring,
+threshold or tournament rule changed.
+
 ### The Home card (US4)
 
 `weekSummary` (domain) over what `TrainingSummaryService` gathers; nothing stored.

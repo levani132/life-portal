@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ExerciseRankView, RankPosition } from '@life-portal/shared-types';
 import { StrengthRank, TrainingLevelLink, formatRankScore, workCapacityLine } from './strength-rank';
 import { api } from '../../lib/api';
@@ -129,4 +129,28 @@ it('says fixed standards are fixed, and drops the draft warning', () => {
   render(<StrengthRank exerciseId="e1" today="2026-11-13" />);
   expect(screen.getByText(/Standards v1 are fixed/)).toBeTruthy();
   expect(screen.queryByText(/may still change before they are fixed/)).toBeNull();
+});
+
+it('opens all ranks from the rank card, naming the exercise and marking where the member is (#13)', () => {
+  responses['/portal'] = { access: { trainingRanks: true, tournaments: true } };
+  responses[RANK_URL] = view();
+  responses['/training/exercises/e1'] = { id: 'e1', name: 'Barbell Bench Press - Medium Grip' };
+  render(<StrengthRank exerciseId="e1" today="2026-11-13" />);
+  fireEvent.click(screen.getByRole('button', { name: 'All ranks' }));
+  const dialog = screen.getByRole('dialog', { name: 'Ranks · Barbell Bench Press - Medium Grip' });
+  const rungs = within(dialog).getAllByRole('listitem');
+  expect(rungs.map((rung) => rung.querySelector('p')?.textContent)).toEqual(['Legend', 'Master', 'Elite', 'Veteran', 'Achiever', 'Challenger', 'Explorer', 'Initiate']);
+  const here = rungs.find((rung) => rung.getAttribute('aria-current') === 'step');
+  expect(here?.textContent).toMatch(/Veteran.*You · II/);
+  expect(rungs[0].textContent).toMatch(/Locked/);
+  expect(rungs[7].textContent).toMatch(/Reached/);
+  expect(within(dialog).getByText(/Tournaments: monthly/)).toBeTruthy();
+});
+
+it('says the rank card has no standard for an unranked exercise, without an All ranks button', () => {
+  responses['/portal'] = access(true);
+  responses[RANK_URL] = view({ status: 'unranked', reason: 'no_benchmark', benchmark: undefined, current: undefined, highest: undefined });
+  render(<StrengthRank exerciseId="e1" today="2026-11-13" />);
+  expect(screen.getByText(/it has no published standard/)).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'All ranks' })).toBeNull();
 });

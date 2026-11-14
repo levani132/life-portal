@@ -1,10 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { Clock, Flame, Star, Trophy, Zap } from 'lucide-react';
 import type { PortalState, TrainingLevel, TrainingSummary } from '@life-portal/shared-types';
 import { formatRecordValue } from '@life-portal/shared-domain';
 import { useApi } from '../../lib/hooks';
 import { useWorkoutDay } from '../../lib/training';
+import { Modal } from '../ui';
+import { RankJourney } from './rank-journey';
 
 /** `1:05` for an hour and five minutes, `25m` under an hour. Display only. */
 function shortTime(seconds: number): string {
@@ -28,6 +31,8 @@ function lastLabel(days: number | undefined): string {
 export function TrainingHero({ hideWhileTraining = false }: { hideWhileTraining?: boolean }) {
   const today = useWorkoutDay()();
   const { data } = useApi<TrainingSummary>(`/training/summary?today=${today}`);
+  const portal = useApi<PortalState>('/portal');
+  const [ranks, setRanks] = useState(false);
   // On the Workout tab the open workout's own header says all of this; keep it near the top.
   if (hideWhileTraining && data?.openSessionId) return null;
   const workouts = data?.workoutsThisWeek ?? 0;
@@ -44,6 +49,7 @@ export function TrainingHero({ hideWhileTraining = false }: { hideWhileTraining?
             : `${workouts} workouts down this week. Nice work.`;
 
   return (
+    <>
     <section className="relative mb-4 overflow-hidden rounded-2xl bg-gradient-to-br from-train-pull-solid via-train-arms-solid to-train-cardio-solid p-4 text-white shadow-lg shadow-train-arms-solid/20 sm:p-5">
       <div aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-white/10" />
       <div aria-hidden className="pointer-events-none absolute -bottom-16 right-16 h-32 w-32 rounded-full bg-white/10" />
@@ -62,9 +68,14 @@ export function TrainingHero({ hideWhileTraining = false }: { hideWhileTraining?
             <Stat icon={<Zap className="h-4 w-4" />} value={data?.openSessionId ? 'Now' : lastLabel(data?.daysSinceLast)} label="last workout" />
           )}
         </dl>
-        <LevelBar today={today} />
+        <LevelBar today={today} onRanks={portal.data?.access.trainingRanks ? () => setRanks(true) : undefined} />
       </div>
     </section>
+    {/* Outside the hero: its backdrop blur would trap a fixed modal, and its white text would leak in. */}
+    <Modal open={ranks} onClose={() => setRanks(false)} title="Strength ranks" wide>
+      <RankJourney tournaments={!!portal.data?.access.tournaments} />
+    </Modal>
+    </>
   );
 }
 
@@ -73,7 +84,7 @@ export function TrainingHero({ hideWhileTraining = false }: { hideWhileTraining?
  * you have trained, not how strong you are, so it never sits next to a strength figure. Hidden
  * until it loads, and when the flag is off.
  */
-function LevelBar({ today }: { today: string }) {
+function LevelBar({ today, onRanks }: { today: string; onRanks?: () => void }) {
   const portal = useApi<PortalState>('/portal');
   const enabled = !!portal.data?.access.trainingLevels;
   const { data } = useApi<TrainingLevel>(enabled ? `/training/level?today=${today}` : null);
@@ -89,6 +100,11 @@ function LevelBar({ today }: { today: string }) {
           {toNext} XP to level {data.level + 1}
         </span>
       </div>
+      {onRanks && (
+        <button type="button" className="mt-1 text-[11px] font-semibold text-white underline underline-offset-2" onClick={onRanks}>
+          All strength ranks
+        </button>
+      )}
       <div
         className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/25"
         role="progressbar"
