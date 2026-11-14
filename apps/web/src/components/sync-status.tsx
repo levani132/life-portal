@@ -30,7 +30,7 @@ export function SyncStatus() {
 
   const auth = items.some((item) => item.state === 'auth');
   const attention = items.filter(
-    (item) => item.state === 'error' || item.state === 'conflict' || item.state === 'held',
+    (item) => item.state === 'error' || item.state === 'conflict' || item.state === 'held' || item.state === 'incompatible',
   ).length;
   const label = auth
     ? 'Sign in to sync'
@@ -131,6 +131,7 @@ const STATE_TEXT: Record<OutboxItem['state'], string> = {
   error: 'Not accepted',
   conflict: 'Changed elsewhere',
   held: 'Waiting for you',
+  incompatible: 'Can’t be sent by this version',
 };
 
 function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: string; run: Undo } | null) => void }) {
@@ -172,7 +173,7 @@ function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: st
         </div>
         <div className="flex shrink-0 gap-1">
           {/* Sending a clashing edit again would only clash again: the person chooses below. */}
-          {!clash && !tooOld && item.state !== 'held' && (
+          {!clash && !tooOld && item.state !== 'held' && item.state !== 'incompatible' && (
             <button
               type="button"
               className="btn-ghost px-2 py-1 text-xs"
@@ -207,6 +208,13 @@ function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: st
       )}
       {clash && <ClashChoice item={item} clash={clash} onUndo={onUndo} />}
       {tooOld && <TooOldChoice item={item} recordedAt={tooOld.recordedAt} />}
+      {/* Spec 034: saved by another version of the app; kept exactly as stored, never sent. */}
+      {item.state === 'incompatible' && (
+        <p className="mt-2 rounded-md bg-amber-500/10 p-2 text-xs">
+          This change was saved by a different version of the app, and this version can’t read it, so it won’t be
+          sent. It stays on this device unchanged, in case an update can send it.
+        </p>
+      )}
       {/* Spec 034: queued more than 30 days ago; sent only if the person still wants it. */}
       {item.state === 'held' && (
         <div className="mt-2 space-y-2 rounded-md bg-amber-500/10 p-2 text-xs">
@@ -231,7 +239,9 @@ function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: st
       {confirm && (
         <div className="mt-2 flex flex-wrap items-center justify-end gap-2 rounded-md bg-rose-500/10 p-2 text-xs">
           <span className="mr-auto">
-            Delete this change for good? Changes that depend on it go too.
+            {item.state === 'incompatible'
+              ? 'Delete this change for good? It cannot be recovered afterwards, and changes that depend on it go too.'
+              : 'Delete this change for good? Changes that depend on it go too.'}
           </span>
           <button
             type="button"

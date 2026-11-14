@@ -1,3 +1,4 @@
+import { OUTBOX_SCHEMA, readOutboxRecord } from './schema';
 import { ApiError, NetworkError } from '../api';
 import { offlineModuleOf, type OutboxItem, type OutboxState, type OutboxStore, type WriteMethod } from './types';
 
@@ -122,7 +123,7 @@ export class Outbox {
 
   /** Reads the store again (after a reload, or when another tab changed it). */
   async load(): Promise<void> {
-    this.items = await this.options.store.all();
+    this.items = await this.read();
     this.publish();
   }
 
@@ -133,6 +134,7 @@ export class Outbox {
     const seq = Math.max(this.now(), (this.items[this.items.length - 1]?.seq ?? 0) + 1);
     const item: OutboxItem = {
       ...input,
+      schema: OUTBOX_SCHEMA,
       seq,
       state: 'pending',
       attempts: 0,
@@ -162,7 +164,7 @@ export class Outbox {
       this.timer = undefined;
     }
     // Under the lock, the store is the truth: another tab may have sent or added items.
-    this.items = await this.options.store.all();
+    this.items = await this.read();
     // Spec 034: a write from more than 30 days ago may no longer be what the person wants.
     for (const item of this.items) {
       if (item.state === 'pending' && !item.sendConfirmed && item.createdAt < this.now() - HOLD_AFTER_MS)
@@ -237,7 +239,14 @@ export class Outbox {
     }, Math.max(0, at - this.now()));
   }
 
+  /** The store as this version reads it (spec 034): migrated, or `incompatible` and left as stored. */
+  private async read(): Promise<OutboxItem[]> {
+    return (await this.options.store.all()).map((record) => readOutboxRecord(record));
+  }
+
   private async update(item: OutboxItem, patch: Partial<OutboxItem>) {
+    // Spec 034: a record this version cannot read is kept exactly as it was stored.
+    if (item.state === 'incompatible') return;
     const next = { ...item, ...patch };
     await this.options.store.put(next);
     this.items = this.items.map((other) => (other.id === item.id ? next : other));
@@ -249,7 +258,7 @@ export class Outbox {
   async retry(id: string): Promise<void> {
     await this.load();
     const item = this.items.find((other) => other.id === id);
-    if (!item) return;
+    if (!item || item.state === 'incompatible') return;
     await this.update(item, { state: 'pending', nextAttemptAt: 0 });
     void this.drain();
   }
@@ -263,7 +272,7 @@ export class Outbox {
   async replace(id: string, input: Pick<EnqueueInput, 'body' | 'meta' | 'label'> & { id: string }): Promise<void> {
     await this.load();
     const item = this.items.find((other) => other.id === id);
-    if (!item || this.items.some((other) => other.id === input.id)) return;
+    if (!item || item.state === 'incompatible' || this.items.some((other) => other.id === input.id)) return;
     const { lastError: _error, lastErrorCode: _code, lastErrorData: _data, lastErrorCurrent: _current, ...rest } = item;
     const next: OutboxItem = {
       ...rest,
@@ -336,7 +345,7 @@ export class Outbox {
     this.timer = undefined;
   }
 
-  count(states: OutboxState[] = ['pending', 'error', 'conflict', 'auth', 'held']): number {
+  count(states: OutboxState[] = ['pending', 'error', 'conflict', 'auth', 'held', 'incompatible']): number {
     return this.items.filter((item) => states.includes(item.state)).length;
   }
 

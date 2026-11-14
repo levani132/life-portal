@@ -10,8 +10,10 @@ export type WriteMethod = 'POST' | 'PUT' | 'PATCH' | 'DELETE';
  * - `conflict`: the server answered 409; the thing changed elsewhere. Needs the person.
  * - `auth`: the session ended. Waits, under this account only, until the same account signs in.
  * - `held`: queued more than 30 days ago (spec 034). Not sent until the person confirms it.
+ * - `incompatible`: a stored record this version cannot read (spec 034, `schema.ts`). Never sent
+ *   and never rewritten; only discarded, with a confirmation.
  */
-export type OutboxState = 'pending' | 'error' | 'conflict' | 'auth' | 'held';
+export type OutboxState = 'pending' | 'error' | 'conflict' | 'auth' | 'held' | 'incompatible';
 
 /** One write, kept on the device until the server acknowledges it. */
 export interface OutboxItem<M = unknown> {
@@ -52,6 +54,8 @@ export interface OutboxItem<M = unknown> {
   maybeSent?: boolean;
   /** Spec 034: the person confirmed sending it although it was queued more than 30 days ago. */
   sendConfirmed?: boolean;
+  /** Spec 034: the record's shape version (`schema.ts`); missing means 1. */
+  schema?: number;
   createdAt: number;
 }
 
@@ -66,6 +70,8 @@ export interface CacheEntry<V = unknown> {
   value: V;
   /** Epoch ms of the last read or write; unused entries expire. */
   touchedAt: number;
+  /** Spec 034: the value's shape version; another one is dropped and fetched again. Missing = 1. */
+  schema?: number;
 }
 
 export interface CacheStore {

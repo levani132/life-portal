@@ -16,6 +16,20 @@ the first consumer; #17 and #18 extend it to training and nutrition.
 enqueue or `put` for anything else **throws**. `outbox.spec.ts` asserts money keys are refused.
 Adding a module to the list is a privacy decision; record it in `docs/DECISIONS.md`.
 
+**Versions (spec 034).** The IndexedDB version (`idb-store.ts`, still 1) covers stores and
+indexes. Each record also carries `schema` (`offline/schema.ts`; missing means 1), which covers
+its shape.
+- **Outbox items are read through `readOutboxRecord()`.**
+  - The current version is used as it is.
+  - An older one is migrated step by step (`MIGRATIONS[n]` turns n into n+1) and saved migrated
+    when next updated.
+  - Anything else becomes `incompatible`: a newer app wrote it, it fails the shape check, or a
+    migration throws.
+- **What happens to an incompatible item.** It is never sent, retried or rewritten. The stored
+  record stays byte-for-byte as it was, so a later version can still send it. Writes waiting on
+  it keep waiting. The sync sheet explains this and offers Discard behind a confirmation.
+- **Cached reads.** One in another shape is simply dropped and fetched again: it is only a copy.
+
 Storage is the browser's IndexedDB, database `lp-offline:<userId>` (stores `outbox`, keyPath
 `id`; `cache`, keyPath `key`, index `touchedAt`). It is **not encrypted at rest** by the app.
 Settings says so, and says iOS may evict it.

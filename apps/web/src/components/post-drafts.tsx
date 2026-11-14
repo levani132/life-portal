@@ -72,7 +72,7 @@ function DraftRow({ item }: { item: OutboxItem<PostDraftMeta> }) {
 
   const live = publishing?.id === item.id;
   const waitingOn = (item.dependsOn ?? []).some((id) => snapshot.items.some((other) => other.id === id));
-  const refused = item.state === 'error' || item.state === 'conflict';
+  const refused = item.state === 'error' || item.state === 'conflict' || item.state === 'incompatible';
   const status = live
     ? `Posting… ${Math.round(publishing.fraction * 100)}%`
     : refused

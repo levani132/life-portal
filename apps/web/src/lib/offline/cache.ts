@@ -1,3 +1,4 @@
+import { CACHE_SCHEMA } from './schema';
 import { CACHE_SHELL_KEYS, offlineModuleOf, type CacheStore } from './types';
 
 /** Unused cached reads are dropped after this (decision 2026-11-14): the refresh-token lifetime. */
@@ -23,7 +24,8 @@ export class OfflineCache {
     this.check(key);
     const entry = await this.store.get(key);
     if (!entry) return undefined;
-    if (entry.touchedAt < this.now() - CACHE_TTL_MS) {
+    // Spec 034: a copy in another shape is only a copy: drop it, the server has the original.
+    if (entry.touchedAt < this.now() - CACHE_TTL_MS || (entry.schema ?? 1) !== CACHE_SCHEMA) {
       await this.store.remove(key);
       return undefined;
     }
@@ -33,7 +35,7 @@ export class OfflineCache {
 
   async put<V>(key: string, value: V): Promise<void> {
     this.check(key);
-    await this.store.put({ key, value, touchedAt: this.now() });
+    await this.store.put({ key, value, touchedAt: this.now(), schema: CACHE_SCHEMA });
   }
 
   remove(key: string): Promise<void> {
