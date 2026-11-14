@@ -1,0 +1,40 @@
+# Integration tests (issue #22): the real API against a real MongoDB, with the web outbox driven
+# against it. Separate from `check.yml` so the quality gate stays fast and database-free.
+# Needs no secrets: the JWT secret is random per run and each test file drops its own database.
+name: integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      NX_NO_CLOUD: 'true'
+      INTEGRATION_MONGODB_URI: mongodb://127.0.0.1:27017
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run test:integration

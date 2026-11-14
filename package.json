@@ -14,8 +14,9 @@
     "seed:foods": "npx tsx --tsconfig apps/api/tsconfig.app.json apps/api/src/seed/seed-foods.ts",
     "training:machines-audit": "npx tsx --tsconfig apps/api/tsconfig.app.json apps/api/src/seed/training-machines-audit.ts",
     "test": "npx nx run-many -t test",
+    "test:integration": "jest -c integration/jest.config.cjs --runInBand",
     "lint": "npx nx run-many -t lint",
-    "typecheck": "npx tsc -p apps/api/tsconfig.app.json --noEmit && npx tsc -p apps/web/tsconfig.json --noEmit",
+    "typecheck": "npx tsc -p apps/api/tsconfig.app.json --noEmit && npx tsc -p apps/web/tsconfig.json --noEmit && npx tsc -p integration/tsconfig.json",
     "check": "npm run typecheck && npm run lint && npm test"
   },
   "private": true,
