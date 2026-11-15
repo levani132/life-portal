@@ -55,7 +55,7 @@ const MUSCLE_CHIPS = [...MUSCLES].sort(
 
 /**
  * What leads an exercise's row. With a strength rank, the rank's emblem is the main mark and the
- * muscle group shrinks to a coloured badge on its corner; without one, the group's icon on its
+ * muscle group shrinks to a coloured badge on its corner (above the division pips, never over them); without one, the group's icon on its
  * tint, as before. An inactive rank (the highest ever, not kept up) is greyed.
  */
 function ExerciseMark({ style, rank }: { style: GroupStyle; rank?: ExerciseRankBadge }) {
@@ -77,7 +77,7 @@ function ExerciseMark({ style, rank }: { style: GroupStyle; rank?: ExerciseRankB
         label={`${rank.tier} ${rank.division}${rank.status === 'inactive' ? ', inactive' : ''}`}
       />
       <span
-        className={clsx('absolute -bottom-0.5 -right-1 flex h-4 w-4 items-center justify-center rounded-full ring-2 ring-surface-raised', style.solid)}
+        className={clsx('absolute -right-1.5 bottom-2 flex h-4 w-4 items-center justify-center rounded-full ring-2 ring-surface-raised', style.solid)}
         aria-hidden
       >
         <Icon className="h-2.5 w-2.5" />
