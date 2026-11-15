@@ -604,10 +604,19 @@ earlier live-percentile idea). `GET /training/exercises/:id/rank?today=` needs `
 **Ranks in the exercise list.** `GET /training/ranks?today=` (`TrainingRankService.badges`) is the
 short form for lists: it reads all of the caller's own sets once and runs the same `exerciseRank()`
 per shared catalogue exercise, so a badge always agrees with that exercise's rank panel. Nothing is
-stored. `ExerciseSearch` (the Exercises tab and every exercise picker) leads a ranked exercise's row
-with its rank emblem, the muscle group shrunk to a coloured badge on the emblem's corner; an
-inactive rank shows the highest ever, greyed; an unranked exercise keeps the group icon on its
-tint. The read is not kept on the device: offline, rows show the group icon.
+stored. The read is not kept on the device: offline, rows show no rank.
+
+**Muscle figures and the mark that leads a row.** `muscle-figure.tsx` holds eight close-up
+anatomical panels (chest, back, flexed arm, abs, hips, thighs front and back, calves) drawn as
+separate muscle shapes: our own drawings, signed off on the concept sheets. The first primary
+muscle picks the panel, every primary muscle on that panel is lit in the group colour, and the rest
+is dimmed. Display only, derived from `primaryMuscles`. In `ExerciseSearch` (the Exercises tab and
+every exercise picker) an unranked exercise's row leads with its figure on the group tint. A ranked
+one leads with the rank emblem, whose centre glyph gives way to a dark plate (`RANK_PLATE`)
+carrying the figure (`RankEmblem`'s `muscles` prop); shape, material, trim, ornaments and division
+pips are unchanged, and an inactive rank shows the highest ever, greyed. Cardio (by measure) and
+exercises with no muscle keep the group icon, and their emblem keeps its glyph. The emblem
+elsewhere (rank panel, journey, recap) is unchanged.
 
 **Tiers.** Initiate, Explorer, Challenger, Achiever, Veteran, Elite, Master, Legend, each in
 divisions III → II → I: 24 milestones. Each tier's score range is split into thirds; Legend is as

@@ -2,7 +2,8 @@
 
 import clsx from 'clsx';
 import { useId } from 'react';
-import { RANK_DIVISIONS, type RankDivision, type RankTier } from '@life-portal/shared-types';
+import { RANK_DIVISIONS, type Muscle, type RankDivision, type RankTier } from '@life-portal/shared-types';
+import { MuscleFigure, RANK_PLATE, hasMuscleFigure, plateColors } from './muscle-figure';
 
 /**
  * The strength-rank emblems (#13), as signed off on the concept sheet. Display only: nothing
@@ -13,6 +14,10 @@ import { RANK_DIVISIONS, type RankDivision, type RankTier } from '@life-portal/s
  * material rises from stone to metals to gems with gold trim. The division is the number of filled
  * pips (III one, II two, I three), with empty slots drawn as outlines so it reads in greyscale.
  * The emblem is decorative unless `label` is given: the rank is always also written as text.
+ *
+ * With `muscles` (an exercise's rank in a list), the centre glyph gives way to a dark plate
+ * carrying that exercise's muscle figure in its group colour, so one mark says rank and muscle.
+ * Everything else about the emblem stays.
  *
  * Motion: only Legend's rays turn, only where `animate` is set (a large, single emblem), and never
  * under `prefers-reduced-motion` (`motion-safe:`).
@@ -113,6 +118,18 @@ function GlyphMark({ glyph, ink }: { glyph: Glyph; ink: string }) {
   }
 }
 
+/** Where the muscle figure sits in each silhouette: its size and centre height, in emblem units. */
+const FIGURE_ROOM: Record<Shape, [number, number]> = {
+  circle: [26, 30],
+  diamond: [22, 30],
+  heater: [27, 28],
+  hex: [27, 30],
+  kite: [25, 28],
+  oct: [28, 30],
+  crowned: [26, 32],
+  medal: [25, 30],
+};
+
 export function RankEmblem({
   tier,
   division,
@@ -121,6 +138,7 @@ export function RankEmblem({
   muted = false,
   animate = false,
   label,
+  muscles,
   className,
 }: {
   tier: RankTier;
@@ -135,6 +153,8 @@ export function RankEmblem({
   animate?: boolean;
   /** Makes the emblem an image with this name; without it the emblem is decorative. */
   label?: string;
+  /** The exercise's main muscles: replaces the glyph with their figure on a dark plate. */
+  muscles?: readonly Muscle[];
   className?: string;
 }) {
   const look = TIER_LOOK[tier];
@@ -189,8 +209,24 @@ export function RankEmblem({
         )}
         <path d={body} fill={`url(#${id}m)`} stroke={look.trim} strokeWidth={2.6} strokeLinejoin="round" />
         <path d={body} fill={`url(#${id}s)`} />
-        <path d={body} transform="translate(32 31) scale(.8) translate(-32 -31)" fill="none" stroke="#fff" strokeOpacity={0.4} strokeWidth={1.6} strokeLinejoin="round" />
-        <GlyphMark glyph={look.glyph} ink={look.ink} />
+        {hasMuscleFigure(muscles) ? (
+          <>
+            <path d={body} transform="translate(32 31) scale(.78) translate(-32 -31)" fill={RANK_PLATE} stroke={look.trim} strokeWidth={1.4} strokeLinejoin="round" />
+            <MuscleFigure
+              muscles={muscles}
+              {...plateColors(muscles)}
+              gap={RANK_PLATE}
+              x={32 - FIGURE_ROOM[look.shape][0] / 2}
+              y={FIGURE_ROOM[look.shape][1] - FIGURE_ROOM[look.shape][0] / 2}
+              size={FIGURE_ROOM[look.shape][0]}
+            />
+          </>
+        ) : (
+          <>
+            <path d={body} transform="translate(32 31) scale(.8) translate(-32 -31)" fill="none" stroke="#fff" strokeOpacity={0.4} strokeWidth={1.6} strokeLinejoin="round" />
+            <GlyphMark glyph={look.glyph} ink={look.ink} />
+          </>
+        )}
         {look.crown && (
           <>
             <path d={CROWN} fill={`url(#${id}g)`} stroke="#92400e" strokeWidth={1.3} strokeLinejoin="round" />

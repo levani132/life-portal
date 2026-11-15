@@ -7,11 +7,13 @@ User-visible changes. Newest first.
 - **"Next from your plans" is now above "Ready when you are"** on the Workout tab, so the workout
   you're most likely to start is the first thing there. Without a plan in use, nothing changes.
 
-## 2026-11-15: Ranks in the exercise list
+## 2026-11-15: Muscle pictures and ranks in the exercise list
 
-- **An exercise you hold a strength rank on shows that rank's emblem in the exercise list**, with
-  its muscle group as a small coloured badge on the corner. A rank you haven't kept up is greyed.
-  Exercises without a rank look as before.
+- **Each exercise in the list shows a small picture of the body part it works**, with the
+  targeted muscles lit in the muscle group's colour, in place of the flame, waves and other group
+  icons. Cardio keeps its heart.
+- **An exercise you hold a strength rank on shows that rank's emblem with the muscle picture
+  inside it.** A rank you haven't kept up is greyed.
 - **The Exercises tab has less padding on a phone**, so names and details get more width.
 
 ## 2026-11-15: Training settings moved to the top card
