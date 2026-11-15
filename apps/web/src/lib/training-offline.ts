@@ -33,6 +33,7 @@ import {
 } from './offline/training-overlay';
 import { earlierEditsOf } from './offline/conflicts';
 import type { OutboxItem, WriteMethod } from './offline/types';
+import { clearDrafts } from './training-drafts';
 import { CURRENT_KEY, planKey, revalidateTraining, sessionKey, useWorkoutDay } from './training';
 
 /**
@@ -484,11 +485,14 @@ export const trainingWrites = {
       { op: 'session.finish', sessionId: session.id, endedAt },
       { method: 'POST', path: `${base(session.id)}/finish`, body: { endedAt } },
       'Finish workout',
-    );
+    ).then(() => clearDrafts(session.id));
   },
 
   remove(sessionId: string): Promise<void> {
-    return write({ op: 'session.remove', sessionId }, { method: 'DELETE', path: base(sessionId) }, 'Delete workout');
+    // Issue #32: rows typed but never ticked are no use once the workout is over.
+    return write({ op: 'session.remove', sessionId }, { method: 'DELETE', path: base(sessionId) }, 'Delete workout').then(() =>
+      clearDrafts(sessionId),
+    );
   },
 
   /**

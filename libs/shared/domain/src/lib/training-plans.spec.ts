@@ -5,6 +5,8 @@ import {
   planProgress,
   prefillFor,
   recentPlanIds,
+  startingRowCount,
+  startingSet,
   validatePlan,
   validatePlanTarget,
 } from './training-plans';
@@ -256,5 +258,61 @@ describe('validatePlanTarget: body weight with a signed load (#5)', () => {
     expect(validatePlanTarget('bodyweight_reps', working({ reps: 5, weightGrams: 20_000, assistGrams: 10_000 }))).toBe(
       'Use added weight or assistance, not both.',
     );
+  });
+});
+
+describe('starting a workout from last time (#32)', () => {
+  // The issue's example: the plan says 3 × 12 at 80 kg, last time was 85 × 10, 85 × 9, 80 × 11.
+  const plan = [0, 1, 2].map(() => working({ reps: 12, weightGrams: 80_000 }));
+  const lastTime = [
+    { type: 'working' as const, reps: 10, weightGrams: 85_000 },
+    { type: 'working' as const, reps: 9, weightGrams: 85_000 },
+    { type: 'working' as const, reps: 11, weightGrams: 80_000 },
+  ];
+
+  it('starts with last time’s sets, not the plan’s', () => {
+    expect(startingRowCount(lastTime, plan)).toBe(3);
+    expect([0, 1, 2].map((position) => startingSet('weight_reps', position, lastTime, plan[position])?.values)).toEqual([
+      { reps: 10, weightGrams: 85_000 },
+      { reps: 9, weightGrams: 85_000 },
+      { reps: 11, weightGrams: 80_000 },
+    ]);
+    expect(startingSet('weight_reps', 0, lastTime, plan[0])?.source).toBe('last_time');
+  });
+
+  it('takes last time’s set count even when the plan has more or fewer', () => {
+    expect(startingRowCount(lastTime.slice(0, 2), plan)).toBe(2);
+    expect(startingRowCount([...lastTime, ...lastTime], plan)).toBe(6);
+    // A row the plan has but last time did not starts empty; the table carries the row above.
+    expect(startingSet('weight_reps', 2, lastTime.slice(0, 2), plan[2])).toBeUndefined();
+  });
+
+  it('carries the set type over from last time, warm-ups included', () => {
+    const withWarmup = [{ type: 'warmup' as const, reps: 12, weightGrams: 40_000 }, ...lastTime];
+    expect(startingSet('weight_reps', 0, withWarmup, working({ reps: 5 }))).toEqual({
+      type: 'warmup',
+      values: { reps: 12, weightGrams: 40_000 },
+      source: 'last_time',
+    });
+  });
+
+  it('uses the plan only when there is no history', () => {
+    expect(startingRowCount(undefined, plan)).toBe(3);
+    expect(startingRowCount([], plan)).toBe(3);
+    expect(startingSet('weight_reps', 1, [], plan[1])).toEqual({ type: 'working', values: { reps: 12, weightGrams: 80_000 }, source: 'plan' });
+  });
+
+  it('starts one empty row with neither', () => {
+    expect(startingRowCount(undefined, undefined)).toBe(1);
+    expect(startingSet('weight_reps', 0, undefined, undefined)).toBeUndefined();
+  });
+
+  it('copies only what the exercise measures', () => {
+    const plank = [{ type: 'working' as const, durationSeconds: 60, reps: 3, weightGrams: 10_000 }];
+    expect(startingSet('duration', 0, plank, undefined)?.values).toEqual({ durationSeconds: 60, weightGrams: 10_000 });
+    const pullUps = [{ type: 'working' as const, reps: 8, assistGrams: 20_000 }];
+    expect(startingSet('bodyweight_reps', 0, pullUps, undefined)?.values).toEqual({ reps: 8, assistGrams: 20_000 });
+    const run = [{ type: 'working' as const, distanceMeters: 5_000, durationSeconds: 1_500 }];
+    expect(startingSet('distance_duration', 0, run, undefined)?.values).toEqual({ distanceMeters: 5_000, durationSeconds: 1_500 });
   });
 });

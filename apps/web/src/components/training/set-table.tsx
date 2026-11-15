@@ -4,10 +4,11 @@ import clsx from 'clsx';
 import { useEffect, useRef, useState } from 'react';
 import { Check, Plus, Trash2 } from 'lucide-react';
 import type { Measure, PlanTarget, SessionExercise, SetValues, WorkoutSet } from '@life-portal/shared-types';
-import { formatDay, formatWeight, setFieldsFor } from '@life-portal/shared-domain';
+import { formatDay, formatWeight, setFieldsFor, startingRowCount, startingSet } from '@life-portal/shared-domain';
 import { Modal } from '../ui';
 import { ApiError } from '../../lib/api';
 import { trainingWrites } from '../../lib/training-offline';
+import { draftNow, loadDraft, saveDraft } from '../../lib/training-drafts';
 import {
   RECORD_LABELS,
   SET_TYPE_LABELS,
@@ -70,9 +71,14 @@ const INPUT = 'px-1 text-center font-semibold tabular-nums';
 
 /**
  * The sets of one exercise as a table (spec 024 follow-up): one row per set with its inputs in
- * the row and a tick at the end. Planned sets are there from the start, pre-filled; ticking one
- * logs it, un-ticking a logged one takes it back, and the plus adds a row beyond the plan.
- * Rows not yet ticked are never data: nothing is sent until the tick.
+ * the row and a tick at the end. Ticking a row logs it, un-ticking a logged one takes it back, and
+ * the plus adds a row. Rows not yet ticked are never data: nothing is sent until the tick.
+ *
+ * Issue #32: an exercise done before starts with last time's sets, count, numbers and type, even
+ * when the plan says otherwise; the plan fills only an exercise never done (`startingSet`). What
+ * is typed into open rows, and rows added or removed, are kept on the device until the workout
+ * ends (`training-drafts`), so leaving and coming back never resets them, and nothing derived
+ * ever replaces a typed value.
  */
 export function SetTable({
   exercise,
@@ -89,37 +95,68 @@ export function SetTable({
   const measure = exercise.snapshot.measure;
   const columns = setColumns(measure, unit);
   const done = exercise.sets.length;
-  const targetCount = exercise.planned?.targets.length ?? 0;
-  // From a plan (spec 023): the open targets still to do, after any sets waiting to be sent.
-  const suggestions = exercise.skipped ? [] : exercise.openTargets;
+  const targets = exercise.planned?.targets;
+  const previous = exercise.previous?.sets;
+  const base = startingRowCount(previous, targets);
 
+  const kept = draftNow<SetFields>(exercise.sessionId, exercise.id);
   /** What the person typed into rows not yet ticked, by row position. Untouched rows are derived. */
-  const [edits, setEdits] = useState<Record<number, SetFields>>({});
-  /** Rows added with the plus. An exercise with no plan and no sets starts with one. */
-  const [extra, setExtra] = useState(() => (done === 0 && !exercise.planned ? 1 : 0));
+  const [edits, setEdits] = useState<Record<number, SetFields>>(() => kept?.edits ?? {});
+  /** Rows added (+) or removed (−) beyond what the exercise starts with. */
+  const [extra, setExtra] = useState(() => kept?.extra ?? 0);
   const [problem, setProblem] = useState<{ position: number; text: string } | null>(null);
   const [options, setOptions] = useState<number | null>(null);
 
+  // A draft kept from before a reload arrives from the device; it never replaces this visit's typing.
+  const touched = useRef(Boolean(kept));
+  useEffect(() => {
+    if (touched.current) return;
+    let live = true;
+    void loadDraft<SetFields>(exercise.sessionId, exercise.id).then((draft) => {
+      if (!live || !draft || touched.current) return;
+      touched.current = true;
+      setEdits(draft.edits);
+      setExtra(draft.extra);
+    });
+    return () => {
+      live = false;
+    };
+  }, [exercise.sessionId, exercise.id]);
+  useEffect(() => {
+    if (touched.current) saveDraft(exercise.sessionId, exercise.id, { edits, extra });
+  }, [exercise.sessionId, exercise.id, edits, extra]);
+  const touch = () => {
+    touched.current = true;
+  };
+
   const lastLogged: SetValues | undefined = exercise.sets[exercise.sets.length - 1];
-  const previous = exercise.previous?.sets;
   let above: SetValues | undefined = lastLogged;
-  const drafts = exercise.skipped
-    ? []
-    : Array.from({ length: suggestions.length + extra }, (_, index) => {
-        const position = done + index;
-        const target: PlanTarget | undefined = suggestions[index];
-        const suggested = target ? suggestionValue(exercise, target, position, lastLogged) : undefined;
-        // A row beyond the plan starts from the row above it, else from the same set last time.
-        const start =
-          suggested?.value ??
-          (above && valuesOf(above)) ??
-          (previous?.length ? valuesOf(previous[position] ?? previous[previous.length - 1]) : undefined);
-        const fields = edits[position] ?? fieldsFor(measure, start, unit);
-        above = readFields(measure, fields, unit);
-        return { position, target, source: suggested?.source, fields, planned: Boolean(target) };
-      });
+  const count = exercise.skipped ? 0 : Math.max(0, Math.max(0, base - done) + extra);
+  const drafts = Array.from({ length: count }, (_, index) => {
+    const position = done + index;
+    const target: PlanTarget | undefined = targets?.[position];
+    let start: (SetValues & { type?: SetFormValue['type'] }) | undefined;
+    let source: 'last_time' | 'plan' | undefined;
+    if (previous?.length) {
+      const before = startingSet(measure, position, previous, target);
+      if (before) {
+        start = { type: before.type, ...before.values };
+        source = 'last_time';
+      }
+    } else if (target) {
+      const suggested = suggestionValue(exercise, target, position, lastLogged);
+      start = suggested.value;
+      source = suggested.source;
+    }
+    // A row beyond what the exercise starts with carries the row above down.
+    start ??= above && valuesOf(above);
+    const fields = edits[position] ?? fieldsFor(measure, start, unit);
+    above = readFields(measure, fields, unit);
+    return { position, target, source, fields };
+  });
 
   const change = (position: number, fields: SetFields, patch: Partial<SetFields>) => {
+    touch();
     setEdits((current) => ({ ...current, [position]: { ...fields, ...patch } }));
     setProblem((current) => (current?.position === position ? null : current));
   };
@@ -142,27 +179,36 @@ export function SetTable({
       setProblem({ position, text: issue });
       return;
     }
+    touch();
     setProblem(null);
     onLog(value);
     // The ticked row becomes the next logged set; rows above it that are still open move down one.
     dropRow(position, (other) => (other < position ? other + 1 : other));
-    if (!suggestions.length) setExtra((count) => Math.max(0, count - 1));
+    // Past the rows the exercise started with, the ticked row was one of the added ones.
+    if (done >= base) setExtra((current) => current - 1);
   };
 
   const removeRow = (position: number) => {
+    touch();
     setOptions(null);
     dropRow(position, (other) => (other > position ? other - 1 : other));
-    setExtra((count) => Math.max(0, count - 1));
+    setExtra((current) => current - 1);
+  };
+
+  const addRow = () => {
+    touch();
+    setExtra((current) => current + 1);
   };
 
   /** Un-ticking a logged set deletes it and puts its numbers back in an open row. */
   const untick = async (set: WorkoutSet, fields: SetFields) => {
     const position = exercise.sets.length - 1;
-    const reopensTarget = !exercise.skipped && exercise.sets.length - 1 < targetCount;
     // Spec 028: kept on the device and applied at once; sent when there is a connection.
     await trainingWrites.removeSet(exercise.sessionId, set.id);
+    touch();
     setEdits((current) => ({ ...current, [position]: fields }));
-    if (!reopensTarget) setExtra((count) => count + 1);
+    // Within the rows the exercise started with, the row comes back by itself.
+    if (position >= base) setExtra((current) => current + 1);
   };
 
   const optionsRow = drafts.find((draft) => draft.position === options);
@@ -206,9 +252,13 @@ export function SetTable({
             onTick={() => tick(draft.position, draft.fields)}
             problem={problem?.position === draft.position ? problem.text : undefined}
             caption={
-              index === 0 && draft.target
-                ? `Plan: ${describeTarget(measure, draft.target, unit)}${draft.source === 'last_time' ? ' · filled from last time' : ''}`
-                : undefined
+              index !== 0
+                ? undefined
+                : draft.target
+                  ? `Plan: ${describeTarget(measure, draft.target, unit)}${draft.source === 'last_time' ? ' · filled from last time' : ''}`
+                  : draft.source === 'last_time' && exercise.previous
+                    ? `Filled from last time (${formatDay(exercise.previous.day)})`
+                    : undefined
             }
           />
         ))}
@@ -217,7 +267,7 @@ export function SetTable({
         <button
           type="button"
           className="mt-2 flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-accent/40 text-sm font-semibold text-accent transition-colors hover:border-accent hover:bg-accent/5"
-          onClick={() => setExtra((count) => count + 1)}
+          onClick={addRow}
         >
           <Plus className="h-5 w-5" /> Add set
         </button>
@@ -230,11 +280,9 @@ export function SetTable({
               Done
             </button>
           </div>
-          {!optionsRow.planned && (
-            <button type="button" className="btn-danger" onClick={() => removeRow(optionsRow.position)}>
-              <Trash2 className="h-4 w-4" /> Remove set
-            </button>
-          )}
+          <button type="button" className="btn-danger" onClick={() => removeRow(optionsRow.position)}>
+            <Trash2 className="h-4 w-4" /> Remove set
+          </button>
         </Modal>
       )}
     </div>

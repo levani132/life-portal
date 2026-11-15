@@ -223,6 +223,45 @@ export function prefillFor(
   return { type: target.type, values: pick(target), source: 'plan' };
 }
 
+/**
+ * Issue #32: how many set rows an exercise in a new workout starts with. Last time wins over the
+ * plan, including the count: people repeat what they actually did. The plan's count is used only
+ * for an exercise never done before, and an exercise with neither starts with one row.
+ */
+export function startingRowCount(
+  previousSets: readonly unknown[] | undefined,
+  targets: readonly PlanTarget[] | undefined,
+): number {
+  if (previousSets?.length) return previousSets.length;
+  if (targets?.length) return targets.length;
+  return 1;
+}
+
+/**
+ * Issue #32: what the row at `position` starts with. With history, the set at the same position
+ * last time, type included (a warm-up stays a warm-up), whatever the plan says; a row beyond last
+ * time's count gets nothing here (the caller carries the row above down). Without history, the
+ * plan's target at that position. Without either, nothing. Only fields the measure allows.
+ */
+export function startingSet(
+  measure: Measure,
+  position: number,
+  previousSets: readonly (SetValues & { type?: SetType })[] | undefined,
+  target: PlanTarget | undefined,
+): Prefill | undefined {
+  if (previousSets?.length) {
+    const before = previousSets[position];
+    if (!before) return undefined;
+    const values: SetValues = {};
+    for (const field of setFieldsFor(measure).allowed) {
+      const value = before[field];
+      if (value !== undefined && value !== null) values[field] = value;
+    }
+    return { type: before.type ?? 'working', values, source: 'last_time' };
+  }
+  return target ? prefillFor(measure, target, undefined, position) : undefined;
+}
+
 // ------------------------------------------------------------------ progress (research R8)
 
 /** The part of a session that progress reads. Open sessions count: you are doing it now. */

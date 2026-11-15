@@ -1,4 +1,5 @@
-import { fieldsFor, readFields } from './set-row';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { SetInput, fieldsFor, readFields } from './set-row';
 
 jest.mock('../../lib/api', () => ({ api: {}, ApiError: class extends Error {} }));
 
@@ -34,5 +35,32 @@ describe('the signed body-weight load', () => {
     const assisted = fieldsFor('assisted_reps', undefined, 'kg');
     expect(readFields('assisted_reps', { ...assisted, assist: '-20', reps: '8' }, 'kg').assistGrams).toBe(20000);
     expect(readFields('assisted_reps', { ...assisted, assist: '20', reps: '8' }, 'kg').assistGrams).toBe(20000);
+  });
+});
+
+describe('selecting a set number on focus (#32)', () => {
+  const reps = { key: 'reps', label: 'Reps', aria: 'Reps', inputMode: 'numeric', placeholder: '0' } as const;
+  const fields = fieldsFor('weight_reps', { reps: 12, type: 'working' }, 'kg');
+  const frame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+
+  it('selects the whole value when focused by keyboard, so typing replaces it', async () => {
+    render(<SetInput column={reps} fields={fields} onChange={jest.fn()} />);
+    const input = screen.getByLabelText('Reps') as HTMLInputElement;
+    input.focus();
+    await frame();
+    expect([input.selectionStart, input.selectionEnd]).toEqual([0, 2]);
+  });
+
+  it('keeps the selection through the tap that focused it, and lets the next tap place the caret', async () => {
+    render(<SetInput column={reps} fields={fields} onChange={jest.fn()} />);
+    const input = screen.getByLabelText('Reps') as HTMLInputElement;
+    fireEvent.pointerDown(input);
+    input.focus();
+    const first = fireEvent.pointerUp(input);
+    expect(first).toBe(false); // the caret-placing default was prevented
+    expect([input.selectionStart, input.selectionEnd]).toEqual([0, 2]);
+    // Already focused: a second tap is the person's own and is left alone.
+    fireEvent.pointerDown(input);
+    expect(fireEvent.pointerUp(input)).toBe(true);
   });
 });

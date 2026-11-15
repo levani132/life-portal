@@ -18,6 +18,7 @@ import { unregisterThisDevice } from './push';
 import { forgetUser, rememberedUser, rememberUser } from './offline/account';
 import { deleteOfflineData, endOffline, outbox, startOffline } from './offline/runtime';
 import { PendingLogout } from '../components/pending-logout';
+import { forgetDraftsInMemory } from './training-drafts';
 
 interface AuthState {
   user: User | null;
@@ -127,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     tokens.clear();
     if (user) await deleteOfflineData(user.id);
+    forgetDraftsInMemory();
     forgetUser();
     setOfflineSession(false);
     setUser(null);

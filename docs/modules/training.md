@@ -152,11 +152,33 @@ the `{userId, 'plan.planId', day}` index.
   carries a weight logged earlier in the same workout into a target without one, so the second
   set of a new exercise is still one tap.
 - **The set table** (`components/training/set-table.tsx`): one row per set, inputs in the row, a
-  tick at the end. Logged sets, then sets still in the queue, then open rows: one per open
-  target (each pre-filled as above), then rows added with "Add set". An open row is never data;
-  ticking it sends the set, un-ticking a logged one deletes it and keeps its numbers in an open
-  row. What is typed into open rows is browser state keyed by row position. A logged row's
-  numbers save (`PATCH /sets/:id`) when the row is left. Type and RPE sit behind the set number.
+  tick at the end. Logged sets, then sets still in the queue, then open rows, then rows added with
+  "Add set". An open row is never data; ticking it sends the set, un-ticking a logged one deletes
+  it and keeps its numbers in an open row. A logged row's numbers save (`PATCH /sets/:id`) when
+  the row is left. Type and RPE sit behind the set number. Any open row can be removed.
+- **What an exercise starts with (issue #32): last time wins over the plan.** Domain
+  `startingRowCount(previousSets, targets)` and `startingSet(measure, position, previousSets,
+  target)`. An exercise with `previous` (planned, unplanned or added) starts with **exactly**
+  last time's sets: their count, numbers (only the fields its measure allows) and type, by
+  position, so a warm-up stays a warm-up. The plan's targets (`prefillFor`) are used only when
+  there is no history; neither gives one empty row. Rows beyond those carry the row above down.
+  The plan caption ("Plan: 3 × 12 @ 80 kg") still shows, so a plan that differs from last time is
+  visible. A planned exercise is done once it has as many sets as it started with
+  (`setGoal` in `lib/training-workout.ts`); `openTargets` and the header's "of N planned sets"
+  still count the plan's targets.
+- **Open rows are kept on the device until the workout ends (issue #32)**,
+  `lib/training-drafts.ts`: per workout (`training:draft:<sessionId>` in the training cache, plus
+  memory), per workout exercise, the typed fields by row position and `extra` (rows added minus
+  removed relative to the starting count). Leaving the tab, a reload or closing the app keeps
+  them. Untouched rows stay derived, so `previous` arriving later fills them; a typed row or a
+  draft touched in this visit is never replaced by one read back from the device. Cleared by
+  `trainingWrites.finish` and `.remove`, and on sign-out with the rest of the device's data. Never
+  sent anywhere.
+- **Focusing a set's number selects it** (`selectOnFocus` in `set-row.tsx`), so typing replaces
+  it. The pointer-up of the tap that focused the field is swallowed (it would put the caret
+  back); later taps place the caret normally. Keyboard focus selects too.
+- **No previous-values column.** Last time is already shown in the exercise's header; the owner
+  chose not to add a PREV column or per-input hints (#32).
 - **One signed load field for `bodyweight_reps`** (web only; storage is unchanged): below zero is
   `assistGrams`, above is `weightGrams`, zero or empty is neither. The field has a sign switch,
   because the iOS decimal pad has no minus key. The carry-over above never adds assistance to a
@@ -190,13 +212,21 @@ superset), else the superset's last member's rest, else the exercise's own. The 
 +15 s and Skip change the current rest only, in memory (`useRestControls`, shared with the bar).
 
 **Done and current** (`workoutFocus`, derived on every render, sets still being sent included):
-a planned exercise is done once its planned sets are logged (extra sets keep it done); one added
+a planned exercise is done once its starting sets are logged (last time's count when it has
+history, else the plan's, `setGoal`; extra sets keep it done); one added
 by hand is done once it has a set and the last set was in another exercise outside its superset.
 Skipped exercises are neither. Current: in the last set's superset, the next member not done,
 round and round; else the last set's exercise while not done; else the first neither done nor
 skipped. Done exercises collapse to one green line and expand on tap; finished workouts are
 shown expanded. The collapse animates and keeps the page still; see "Collapsing without a jump"
 under Web.
+
+**Entering an open workout scrolls to the current exercise (issue #32)**,
+`lib/workout-entry-scroll.ts`: on mounting the open workout and each time its tab comes back
+(the tab panel losing `inert`), two frames later, the window glides (instantly under reduced
+motion) so the `aria-current="step"` card sits under the header and rest timer. Not after a
+tick, not when the person touched, wheeled or typed in between, not when nothing is current
+(everything done or skipped), and not when it is already within 4 px.
 
 **Rest over push** (`rest-alarm.service.ts`). The browser alone knows when a rest ends (the
 superset rule, ±15 s, Skip), so `RestAlarmSync` (mounted with the workout bar, on every page)

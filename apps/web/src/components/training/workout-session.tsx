@@ -37,6 +37,7 @@ import {
 import { ErrorNote, Modal, Spinner, Textarea } from '../ui';
 import { Collapsible } from '../collapsible';
 import { useScrollAnchor } from '../../lib/scroll-anchor';
+import { useScrollToCurrentOnEntry } from '../../lib/workout-entry-scroll';
 import { ApiError } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
 import {
@@ -63,7 +64,7 @@ import { SuggestedPlans } from './plan-suggestions';
 import { GROUP_STYLES, exerciseGroup, usePlanStyle } from '../../lib/training-colors';
 import { RestTimer } from './rest-timer';
 import { RestEditor } from './rest-editor';
-import { exerciseRest, sessionFocus } from '../../lib/training-workout';
+import { exerciseRest, sessionFocus, setGoal } from '../../lib/training-workout';
 import { SetForm, type SetFormValue } from './set-row';
 import { SetTable } from './set-table';
 import { PlanDayUpdate } from './plan-day-update';
@@ -179,6 +180,8 @@ export function WorkoutSession({
   const unsynced = hasUnsyncedWrites(writes, session.id);
   const list = useRef<HTMLDivElement>(null);
   useScrollAnchor(list);
+  // Issue #32: entering the open workout brings its first unfinished exercise into view.
+  useScrollToCurrentOnEntry(list, open);
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -544,7 +547,7 @@ function ExerciseBlock({
   const group = exerciseGroup(exercise.snapshot.primaryMuscles, measure);
   const style = GROUP_STYLES[group];
   const GroupIcon = style.icon;
-  const targetCount = exercise.planned?.targets.length ?? 0;
+  const targetCount = setGoal(exercise);
   const complete = targetCount > 0 && done >= targetCount;
   const iconButton = 'flex h-9 w-9 items-center justify-center rounded-lg text-ink-faint transition-colors hover:bg-surface hover:text-ink disabled:opacity-30';
   const isDone = state === 'done';

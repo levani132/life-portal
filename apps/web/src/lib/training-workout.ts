@@ -1,7 +1,7 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import { restAfter, supersetRuns, workoutFocus, type FocusExercise, type SupersetPlace } from '@life-portal/shared-domain';
+import { restAfter, startingRowCount, supersetRuns, workoutFocus, type FocusExercise, type SupersetPlace } from '@life-portal/shared-domain';
 import type { PlanDetail, PlanInput, SessionDetail, SessionExercise } from '@life-portal/shared-types';
 
 /**
@@ -21,6 +21,14 @@ export interface SessionFocus {
   supersets: Map<string, SupersetPlace>;
 }
 
+/**
+ * How many sets make a planned exercise done (issue #32): as many as it started with, which is
+ * last time's count when there is history, else the plan's. 0 for one added by hand (it is done
+ * once the person moves on).
+ */
+export const setGoal = (exercise: SessionExercise): number =>
+  exercise.planned ? startingRowCount(exercise.previous?.sets, exercise.planned.targets) : 0;
+
 /** The rest an exercise asks for: chosen in this workout, else the plan's. Absent: the default. */
 export const exerciseRest = (exercise: SessionExercise): number | undefined =>
   exercise.restSeconds ?? exercise.planned?.restSeconds;
@@ -36,7 +44,7 @@ export function sessionFocus(
     id: exercise.id,
     superset: exercise.superset,
     skipped: exercise.skipped,
-    targetCount: exercise.planned?.targets.length ?? 0,
+    targetCount: setGoal(exercise),
     logged: exercise.sets.length + (waiting.get(exercise.id) ?? 0),
     restSeconds: exerciseRest(exercise),
   }));

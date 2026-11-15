@@ -1,7 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type InputHTMLAttributes } from 'react';
 import {
   SET_TYPES,
   type Measure,
@@ -119,6 +119,39 @@ export function setColumns(measure: Measure, unit: WeightUnit): SetColumn[] {
  * A number with a sign switch in front: `+` is added weight, `−` is assistance. Typing a minus
  * works too where the keyboard has one; the switch is for the iOS decimal pad, which does not.
  */
+/**
+ * Issue #32: focusing a set's number selects all of it, so typing replaces it. Only on the way
+ * in: the pointer-up that focused the field would otherwise put the caret back, so that one
+ * pointer-up is swallowed, and every later tap or keypress places the caret as usual. iOS drops
+ * a selection made inside the focus event itself, hence the next frame.
+ */
+export function selectOnFocus(): Pick<
+  InputHTMLAttributes<HTMLInputElement>,
+  'onFocus' | 'onPointerDown' | 'onPointerUp'
+> {
+  const selectAll = (input: HTMLInputElement) => input.setSelectionRange(0, input.value.length);
+  return {
+    // A tap on a field that is not focused yet: its pointer-up is the one that would move the caret.
+    onPointerDown: (event) => {
+      const input = event.currentTarget;
+      if (document.activeElement !== input) input.dataset.focusing = '1';
+    },
+    onFocus: (event) => {
+      const input = event.currentTarget;
+      requestAnimationFrame(() => {
+        if (document.activeElement === input) selectAll(input);
+      });
+    },
+    onPointerUp: (event) => {
+      const input = event.currentTarget;
+      if (input.dataset.focusing !== '1') return;
+      delete input.dataset.focusing;
+      event.preventDefault();
+      if (document.activeElement === input) selectAll(input);
+    },
+  };
+}
+
 function SignedInput({
   value,
   onChange,
@@ -151,6 +184,7 @@ function SignedInput({
       </button>
       <Input
         inputMode="decimal"
+        {...selectOnFocus()}
         className={clsx('pl-10', className)}
         value={magnitude}
         disabled={disabled}
@@ -193,6 +227,7 @@ export function SetInput({
   }
   return (
     <Input
+      {...selectOnFocus()}
       inputMode={column.inputMode}
       className={className}
       value={fields[column.key]}

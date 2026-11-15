@@ -292,7 +292,9 @@ function ScrollHeader({
     const root = document.documentElement;
     const node = ref.current;
     const apply = () => {
-      const height = !hidden && node ? node.offsetHeight : 0;
+      // Issue #32: the real (fractional) height. `offsetHeight` rounds, and rounding down left a
+      // hairline above the stuck timer that content showed through.
+      const height = !hidden && node ? node.getBoundingClientRect().height : 0;
       root.style.setProperty('--header-offset', `${height}px`);
       root.style.setProperty('--header-band', height ? '0px' : 'var(--top-chrome)');
     };

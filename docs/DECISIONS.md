@@ -2257,3 +2257,23 @@ is display only.
 **No lockout by construction.** Unlinking the last way in is refused; a Google-only account adds
 a password through the reset email, which already proves the inbox.
 
+## 2026-11-15 · A workout starts from last time, and untyped rows stay on the device (issue #32)
+
+**Last time overrides the plan, count included.** The owner's call: what was actually done is a
+better start than what was planned, so an exercise with history starts with exactly those sets.
+The plan stays visible in the caption and still decides done/current. Only an exercise with no
+history uses the plan.
+
+**Typed-but-unticked rows are device state, not data.** They are kept in the training cache
+(already allowed on the device, spec 027) so a reload does not lose them, and are never sent:
+the tick is still the only thing that logs a set. A draft read back from the device never
+replaces typing done in this visit, and derived values never replace a typed one. Cleared on
+finish, discard and sign-out.
+
+**No previous-values UI.** Last time already shows in the exercise header; a PREV column would
+cost width on a phone for something already on screen.
+
+**Offline workouts still start without history.** A workout or exercise started offline has no
+`previous` (no per-exercise sets are cached), so it falls back to the plan. Caching history per
+exercise is a separate, larger change.
+

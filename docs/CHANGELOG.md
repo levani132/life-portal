@@ -2,6 +2,17 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-15: A workout starts where you left off last time
+
+- **An exercise you've done before starts with last time's sets**: the same number of sets, the
+  same weights and reps, and warm-ups still marked as warm-ups, even when the plan says
+  something else. The plan only fills in an exercise you've never done. Nothing is logged until
+  you tick it.
+- **What you type into a set you haven't ticked is kept** when you switch tabs, reload or close
+  the app, until you finish or discard the workout. Added and removed sets are kept too.
+- **Tapping a weight or reps field selects the number**, so typing replaces it.
+- **Opening a workout scrolls to the exercise you're on.**
+
 ## 2026-11-15: No "Training" title anywhere in Training
 
 - **The "Training" title row is gone from every Training tab**, not only during a workout, so
