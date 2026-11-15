@@ -70,32 +70,72 @@ async function parseError(response: Response): Promise<ApiError> {
   return new ApiError(body.message ?? body.error ?? 'Request failed', response.status, undefined, code, record);
 }
 
+/** Why the last sign-out happened, when the login page should explain it (issue #27). */
+export const SIGNED_OUT_REASON_KEY = 'lp.signedOutReason';
+
 /**
  * `refused` means the server said no (the session is over); `unreachable` means it could not be
  * asked. Only `refused` signs the person out: offline (spec 027) a refresh that cannot reach the
  * server must keep the tokens, or opening the app without signal would log you out.
+ *
+ * Issue #27: the server rotates the refresh token and treats an old one as stolen, so two tabs
+ * must not refresh with the same token. A Web Lock makes the tabs take turns, and a tab that gets
+ * the lock after another one refreshed just picks up the stored tokens.
  */
 async function refreshSession(): Promise<'ok' | 'refused' | 'unreachable'> {
-  const refreshToken = tokens.refresh;
-  if (!refreshToken) return 'refused';
+  const sent = tokens.refresh;
+  if (!sent) return 'refused';
+  const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
+  if (!locks) return refreshWith(sent);
+  return locks.request('lp.refresh', () => refreshWith(sent));
+}
+
+async function refreshWith(sent: string): Promise<'ok' | 'refused' | 'unreachable'> {
+  const current = tokens.refresh;
+  if (!current) return 'refused';
+  if (current !== sent) return 'ok';
 
   let response: Response;
   try {
     response = await fetch(`${API_URL}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
+      body: JSON.stringify({ refreshToken: sent }),
     });
   } catch {
     return 'unreachable';
   }
   if (response.status >= 500) return 'unreachable';
-  if (!response.ok) {
-    tokens.clear();
-    return 'refused';
+  if (response.ok) {
+    tokens.set((await response.json()) as AuthTokens);
+    return 'ok';
   }
-  tokens.set((await response.json()) as AuthTokens);
-  return 'ok';
+
+  const code = await response
+    .json()
+    .then((body: { code?: unknown }) => (typeof body.code === 'string' ? body.code : undefined))
+    .catch(() => undefined);
+  // Another tab refreshed with this token a moment ago (a browser without Web Locks): its new
+  // tokens are about to land in storage. Wait for them rather than signing out.
+  if (code === 'REFRESH_SUPERSEDED' && (await tokensReplaced(sent))) return 'ok';
+  if (code === 'LEGACY_SESSION') {
+    try {
+      window.localStorage.setItem(SIGNED_OUT_REASON_KEY, 'upgrade');
+    } catch {
+      // The notice is a courtesy; signing out must not depend on it.
+    }
+  }
+  tokens.clear();
+  return 'refused';
+}
+
+async function tokensReplaced(sent: string, waitMs = 2000): Promise<boolean> {
+  const until = Date.now() + waitMs;
+  while (Date.now() < until) {
+    if (tokens.refresh && tokens.refresh !== sent) return true;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return false;
 }
 
 /** No answer from the server at all (offline, DNS, a dropped connection). Never an `ApiError`. */

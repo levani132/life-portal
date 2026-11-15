@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { ApiError } from '../../lib/api';
+import { ApiError, SIGNED_OUT_REASON_KEY } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
 import { ErrorNote, Field, Input } from '../../components/ui';
 
@@ -14,6 +14,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [upgraded, setUpgraded] = useState(false);
+
+  // Issue #27: everyone was signed out once when sign-in sessions were rebuilt. Say why.
+  useEffect(() => {
+    try {
+      setUpgraded(window.localStorage.getItem(SIGNED_OUT_REASON_KEY) === 'upgrade');
+    } catch {
+      setUpgraded(false);
+    }
+  }, []);
 
   // Already signed in: no reason to show the form.
   useEffect(() => {
@@ -26,6 +36,11 @@ export default function LoginPage() {
     setError(null);
     try {
       await login(email, password);
+      try {
+        window.localStorage.removeItem(SIGNED_OUT_REASON_KEY);
+      } catch {
+        // Nothing to clean up.
+      }
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Could not sign in.');
     } finally {
@@ -40,6 +55,14 @@ export default function LoginPage() {
           Life<span className="text-accent">Portal</span>
         </h1>
         <p className="mb-6 text-sm text-ink-muted">Sign in to see where you stand.</p>
+
+        {upgraded && (
+          <p role="status" className="card mb-4 p-4 text-sm text-ink-muted">
+            We made sign-in more secure, so everyone has to sign in again once. Anything you saved
+            on this device that hadn&apos;t been sent yet is still here and will be sent after you
+            sign in.
+          </p>
+        )}
 
         <form onSubmit={submit} className="card space-y-4 p-5">
           <Field label="Email">

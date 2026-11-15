@@ -42,8 +42,9 @@ export class User {
   passwordHash!: string;
 
   /**
-   * Hash of the currently valid refresh token. Storing it lets logout actually invalidate a
-   * session rather than merely asking the client to forget the token.
+   * @deprecated Never read since issue #27; sessions live in `auth_sessions`. It was a bcrypt
+   * hash, and bcrypt only reads 72 bytes, which every refresh token of one user shared, so it
+   * could not revoke anything. Kept in the schema only so sign-in can `$unset` it.
    */
   @Prop({ select: false })
   refreshTokenHash?: string;

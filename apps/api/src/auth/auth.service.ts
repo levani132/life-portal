@@ -7,11 +7,14 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
+import { randomUUID } from 'node:crypto';
 import * as bcrypt from 'bcryptjs';
-import type { AuthSession, AuthTokens, JwtPayload, User as UserDto } from '@life-portal/shared-types';
+import type { AuthSession, AuthTokens, JwtPayload, RefreshRefusal, User as UserDto } from '@life-portal/shared-types';
 import { CONFIG, type AppConfig } from '../config/configuration';
 import { User, type UserDocument } from './schemas/user.schema';
+import { SessionsService } from './sessions.service';
+import { tokenHash } from './session-rules';
 import type { ChangePasswordDto, LoginDto, RegisterDto } from './dto/auth.dto';
 
 const BCRYPT_ROUNDS = 12;
@@ -22,9 +25,10 @@ export class AuthService {
     @InjectModel(User.name) private readonly userModel: Model<User>,
     private readonly jwt: JwtService,
     @Inject(CONFIG) private readonly config: AppConfig,
+    private readonly sessions: SessionsService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<AuthSession> {
+  async register(dto: RegisterDto, device = 'Unknown device'): Promise<AuthSession> {
     // When an invite code is configured, registration is closed without it. This is what
     // keeps a publicly deployed instance from accepting strangers.
     if (this.config.registrationInviteCode && dto.inviteCode !== this.config.registrationInviteCode) {
@@ -44,11 +48,11 @@ export class AuthService {
       cohort: 'production',
     });
 
-    return this.issueSession(created);
+    return this.issueSession(created, device);
   }
 
-  async login(dto: LoginDto): Promise<AuthSession> {
-    return this.issueSession(await this.authenticateCredentials(dto));
+  async login(dto: LoginDto, device = 'Unknown device'): Promise<AuthSession> {
+    return this.issueSession(await this.authenticateCredentials(dto), device);
   }
 
   /** Verify an OAuth sign-in without rotating the dashboard session. */
@@ -70,45 +74,69 @@ export class AuthService {
     return user;
   }
 
+  /**
+   * Rotates a refresh token (issue #27). The token must belong to a live session and be that
+   * session's current token; see `SessionsService.rotate` for how a race differs from a replay.
+   * A token from before sessions existed (no `sid`) is refused: those could not be revoked.
+   */
   async refresh(refreshToken: string): Promise<AuthTokens> {
     let payload: JwtPayload;
     try {
       payload = await this.jwt.verifyAsync<JwtPayload>(refreshToken, { secret: this.config.jwtSecret });
     } catch {
-      throw new UnauthorizedException('Your session has expired. Please sign in again.');
+      throw refused('SESSION_ENDED', 'Your session has expired. Please sign in again.');
     }
     if (payload.typ !== 'refresh') {
       throw new UnauthorizedException('That token cannot be used to refresh a session.');
     }
-
-    const user = await this.userModel.findById(payload.sub).select('+refreshTokenHash');
-    if (!user?.refreshTokenHash) {
-      throw new UnauthorizedException('Your session has been signed out.');
-    }
-    // Comparing against the stored hash makes logout and password changes actually revoke
-    // outstanding refresh tokens.
-    if (!(await bcrypt.compare(refreshToken, user.refreshTokenHash))) {
-      throw new UnauthorizedException('Your session has been signed out.');
+    if (!payload.sid) {
+      throw refused('LEGACY_SESSION', 'Sign-in was upgraded for security. Please sign in again.');
     }
 
-    const session = await this.issueSession(user);
-    return { accessToken: session.accessToken, refreshToken: session.refreshToken, expiresIn: session.expiresIn };
+    const user = await this.userModel.findById(payload.sub);
+    if (!user) throw refused('SESSION_ENDED', 'Your session has been signed out.');
+
+    const next = await this.signTokens(user, payload.sid);
+    const refusal = await this.sessions.rotate({
+      id: payload.sid,
+      userId: String(user._id),
+      presentedHash: tokenHash(refreshToken),
+      nextHash: tokenHash(next.refreshToken),
+      expiresAt: this.sessionExpiry(),
+    });
+    if (refusal) {
+      if (refusal === 'REFRESH_SUPERSEDED') {
+        throw new ConflictException({
+          code: refusal,
+          message: 'This session was just refreshed elsewhere on this device.',
+        });
+      }
+      throw refused(refusal, 'Your session has been signed out.');
+    }
+    return next;
   }
 
-  async logout(userId: string): Promise<{ success: true }> {
-    await this.userModel.findByIdAndUpdate(userId, { $unset: { refreshTokenHash: 1 } });
+  /** Signs this device out. Other devices stay signed in. */
+  async logout(userId: string, sessionId: string): Promise<{ success: true }> {
+    await this.sessions.revoke(userId, sessionId, 'logout');
     return { success: true };
   }
 
-  async changePassword(userId: string, dto: ChangePasswordDto): Promise<{ success: true }> {
+  /** Signs every device out, this one included. */
+  async logoutAll(userId: string): Promise<{ success: true; ended: number }> {
+    const ended = await this.sessions.revokeAll(userId, 'logout_all');
+    return { success: true, ended };
+  }
+
+  /** Changing the password keeps this session and signs every other one out. */
+  async changePassword(userId: string, sessionId: string, dto: ChangePasswordDto): Promise<{ success: true }> {
     const user = await this.userModel.findById(userId).select('+passwordHash');
     if (!user || !(await bcrypt.compare(dto.currentPassword, user.passwordHash))) {
       throw new UnauthorizedException('Your current password is incorrect.');
     }
     user.passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
-    // Changing the password signs every other session out.
-    user.refreshTokenHash = undefined;
     await user.save();
+    await this.sessions.revokeAll(userId, 'password_change', sessionId);
     return { success: true };
   }
 
@@ -118,27 +146,41 @@ export class AuthService {
     return user.toJSON() as unknown as UserDto;
   }
 
-  private async issueSession(user: UserDocument): Promise<AuthSession> {
-    const base = { sub: String(user._id), email: user.email, roles: user.roles };
+  private async issueSession(user: UserDocument, device: string): Promise<AuthSession> {
+    const sessionId = new Types.ObjectId();
+    const tokens = await this.signTokens(user, String(sessionId));
+    await this.sessions.create({
+      id: sessionId,
+      userId: String(user._id),
+      tokenHash: tokenHash(tokens.refreshToken),
+      device,
+      expiresAt: this.sessionExpiry(),
+    });
+    // The single pre-#27 refresh hash is dead weight now; drop it when its owner signs in.
+    await this.userModel.updateOne({ _id: user._id, refreshTokenHash: { $exists: true } }, { $unset: { refreshTokenHash: 1 } });
 
+    return { ...tokens, user: user.toJSON() as unknown as UserDto };
+  }
+
+  private async signTokens(user: UserDocument, sid: string): Promise<AuthTokens> {
+    const base = { sub: String(user._id), email: user.email, roles: user.roles, sid };
     const accessToken = await this.jwt.signAsync(
       { ...base, typ: 'access' } satisfies Omit<JwtPayload, 'iat' | 'exp'>,
       { secret: this.config.jwtSecret, expiresIn: this.config.accessTokenTtlSeconds },
     );
+    // `jti` makes every refresh token unique, so its hash identifies exactly one token.
     const refreshToken = await this.jwt.signAsync(
-      { ...base, typ: 'refresh' } satisfies Omit<JwtPayload, 'iat' | 'exp'>,
+      { ...base, typ: 'refresh', jti: randomUUID() } satisfies Omit<JwtPayload, 'iat' | 'exp'>,
       { secret: this.config.jwtSecret, expiresIn: this.config.refreshTokenTtlSeconds },
     );
-
-    await this.userModel.findByIdAndUpdate(user._id, {
-      refreshTokenHash: await bcrypt.hash(refreshToken, BCRYPT_ROUNDS),
-    });
-
-    return {
-      accessToken,
-      refreshToken,
-      expiresIn: this.config.accessTokenTtlSeconds,
-      user: user.toJSON() as unknown as UserDto,
-    };
+    return { accessToken, refreshToken, expiresIn: this.config.accessTokenTtlSeconds };
   }
+
+  private sessionExpiry(): Date {
+    return new Date(Date.now() + this.config.refreshTokenTtlSeconds * 1000);
+  }
+}
+
+function refused(code: RefreshRefusal, message: string): UnauthorizedException {
+  return new UnauthorizedException({ code, message });
 }

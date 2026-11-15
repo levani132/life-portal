@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-15: Safer sign-in
+
+- **Everyone has to sign in again once.** Signing out and changing your password didn't fully
+  end your other sessions before; now they do, immediately. Anything you saved on a device but
+  hadn't sent yet stays there and is sent after you sign in.
+- **Each device has its own session.** Signing out ends only the device you're on.
+- **Changing your password signs out your other devices** and keeps you signed in where you are.
+
 ## 2026-11-15: More room during a workout
 
 - **The "Training" title row is gone while a workout is open**, so your exercises start 60 px

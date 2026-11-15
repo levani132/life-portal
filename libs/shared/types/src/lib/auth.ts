@@ -25,9 +25,33 @@ export interface JwtPayload {
   roles: string[];
   /** Distinguishes access from refresh tokens so a refresh token cannot call data routes. */
   typ: 'access' | 'refresh';
+  /**
+   * The sign-in session (`auth_sessions` row) this token belongs to. Every token issued since
+   * issue #27 carries one; a token without it is from before sessions existed and is refused.
+   */
+  sid?: Id;
+  /** Random per token, so two tokens never share a hash (issue #27). */
+  jti?: string;
   iat?: number;
   exp?: number;
 }
+
+/** One signed-in device, as `GET /auth/sessions` lists it. */
+export interface AuthSessionInfo {
+  id: Id;
+  /** A short label from the browser, e.g. "Safari on iPhone". */
+  device: string;
+  createdAt: string;
+  lastUsedAt: string;
+  /** The session the request came from. */
+  current: boolean;
+}
+
+/**
+ * Refusal codes from `POST /auth/refresh`. `REFRESH_SUPERSEDED` is not a sign-out: another tab
+ * refreshed with the same token a moment ago, so the caller should pick up the new one.
+ */
+export type RefreshRefusal = 'LEGACY_SESSION' | 'SESSION_ENDED' | 'REFRESH_REUSED' | 'REFRESH_SUPERSEDED';
 
 export interface RegisterRequest {
   email: string;

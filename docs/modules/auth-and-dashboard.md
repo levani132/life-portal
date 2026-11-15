@@ -8,8 +8,21 @@ The three modules that are not widgets.
 
 **Code:** `apps/api/src/auth/`
 
-`users` collection: email, name, bcrypt `passwordHash` (cost 12, `select: false`), `roles`,
-and `refreshTokenHash`.
+`users` collection: email, name, bcrypt `passwordHash` (cost 12, `select: false`), `roles`.
+A legacy `refreshTokenHash` may still be on old rows; nothing reads it, and signing in `$unset`s
+it (issue #27).
+
+`auth_sessions` collection (issue #27), one row per signed-in device:
+
+| Field | Meaning |
+|---|---|
+| `userId` | the account (string, like every other module) |
+| `tokenHash` | SHA-256 hex of the refresh token valid now (unique) |
+| `previousHash`, `rotatedAt` | the token it replaced, and when, to tell a race from a replay |
+| `lastUsedAt` | the last sign-in or refresh |
+| `expiresAt` | now + `REFRESH_TOKEN_TTL_SECONDS`, moved forward on each refresh; a TTL index deletes the row after it |
+| `device` | a coarse label from the user-agent ("Safari on iPhone"), at most 80 chars |
+| `revokedAt`, `revokedReason` | `logout`, `logout_all`, `revoked`, `password_change`, `password_reset` or `replay` |
 
 ## Guarded by default
 
@@ -22,24 +35,61 @@ Public routes: `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, 
 ## Tokens
 
 Access and refresh tokens are both JWTs signed with `JWT_SECRET`, distinguished by a `typ`
-claim. `JwtStrategy.validate()` rejects `typ: 'refresh'`, so a refresh token cannot be used as a
-bearer token on data routes.
+claim. Both carry `sid`, the `auth_sessions` row they belong to, and a refresh token also carries a
+random `jti`, so no two refresh tokens are alike.
+
+`JwtStrategy.validate()` rejects `typ: 'refresh'`, so a refresh token cannot be used as a bearer
+token on data routes. It also checks that the token's session is still live, with one indexed
+read per request. That makes logout, "sign out everywhere" and a password change take effect
+immediately, not when the 15-minute access token runs out. A token without `sid` predates
+sessions and is refused.
 
 Lifetimes are configured **in seconds** (`ACCESS_TOKEN_TTL_SECONDS`, default 900;
 `REFRESH_TOKEN_TTL_SECONDS`, default 30 days) — see `docs/DECISIONS.md` for why not `15m` strings.
 
-**Refresh tokens rotate.** Each refresh issues a new pair and replaces the stored
-`refreshTokenHash`. Logout (`$unset`) and password change genuinely revoke outstanding sessions
-rather than asking the client to forget a still-valid token. The consequence is that the client
-must not run two refreshes concurrently — `apps/web/src/lib/api.ts` shares one in-flight
-`refreshPromise` for exactly this reason.
+**Refresh tokens rotate, and each works once** (issue #27). `POST /auth/refresh` signs a new
+pair for the same session. It then swaps the session's `tokenHash` with one atomic
+`findOneAndUpdate`, whose filter requires the presented hash to be the current one. Of two
+simultaneous refreshes with one token, exactly one wins. When nothing matched,
+`refreshFailure()` (`session-rules.ts`) decides:
+
+| Situation | Answer | Session |
+|---|---|---|
+| no session, revoked or expired | 401 `SESSION_ENDED` | — |
+| the token it just replaced, within 30 s (`REFRESH_GRACE_MS`) | 409 `REFRESH_SUPERSEDED` | kept |
+| any other old token | 401 `REFRESH_REUSED` | **revoked** (a replay: one holder is not the owner) |
+| no `sid` (issued before #27) | 401 `LEGACY_SESSION` | — |
+
+Only the one session is revoked on a replay, never the account's others, so a bug or a race
+cannot sign someone out everywhere.
+
+The web client makes tabs take turns: `refreshSession()` in `apps/web/src/lib/api.ts` runs under
+the `lp.refresh` Web Lock. A tab that gets the lock after another tab refreshed just uses the
+stored tokens. Without Web Locks, a `REFRESH_SUPERSEDED` makes it wait up to 2 s for the other
+tab's tokens to land in storage before giving up. `LEGACY_SESSION` leaves `lp.signedOutReason`,
+so the login page can say why everyone had to sign in again once. Writes still in the outbox stay
+on the device and are sent after the same account signs in (spec 027).
+
+| Route | What it does |
+|---|---|
+| `POST /auth/logout` | ends this session |
+| `POST /auth/logout-all` | ends every session, this one included |
+| `GET /auth/sessions` | the live sessions: `id`, `device`, `createdAt`, `lastUsedAt`, `current` |
+| `DELETE /auth/sessions/:id` | ends one of your own sessions (404 for anyone else's) |
+| `POST /auth/sessions/revoke-others` | ends every session except this one |
+| `POST /auth/change-password` | needs the current password; keeps this session and ends the others |
 
 ## Other details worth keeping
 
 - Login compares against a dummy hash when the email does not exist, so response timing and the
   error message do not reveal which emails are registered.
-- The `User` schema's `toJSON` deletes `passwordHash` and `refreshTokenHash` on the way out, so
-  even a controller that returned a raw user could not leak them.
+- The `User` schema's `toJSON` deletes `passwordHash` and the legacy `refreshTokenHash` on the way
+  out, so even a controller that returned a raw user could not leak them.
+- Refresh tokens are hashed with SHA-256, not bcrypt. bcrypt only reads the first 72 bytes, and
+  every refresh token of one user shares those (the JWT header and the start of the payload,
+  which is the user id). See `docs/DECISIONS.md`.
+- Tokens are kept in `localStorage`, which an XSS bug could read. Moving them to httpOnly cookies is
+  a separate follow-up: it would bring CSRF into play, which the current bearer header does not.
 - `REGISTRATION_INVITE_CODE`, when set, closes registration. Set it in production.
 
 ---

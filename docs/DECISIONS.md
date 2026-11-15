@@ -2149,3 +2149,37 @@ other people's posts on the device is S3 and is waiting for the owner.
   later. This is the price of "derived, never persisted", and it is labelled.
 - **A Training-only account writes a Food row.** `weigh_ins` now has two writers. Both go through
   one service method.
+
+## 2026-11-15 · Sign-in sessions, and why refresh tokens are not bcrypt-hashed (issue #27)
+
+**The bug.** One bcrypt `refreshTokenHash` per user was meant to make logout and password changes
+revoke refresh tokens. bcrypt only reads the first 72 bytes of its input. A refresh JWT's first
+72 bytes are the header (`eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.`) and the start of the payload,
+which is `{"sub":"<user id>…`, so they are the same for every refresh token of a user. Any
+unexpired refresh token therefore matched whatever hash was stored. Rotation did nothing, and
+logout or a password change revoked old tokens only until the next sign-in.
+
+**The fix.**
+- **One `auth_sessions` row per device.** Each holds the SHA-256 of its current refresh token.
+- **SHA-256 is enough.** The token is a signed JWT with a random `jti`, so there is nothing to
+  brute-force, and a slow KDF would only cost time.
+- **Rotation is atomic.** The filter requires the presented hash.
+- **A replay revokes the session.** Only that session, so a fault cannot sign someone out
+  everywhere.
+- **The token that was just replaced gets a 30 s grace,** answered with 409
+  `REFRESH_SUPERSEDED`. Two tabs refreshing with one token is normal and must not count as theft.
+  The web client also serialises refreshes across tabs with a Web Lock.
+
+**Instant revocation.** Access tokens carry `sid`, and the guard checks that session on every
+request: one indexed `exists` on `_id`. It is not cached, because a cache would bring back the
+window in which a revoked session still works.
+
+**Everyone signs in again once.** Tokens without `sid` are refused, refresh and access alike. We
+did not upgrade old refresh tokens into sessions: because of the bug, any of a user's old tokens
+was as good as another, so none of them could be trusted as the one live token. Pending offline
+writes survive this, because an expired session only pauses the outbox, and the login page
+explains why.
+
+**Not done here.** Tokens stay in `localStorage`. httpOnly cookies would stop an XSS bug from
+reading them, but would bring in CSRF protection and change the offline and MCP flows. That is a
+separate follow-up.
