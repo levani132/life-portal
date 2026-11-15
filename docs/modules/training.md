@@ -195,7 +195,8 @@ by hand is done once it has a set and the last set was in another exercise outsi
 Skipped exercises are neither. Current: in the last set's superset, the next member not done,
 round and round; else the last set's exercise while not done; else the first neither done nor
 skipped. Done exercises collapse to one green line and expand on tap; finished workouts are
-shown expanded.
+shown expanded. The collapse animates and keeps the page still; see "Collapsing without a jump"
+under Web.
 
 **Rest over push** (`rest-alarm.service.ts`). The browser alone knows when a rest ends (the
 superset rule, ±15 s, Skip), so `RestAlarmSync` (mounted with the workout bar, on every page)
@@ -777,6 +778,29 @@ its countdown and controls keep their state and there is never a duplicate. It s
 solid `bg-surface` band. With no header showing it pads itself by `--header-band`
 (`var(--top-chrome)`), so it fills the iOS status-bar band instead of leaving it hollow. It
 renders nothing when there is no rest to show, so no empty bar stays pinned.
+
+**Collapsing without a jump (issue #24, display only).** A done exercise's body is wrapped in
+`components/collapsible.tsx`. It folds away over 220 ms: a grid row from `1fr` to `0fr` with a fade,
+so nothing is measured. It stays mounted until it has closed, and a tap mid-way reverses it.
+`prefers-reduced-motion` makes it instant. That alone does not stop the jump, because Safari has
+no CSS scroll anchoring, and Chrome's may anchor to a node inside the card that is shrinking. The
+rest timer appearing above the list moves everything too.
+
+So the workout list sets `overflow-anchor: none` and anchors itself with `useScrollAnchor`
+(`lib/scroll-anchor.ts`), the same in every browser:
+- **The anchor** is the card last touched while it is still on screen, else the first card
+  visible at the top. Cards are marked `data-scroll-anchor`.
+- **Correcting:** after each commit (layout effect) and each size change of the list
+  (`ResizeObserver`, which covers the animation frames and the rest timer), the window is scrolled
+  by however far the anchor moved, before paint.
+- **The reader's own scroll** only re-picks the anchor; it is never undone.
+- **Near the bottom of the page**, shrinking content would make the browser clamp the scroll and
+  pull everything down. So the list keeps a `min-height` floor: the height the current scroll
+  needs. The floor is set before anything shrinks and follows the reader as they scroll up.
+  When following the anchor down would scroll past the end, the floor first grows by the
+  shortfall (`shortfall`).
+
+The maths (`pickAnchor`, `correction`, `floorHeight`, `shortfall`) is pure and unit-tested.
 
 ## Deletion
 

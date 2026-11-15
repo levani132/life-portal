@@ -2096,3 +2096,24 @@ other people's posts on the device is S3 and is waiting for the owner.
 - Past workouts keep the old name in their frozen snapshot, so one exercise shows under two
   names across time.
 
+## 2026-11-15 · The workout list anchors its own scroll (issue #24)
+
+**Decided:**
+- A done exercise's body folds away with a CSS grid-row transition instead of unmounting.
+- The workout list turns native scroll anchoring off (`overflow-anchor: none`) and keeps the
+  reader's place with one hook, `useScrollAnchor`. The anchor is the card last touched, else the
+  first card on screen.
+- After each commit and each size change, the hook scrolls the window by however far the anchor
+  moved. A `min-height` floor stops the page shrinking under the current scroll.
+
+**Buys:**
+- The same behaviour in every browser. Safari has no `overflow-anchor`. Chrome's can pick a node
+  inside the collapsing card and drift with it.
+- One mechanism covers the collapse, the expand and the rest timer appearing or ending.
+
+**Costs:**
+- A brief empty space can remain below the list after a collapse near the bottom of the page. It
+  closes as soon as the reader scrolls up.
+- Lists that should keep their place need `data-scroll-anchor` on their cards. Nothing else in the
+  app uses the hook yet.
+

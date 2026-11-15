@@ -1,7 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -35,6 +35,8 @@ import {
   type SupersetPlace,
 } from '@life-portal/shared-domain';
 import { ErrorNote, Modal, Spinner, Textarea } from '../ui';
+import { Collapsible } from '../collapsible';
+import { useScrollAnchor } from '../../lib/scroll-anchor';
 import { ApiError } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
 import {
@@ -155,6 +157,8 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
   const sync = useTrainingSync();
   const writes = useTrainingWrites();
   const unsynced = hasUnsyncedWrites(writes, session.id);
+  const list = useRef<HTMLDivElement>(null);
+  useScrollAnchor(list);
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -243,7 +247,8 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
   const setCount = session.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0);
 
   return (
-    <div className="space-y-4">
+    // Native scroll anchoring is off here: useScrollAnchor does it the same in every browser (#24).
+    <div ref={list} className="space-y-4 [overflow-anchor:none]">
       <section className="card overflow-hidden p-0">
         <div className={clsx('relative bg-gradient-to-br p-4 text-white', planStyle.gradient)}>
           <div aria-hidden className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full bg-white/10" />
@@ -501,13 +506,14 @@ function ExerciseBlock({
   return (
     <section
       className={clsx(
-        'card border-l-4 p-4 transition-colors',
+        'card border-l-4 p-4 transition-[color,background-color,border-color,box-shadow,padding] duration-200 motion-reduce:transition-none',
         isDone ? 'border-l-emerald-500 bg-emerald-500/[0.06]' : style.edge,
         state === 'current' && 'ring-2 ring-train-pull/60',
         exercise.skipped && 'opacity-70',
         collapsed && 'py-3',
       )}
       aria-current={state === 'current' ? 'step' : undefined}
+      data-scroll-anchor
     >
       <header
         className={clsx('flex items-start gap-3', isDone && 'cursor-pointer')}
@@ -587,8 +593,7 @@ function ExerciseBlock({
           {expanded ? `Collapse ${exercise.snapshot.name}` : `Show ${exercise.snapshot.name} and add sets`}
         </button>
       )}
-      {!collapsed && (
-      <>
+      <Collapsible open={!collapsed}>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-1">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           {machineLabel && <span className="text-xs text-ink-faint">On {machineLabel}</span>}
@@ -682,8 +687,7 @@ function ExerciseBlock({
           </button>
         </p>
       )}
-      </>
-      )}
+      </Collapsible>
       {detail && <ExerciseDetail id={exercise.exerciseId} initialTab={detail} onClose={() => setDetail(null)} />}
       {editing && (
         <EditSet sessionId={session.id} set={editing} measure={measure} onClose={() => setEditing(null)} />

@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-15: Finishing an exercise no longer jumps the page
+
+- **Ticking an exercise's last set folds it away smoothly**, and what you were looking at stays
+  where it was, at the top or the bottom of the screen, on a phone or a computer. The rest timer
+  appearing no longer shifts the list either. With "Reduce motion" on, it folds at once, still
+  without a jump.
+
 ## 2026-11-14: Find the chest press machine
 
 - **Searching "chest press", "machine chest press", "seated chest press" or "machine bench
