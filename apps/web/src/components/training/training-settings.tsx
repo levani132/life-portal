@@ -16,7 +16,7 @@ const UNIT_LABELS: Record<WeightUnit, string> = { kg: 'Kilograms (kg)', lb: 'Pou
  * display and input only; switching it rewrites no stored weight, so past lifts simply show in
  * the other unit.
  */
-export function TrainingSettings() {
+export function TrainingSettings({ onDark = false }: { onDark?: boolean } = {}) {
   const profile = useTrainingProfile();
   const [open, setOpen] = useState(false);
   const [unit, setUnit] = useState<WeightUnit>(profile.weightUnit);
@@ -53,7 +53,18 @@ export function TrainingSettings() {
 
   return (
     <>
-      <button type="button" className="btn-ghost" onClick={show} aria-label="Training settings" title="Training settings">
+      <button
+        type="button"
+        className={
+          onDark
+            ? // Issue #26: on the workout card, beside Finish and plainly secondary to it.
+              'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white transition-colors hover:bg-white/25'
+            : 'btn-ghost'
+        }
+        onClick={show}
+        aria-label="Training settings"
+        title="Training settings"
+      >
         <Settings2 size={18} aria-hidden />
       </button>
       <Modal

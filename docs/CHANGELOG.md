@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-15: More room during a workout
+
+- **The "Training" title row is gone while a workout is open**, so your exercises start 60 px
+  higher. Training settings is the gear next to Finish on the workout card. Everywhere else in
+  Training the title and its gear are where they were.
+
 ## 2026-11-15: Finishing a workout
 
 - **Finish now shows your workout before saving it:** time, volume, sets, reps and exercises.

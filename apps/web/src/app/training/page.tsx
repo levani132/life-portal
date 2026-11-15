@@ -14,7 +14,7 @@ import { CurrentWorkout, WorkoutSession } from '../../components/training/workou
 import { ErrorNote, Spinner } from '../../components/ui';
 import { api } from '../../lib/api';
 import { formatDuration, useWorkoutDay } from '../../lib/training';
-import { useHistoryPage, useSessionDetail } from '../../lib/training-offline';
+import { useCurrentSession, useHistoryPage, useSessionDetail } from '../../lib/training-offline';
 import { OPEN_WORKOUT_EVENT, setWorkoutOnScreen } from '../../lib/training-workout';
 
 const TABS: readonly { id: 'workout' | 'plans' | 'history' | 'exercises'; label: string; icon: LucideIcon }[] = [
@@ -49,9 +49,14 @@ function Training() {
     window.addEventListener(OPEN_WORKOUT_EVENT, open);
     return () => window.removeEventListener(OPEN_WORKOUT_EVENT, open);
   }, []);
+  // Issue #26: while a workout is open on screen, the page's title row is redundant (the workout
+  // card says what this is) and costs a row on a phone. The gear moves into the workout card's
+  // own top row, next to Finish; the heading stays for screen readers.
+  const { data: current } = useCurrentSession(tab === 'workout');
+  const training = tab === 'workout' && current?.status === 'open';
   return (
     <>
-      <PageHeader title="Training" actions={<TrainingSettings />} />
+      {training ? <h1 className="sr-only">Training</h1> : <PageHeader title="Training" actions={<TrainingSettings />} />}
       <TrainingHero hideWhileTraining={tab === 'workout'} />
       <div
         role="tablist"

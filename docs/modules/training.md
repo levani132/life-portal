@@ -791,7 +791,17 @@ Plans (ready-made and own plans; a plan's workouts each with Start; Copy on ever
 Delete on own ones, with `plan-editor.tsx` editing a whole plan and reordering by up/down buttons,
 never drag, because the tabs swipe; spec 023), History (past sessions,
 each opening for reading and editing) and Exercises (the catalogue with filters and a detail view,
-where own exercises can be edited or deleted). Adding an exercise to a workout is one choice (#14):
+where own exercises can be edited or deleted).
+
+**No title row while a workout is open (issue #26).** On the Workout tab with a workout open, the
+page's "Training" title row is not shown. The workout card already says what this is, and the row
+cost 60 px at the top on both a phone and a desktop. A screen-reader-only `h1` keeps the page's
+heading. Training's settings gear (weight unit, default rest) moves into the workout card's top
+row, next to Finish, smaller and visibly secondary. So no row is added, and Finish still opens the
+confirm sheet (#25). On every other tab, with no workout open, and in History, the title row and
+its gear are as before. Nothing about the sticky rest timer or the scroll anchoring (#24) changes.
+
+Adding an exercise to a workout is one choice (#14):
 the exercise, searched and filtered by muscle and equipment, with "Create exercise" for what the
 catalogue lacks. A workout from before #14 shows its machine on the card, read-only. A finished
 plan workout (right after Finish, and opened from History) shows `PlanDayUpdate`
