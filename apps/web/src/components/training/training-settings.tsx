@@ -16,7 +16,7 @@ const UNIT_LABELS: Record<WeightUnit, string> = { kg: 'Kilograms (kg)', lb: 'Pou
  * display and input only; switching it rewrites no stored weight, so past lifts simply show in
  * the other unit.
  */
-export function TrainingSettings({ onDark = false }: { onDark?: boolean } = {}) {
+export function TrainingSettings({ inTabs = false }: { inTabs?: boolean } = {}) {
   const profile = useTrainingProfile();
   const [open, setOpen] = useState(false);
   const [unit, setUnit] = useState<WeightUnit>(profile.weightUnit);
@@ -56,9 +56,9 @@ export function TrainingSettings({ onDark = false }: { onDark?: boolean } = {}) 
       <button
         type="button"
         className={
-          onDark
-            ? // Issue #26: on the workout card, beside Finish and plainly secondary to it.
-              'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white transition-colors hover:bg-white/25'
+          inTabs
+            ? // Issue #30: the trailing cell of Training's tab strip, quieter than the tabs.
+              'flex min-h-[3rem] w-11 shrink-0 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-surface hover:text-ink'
             : 'btn-ghost'
         }
         onClick={show}

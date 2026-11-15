@@ -36,8 +36,8 @@ auto-selected; existing accounts add it from Manage modules.
 | RPE | 1–10 in half steps (a scale, not a quantity) | `rpe` |
 
 Optional numbers have **no default**: "no added weight" and "weight not recorded" are different
-facts. kg/lb is a display preference (`training_profiles.weightUnit`, set from the gear on
-`/training`); nothing converted is stored. Conversion is `gramsToDisplay` / `displayToGrams` in
+facts. kg/lb is a display preference (`training_profiles.weightUnit`, set from the gear at the
+end of `/training`'s tab strip); nothing converted is stored. Conversion is `gramsToDisplay` / `displayToGrams` in
 `libs/shared/domain/src/lib/training-format.ts`: 1 lb = 453.59237 g exactly, a typed value is
 rounded to whole grams **once**, and display shows two decimals (225 lb → 102 058 g → "102.06 kg",
 and back to "225 lb"). Switching the unit rewrites nothing; a set form open during a switch
@@ -793,13 +793,15 @@ never drag, because the tabs swipe; spec 023), History (past sessions,
 each opening for reading and editing) and Exercises (the catalogue with filters and a detail view,
 where own exercises can be edited or deleted).
 
-**No title row while a workout is open (issue #26).** On the Workout tab with a workout open, the
-page's "Training" title row is not shown. The workout card already says what this is, and the row
-cost 60 px at the top on both a phone and a desktop. A screen-reader-only `h1` keeps the page's
-heading. Training's settings gear (weight unit, default rest) moves into the workout card's top
-row, next to Finish, smaller and visibly secondary. So no row is added, and Finish still opens the
-confirm sheet (#25). On every other tab, with no workout open, and in History, the title row and
-its gear are as before. Nothing about the sticky rest timer or the scroll anchoring (#24) changes.
+**No title row, anywhere in Training (issue #30, correcting #26).** `/training` shows no
+"Training" title row in any tab (Workout idle or open, Plans, History including an opened past
+workout, Exercises). The tab strip already says where you are, and the row cost about 60 px at the
+top on a phone and on a desktop. A screen-reader-only `h1` keeps the page's heading, and the strip
+stays a `tablist` labelled "Training". Training's settings gear (weight unit, default rest) is the
+**last cell of the tab strip**: a button outside the `tablist`, inside the same rounded strip, so it
+is one tap away in every tab and state and adds no row. It is the only Training gear: #26's gear
+beside Finish on the workout card is gone, and Finish still opens the confirm sheet (#25). App-wide
+Settings is unchanged. Nothing about the sticky rest timer or the scroll anchoring (#24) changes.
 
 Adding an exercise to a workout is one choice (#14):
 the exercise, searched and filtered by muscle and equipment, with "Create exercise" for what the

@@ -69,7 +69,6 @@ import { SetTable } from './set-table';
 import { PlanDayUpdate } from './plan-day-update';
 import { FinishSheet } from './finish-sheet';
 import { WorkoutRecapView } from './workout-recap';
-import { TrainingSettings } from './training-settings';
 
 const message = (error: unknown) =>
   error instanceof ApiError ? error.message : 'Could not reach the server. Try again.';
@@ -292,18 +291,14 @@ export function WorkoutSession({
               {session.plan && <p className="truncate text-sm text-white/85">{session.plan.planName}</p>}
             </div>
             {open ? (
-              <div className="flex shrink-0 items-center gap-2">
-                {/* Issue #26: Training's settings, here because the page's title row is hidden. */}
-                <TrainingSettings onDark />
-                <button
-                  type="button"
-                  className="shrink-0 rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-900 shadow transition-colors hover:bg-white/90 disabled:opacity-60"
-                  disabled={busy}
-                  onClick={() => void finish('now')}
-                >
-                  Finish
-                </button>
-              </div>
+              <button
+                type="button"
+                className="shrink-0 rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-900 shadow transition-colors hover:bg-white/90 disabled:opacity-60"
+                disabled={busy}
+                onClick={() => void finish('now')}
+              >
+                Finish
+              </button>
             ) : (
               <button
                 type="button"

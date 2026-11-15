@@ -1,12 +1,30 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import TrainingPage from '../../app/training/page';
-import { TrainingSettings } from './training-settings';
 
+/**
+ * Issue #30 (correcting #26): Training shows no title row in any tab or state, and its settings
+ * gear is the last cell of the tab strip, so it is reachable everywhere in one tap.
+ */
 let current: { status: 'open' | 'finished' } | null = null;
+let history: { id: string }[] = [];
 jest.mock('../../lib/training-offline', () => ({
   useCurrentSession: (enabled = true) => ({ data: enabled ? current : undefined }),
-  useHistoryPage: () => ({ data: { sessions: [] }, isLoading: false }),
-  useSessionDetail: () => ({}),
+  useHistoryPage: () => ({
+    data: {
+      sessions: history.map((s) => ({
+        ...s,
+        day: '2026-11-14',
+        status: 'finished',
+        setCount: 3,
+        durationSeconds: 1800,
+        exerciseNames: ['Squat'],
+      })),
+    },
+    isLoading: false,
+  }),
+  useSessionDetail: (id: string) => ({ data: { id } }),
 }));
 jest.mock('../../lib/training', () => ({
   ...jest.requireActual('../../lib/training'),
@@ -17,53 +35,65 @@ jest.mock('../../lib/api', () => ({ api: { put: jest.fn() } }));
 jest.mock('../../lib/hooks', () => ({ revalidate: jest.fn(), useApi: () => ({}) }));
 jest.mock('../app-shell', () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  PageHeader: ({ title, actions }: { title: string; actions?: React.ReactNode }) => (
-    <div data-testid="title-row">
-      <h1>{title}</h1>
-      {actions}
-    </div>
-  ),
+  // Rendering one would be the bug: it is the visible title row.
+  PageHeader: ({ title }: { title: string }) => <div data-testid="title-row">{title}</div>,
 }));
 jest.mock('./workout-session', () => ({
-  CurrentWorkout: () => <p>Workout screen</p>,
-  WorkoutSession: () => null,
+  CurrentWorkout: () => <p>{current?.status === 'open' ? 'Workout in progress' : 'No workout'}</p>,
+  WorkoutSession: () => <p>Past workout</p>,
 }));
 jest.mock('./training-hero', () => ({ TrainingHero: () => null }));
 jest.mock('./plans', () => ({ Plans: () => <p>Plans screen</p> }));
-jest.mock('./exercise-library', () => ({ ExerciseLibrary: () => null }));
+jest.mock('./exercise-library', () => ({ ExerciseLibrary: () => <p>Exercise library</p> }));
 
 beforeEach(() => {
   current = null;
+  history = [];
 });
 
-describe('the Training page header (#26)', () => {
-  it('drops the title row while a workout is open on the Workout tab, keeping the heading for screen readers', () => {
-    current = { status: 'open' };
+const TABS = ['Workout', 'Plans', 'History', 'Exercises'] as const;
+const STATES = [
+  ['with no workout', null],
+  ['during a workout', { status: 'open' }],
+] as const;
+
+describe.each(STATES)('Training %s', (_label, state) => {
+  it.each(TABS)('%s: no title row, one gear, and it opens Training settings', (tab) => {
+    current = state ? { ...state } : null;
     render(<TrainingPage />);
+    fireEvent.click(screen.getByRole('tab', { name: new RegExp(tab) }));
+    expect(screen.getByRole('tab', { name: new RegExp(tab) }).getAttribute('aria-selected')).toBe('true');
+
     expect(screen.queryByTestId('title-row')).toBeNull();
+    // The heading is still there for screen readers, and only for them.
     expect(screen.getByRole('heading', { level: 1, name: 'Training' }).className).toContain('sr-only');
-    expect(screen.getByText('Workout screen')).toBeTruthy();
-  });
 
-  it('keeps the title row and its gear with no workout open', () => {
-    render(<TrainingPage />);
-    expect(screen.getByTestId('title-row')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Training settings' })).toBeTruthy();
-  });
-
-  it('brings the title row back on the other tabs while a workout is open', () => {
-    current = { status: 'open' };
-    render(<TrainingPage />);
-    fireEvent.click(screen.getByRole('tab', { name: /Plans/ }));
-    expect(screen.getByTestId('title-row')).toBeTruthy();
-    expect(screen.getByText('Plans screen')).toBeTruthy();
-  });
-});
-
-describe("the workout card's gear (#26)", () => {
-  it('opens Training settings in one tap', () => {
-    render(<TrainingSettings onDark />);
-    fireEvent.click(screen.getByRole('button', { name: 'Training settings' }));
+    const gears = screen.getAllByRole('button', { name: 'Training settings' });
+    expect(gears).toHaveLength(1);
+    fireEvent.click(gears[0]);
     expect(screen.getByRole('dialog', { name: 'Training settings' })).toBeTruthy();
   });
+});
+
+it('keeps the gear out of the tab list, so the tabs stay four tabs', () => {
+  render(<TrainingPage />);
+  const tablist = screen.getByRole('tablist', { name: 'Training' });
+  expect(within(tablist).getAllByRole('tab')).toHaveLength(4);
+  expect(within(tablist).queryByRole('button', { name: 'Training settings' })).toBeNull();
+});
+
+it('keeps the gear and no title row with a past workout open from History', () => {
+  history = [{ id: 'w1' }];
+  render(<TrainingPage />);
+  fireEvent.click(screen.getByRole('tab', { name: /History/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Squat/ }));
+  expect(screen.getByText('Past workout')).toBeTruthy();
+  expect(screen.queryByTestId('title-row')).toBeNull();
+  expect(screen.getAllByRole('button', { name: 'Training settings' })).toHaveLength(1);
+});
+
+it('does not give the workout card a second gear (the #26 placement)', () => {
+  // The card is mocked above, so check its source: it must not render Training settings itself.
+  const card = readFileSync(join(__dirname, 'workout-session.tsx'), 'utf8');
+  expect(card).not.toMatch(/TrainingSettings/);
 });

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, ClipboardList, Dumbbell, History as HistoryIcon, Library, type LucideIcon } from 'lucide-react';
 import type { SessionListItem, SessionPage } from '@life-portal/shared-types';
 import { addDays, diffDays, formatDay, weekdayOf } from '@life-portal/shared-domain';
-import { AppShell, PageHeader } from '../../components/app-shell';
+import { AppShell } from '../../components/app-shell';
 import { ExerciseLibrary } from '../../components/training/exercise-library';
 import { Plans } from '../../components/training/plans';
 import { TrainingHero } from '../../components/training/training-hero';
@@ -14,7 +14,7 @@ import { CurrentWorkout, WorkoutSession } from '../../components/training/workou
 import { ErrorNote, Spinner } from '../../components/ui';
 import { api } from '../../lib/api';
 import { formatDuration, useWorkoutDay } from '../../lib/training';
-import { useCurrentSession, useHistoryPage, useSessionDetail } from '../../lib/training-offline';
+import { useHistoryPage, useSessionDetail } from '../../lib/training-offline';
 import { OPEN_WORKOUT_EVENT, setWorkoutOnScreen } from '../../lib/training-workout';
 
 const TABS: readonly { id: 'workout' | 'plans' | 'history' | 'exercises'; label: string; icon: LucideIcon }[] = [
@@ -49,41 +49,41 @@ function Training() {
     window.addEventListener(OPEN_WORKOUT_EVENT, open);
     return () => window.removeEventListener(OPEN_WORKOUT_EVENT, open);
   }, []);
-  // Issue #26: while a workout is open on screen, the page's title row is redundant (the workout
-  // card says what this is) and costs a row on a phone. The gear moves into the workout card's
-  // own top row, next to Finish; the heading stays for screen readers.
-  const { data: current } = useCurrentSession(tab === 'workout');
-  const training = tab === 'workout' && current?.status === 'open';
+  // Issue #30 (correcting #26): Training has no visible title row in any tab or state. The tab
+  // strip already says where you are, and the row cost about 60 px on a phone. The heading stays
+  // for screen readers, and Training's settings gear is the strip's last cell: on screen
+  // everywhere, so it is one tap away with or without a workout.
   return (
     <>
-      {training ? <h1 className="sr-only">Training</h1> : <PageHeader title="Training" actions={<TrainingSettings />} />}
+      <h1 className="sr-only">Training</h1>
       <TrainingHero hideWhileTraining={tab === 'workout'} />
       <div
-        role="tablist"
-        aria-label="Training"
-        className="mb-4 grid grid-cols-4 gap-1 rounded-2xl border border-border bg-surface-raised p-1 shadow-sm"
+        className="mb-4 flex items-stretch gap-1 rounded-2xl border border-border bg-surface-raised p-1 shadow-sm"
         data-no-tab-swipe
       >
-        {TABS.map((item) => {
-          const Icon = item.icon;
-          const selected = tab === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              className={clsx(
-                'flex min-h-[3rem] flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-xs font-semibold transition-colors',
-                selected ? 'bg-accent-solid text-on-accent shadow' : 'text-ink-muted hover:bg-surface hover:text-ink',
-              )}
-              onClick={() => setTab(item.id)}
-            >
-              <Icon className="h-4 w-4" aria-hidden />
-              <span className="truncate">{item.label}</span>
-            </button>
-          );
-        })}
+        <div role="tablist" aria-label="Training" className="grid min-w-0 flex-1 grid-cols-4 gap-1">
+          {TABS.map((item) => {
+            const Icon = item.icon;
+            const selected = tab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                className={clsx(
+                  'flex min-h-[3rem] flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-xs font-semibold transition-colors',
+                  selected ? 'bg-accent-solid text-on-accent shadow' : 'text-ink-muted hover:bg-surface hover:text-ink',
+                )}
+                onClick={() => setTab(item.id)}
+              >
+                <Icon className="h-4 w-4" aria-hidden />
+                <span className="truncate">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <TrainingSettings inTabs />
       </div>
       {tab === 'workout' && <CurrentWorkout onBrowsePlans={() => setTab('plans')} />}
       {tab === 'plans' && <Plans onStarted={() => setTab('workout')} />}

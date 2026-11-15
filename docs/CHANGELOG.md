@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-15: No "Training" title anywhere in Training
+
+- **The "Training" title row is gone from every Training tab**, not only during a workout, so
+  every tab starts about 60 px higher.
+- **Training settings is the gear at the end of the tab strip** (after Exercises), reachable in
+  one tap from any tab, with or without a workout. The gear next to Finish is gone.
+
 ## 2026-11-15: Continue with Google
 
 - **Sign in or sign up with Google**, once the server is set up for it. Until then the button
