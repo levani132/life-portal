@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import TrainingPage from '../../app/training/page';
 
 /**
- * Issue #30 (correcting #26): Training shows no title row in any tab or state, and its settings
- * gear is the last cell of the tab strip, so it is reachable everywhere in one tap.
+ * Issue #30 (correcting #26): Training shows no title row in any tab or state, and exactly one
+ * settings gear is reachable everywhere in one tap: on the hero, or in the tab strip's last cell
+ * where the hero is hidden (the Workout tab during a workout).
  */
 let current: { status: 'open' | 'finished' } | null = null;
 let history: { id: string }[] = [];
@@ -32,7 +33,11 @@ jest.mock('../../lib/training', () => ({
   useTrainingProfile: () => ({ weightUnit: 'kg', defaultRestSeconds: 90, loaded: true }),
 }));
 jest.mock('../../lib/api', () => ({ api: { put: jest.fn() } }));
-jest.mock('../../lib/hooks', () => ({ revalidate: jest.fn(), useApi: () => ({}) }));
+jest.mock('../../lib/hooks', () => ({
+  revalidate: jest.fn(),
+  useApi: (key: string | null) =>
+    key?.startsWith('/training/summary') && current?.status === 'open' ? { data: { openSessionId: 'w0' } } : {},
+}));
 jest.mock('../app-shell', () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   // Rendering one would be the bug: it is the visible title row.
@@ -42,7 +47,10 @@ jest.mock('./workout-session', () => ({
   CurrentWorkout: () => <p>{current?.status === 'open' ? 'Workout in progress' : 'No workout'}</p>,
   WorkoutSession: () => <p>Past workout</p>,
 }));
-jest.mock('./training-hero', () => ({ TrainingHero: () => null }));
+jest.mock('./training-hero', () => ({
+  TrainingHero: ({ hidden, action }: { hidden?: boolean; action?: React.ReactNode }) =>
+    hidden ? null : <section data-testid="hero">{action}</section>,
+}));
 jest.mock('./plans', () => ({ Plans: () => <p>Plans screen</p> }));
 jest.mock('./exercise-library', () => ({ ExerciseLibrary: () => <p>Exercise library</p> }));
 
@@ -75,11 +83,27 @@ describe.each(STATES)('Training %s', (_label, state) => {
   });
 });
 
-it('keeps the gear out of the tab list, so the tabs stay four tabs', () => {
+it.each(STATES)('keeps the gear out of the tab list %s, so the tabs stay four tabs', (_label, state) => {
+  current = state ? { ...state } : null;
   render(<TrainingPage />);
   const tablist = screen.getByRole('tablist', { name: 'Training' });
   expect(within(tablist).getAllByRole('tab')).toHaveLength(4);
   expect(within(tablist).queryByRole('button', { name: 'Training settings' })).toBeNull();
+});
+
+it('puts the gear on the hero, and in the tab strip only where the hero is hidden', () => {
+  render(<TrainingPage />);
+  expect(within(screen.getByTestId('hero')).getByRole('button', { name: 'Training settings' })).toBeTruthy();
+
+  current = { status: 'open' };
+  cleanup();
+  render(<TrainingPage />);
+  // Workout tab during a workout: no hero, so the gear is the strip's last cell.
+  expect(screen.queryByTestId('hero')).toBeNull();
+  expect(screen.getAllByRole('button', { name: 'Training settings' })).toHaveLength(1);
+  fireEvent.click(screen.getByRole('tab', { name: /Plans/ }));
+  expect(within(screen.getByTestId('hero')).getByRole('button', { name: 'Training settings' })).toBeTruthy();
+  expect(screen.getAllByRole('button', { name: 'Training settings' })).toHaveLength(1);
 });
 
 it('keeps the gear and no title row with a past workout open from History', () => {

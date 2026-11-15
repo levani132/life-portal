@@ -827,9 +827,11 @@ where own exercises can be edited or deleted).
 "Training" title row in any tab (Workout idle or open, Plans, History including an opened past
 workout, Exercises). The tab strip already says where you are, and the row cost about 60 px at the
 top on a phone and on a desktop. A screen-reader-only `h1` keeps the page's heading, and the strip
-stays a `tablist` labelled "Training". Training's settings gear (weight unit, default rest) is the
-**last cell of the tab strip**: a button outside the `tablist`, inside the same rounded strip, so it
-is one tap away in every tab and state and adds no row. It is the only Training gear: #26's gear
+stays a `tablist` labelled "Training". Training's settings gear (weight unit, default rest) is at
+the **top right of the hero**. Where the hero is hidden (the Workout tab during a workout) it is the
+**last cell of the tab strip** instead: a button outside the `tablist`, inside the same rounded
+strip. Either way exactly one is on screen, one tap away in every tab and state, and it adds no row.
+The page owns the settings modal, outside the hero. It is the only Training gear: #26's gear
 beside Finish on the workout card is gone, and Finish still opens the confirm sheet (#25). App-wide
 Settings is unchanged. Nothing about the sticky rest timer or the scroll anchoring (#24) changes.
 

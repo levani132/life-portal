@@ -25,16 +25,17 @@ function lastLabel(days: number | undefined): string {
 
 /**
  * The top of Training (spec 024): this week at a glance on a gradient, from the same summary the
- * Home card reads. Nothing here is a control; it only shows where the week stands. Hidden on the
- * Workout tab while a workout is open, where that workout's header carries the same news.
+ * Home card reads. It shows where the week stands; its one control is the `action` slot at the top
+ * right, where the page puts Training's settings gear. Hidden on the Workout tab while a workout
+ * is open (`hidden`, decided by the page, which then moves the gear to the tab strip).
  */
-export function TrainingHero({ hideWhileTraining = false }: { hideWhileTraining?: boolean }) {
+export function TrainingHero({ hidden = false, action }: { hidden?: boolean; action?: React.ReactNode }) {
   const today = useWorkoutDay()();
   const { data } = useApi<TrainingSummary>(`/training/summary?today=${today}`);
   const portal = useApi<PortalState>('/portal');
   const [ranks, setRanks] = useState(false);
   // On the Workout tab the open workout's own header says all of this; keep it near the top.
-  if (hideWhileTraining && data?.openSessionId) return null;
+  if (hidden) return null;
   const workouts = data?.workoutsThisWeek ?? 0;
   const line = !data
     ? 'Loading your week…'
@@ -54,11 +55,16 @@ export function TrainingHero({ hideWhileTraining = false }: { hideWhileTraining?
       <div aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-white/10" />
       <div aria-hidden className="pointer-events-none absolute -bottom-16 right-16 h-32 w-32 rounded-full bg-white/10" />
       <div className="relative">
-        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/80">
-          {data?.openSessionId ? <Zap className="h-3.5 w-3.5" /> : <Flame className="h-3.5 w-3.5" />}
-          This week
-        </p>
-        <p className="mt-1 truncate text-base font-semibold sm:text-lg">{line}</p>
+        <div className="flex items-start gap-3">
+          <div className="flex-1">
+            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/80">
+              {data?.openSessionId ? <Zap className="h-3.5 w-3.5" /> : <Flame className="h-3.5 w-3.5" />}
+              This week
+            </p>
+            <p className="mt-1 truncate text-base font-semibold sm:text-lg">{line}</p>
+          </div>
+          {action}
+        </div>
         <dl className="mt-4 grid grid-cols-3 gap-2">
           <Stat icon={<Flame className="h-4 w-4" />} value={String(workouts)} label={workouts === 1 ? 'workout' : 'workouts'} />
           <Stat icon={<Clock className="h-4 w-4" />} value={shortTime(data?.secondsThisWeek ?? 0)} label="time" />

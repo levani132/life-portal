@@ -3,16 +3,17 @@
 import clsx from 'clsx';
 import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, ClipboardList, Dumbbell, History as HistoryIcon, Library, type LucideIcon } from 'lucide-react';
-import type { SessionListItem, SessionPage } from '@life-portal/shared-types';
+import type { SessionListItem, SessionPage, TrainingSummary } from '@life-portal/shared-types';
 import { addDays, diffDays, formatDay, weekdayOf } from '@life-portal/shared-domain';
 import { AppShell } from '../../components/app-shell';
 import { ExerciseLibrary } from '../../components/training/exercise-library';
 import { Plans } from '../../components/training/plans';
 import { TrainingHero } from '../../components/training/training-hero';
-import { TrainingSettings } from '../../components/training/training-settings';
+import { TrainingSettingsButton, TrainingSettingsModal } from '../../components/training/training-settings';
 import { CurrentWorkout, WorkoutSession } from '../../components/training/workout-session';
 import { ErrorNote, Spinner } from '../../components/ui';
 import { api } from '../../lib/api';
+import { useApi } from '../../lib/hooks';
 import { formatDuration, useWorkoutDay } from '../../lib/training';
 import { useHistoryPage, useSessionDetail } from '../../lib/training-offline';
 import { OPEN_WORKOUT_EVENT, setWorkoutOnScreen } from '../../lib/training-workout';
@@ -35,6 +36,11 @@ export default function TrainingPage() {
 
 function Training() {
   const [tab, setTab] = useState<Tab>('workout');
+  const [settings, setSettings] = useState(false);
+  const today = useWorkoutDay()();
+  // The same summary the hero reads. On the Workout tab an open workout's header replaces the hero.
+  const summary = useApi<TrainingSummary>(`/training/summary?today=${today}`);
+  const heroHidden = tab === 'workout' && !!summary.data?.openSessionId;
   // Spec 025: the pinned workout bar hides while the workout itself is on screen, and its tap
   // brings this page back to the Workout tab.
   useEffect(() => {
@@ -51,12 +57,16 @@ function Training() {
   }, []);
   // Issue #30 (correcting #26): Training has no visible title row in any tab or state. The tab
   // strip already says where you are, and the row cost about 60 px on a phone. The heading stays
-  // for screen readers, and Training's settings gear is the strip's last cell: on screen
-  // everywhere, so it is one tap away with or without a workout.
+  // for screen readers. Training's settings gear is at the top right of the hero; where
+  // the hero is hidden it is the strip's last cell instead, so exactly one is on screen
+  // everywhere, one tap away with or without a workout.
   return (
     <>
       <h1 className="sr-only">Training</h1>
-      <TrainingHero hideWhileTraining={tab === 'workout'} />
+      <TrainingHero
+        hidden={heroHidden}
+        action={<TrainingSettingsButton placement="hero" onClick={() => setSettings(true)} />}
+      />
       <div
         className="mb-4 flex items-stretch gap-1 rounded-2xl border border-border bg-surface-raised p-1 shadow-sm"
         data-no-tab-swipe
@@ -83,12 +93,13 @@ function Training() {
             );
           })}
         </div>
-        <TrainingSettings inTabs />
+        {heroHidden && <TrainingSettingsButton placement="tabs" onClick={() => setSettings(true)} />}
       </div>
       {tab === 'workout' && <CurrentWorkout onBrowsePlans={() => setTab('plans')} />}
       {tab === 'plans' && <Plans onStarted={() => setTab('workout')} />}
       {tab === 'history' && <History />}
       {tab === 'exercises' && <ExerciseLibrary />}
+      <TrainingSettingsModal open={settings} onClose={() => setSettings(false)} />
     </>
   );
 }
