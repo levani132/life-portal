@@ -172,6 +172,20 @@ is in `docs/runbooks/email.md`.
 
 Links last 30 minutes (`RESET_TTL_MINUTES`).
 
+## Web: Sign-in & security (issue #27 S4)
+
+`/settings/security` is linked from Settings and backed by `components/account-security.tsx`.
+- **Change password** asks for the current password and the new one twice. It has Show/Hide
+  toggles (`PasswordInput`, with `aria-pressed`) and shows the API's policy messages as they
+  come. On success it clears the fields and says the other devices were signed out.
+- **Signed-in devices** lists `GET /auth/sessions`, with this device marked and each device's
+  last activity. It can sign out one device or all the others.
+  - **"Sign out everywhere"** first ends the other sessions, then signs this device out through
+    `useAuth().logout()`. Writes still in the outbox therefore get the usual question before
+    anything is discarded.
+  - The list is a plain SWR read. Like everything money- or account-related, it is never kept
+    offline.
+
 ## Other details worth keeping
 
 - Login compares against a real dummy hash when the email does not exist (see Timing above), so

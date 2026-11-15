@@ -232,6 +232,14 @@ function Settings() {
           </div>
         </Panel>
         <Panel
+          title="Sign-in & security"
+          description="Change your password and see the devices signed in to your account."
+        >
+          <Link href="/settings/security" className="btn inline-flex">
+            Manage sign-in
+          </Link>
+        </Panel>
+        <Panel
           title="AI Assistant"
           description="Connect ChatGPT, Claude, or other AI apps to your nutrition data."
         >
