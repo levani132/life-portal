@@ -490,11 +490,25 @@ export const trainingWrites = {
   remove(sessionId: string): Promise<void> {
     return write({ op: 'session.remove', sessionId }, { method: 'DELETE', path: base(sessionId) }, 'Delete workout');
   },
+
+  /**
+   * Issue #25: body weight from the finish sheet, against the day's version the sheet saw (0:
+   * none). Never sent unless the person changed it and confirmed; a clash with a weigh-in made
+   * elsewhere waits in the sync sheet for them to choose.
+   */
+  weighIn(sessionId: string, input: { day: string; weightGrams: number }, seen: { version?: number } | undefined): Promise<void> {
+    const baseVersion = seen ? (seen.version ?? 0) : 0;
+    return write(
+      { op: 'weighin.put', sessionId, day: input.day, weightGrams: input.weightGrams, baseVersion },
+      { method: 'PUT', path: '/training/weigh-in', body: { ...input, baseVersion } },
+      `Weigh-in · ${input.day}`,
+    );
+  },
 };
 
 /** Whether this workout still has writes on the device: its records and ranks are not final. */
 export function hasUnsyncedWrites(writes: readonly TrainingWriteMeta[], sessionId: string): boolean {
-  return writes.some((meta) => meta.sessionId === sessionId && meta.op !== 'plan-update');
+  return writes.some((meta) => meta.sessionId === sessionId && meta.op !== 'plan-update' && meta.op !== 'weighin.put');
 }
 
 /**

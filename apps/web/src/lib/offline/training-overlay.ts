@@ -73,7 +73,12 @@ export type TrainingWriteMeta =
   | { op: 'session.patch'; sessionId: string; patch: { notes?: string; day?: string }; baseVersion?: number }
   | { op: 'session.finish'; sessionId: string; endedAt: string }
   | { op: 'session.remove'; sessionId: string }
-  | { op: 'plan-update'; sessionId: string };
+  | { op: 'plan-update'; sessionId: string }
+  /**
+   * Issue #25: the body weight saved from a workout's finish sheet. Food's one-per-day row, weight
+   * only, against the version the sheet saw. It changes nothing in the workout.
+   */
+  | { op: 'weighin.put'; sessionId: string; day: string; weightGrams: number; baseVersion: number };
 
 /** What the overlay needs of an outbox item. */
 export interface OverlayItem {
@@ -257,6 +262,7 @@ export function applyWrite(session: SessionDetail | null, meta: TrainingWriteMet
     case 'session.remove':
       return null;
     case 'plan-update':
+    case 'weighin.put':
       return session;
   }
 }

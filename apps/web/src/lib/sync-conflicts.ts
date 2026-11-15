@@ -30,6 +30,11 @@ async function resend(item: OutboxItem, base: number, patch: Record<string, unkn
 export type Undo = () => Promise<void>;
 
 function weighInUndo(item: OutboxItem, values: Record<string, unknown>, base: number): Undo {
+  if (item.kind === 'training.weighin.put') {
+    // Issue #25: put back through Training, which may not have Food.
+    const meta = item.meta as Extract<TrainingWriteMeta, { op: 'weighin.put' }>;
+    return () => trainingWrites.weighIn(meta.sessionId, { day: meta.day, weightGrams: Number(values['weightGrams']) }, { version: base });
+  }
   const meta = item.meta as Extract<NutritionWriteMeta, { op: 'weighin.put' }>;
   return () =>
     foodWrites.putWeighIn(

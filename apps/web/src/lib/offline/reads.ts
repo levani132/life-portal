@@ -22,6 +22,8 @@ const READS: [RegExp, (match: RegExpMatchArray) => string][] = [
   [/^\/training\/sessions$/, () => 'training:history'],
   [/^\/training\/sessions\/([0-9a-f]{24})$/, (m) => `training:session:${m[1]}`],
   [/^\/training\/exercises\/offline$/, () => 'training:exercises'],
+  // Issue #25: the finish sheet's body weight, offline too.
+  [/^\/training\/weigh-ins\/recent$/, () => 'training:weigh-ins'],
   // The day-start hour decides which day a workout belongs to.
   [/^\/nutrition\/profile$/, () => 'nutrition:profile'],
   // Spec 029: the Food day, one copy per day viewed.

@@ -30,6 +30,8 @@ const KINDS: Record<string, EditKind> = {
   'training.session.patch': 'session',
   'nutrition.entry.patch': 'entry',
   'nutrition.weighin.put': 'weighin',
+  // Issue #25: the same row, from Training's finish sheet (weight only).
+  'training.weighin.put': 'weighin',
 };
 
 type Meta = Record<string, unknown> & { patch?: Record<string, unknown>; baseVersion?: number };
@@ -55,7 +57,8 @@ export function editOf(item: Pick<OutboxItem, 'kind' | 'meta'>): Edit | undefine
         kind,
         rowKey: `weighin:${meta['day']}`,
         base,
-        patch: { weightGrams, bodyFatPct, ...(note != null ? { note } : {}) },
+        // Training's weigh-in changes the weight alone, so only the weight is compared.
+        patch: item.kind === 'training.weighin.put' ? { weightGrams } : { weightGrams, bodyFatPct, ...(note != null ? { note } : {}) },
         textField: undefined,
       };
     }

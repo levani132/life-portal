@@ -527,3 +527,47 @@
     }
   }
 }
+
+/*
+ * Issue #25: the workout recap's entrance. Opacity and transform only, so nothing moves the
+ * layout. Longhands, because a delay is set per item (inline) and the shorthand would reset it.
+ * With reduced motion everything is simply shown.
+ */
+.recap-in {
+  animation-name: recap-in;
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation-fill-mode: both;
+}
+.recap-pop {
+  animation-name: recap-pop;
+  animation-duration: 520ms;
+  animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation-fill-mode: both;
+}
+@keyframes recap-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes recap-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .recap-in,
+  .recap-pop {
+    animation: none;
+  }
+}

@@ -67,6 +67,8 @@ import { exerciseRest, sessionFocus } from '../../lib/training-workout';
 import { SetForm, type SetFormValue } from './set-row';
 import { SetTable } from './set-table';
 import { PlanDayUpdate } from './plan-day-update';
+import { FinishSheet } from './finish-sheet';
+import { WorkoutRecapView } from './workout-recap';
 
 const message = (error: unknown) =>
   error instanceof ApiError ? error.message : 'Could not reach the server. Try again.';
@@ -91,6 +93,9 @@ export function CurrentWorkout({ onBrowsePlans }: { onBrowsePlans?: () => void }
   const workoutDay = useWorkoutDay();
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  // Issue #25: the recap outlives the workout's screen, which goes back to "Ready" once finished.
+  const [recap, setRecap] = useState<SessionDetail | null>(null);
+  const recapView = recap && <WorkoutRecapView session={recap} celebrate onClose={() => setRecap(null)} />;
 
   const start = async () => {
     setStarting(true);
@@ -139,17 +144,32 @@ export function CurrentWorkout({ onBrowsePlans }: { onBrowsePlans?: () => void }
           {startError && <div className="relative mt-3"><ErrorNote message={startError} /></div>}
         </section>
         <SuggestedPlans />
+        {recapView}
       </div>
     );
   }
-  return <WorkoutSession session={data} />;
+  return (
+    <>
+      <WorkoutSession session={data} onFinished={setRecap} />
+      {recapView}
+    </>
+  );
 }
 
 /**
  * One session, open or finished: exercises in order, their sets as a table to tick off, and
  * the session's own controls. Finished sessions stay editable (spec 020, story 1 #5).
  */
-export function WorkoutSession({ session, onGone }: { session: SessionDetail; onGone?: () => void }) {
+export function WorkoutSession({
+  session,
+  onGone,
+  onFinished,
+}: {
+  session: SessionDetail;
+  onGone?: () => void;
+  /** Issue #25: the workout as it was finished, for its recap. */
+  onFinished?: (session: SessionDetail) => void;
+}) {
   const open = session.status === 'open';
   const now = useNow(open);
   const planStyle = usePlanStyle(session.plan?.planId);
@@ -163,6 +183,8 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notes, setNotes] = useState(session.notes ?? '');
+  const [finishing, setFinishing] = useState(false);
+  const [showRecap, setShowRecap] = useState(false);
   useEffect(() => setNotes(session.notes ?? ''), [session.notes]);
 
   const run = async (fn: () => Promise<unknown>) => {
@@ -199,7 +221,13 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
       await discard();
       return;
     }
-    await run(() => trainingWrites.finish(session, at));
+    // Issue #25: finishing now is reviewed and confirmed in the finish sheet. A workout left open
+    // by mistake is finished at its last set at once, as before.
+    if (at === 'now') {
+      setFinishing(true);
+      return;
+    }
+    if (await run(() => trainingWrites.finish(session, at))) onFinished?.(finishedCopy(session, session.lastSetAt));
   };
 
   const saveNotes = () => {
@@ -262,7 +290,7 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
               </h2>
               {session.plan && <p className="truncate text-sm text-white/85">{session.plan.planName}</p>}
             </div>
-            {open && (
+            {open ? (
               <button
                 type="button"
                 className="shrink-0 rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-900 shadow transition-colors hover:bg-white/90 disabled:opacity-60"
@@ -270,6 +298,14 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
                 onClick={() => void finish('now')}
               >
                 Finish
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="shrink-0 rounded-xl bg-white/20 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/30"
+                onClick={() => setShowRecap(true)}
+              >
+                Summary
               </button>
             )}
           </div>
@@ -359,6 +395,19 @@ export function WorkoutSession({ session, onGone }: { session: SessionDetail; on
           />
         </div>
       </section>
+
+      {finishing && (
+        <FinishSheet
+          session={session}
+          elapsedSeconds={elapsed}
+          onClose={() => setFinishing(false)}
+          onFinished={(finished) => {
+            setFinishing(false);
+            onFinished?.(finishedCopy(finished, new Date().toISOString(), elapsed));
+          }}
+        />
+      )}
+      {showRecap && <WorkoutRecapView session={session} onClose={() => setShowRecap(false)} />}
 
       {/* Issue #15: a finished plan workout may offer to update its plan day. Never blocks. */}
       {!open && session.plan && <PlanDayUpdate sessionId={session.id} />}
@@ -750,5 +799,18 @@ function EditSet({
       </button>
     </Modal>
   );
+}
+
+/** The workout as it is once finished, for its recap before the server's copy arrives (#25). */
+function finishedCopy(session: SessionDetail, endedAt: string | undefined, elapsedSeconds?: number): SessionDetail {
+  const end = endedAt ?? new Date().toISOString();
+  return {
+    ...session,
+    status: 'finished',
+    endedAt: end,
+    durationSeconds: elapsedSeconds ?? Math.max(0, Math.floor((Date.parse(end) - Date.parse(session.startedAt)) / 1000)),
+    // Unlogged planned exercises are dropped on finish, as the server does.
+    exercises: session.exercises.filter((exercise) => exercise.sets.length > 0),
+  };
 }
 
