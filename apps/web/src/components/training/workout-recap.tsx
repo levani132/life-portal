@@ -51,15 +51,16 @@ export function WorkoutRecapView({
   const totals: WorkoutTotals = recap?.totals ?? workoutTotals(session);
   const unit = profile.weightUnit;
   let step = 0;
-  const stagger = (on: boolean, className = 'recap-in'): { className?: string; style?: CSSProperties } =>
-    on ? { className, style: { animationDelay: `${120 + step++ * 90}ms` } } : {};
+  /** Merges the entrance into an element's own classes, staggered. */
+  const stagger = (on: boolean, own?: string): { className?: string; style?: CSSProperties } =>
+    on ? { className: clsx(own, 'recap-in'), style: { animationDelay: `${120 + step++ * 90}ms` } } : { className: own };
   /** The workout's own numbers: true from the start, so they may animate at once. */
-  const enter = () => stagger(celebrate);
+  const enter = (own?: string) => stagger(celebrate, own);
   /** What was earned: only when confirmed in time (see above). */
-  const earned = () => stagger(decided.current === true);
+  const earned = (own?: string) => stagger(decided.current === true, own);
 
   return (
-    <Modal open onClose={onClose} title={celebrate ? 'Workout complete' : `Workout · ${formatDay(session.day)}`}>
+    <Modal open onClose={onClose} title={celebrate ? 'Summary' : `Workout · ${formatDay(session.day)}`}>
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <span
@@ -79,7 +80,7 @@ export function WorkoutRecapView({
           </div>
         </div>
 
-        <dl className="grid grid-cols-3 gap-2" {...enter()}>
+        <dl {...enter('grid grid-cols-3 gap-2')}>
           <Stat icon={Timer} label="Time" value={formatDuration(totals.durationSeconds)} />
           <Stat icon={Weight} label="Volume" value={totals.volumeGrams ? formatWeight(totals.volumeGrams, unit) : '—'} />
           <Stat icon={Layers} label="Sets" value={String(totals.workingSets)} />
@@ -154,7 +155,7 @@ function Achievements({
 }: {
   recap: WorkoutRecap;
   unit: ReturnType<typeof useTrainingProfile>['weightUnit'];
-  enter: (className?: string) => { className?: string; style?: CSSProperties };
+  enter: (own?: string) => { className?: string; style?: CSSProperties };
 }) {
   const rankUps = recap.rankUps ?? [];
   const levelUp = recap.level && recap.level.to > recap.level.from;
@@ -165,7 +166,7 @@ function Achievements({
           <RankEmblem tier={up.to.tier} division={up.to.division} size={36} label={rankLabel(up.to)} />
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">Rank up · {up.name}</p>
-            <p className="font-bold capitalize">
+            <p className="font-bold">
               {up.from ? `${rankLabel(up.from)} → ${rankLabel(up.to)}` : `First rank: ${rankLabel(up.to)}`}
             </p>
             <p className="text-[11px] text-ink-faint">Strength rank on this exercise</p>
@@ -229,7 +230,7 @@ function Achievements({
       )}
 
       {!recap.achievements && (
-        <p className="flex items-center gap-2 text-sm text-ink-muted" {...enter()}>
+        <p {...enter('flex items-center gap-2 text-sm text-ink-muted')}>
           <Medal className="h-4 w-4 text-ink-faint" aria-hidden /> Done and logged. Every session counts.
         </p>
       )}

@@ -223,6 +223,14 @@ method returns early and reads no profile.
   or before `day`, ascending, as `{day, weightGrams}` only, in one query. Training uses it for
   bodyweight and assisted loads and never reads `weigh_ins` itself. Nothing else flows either way:
   training adds no burned energy to Food.
+- **Training writes weigh-ins too (issue #25).** The finish sheet records body weight through
+  `/training/weigh-in`, for accounts with Training whether or not Food is on. It is the same
+  `weigh_ins` row and the same `upsertWeighIn`, with `weightOnly`:
+  - it sets `weightGrams` alone, so body fat and note are kept;
+  - it requires `baseVersion`;
+  - the same weight again is not a write.
+  
+  `GET /training/weigh-ins/recent` lists the latest two. See `training.md`, "Finishing a workout".
 - **Nothing else.** Apart from that read, this widget links to no other module. It does not touch cash flow, and a
   grocery expense is a cash-flow concern that deliberately knows nothing about calories.
 

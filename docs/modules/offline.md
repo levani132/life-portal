@@ -122,6 +122,12 @@ Module-level request ids (training's `requestId`) remain; the header is the gene
 - **Refusal details.** An item keeps `lastErrorCode` and the string fields of the error body
   (`lastErrorData`, e.g. `openSessionId`), so the sync sheet can offer a fix, not only Discard.
 - **Never computed on the device:** records, ranks, levels, 1RM, tournaments.
+- **The finish sheet's weigh-in (issue #25)** is a training write, `weighin.put`. It changes
+  nothing in the workout, and it does not make the workout count as unsynced for records. It is
+  the same row as Food's `weighin.put`: the conflict kind is `weighin` for both, and they wait for
+  each other (`weighin:<day>`). Only the weight is compared, and putting it back goes through
+  Training. `/training/weigh-ins/recent` is cached as `training:weigh-ins`. The workout recap is
+  never cached: offline it is the device's own totals, with records and ranks pending.
 
 ## Food on top of the outbox (spec 029, issue #18)
 

@@ -2,6 +2,25 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-15: Finishing a workout
+
+- **Finish now shows your workout before saving it:** time, volume, sets, reps and exercises.
+  You can add a note and one body weight for the whole workout, then tap "Confirm & finish
+  workout".
+- **Body weight is optional.** If you already weighed in today, it shows that weigh-in, and only
+  changing the number replaces it (it tells you). Otherwise it suggests your last weight but saves
+  only if you tick "Save as today's weigh-in". This works even if you don't use Food.
+- **A recap when you finish:**
+  - new personal records;
+  - strength rank-ups, per exercise;
+  - your overall training level and XP, shown separately;
+  - sets by muscle.
+  
+  Only real achievements are shown, and with "Reduce motion" on nothing animates.
+- **Finished offline?** You see your numbers right away. Records and ranks appear in the
+  workout's Summary in History once it syncs.
+- **Reopen any finished workout's recap** with "Summary" in History.
+
 ## 2026-11-15: Finishing an exercise no longer jumps the page
 
 - **Ticking an exercise's last set folds it away smoothly**, and what you were looking at stays

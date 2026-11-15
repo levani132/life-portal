@@ -392,6 +392,65 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `PUT` | `/sessions/:id/rest-alarm` `{at: ISO \| null}` | Spec 025: 204. Sets, moves or cancels the person's rest-over push (in memory). |
 | `GET` | `/exercises/:id/rank?today=` | Issue #5b, needs `trainingRanks` (403 otherwise): `ExerciseRankView`, current and highest-ever strength rank. See Strength ranks. |
 | `GET` | `/summary?today=` | The Home card's figures (`TrainingSummary`, with `weightUnit`, read without creating a profile); also in `GET /api/dashboard`. |
+| `GET` | `/sessions/:id/recap` | Issue #25: `WorkoutRecap`, recomputed on every read as of that workout. See Finishing a workout. |
+| `GET` | `/weigh-ins/recent` | Issue #25: `{weighIns}`, the two latest, newest first (`{id, day, weightGrams, version?}`). For anyone with Training, Food or not. |
+| `PUT` | `/weigh-in` `{day, weightGrams, baseVersion}` | Issue #25: Food's weigh-in row, **weight only**, against a required version (`STALE_EDIT` otherwise). Body fat and note are kept; the same weight against the current version is not a write. |
+
+## Finishing a workout (issue #25)
+
+**The finish sheet** (`finish-sheet.tsx`). Finish opens it, and nothing is saved until **Confirm &
+finish workout**. It shows the workout's numbers (`workoutTotals`), one optional body weight for
+the whole workout, and the workout's note. "Finish at last set", for a workout left open, still
+finishes at once.
+
+**Body weight:**
+- It is the same `weigh_ins` row as Food's, one per day. The sheet uses Training's own routes
+  (`/training/weigh-ins/recent`, `/training/weigh-in`), so an account with Training and without
+  Food can record one. The owner decided this on #25. The routes reuse
+  `NutritionService.upsertWeighIn` with `weightOnly`: same validation, same daily upsert, same
+  versions. No Food UI is shown and no data model is duplicated.
+- **Today's weigh-in exists:** the field shows it. It is written only if the number is changed,
+  labelled "Replaces today's measurement of …". Unchanged is never a write, and the server agrees:
+  the same weight against the current version returns the row untouched.
+- **No weigh-in today:** the field is prefilled from the latest one. It is saved only when "Save as
+  today's weigh-in" is ticked (typing a number ticks it).
+- **Writes** go through the outbox: `training.weighin.put` with the version the sheet saw (0 if
+  none). A clash with a weigh-in made elsewhere is a `weighin` conflict in the sync sheet, never
+  an overwrite. A retried confirm is one write, because each write has its own idempotency key.
+
+**The recap** (`workout-recap.tsx`, `GET /sessions/:id/recap`, `workoutRecap()` in
+`libs/shared/domain/src/lib/workout-recap.ts`). Recomputed on every read, never stored
+(principle 3):
+- **Totals:** duration; exercises with a set; sets; working sets; reps over working sets; volume
+  (load × reps over working sets, with bodyweight sets only when body weight is known, and no
+  volume for timed or distance work); working sets per primary muscle.
+- **Records:** the marks the server puts on this workout's sets (see Progress and records).
+- **Strength rank-ups** (`trainingRanks` only): for each exercise, `exerciseRank` without and with
+  this workout's sets.
+  - Counted: sessions finished by then, on or before its day, excluding later ones that day.
+  - Benchmark: the one that applied on the workout's day.
+  - A rank-up is a higher best-ever (`highest`) milestone, or a first rank. A kept or recovered
+    `current` rank is not one.
+- **Level** (`trainingLevels` only): `trainingLevel` without and with the workout, as of its day.
+  The recap reports the XP gained, and a level-up when the level rose. It is shown apart from
+  strength ranks and labelled "Overall training, all exercises".
+- **When features are off:** `rankUps` and `level` are absent, not empty. An open workout gets
+  totals only.
+- **From History** ("Summary"), the same recap is shown still, with a note: it is worked out
+  again now, as of that workout, with today's weigh-ins and rank settings. So correcting a set or
+  a weigh-in can change an old recap.
+
+**Motion:**
+- On finishing, the check mark and the numbers animate in (`.recap-in`, `.recap-pop`: opacity and
+  transform only, so nothing shifts).
+- Achievements animate only when the server's recap arrives within 8 seconds while online.
+- A workout finished offline shows its numbers and "waiting to sync". What it earned appears later
+  in History, without a delayed animation.
+- `prefers-reduced-motion` turns all of it off.
+- #15's plan-day prompt comes after the recap, inside it, and never covers it.
+
+**Not here:** sharing a workout or posting it to the feed. The owner deferred that to its own
+issue on #25.
 
 ## Derived values (computed on read, never stored)
 

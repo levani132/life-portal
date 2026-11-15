@@ -2117,3 +2117,35 @@ other people's posts on the device is S3 and is waiting for the owner.
 - Lists that should keep their place need `data-scroll-anchor` on their cards. Nothing else in the
   app uses the hook yet.
 
+
+## 2026-11-15 · Finishing a workout: a reviewed sheet, a recomputed recap, Training's own weigh-in (issue #25)
+
+**Decided:**
+- Finish opens a sheet, and nothing is saved until "Confirm & finish workout". The sheet holds the
+  workout's numbers, one optional body weight for the whole workout, and the note.
+- **The recap is recomputed on every read**, as of the workout, not stored:
+  - records are the set marks;
+  - strength ranks are `exerciseRank` without and with the workout, as of its day;
+  - the level is `trainingLevel` without and with it, as of its day.
+  
+  From History it says it was recalculated with current weigh-ins and rank settings.
+- **Body weight from Training:**
+  - Uses Food's `weigh_ins` row and service, through `/training/weigh-in`, for anyone with
+    Training (owner decision on #25).
+  - Weight only, with a required version. The same weight again is not a write.
+  - It replaces today's weigh-in only when the number was changed, and says so.
+- Achievements animate only when confirmed by the server within seconds, online. Offline, they
+  appear later in History without animation.
+- Sharing a workout is a separate issue (owner decision).
+
+**Buys:**
+- No stored recap to drift from the sets.
+- No misleading rank-ups or records: everything celebrated comes from the server's engines.
+- Training-only accounts can log body weight without opening Food or copying its data model.
+- A finish sheet confirmed twice cannot double a weigh-in or blank Food's body fat.
+
+**Costs:**
+- **An old recap can change** if its sets, a weigh-in or the person's rank standards are corrected
+  later. This is the price of "derived, never persisted", and it is labelled.
+- **A Training-only account writes a Food row.** `weigh_ins` now has two writers. Both go through
+  one service method.
