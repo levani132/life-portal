@@ -147,3 +147,44 @@ describe('weigh-ins from two devices (spec 030)', () => {
     await expect(f.service.removeWeighIn('u', id)).resolves.toEqual({ id, deleted: true });
   });
 });
+
+describe("Training's finish-sheet weigh-in (issue #25)", () => {
+  const train = (f: ReturnType<typeof fixture>, weightGrams: number, baseVersion?: number) =>
+    f.service.upsertWeighIn('u', '2026-11-15', { day: '2026-11-15', weightGrams, ...(baseVersion !== undefined ? { baseVersion } : {}) }, { weightOnly: true });
+  const seeded = (f: ReturnType<typeof fixture>) =>
+    f.weighIns.docs.push({ _id: new Types.ObjectId(), userId: 'u', day: '2026-11-15', weightGrams: 80_000, bodyFatPct: 0.18, note: 'fasted', version: 2 });
+
+  it("never replaces today's weigh-in it did not see", async () => {
+    const f = fixture();
+    seeded(f);
+    // The sheet was opened before the morning weigh-in reached the server: it saw none (0).
+    expect(await refusal(train(f, 81_500, 0))).toMatchObject({ code: 'STALE_EDIT', current: { weightGrams: 80_000 } });
+    expect(f.weighIns.docs[0]['weightGrams']).toBe(80_000);
+  });
+
+  it('is not a write when the prefilled weight is confirmed unchanged', async () => {
+    const f = fixture();
+    seeded(f);
+    await expect(train(f, 80_000, 2)).resolves.toMatchObject({ weightGrams: 80_000, version: 2 });
+    expect(f.weighIns.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it("replaces only the weight, keeping Food's body fat and note", async () => {
+    const f = fixture();
+    seeded(f);
+    await expect(train(f, 81_500, 2)).resolves.toMatchObject({ weightGrams: 81_500, version: 3, bodyFatPct: 0.18, note: 'fasted' });
+  });
+
+  it('creates the day once, and a retry against the new version is not a second write', async () => {
+    const f = fixture();
+    await expect(train(f, 79_000, 0)).resolves.toMatchObject({ weightGrams: 79_000, version: 1 });
+    await expect(train(f, 79_000, 1)).resolves.toMatchObject({ version: 1 });
+    expect(f.weighIns.docs).toHaveLength(1);
+  });
+
+  it('requires a version', async () => {
+    const f = fixture();
+    await expect(train(f, 79_000)).rejects.toThrow('baseVersion');
+    expect(f.weighIns.docs).toHaveLength(0);
+  });
+});

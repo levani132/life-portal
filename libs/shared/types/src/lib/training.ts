@@ -770,3 +770,83 @@ export interface ExerciseRankView {
   /** Sets left out, and why. */
   excluded: { implausible: number; noBodyWeight: number; machine: number };
 }
+
+// ------------------------------------------------------------------ finishing a workout (#25)
+
+/** A workout's numbers, worked out from its sets (`workoutTotals`). Derived, never stored. */
+export interface WorkoutTotals {
+  durationSeconds: number;
+  exercises: number;
+  /** Every logged set, warm-ups included. */
+  sets: number;
+  /** Sets that are not warm-ups. */
+  workingSets: number;
+  /** Reps over the non-warm-up sets. */
+  reps: number;
+  /**
+   * Load × reps over the non-warm-up sets, whole grams. Bodyweight sets count only with a known
+   * body weight (`effectiveLoad`); timed and distance work has no volume.
+   */
+  volumeGrams: number;
+  /** Non-warm-up sets per primary muscle, most first. A set of a two-muscle exercise counts for both. */
+  setsByMuscle: { muscle: Muscle; sets: number }[];
+}
+
+/** A record a set of this workout set (the marks on its sets). */
+export interface RecapRecord {
+  exerciseId: string;
+  name: string;
+  measure: Measure;
+  kind: RecordKind;
+  setId: string;
+  entry?: RecordEntry;
+}
+
+/** A strength rank that went up in this workout: the best ever before it, and after. */
+export interface RecapRankUp {
+  exerciseId: string;
+  name: string;
+  /** Absent: the first rank ever on this exercise. */
+  from?: RankPosition;
+  to: RankPosition;
+  /** The standards version the ranks were worked out under. */
+  version: string;
+}
+
+/** The overall training level before and after this workout (not a strength rank). */
+export interface RecapLevel {
+  from: number;
+  to: number;
+  xpGained: number;
+  /** The level after, for the progress bar. */
+  after: TrainingLevel;
+}
+
+/**
+ * `GET /training/sessions/:id/recap` (issue #25). Recomputed on every read, as of the workout:
+ * ranks and level before it are worked out without it, and after it with it, under the standards
+ * and weigh-ins as they are now. `levels` and `ranks` are absent when the feature is off.
+ */
+export interface WorkoutRecap {
+  sessionId: string;
+  day: string;
+  status: SessionStatus;
+  totals: WorkoutTotals;
+  records: RecapRecord[];
+  rankUps?: RecapRankUp[];
+  level?: RecapLevel;
+  /** True when anything is worth celebrating: a record, a rank-up or a level-up. */
+  achievements: boolean;
+}
+
+/** The weigh-ins the finish sheet needs: the two most recent (`GET /training/weigh-ins/recent`). */
+export interface RecentWeighIns {
+  weighIns: { id: string; day: string; weightGrams: number; version?: number }[];
+}
+
+/** `PUT /training/weigh-in`: body weight only, against the version the device saw (0: none that day). */
+export interface TrainingWeighInInput {
+  day: string;
+  weightGrams: number;
+  baseVersion: number;
+}

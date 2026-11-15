@@ -24,11 +24,29 @@ export class TrainingLevelService {
 
   async level(userId: string, today: string): Promise<TrainingLevel> {
     await this.access.require(userId, 'trainingLevels');
+    return trainingLevel(await this.levelSessions(userId, today), today);
+  }
+
+  /**
+   * Issue #25: the level as of a finished workout, without and with it. Workouts started after it
+   * on its day are left out, so a recap opened later still shows what that workout did. No
+   * feature check: the recap has done it.
+   */
+  async aroundSession(userId: string, session: { id: string; day: string; startedAt: Date }): Promise<{ before: TrainingLevel; after: TrainingLevel }> {
+    const all = await this.levelSessions(userId, session.day);
+    const upTo = all.filter((row) => row.day !== session.day || row.startedAt <= session.startedAt.toISOString() || row.id === session.id);
+    return {
+      before: trainingLevel(upTo.filter((row) => row.id !== session.id), session.day),
+      after: trainingLevel(upTo, session.day),
+    };
+  }
+
+  private async levelSessions(userId: string, today: string): Promise<LevelSession[]> {
     const rows = await this.sessions
       .find({ userId, status: 'finished', day: { $lte: today } })
       .select('day status startedAt endedAt')
       .lean<SessionRow[]>();
-    if (!rows.length) return trainingLevel([], today);
+    if (!rows.length) return [];
     // One grouped count over the person's sets ({userId, sessionId} index), not a read per session.
     const counts = await this.sets.aggregate<{ _id: string; count: number }>([
       { $match: { userId, type: { $ne: 'warmup' } } },
@@ -46,6 +64,6 @@ export class TrainingLevelService {
       }),
       workingSets: working.get(String(row._id)) ?? 0,
     }));
-    return trainingLevel(sessions, today);
+    return sessions;
   }
 }

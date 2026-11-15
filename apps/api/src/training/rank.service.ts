@@ -107,8 +107,42 @@ export class TrainingRankService {
     };
   }
 
+  /**
+   * Issue #25: one exercise's rank as of a finished workout, without and with that workout's sets.
+   * Only sessions done by then count (a later workout on the same day is left out), and the
+   * benchmark is the one that applied on that day. No feature check: the recap has done it.
+   */
+  async aroundSession(
+    userId: string,
+    exerciseId: string,
+    session: { id: string; day: string; startedAt: Date },
+  ): Promise<{ before: ExerciseRankView; after: ExerciseRankView; name: string } | undefined> {
+    const exercise = await this.catalogue.readable(userId, exerciseId, { includeArchived: true }).catch(() => undefined);
+    if (!exercise) return undefined;
+    const measure = exercise.measure as Measure;
+    const seedKey = exercise.userId ? undefined : exercise.seedKey;
+    const [profile, sets] = await Promise.all([
+      this.profiles.read(userId),
+      this.load(userId, exerciseId, measure, session.day, undefined, session),
+    ]);
+    const input = { exerciseId, seedKey, measure, standards: profile.rankStandards, today: session.day };
+    return {
+      before: exerciseRank({ ...input, sets: sets.filter((set) => set.sessionId !== session.id) }),
+      after: exerciseRank({ ...input, sets }),
+      name: exercise.name,
+    };
+  }
+
   /** The caller's sets of one exercise under its current measure, in finished sessions up to today. */
-  private async load(userId: string, exerciseId: string, measure: Measure, today: string, savedBefore?: Date): Promise<RankSet[]> {
+  private async load(
+    userId: string,
+    exerciseId: string,
+    measure: Measure,
+    today: string,
+    savedBefore?: Date,
+    /** Issue #25: leave out workouts started after this one on its day. */
+    until?: { day: string; startedAt: Date },
+  ): Promise<RankSet[]> {
     const [rows, exercises] = await Promise.all([
       this.sets.find({ userId, exerciseId, ...(savedBefore ? { loggedAt: { $lt: savedBefore } } : {}) }).lean<SetRow[]>(),
       this.workoutExercises.find({ userId, exerciseId }).select('_id machineId snapshot.measure').lean<ExerciseRow[]>(),
@@ -119,7 +153,11 @@ export class TrainingRankService {
       .find({ userId, status: 'finished', day: { $lte: today }, _id: { $in: [...new Set(rows.map((row) => row.sessionId))] } })
       .select('day startedAt')
       .lean<SessionRow[]>();
-    const sessions = new Map(sessionRows.map((row) => [String(row._id), row]));
+    const sessions = new Map(
+      sessionRows
+        .filter((row) => !until || row.day !== until.day || row.startedAt.getTime() <= until.startedAt.getTime())
+        .map((row) => [String(row._id), row]),
+    );
     const weighIns = sessionRows.length ? await this.nutrition.weighInsUpTo(userId, today) : [];
     return rows.flatMap((row) => {
       const session = sessions.get(row.sessionId);

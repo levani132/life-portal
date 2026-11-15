@@ -719,6 +719,17 @@ export class NutritionService {
     return { days, cheatDays: profile.cheatDays ?? [] };
   }
 
+  /** Issue #25: the latest weigh-ins, newest first. */
+  async recentWeighIns(userId: string, limit: number): Promise<{ id: string; day: string; weightGrams: number; version?: number }[]> {
+    const rows = await this.weighIns.find({ userId }).sort({ day: -1 }).limit(limit).lean();
+    return rows.map((row) => ({
+      id: String(row._id),
+      day: row.day,
+      weightGrams: row.weightGrams,
+      ...(row.version !== undefined ? { version: row.version } : {}),
+    }));
+  }
+
   async listWeighIns(userId: string): Promise<WeighInDto[]> {
     const rows = await this.weighIns.find({ userId }).sort({ day: 1 });
     return rows.map((row) => row.toJSON() as unknown as WeighInDto);
@@ -735,16 +746,31 @@ export class NutritionService {
     userId: string,
     today: string,
     dto: UpsertWeighInDto,
+    /**
+     * Issue #25 (Training's finish sheet): change the weight only, keeping the day's body fat and
+     * note, and only against a known version. The same weight again is not a write.
+     */
+    options: { weightOnly?: boolean } = {},
   ): Promise<WeighInDto> {
     const day = dto.day ? toDay(dto.day) : today;
     const patch: Record<string, unknown> = { weightGrams: dto.weightGrams };
     // `$unset` rather than skipping, so clearing a body-fat reading actually clears it and the
     // basal rate falls back to the weight-based equation.
     const unset: Record<string, ''> = {};
-    if (dto.bodyFatPct != null) patch['bodyFatPct'] = dto.bodyFatPct;
-    else unset['bodyFatPct'] = '';
-    if (dto.note != null) patch['note'] = dto.note;
+    if (!options.weightOnly) {
+      if (dto.bodyFatPct != null) patch['bodyFatPct'] = dto.bodyFatPct;
+      else unset['bodyFatPct'] = '';
+      if (dto.note != null) patch['note'] = dto.note;
+    }
     const update = { $set: patch, ...BUMP, ...(Object.keys(unset).length ? { $unset: unset } : {}) };
+
+    if (options.weightOnly) {
+      if (dto.baseVersion === undefined) throw new BadRequestException('baseVersion is required.');
+      const same = await this.weighIns.findOne({ userId, day });
+      if (same && versionOf(same) === dto.baseVersion && same.weightGrams === dto.weightGrams) {
+        return same.toJSON() as unknown as WeighInDto;
+      }
+    }
 
     if (dto.baseVersion === undefined) {
       const saved = await this.weighIns.findOneAndUpdate({ userId, day }, update, {

@@ -30,10 +30,12 @@ import { PlanDayUpdateService } from './plan-day-update.service';
 import { PlansService } from './plans.service';
 import { ProgressService } from './progress.service';
 import { NutritionModule } from '../nutrition/nutrition.module';
+import { NutritionService } from '../nutrition/nutrition.service';
 import { TrainingProfileService } from './profile.service';
 import { SessionsService } from './sessions.service';
 import { TrainingLevelService } from './level.service';
 import { TrainingRankService } from './rank.service';
+import { TrainingRecapService } from './recap.service';
 import { TrainingSummaryService } from './summary.service';
 import { RestAlarmService } from './rest-alarm.service';
 import { Today } from '../common/today';
@@ -50,6 +52,7 @@ import {
   StartSessionDto,
   SwapSessionExerciseDto,
   UpdateExerciseDto,
+  TrainingWeighInDto,
   UpdateSessionDto,
   UpdateSessionExerciseDto,
   RestAlarmDto,
@@ -103,6 +106,8 @@ export class TrainingController {
     private readonly levels: TrainingLevelService,
     private readonly ranks: TrainingRankService,
     private readonly planUpdates: PlanDayUpdateService,
+    private readonly recaps: TrainingRecapService,
+    private readonly nutrition: NutritionService,
   ) {}
 
   /** The Home card's figures, for the person's `today` (spec 020 US4). */
@@ -245,6 +250,24 @@ export class TrainingController {
     return this.plans.remove(userId, id);
   }
 
+  // ---------------------------------------------------------------- body weight (#25)
+
+  /**
+   * Issue #25: the weigh-in a finished workout may record, for anyone with Training, Food or not.
+   * The same `weigh_ins` rows and the same service as Food's: one per day, versioned. Training may
+   * change only the weight, and only against the version the device saw, so it never overwrites a
+   * measurement blindly and never clears Food's body fat or note.
+   */
+  @Get('weigh-ins/recent')
+  async recentWeighIns(@CurrentUser('userId') userId: string) {
+    return { weighIns: await this.nutrition.recentWeighIns(userId, 2) };
+  }
+
+  @Put('weigh-in')
+  weighIn(@CurrentUser('userId') userId: string, @Today() today: string, @Body() dto: TrainingWeighInDto) {
+    return this.nutrition.upsertWeighIn(userId, today, dto, { weightOnly: true });
+  }
+
   // ---------------------------------------------------------------- sessions
 
   @Post('sessions')
@@ -293,6 +316,12 @@ export class TrainingController {
     const finished = await this.sessions.finish(userId, id, dto.at, Date.now(), dto.endedAt);
     this.alarms.clear(userId);
     return finished;
+  }
+
+  /** Issue #25: the workout's recap, recomputed as of that workout. */
+  @Get('sessions/:id/recap')
+  recap(@CurrentUser('userId') userId: string, @Param('id') id: string) {
+    return this.recaps.recap(userId, id);
   }
 
   /** Issue #15: what this finished workout would change in its plan day, and whether it may. */
@@ -418,7 +447,7 @@ export class TrainingController {
     ]),
   ],
   controllers: [TrainingController],
-  providers: [CatalogueSeeder, PlanSeeder, PlansService, PlanDayUpdateService, CatalogueService, ProgressService, TrainingProfileService, SessionsService, TrainingSummaryService, RestAlarmService, TrainingLevelService, TrainingRankService],
+  providers: [CatalogueSeeder, PlanSeeder, PlansService, PlanDayUpdateService, CatalogueService, ProgressService, TrainingProfileService, SessionsService, TrainingSummaryService, RestAlarmService, TrainingLevelService, TrainingRankService, TrainingRecapService],
   exports: [SessionsService, TrainingSummaryService, TrainingRankService, TrainingProfileService],
 })
 export class TrainingModule {}

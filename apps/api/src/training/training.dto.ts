@@ -55,6 +55,16 @@ export class StartSessionDto {
   @IsOptional() @IsISO8601({ strict: true }) startedAt?: string;
 }
 
+/**
+ * Issue #25: body weight from the finish sheet. The same bounds as Food's `UpsertWeighInDto`; the
+ * version is required, so a weigh-in is never overwritten without the device having seen it.
+ */
+export class TrainingWeighInDto {
+  @Matches(DAY, { message: 'day must be a calendar date in YYYY-MM-DD form' }) day!: string;
+  @IsInt() @Min(20_000) @Max(400_000) weightGrams!: number;
+  @IsInt() @Min(0) baseVersion!: number;
+}
+
 export class UpdateSessionDto {
   /** Spec 030: the version this device last saw; a stale one is refused with `STALE_EDIT`. */
   @IsOptional() @IsInt() @Min(0) baseVersion?: number;
