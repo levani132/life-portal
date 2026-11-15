@@ -250,6 +250,11 @@ WorkoutSessionSchema.index(
 );
 WorkoutSessionSchema.index({ userId: 1, day: -1, startedAt: -1 });
 WorkoutSessionSchema.index({ userId: 1, 'plan.planId': 1, day: -1 });
+// Ad-hoc workouts saved into a plan count as its progress too; few sessions have `planUpdate`.
+WorkoutSessionSchema.index(
+  { userId: 1, 'planUpdate.planId': 1, day: -1 },
+  { partialFilterExpression: { 'planUpdate.planId': { $exists: true } } },
+);
 
 // ------------------------------------------------------------------ exercises in a session
 

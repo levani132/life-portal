@@ -2289,9 +2289,10 @@ for nothing a one-workout plan does not already do.
 the finish sheet (finishing stays one decision), once per workout, and planned sets never take
 weights: last time's sets already prefill the next start (#32).
 
-**The workout is not attached to the plan afterwards.** `plan` is frozen at start and stays
-absent, so the saved workout does not count as the plan's progress. Rewriting a finished
-workout's `plan` would break the rule that it is never set after the start.
+**The saved workout counts as the plan's progress, without getting a `plan`.** The owner's call:
+having just done the workout, the plan should show it as done and be the one Play continues.
+`plan` is frozen at start and stays absent (setting it later would break that rule); progress
+instead also reads `planUpdate` on sessions that have no `plan`. Derived on read, as before.
 
 **Online only.** The prompt needs the server's preview and the person's plan list; nothing is
 lost by waiting, since it stays in History.

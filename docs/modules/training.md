@@ -132,7 +132,7 @@ and distance or time for `distance_duration`; weight is optional (the person fil
 `validatePlan` checks `PLAN_LIMITS` (name 80, description 1000, 14 workouts, 30 exercises a
 workout, 1–20 targets, rest 0–900 s). Both live in `libs/shared/domain/src/lib/training-plans.ts`.
 
-**Progress** (US3) is derived on every read from the caller's sessions that carry `plan`, open
+**Progress** (US3) is derived on every read from the caller's sessions that carry `plan` (or were saved into a plan afterwards, see "Saving a workout as a plan workout"), open
 ones included, and never stored, so deleting a session simply stops it counting
 (`planProgress` in `training-plans.ts`). Each workout's `lastDoneDay` is the latest `day` of a
 session for it; the next workout is the one after the most recent session from that plan (by
@@ -283,8 +283,12 @@ workout at the end of one of the caller's **own** plans (`planId`) or makes a ne
 (`planName`), exactly one of the two. The day is `workoutAsPlanDay` (domain): every exercise with a
 logged set, in the order done, with the workout's own rest, and planned sets from `targetsFromSets`,
 so **never a weight**; a superset key survives only where two neighbours still share it. Nothing is
-copied from the plan side and nothing about the workout changes: it gets no `plan`, so it does not
-count as that plan's progress and is not offered a plan-day update. It is once per workout, recorded
+copied from the plan side and nothing about the workout changes: it gets no `plan` and is not
+offered a plan-day update. It **does count as that plan's progress**, for the workout it became:
+`PlansService.sessionRefs` reads sessions with `plan`, plus those with `planUpdate` and no `plan`
+(index `{userId, 'planUpdate.planId', day}`, partial), so the new workout shows the day as last
+done and the plan is the one Home's Play continues. A plan workout that updated its day (#15)
+still counts only for the plan it was started from, never for a copy. It is once per workout, recorded
 in the same `planUpdate` field (`copied: false`); any later `POST` returns the first result and the
 preview says `applied`, with the plan's and workout's names read live (absent once deleted). Retry
 safety does not depend on `planUpdate` being written: the new day's id is the session's id

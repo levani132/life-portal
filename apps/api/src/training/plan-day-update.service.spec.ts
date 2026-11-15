@@ -312,6 +312,22 @@ describe('PlanDayUpdateService: saving an ad-hoc workout as a plan workout', () 
     expect(f.plan().workouts).toHaveLength(2);
   });
 
+  it('counts as the plan’s progress: last done on that day, and the plan becomes the suggested one', async () => {
+    const f = fixture();
+    const session = await adHoc(f);
+    expect(await f.plans.suggested(ME, '2026-11-12')).toEqual([]);
+    await f.updates.save(ME, session.id, { requestId: randomUUID(), workoutName: 'Push', planId: f.planId });
+    const detail = await f.plans.detail(ME, f.planId);
+    expect(detail.workouts.map((workout) => [workout.name, workout.lastDoneDay, workout.isNext])).toEqual([
+      ['Upper', undefined, true],
+      ['Lower', undefined, false],
+      ['Push', '2026-11-12', false],
+    ]);
+    const [suggested] = await f.plans.suggested(ME, '2026-11-12');
+    expect(suggested).toMatchObject({ id: f.planId, lastDoneDay: '2026-11-12', nextWorkout: { id: 'upper', name: 'Upper' } });
+    expect(await f.plans.suggested(OTHER, '2026-11-12')).toEqual([]);
+  });
+
   it('saves once: a second save, to any plan, returns the first and writes nothing', async () => {
     const f = fixture();
     const session = await adHoc(f);

@@ -8,6 +8,8 @@ User-visible changes. Newest first.
   (and later from History) it offers "Save this workout to a plan?": add it to one of your plans
   as a new workout, or make a new plan on the spot. You name the workout, and can edit the plan
   afterwards.
+- **The saved workout counts as done in that plan**, so the plan shows today as its last day and
+  Home's Play continues with the plan's next workout.
 - **It saves the exercises and sets, not the weights.** Next time each exercise starts from what
   you did last time, as any workout does.
 

@@ -106,7 +106,12 @@ function SaveToPlanSheet({
         workoutName: workoutName.trim(),
         ...(planId === NEW_PLAN ? { planName: planName.trim() } : { planId }),
       });
-      await Promise.all([mutate(planUpdateKey(sessionId)), mutate(PLANS_KEY), mutate(planKey(result.planId))]);
+      // Every plan read: the list, this plan, and the suggestions (the saved workout counts as done).
+      await Promise.all([
+        mutate(planUpdateKey(sessionId)),
+        mutate((key) => typeof key === 'string' && key.startsWith(PLANS_KEY)),
+        mutate(planKey(result.planId)),
+      ]);
       onClose();
     } catch (caught) {
       if (caught instanceof NetworkError) {
