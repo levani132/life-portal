@@ -116,6 +116,8 @@ export function CurrentWorkout({ onBrowsePlans }: { onBrowsePlans?: () => void }
   if (!data) {
     return (
       <div className="space-y-4">
+        {/* First: the next workout from a plan in use is the likeliest start. Nothing without one. */}
+        <SuggestedPlans />
         <section className="card relative overflow-hidden p-5">
           <div aria-hidden className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-train-legs/10" />
           <div className="relative flex items-center gap-4">
@@ -144,7 +146,6 @@ export function CurrentWorkout({ onBrowsePlans }: { onBrowsePlans?: () => void }
           </div>
           {startError && <div className="relative mt-3"><ErrorNote message={startError} /></div>}
         </section>
-        <SuggestedPlans />
         {recapView}
       </div>
     );

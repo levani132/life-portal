@@ -141,7 +141,8 @@ workout no longer in the plan. `PlanListItem` carries `lastDoneDay` (the plan's 
 `nextWorkout {id, name}`; `PlanDetail` workouts carry `lastDoneDay` and `isNext`.
 `GET /plans/suggested?today=` lists up to three plans with a session in the 28 days up to and
 including `today` (`recentPlanIds`), most recent first, leaving out deleted and archived plans;
-the Workout tab shows them, with nothing open, as "Start <next workout> · <plan>". Queries use
+the Workout tab shows them, with nothing open, as "Start <next workout> · <plan>", above the
+"Ready when you are" card (Start empty, Choose a plan). Queries use
 the `{userId, 'plan.planId', day}` index.
 
 **Suggestions** in a started workout are derived, never stored as sets:

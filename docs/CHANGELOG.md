@@ -2,6 +2,11 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-15: Your next plan workout comes first
+
+- **"Next from your plans" is now above "Ready when you are"** on the Workout tab, so the workout
+  you're most likely to start is the first thing there. Without a plan in use, nothing changes.
+
 ## 2026-11-15: Ranks in the exercise list
 
 - **An exercise you hold a strength rank on shows that rank's emblem in the exercise list**, with
