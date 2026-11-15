@@ -771,6 +771,18 @@ export interface ExerciseRankView {
   excluded: { implausible: number; noBodyWeight: number; machine: number };
 }
 
+/**
+ * `GET /training/ranks`: one row per exercise the caller holds or has held a rank on, for marking
+ * exercises in a list. Derived on every read like `ExerciseRankView`, of which it is a short form:
+ * `ranked` carries the current position, `inactive` the highest ever.
+ */
+export interface ExerciseRankBadge {
+  exerciseId: string;
+  status: 'ranked' | 'inactive';
+  tier: RankTier;
+  division: RankDivision;
+}
+
 // ------------------------------------------------------------------ finishing a workout (#25)
 
 /** A workout's numbers, worked out from its sets (`workoutTotals`). Derived, never stored. */

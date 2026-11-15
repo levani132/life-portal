@@ -203,6 +203,16 @@ export class CatalogueService {
     return row;
   }
 
+  /** The caller-visible rows among `ids`, archived ones included: what a rank needs of each. */
+  async rankable(userId: string, ids: readonly string[]): Promise<ExerciseRow[]> {
+    const valid = ids.filter((id) => isValidObjectId(id));
+    if (!valid.length) return [];
+    return this.exercises
+      .find(this.visible(userId, { _id: { $in: valid } }))
+      .select('measure userId seedKey')
+      .lean<ExerciseRow[]>();
+  }
+
   // ---------------------------------------------------------------- own exercises
 
   async create(userId: string, input: ExerciseInput): Promise<ExerciseDto> {

@@ -12,13 +12,15 @@ function fixture(options: { standards?: 'men' | 'women'; seedKey?: string; own?:
   const workoutExercises = new FakeModel();
   const sets = new FakeModel();
   const exerciseId = String(new Types.ObjectId());
+  const row = () => ({
+    _id: exerciseId,
+    measure: 'weight_reps',
+    ...(options.own ? { userId: ME } : {}),
+    seedKey: options.seedKey ?? BENCH,
+  });
   const catalogue = {
-    readable: jest.fn(async () => ({
-      _id: exerciseId,
-      measure: 'weight_reps',
-      ...(options.own ? { userId: ME } : {}),
-      seedKey: options.seedKey ?? BENCH,
-    })),
+    readable: jest.fn(async () => row()),
+    rankable: jest.fn(async (_userId: string, ids: string[]) => (ids.includes(exerciseId) ? [row()] : [])),
   };
   const weighIns: { day: string; weightGrams: number }[] = [{ day: '2026-11-01', weightGrams: 80_000 }];
   const nutrition = { weighInsUpTo: jest.fn(async () => weighIns) };
@@ -66,6 +68,27 @@ describe('TrainingRankService (issue #5b)', () => {
       excluded: { machine: 1 },
       benchmark: { version: 'v1', draft: false, standards: 'men' },
     });
+  });
+
+  it('lists the ranked exercises as badges, agreeing with the single read', async () => {
+    const f = fixture({ standards: 'men' });
+    f.workout('2026-11-10', 100, 1);
+    f.workout('2026-11-12', 150, 1, { userId: 'someone-else' });
+    f.workout('2026-11-12', 140, 1, { status: 'open' });
+    expect(await f.service.badges(ME, TODAY)).toEqual([{ exerciseId: f.exerciseId, status: 'ranked', tier: 'Achiever', division: 'II' }]);
+    expect(f.access.require).toHaveBeenCalledWith(ME, 'trainingRanks');
+    // Long after the window: the highest ever, marked inactive.
+    expect(await f.service.badges(ME, '2028-01-01')).toEqual([{ exerciseId: f.exerciseId, status: 'inactive', tier: 'Achiever', division: 'II' }]);
+  });
+
+  it('lists no badge without standards, without sets, or for a private exercise', async () => {
+    const none = fixture();
+    none.workout('2026-11-10', 100, 1);
+    expect(await none.service.badges(ME, TODAY)).toEqual([]);
+    expect(await fixture({ standards: 'men' }).service.badges(ME, TODAY)).toEqual([]);
+    const own = fixture({ standards: 'men', own: true });
+    own.workout('2026-11-10', 100, 1);
+    expect(await own.service.badges(ME, TODAY)).toEqual([]);
   });
 
   it('asks for standards, and never ranks a private exercise', async () => {

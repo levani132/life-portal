@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Panel } from '../ui';
 import { ExerciseDetail } from './exercise-detail';
 import { ExerciseSearch } from './exercise-picker';
 
@@ -13,9 +12,14 @@ export function ExerciseLibrary() {
   const [openId, setOpenId] = useState<string | null>(null);
   return (
     <div className="space-y-4">
-      <Panel title="Exercises" description="Search the catalogue, or create your own.">
+      {/* Tighter than a Panel on a phone, so the rows get the width. */}
+      <section className="card p-3 sm:p-5">
+        <header className="mb-3">
+          <h2 className="text-sm font-semibold text-ink">Exercises</h2>
+          <p className="mt-0.5 text-xs text-ink-faint">Search the catalogue, or create your own.</p>
+        </header>
         <ExerciseSearch onPick={(exercise) => setOpenId(exercise.id)} />
-      </Panel>
+      </section>
       {openId && <ExerciseDetail id={openId} onClose={() => setOpenId(null)} />}
     </div>
   );

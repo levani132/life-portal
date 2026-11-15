@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
-import type { ExerciseRankView, Measure, RankStandards, SetType } from '@life-portal/shared-types';
+import type { ExerciseRankBadge, ExerciseRankView, Measure, RankStandards, SetType } from '@life-portal/shared-types';
 import {
   bestStrength,
   bodyWeightOn,
@@ -54,6 +54,46 @@ export class TrainingRankService {
       standards: profile.rankStandards,
       sets,
       today,
+    });
+  }
+
+  /**
+   * Every exercise the caller holds (`ranked`) or has held (`inactive`, with the highest ever) a
+   * rank on, for marking exercises in a list. The same arithmetic as `rank()`, over all of the
+   * caller's own sets read once; nothing is stored. Empty until standards are chosen.
+   */
+  async badges(userId: string, today: string): Promise<ExerciseRankBadge[]> {
+    await this.access.require(userId, 'trainingRanks');
+    const profile = await this.profiles.read(userId);
+    if (!profile.rankStandards) return [];
+    const [rows, workoutExercises] = await Promise.all([
+      this.sets.find({ userId }).lean<SetRow[]>(),
+      this.workoutExercises.find({ userId }).select('_id machineId snapshot.measure').lean<ExerciseRow[]>(),
+    ]);
+    if (!rows.length) return [];
+    // A private exercise never has a benchmark, so only shared catalogue rows can be ranked.
+    const exercises = (await this.catalogue.rankable(userId, [...new Set(rows.map((row) => row.exerciseId))])).filter(
+      (exercise) => !exercise.userId && exercise.seedKey,
+    );
+    if (!exercises.length) return [];
+    const sessionRows = await this.sessions
+      .find({ userId, status: 'finished', day: { $lte: today } })
+      .select('day startedAt')
+      .lean<SessionRow[]>();
+    if (!sessionRows.length) return [];
+    const sessions = new Map(sessionRows.map((row) => [String(row._id), row]));
+    const byId = new Map(workoutExercises.map((row) => [String(row._id), row]));
+    const weighIns = await this.nutrition.weighInsUpTo(userId, today);
+    const setsOf = new Map<string, SetRow[]>();
+    for (const row of rows) setsOf.set(row.exerciseId, [...(setsOf.get(row.exerciseId) ?? []), row]);
+    return exercises.flatMap((exercise) => {
+      const exerciseId = String(exercise._id);
+      const measure = exercise.measure as Measure;
+      const sets = (setsOf.get(exerciseId) ?? []).flatMap((row) => this.rankSet(row, sessions, byId, measure, weighIns));
+      const view = exerciseRank({ exerciseId, seedKey: exercise.seedKey, measure, standards: profile.rankStandards, sets, today });
+      const position = view.status === 'ranked' ? view.current : view.status === 'inactive' ? view.highest : undefined;
+      if (!position || view.status === 'unranked') return [];
+      return [{ exerciseId, status: view.status, tier: position.tier, division: position.division }];
     });
   }
 
@@ -159,23 +199,32 @@ export class TrainingRankService {
         .map((row) => [String(row._id), row]),
     );
     const weighIns = sessionRows.length ? await this.nutrition.weighInsUpTo(userId, today) : [];
-    return rows.flatMap((row) => {
-      const session = sessions.get(row.sessionId);
-      const workoutExercise = byId.get(row.workoutExerciseId);
-      if (!session || workoutExercise?.snapshot?.measure !== measure) return [];
-      return [
-        {
-          id: String(row._id),
-          sessionId: row.sessionId,
-          day: session.day,
-          type: row.type as SetType,
-          reps: row.reps,
-          weightGrams: row.weightGrams,
-          assistGrams: row.assistGrams,
-          body: bodyWeightOn(weighIns, session.day),
-          machine: !!workoutExercise.machineId,
-        },
-      ];
-    });
+    return rows.flatMap((row) => this.rankSet(row, sessions, byId, measure, weighIns));
+  }
+
+  /** A stored set as the domain reads it; none when its session does not count or its measure differs. */
+  private rankSet(
+    row: SetRow,
+    sessions: Map<string, SessionRow>,
+    workoutExercises: Map<string, ExerciseRow>,
+    measure: Measure,
+    weighIns: Parameters<typeof bodyWeightOn>[0],
+  ): RankSet[] {
+    const session = sessions.get(row.sessionId);
+    const workoutExercise = workoutExercises.get(row.workoutExerciseId);
+    if (!session || workoutExercise?.snapshot?.measure !== measure) return [];
+    return [
+      {
+        id: String(row._id),
+        sessionId: row.sessionId,
+        day: session.day,
+        type: row.type as SetType,
+        reps: row.reps,
+        weightGrams: row.weightGrams,
+        assistGrams: row.assistGrams,
+        body: bodyWeightOn(weighIns, session.day),
+        machine: !!workoutExercise.machineId,
+      },
+    ];
   }
 }

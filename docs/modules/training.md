@@ -421,6 +421,7 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `POST` | `/sessions/:id/plan-update` `{requestId, revision}` | Issue #15: applies to that day only → `{planId, planWorkoutId, copied}`. 409 `PLAN_CHANGED` (day moved on) or `NOTHING_TO_APPLY`; once applied, returns the first result. |
 | `PUT` | `/sessions/:id/rest-alarm` `{at: ISO \| null}` | Spec 025: 204. Sets, moves or cancels the person's rest-over push (in memory). |
 | `GET` | `/exercises/:id/rank?today=` | Issue #5b, needs `trainingRanks` (403 otherwise): `ExerciseRankView`, current and highest-ever strength rank. See Strength ranks. |
+| `GET` | `/ranks?today=` | Issue #5b, needs `trainingRanks` (403 otherwise): `ExerciseRankBadge[]` (`{exerciseId, status, tier, division}`), one per exercise the caller holds (`ranked`, current) or has held (`inactive`, highest ever) a rank on. For marking rows in the exercise list. Empty until standards are chosen. |
 | `GET` | `/summary?today=` | The Home card's figures (`TrainingSummary`, with `weightUnit`, read without creating a profile); also in `GET /api/dashboard`. |
 | `GET` | `/sessions/:id/recap` | Issue #25: `WorkoutRecap`, recomputed on every read as of that workout. See Finishing a workout. |
 | `GET` | `/weigh-ins/recent` | Issue #25: `{weighIns}`, the two latest, newest first (`{id, day, weightGrams, version?}`). For anyone with Training, Food or not. |
@@ -598,6 +599,14 @@ earlier live-percentile idea). `GET /training/exercises/:id/rank?today=` needs `
 `TrainingRankService` reads the caller's own sets of that exercise in finished sessions up to
 `today`, their weigh-ins (Nutrition's `weighInsUpTo`) and their chosen standards;
 `exerciseRank()` in `libs/shared/domain/src/lib/strength-ranks.ts` does the rest.
+
+**Ranks in the exercise list.** `GET /training/ranks?today=` (`TrainingRankService.badges`) is the
+short form for lists: it reads all of the caller's own sets once and runs the same `exerciseRank()`
+per shared catalogue exercise, so a badge always agrees with that exercise's rank panel. Nothing is
+stored. `ExerciseSearch` (the Exercises tab and every exercise picker) leads a ranked exercise's row
+with its rank emblem, the muscle group shrunk to a coloured badge on the emblem's corner; an
+inactive rank shows the highest ever, greyed; an unranked exercise keeps the group icon on its
+tint. The read is not kept on the device: offline, rows show the group icon.
 
 **Tiers.** Initiate, Explorer, Challenger, Achiever, Veteran, Elite, Master, Legend, each in
 divisions III → II → I: 24 milestones. Each tier's score range is split into thirds; Legend is as

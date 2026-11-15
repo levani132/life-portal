@@ -192,6 +192,12 @@ export class TrainingController {
     return this.ranks.rank(userId, id, today);
   }
 
+  /** Issue #5b: the caller's ranked exercises, for marking them in a list; 403 without `trainingRanks`. */
+  @Get('ranks')
+  rankBadges(@CurrentUser('userId') userId: string, @Today() today: string) {
+    return this.ranks.badges(userId, today);
+  }
+
   @Post('exercises')
   createExercise(@CurrentUser('userId') userId: string, @Body() dto: CreateExerciseDto) {
     return this.catalogue.create(userId, dto);

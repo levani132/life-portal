@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-15: Ranks in the exercise list
+
+- **An exercise you hold a strength rank on shows that rank's emblem in the exercise list**, with
+  its muscle group as a small coloured badge on the corner. A rank you haven't kept up is greyed.
+  Exercises without a rank look as before.
+- **The Exercises tab has less padding on a phone**, so names and details get more width.
+
 ## 2026-11-15: Training settings moved to the top card
 
 - **The Training settings gear is at the top right of the "This week" card**, so the tab strip is

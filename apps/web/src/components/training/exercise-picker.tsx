@@ -9,15 +9,18 @@ import {
   MUSCLES,
   type Exercise,
   type ExerciseListItem,
+  type ExerciseRankBadge,
+  type PortalState,
 } from '@life-portal/shared-types';
 import { matchesExerciseSearch } from '@life-portal/shared-domain';
 import { EmptyState, ErrorNote, Input, Select, Spinner } from '../ui';
 import { NetworkError } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
 import { OFFLINE_EXERCISES_KEY } from '../../lib/training-offline';
-import { MEASURE_LABELS, humanise } from '../../lib/training';
-import { GROUP_ORDER, GROUP_STYLES, exerciseGroup, muscleGroup } from '../../lib/training-colors';
+import { MEASURE_LABELS, humanise, useWorkoutDay } from '../../lib/training';
+import { GROUP_ORDER, GROUP_STYLES, exerciseGroup, muscleGroup, type GroupStyle } from '../../lib/training-colors';
 import { ExerciseForm } from './exercise-form';
+import { RankEmblem } from './rank-emblem';
 
 /** Debounced so typing "bench" sends one request, not five. */
 function useDebounced(value: string, ms = 250) {
@@ -49,6 +52,39 @@ function searchOffline(
 const MUSCLE_CHIPS = [...MUSCLES].sort(
   (a, b) => GROUP_ORDER.indexOf(muscleGroup(a)) - GROUP_ORDER.indexOf(muscleGroup(b)),
 );
+
+/**
+ * What leads an exercise's row. With a strength rank, the rank's emblem is the main mark and the
+ * muscle group shrinks to a coloured badge on its corner; without one, the group's icon on its
+ * tint, as before. An inactive rank (the highest ever, not kept up) is greyed.
+ */
+function ExerciseMark({ style, rank }: { style: GroupStyle; rank?: ExerciseRankBadge }) {
+  const Icon = style.icon;
+  if (!rank) {
+    return (
+      <span className={clsx('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', style.tint, style.text)} aria-hidden>
+        <Icon className="h-5 w-5" />
+      </span>
+    );
+  }
+  return (
+    <span className="relative flex h-11 w-10 shrink-0 items-center justify-center">
+      <RankEmblem
+        tier={rank.tier}
+        division={rank.division}
+        size={34}
+        muted={rank.status === 'inactive'}
+        label={`${rank.tier} ${rank.division}${rank.status === 'inactive' ? ', inactive' : ''}`}
+      />
+      <span
+        className={clsx('absolute -bottom-0.5 -right-1 flex h-4 w-4 items-center justify-center rounded-full ring-2 ring-surface-raised', style.solid)}
+        aria-hidden
+      >
+        <Icon className="h-2.5 w-2.5" />
+      </span>
+    </span>
+  );
+}
 
 /**
  * Searches the catalogue (shared exercises plus the person's own). The server ranks: names that
@@ -84,6 +120,13 @@ export function ExerciseSearch({
   const error = offline ? (saved.data ? undefined : search.error) : search.error;
   const isLoading = search.isLoading && !data;
   const canCreate = allowCreate && !offline;
+  // Strength ranks (#5b) mark the rows of ranked exercises. Decoration: the list never waits for it.
+  const portal = useApi<PortalState>('/portal');
+  const today = useWorkoutDay()();
+  const ranks = useApi<ExerciseRankBadge[]>(portal.data?.access.trainingRanks ? `/training/ranks?today=${today}` : null, {
+    shouldRetryOnError: false,
+  });
+  const rankOf = new Map((ranks.data ?? []).map((rank) => [rank.exerciseId, rank]));
 
   return (
     <div className="space-y-3">
@@ -167,18 +210,15 @@ export function ExerciseSearch({
         <ul className="space-y-1.5">
           {data.map((exercise) => {
             const style = GROUP_STYLES[exerciseGroup(exercise.primaryMuscles, exercise.measure)];
-            const Icon = style.icon;
             return (
               <li key={exercise.id}>
                 <button
                   type="button"
-                  className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors enabled:hover:bg-surface disabled:cursor-default"
+                  className="flex w-full items-center gap-2.5 rounded-xl px-1 py-2 text-left transition-colors enabled:hover:bg-surface disabled:cursor-default"
                   onClick={() => onPick?.(exercise)}
                   disabled={!onPick}
                 >
-                  <span className={clsx('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', style.tint, style.text)} aria-hidden>
-                    <Icon className="h-5 w-5" />
-                  </span>
+                  <ExerciseMark style={style} rank={rankOf.get(exercise.id)} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{exercise.name}</span>
                     <span className="block truncate text-xs">
