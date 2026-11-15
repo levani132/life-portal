@@ -17,6 +17,19 @@ not in an issue or a chat, not in the web app's environment (`NEXT_PUBLIC_*` is 
 The redirect URI is derived, never typed separately:
 `${API_PUBLIC_URL}/api/auth/google/callback`.
 
+### This deployment
+
+Found from the repo's homepage, the API's CORS answer and `/api/health` on 2026-11-15:
+
+| | Value |
+|---|---|
+| Web origin (`WEB_BASE_URL`) | `https://life-portal-tan.vercel.app` |
+| API origin (`API_PUBLIC_URL`) | `https://life-portal.onrender.com` |
+| **Authorized redirect URI** | `https://life-portal.onrender.com/api/auth/google/callback` |
+| Authorized domains | `vercel.app`, `onrender.com` |
+
+If either origin changes (a custom domain), update the variable and the redirect URI together.
+
 ## 1. Google Cloud project
 
 1. Open <https://console.cloud.google.com/> and sign in with the Google account that should own
