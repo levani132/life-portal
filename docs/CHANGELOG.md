@@ -2,6 +2,15 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-16: Save a workout to a plan
+
+- **A workout you started empty can be saved to a plan** once it's finished. After the recap
+  (and later from History) it offers "Save this workout to a plan?": add it to one of your plans
+  as a new workout, or make a new plan on the spot. You name the workout, and can edit the plan
+  afterwards.
+- **It saves the exercises and sets, not the weights.** Next time each exercise starts from what
+  you did last time, as any workout does.
+
 ## 2026-11-15: A workout starts where you left off last time
 
 - **An exercise you've done before starts with last time's sets**: the same number of sets, the

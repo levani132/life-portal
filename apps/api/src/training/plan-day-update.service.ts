@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, type Model } from 'mongoose';
 import type {
@@ -6,9 +6,17 @@ import type {
   PlanDayUpdateInput,
   PlanDayUpdatePreview,
   PlanDayUpdateResult,
+  PlanExerciseInput,
   PlanInput,
+  PlanSaveInput,
 } from '@life-portal/shared-types';
-import { planDayUpdate, validatePlan, type PlanDayUpdateDiff } from '@life-portal/shared-domain';
+import {
+  planDayUpdate,
+  validatePlan,
+  workoutAsPlanDay,
+  type PlanDayUpdateDiff,
+  type PlanUpdateSessionExercise,
+} from '@life-portal/shared-domain';
 import { PlansService, toExerciseInput, toTarget, type PlanRow } from './plans.service';
 import { Exercise, WorkoutExercise, WorkoutSession, WorkoutSet } from './training.schemas';
 
@@ -21,6 +29,8 @@ interface Prepared {
   session: SessionRow;
   plan?: PlanRow;
   diff?: PlanDayUpdateDiff;
+  /** An ad-hoc workout as a plan day, when it can be saved as one. */
+  day?: PlanExerciseInput[];
 }
 
 /**
@@ -75,6 +85,103 @@ export class PlanDayUpdateService {
   }
 
   /**
+   * A finished workout that was not started from a plan, saved as a new workout of an own plan or
+   * of a plan made on the spot. Once per workout, recorded in `planUpdate` like an update. Both
+   * writes are keyed by the session (the day's id, the new plan's `requestId`), so a retry after a
+   * lost answer never adds a second day or a second plan.
+   */
+  async save(userId: string, sessionId: string, input: PlanSaveInput): Promise<PlanDayUpdateResult> {
+    const { preview, session, day } = await this.prepare(userId, sessionId);
+    if (session.planUpdate) return resultOf(session.planUpdate);
+    if (preview.status !== 'saveable' || !day) {
+      throw new ConflictException({
+        code: 'NOTHING_TO_APPLY',
+        message: preview.message ?? 'There is nothing to save from this workout.',
+      });
+    }
+    const planName = input.planName?.trim();
+    if (Boolean(input.planId) === Boolean(planName)) {
+      throw new BadRequestException('Choose one of your plans or name a new one.');
+    }
+    const key = String(session._id);
+    const workout = { name: input.workoutName.trim(), exercises: day };
+    let result: PlanDayUpdateResult;
+    if (input.planId) {
+      await this.plans.addDay(userId, input.planId, { id: key, ...workout });
+      result = { planId: input.planId, planWorkoutId: key, copied: false };
+    } else {
+      const plan = await this.plans.create(userId, { requestId: `workout:${key}`, name: planName as string, workouts: [workout] });
+      result = { planId: plan.id, planWorkoutId: plan.workouts[0].id, copied: false };
+    }
+    await this.sessions.updateOne(
+      { _id: session._id, userId, planUpdate: { $exists: false } },
+      { $set: { planUpdate: { requestId: input.requestId, ...result, at: new Date() } } },
+    );
+    const stored = await this.sessions.findOne({ _id: session._id, userId }).select('planUpdate').lean<SessionRow>();
+    return stored?.planUpdate ? resultOf(stored.planUpdate) : result;
+  }
+
+  /** What to offer for a workout that was not started from a plan. */
+  private async prepareAdHoc(userId: string, session: SessionRow): Promise<Prepared> {
+    const empty = { changes: [], before: [], after: [] };
+    if (session.planUpdate) {
+      const saved = session.planUpdate;
+      const plan = await this.plans.readable(userId, saved.planId).catch((error: unknown) => {
+        if (error instanceof NotFoundException) return undefined;
+        throw error;
+      });
+      const workout = plan?.workouts.find((item) => item.id === saved.planWorkoutId);
+      return {
+        session,
+        preview: {
+          status: 'applied',
+          planId: saved.planId,
+          planWorkoutId: saved.planWorkoutId,
+          ...(plan ? { planName: plan.name } : {}),
+          ...(workout ? { workoutName: workout.name } : {}),
+          applied: resultOf(saved),
+          ...empty,
+        },
+      };
+    }
+    if (session.status !== 'finished') return { session, preview: { status: 'not_from_plan', ...empty } };
+    const { rows, exercises } = await this.done(userId, String(session._id));
+    const day = workoutAsPlanDay(exercises);
+    if (!day.exercises.length) return { session, preview: { status: 'not_from_plan', ...empty } };
+    const measures = new Map(rows.map((row) => [row.exerciseId, row.snapshot.measure as Measure]));
+    const problems = validatePlan({ name: 'Plan', workouts: [{ name: 'Workout', exercises: day.exercises }] }, (id) => measures.get(id));
+    if (problems.length) {
+      return { session, preview: { status: 'invalid', message: problems[0].message, ...empty } };
+    }
+    return { session, day: day.exercises, preview: { status: 'saveable', ...empty, after: day.lines } };
+  }
+
+  /** The workout's exercises in order, each with its logged sets as a plan reads them. */
+  private async done(userId: string, sessionId: string): Promise<{ rows: ExerciseRow[]; exercises: PlanUpdateSessionExercise[] }> {
+    const [rows, sets] = await Promise.all([
+      this.exercises.find({ userId, sessionId }).sort({ order: 1 }).lean<ExerciseRow[]>(),
+      this.sets.find({ userId, sessionId }).sort({ order: 1, loggedAt: 1 }).lean<SetRow[]>(),
+    ]);
+    const setsBy = new Map<string, SetRow[]>();
+    for (const set of sets) setsBy.set(set.workoutExerciseId, [...(setsBy.get(set.workoutExerciseId) ?? []), set]);
+    const exercises = rows.map((row) => ({
+      exerciseId: row.exerciseId,
+      name: row.snapshot.name,
+      measure: row.snapshot.measure as Measure,
+      ...(row.planned ? { planExerciseId: row.planned.planExerciseId } : {}),
+      ...(row.restSeconds != null ? { restSeconds: row.restSeconds } : {}),
+      ...(row.superset ? { superset: row.superset } : {}),
+      sets: (setsBy.get(String(row._id)) ?? []).map((set) => ({
+        type: set.type,
+        ...(set.reps != null ? { reps: set.reps } : {}),
+        ...(set.durationSeconds != null ? { durationSeconds: set.durationSeconds } : {}),
+        ...(set.distanceMeters != null ? { distanceMeters: set.distanceMeters } : {}),
+      })),
+    }));
+    return { rows, exercises };
+  }
+
+  /**
    * A ready-made plan cannot be edited, so the caller gets their own copy with this day updated.
    * `copy()` keeps the order of days and exercises, so ids map across by position. Retried with
    * the same `requestId`, `copy()` returns the copy already made; if its day was already updated
@@ -109,9 +216,7 @@ export class PlanDayUpdateService {
     const session = await this.sessions.findOne({ _id: sessionId, userId }).lean<SessionRow>();
     if (!session) throw new NotFoundException(`Workout ${sessionId} not found`);
     const empty = { changes: [], before: [], after: [] };
-    if (!session.plan) {
-      return { session, preview: { status: 'not_from_plan', ...empty } };
-    }
+    if (!session.plan) return this.prepareAdHoc(userId, session);
     const named = {
       planId: session.plan.planId,
       planWorkoutId: session.plan.planWorkoutId,
@@ -142,12 +247,7 @@ export class PlanDayUpdateService {
     }
     const current = { ...named, planName: plan.name, workoutName: day.name };
 
-    const [rows, sets] = await Promise.all([
-      this.exercises.find({ userId, sessionId }).sort({ order: 1 }).lean<ExerciseRow[]>(),
-      this.sets.find({ userId, sessionId }).sort({ order: 1, loggedAt: 1 }).lean<SetRow[]>(),
-    ]);
-    const setsBy = new Map<string, SetRow[]>();
-    for (const set of sets) setsBy.set(set.workoutExerciseId, [...(setsBy.get(set.workoutExerciseId) ?? []), set]);
+    const { rows, exercises: done } = await this.done(userId, sessionId);
 
     // Every exercise of the plan, not only this day's: the whole plan is validated below.
     const ids = [...new Set(plan.workouts.flatMap((workout) => workout.exercises.map((exercise) => exercise.exerciseId)))].filter(isValidObjectId);
@@ -160,20 +260,7 @@ export class PlanDayUpdateService {
     const diff = planDayUpdate({
       day: day.exercises.map((exercise) => ({ ...toExerciseInput(exercise) })),
       lookup: (exerciseId) => catalogue.get(exerciseId),
-      session: rows.map((row) => ({
-        exerciseId: row.exerciseId,
-        name: row.snapshot.name,
-        measure: row.snapshot.measure as Measure,
-        ...(row.planned ? { planExerciseId: row.planned.planExerciseId } : {}),
-        ...(row.restSeconds != null ? { restSeconds: row.restSeconds } : {}),
-        ...(row.superset ? { superset: row.superset } : {}),
-        sets: (setsBy.get(String(row._id)) ?? []).map((set) => ({
-          type: set.type,
-          ...(set.reps != null ? { reps: set.reps } : {}),
-          ...(set.durationSeconds != null ? { durationSeconds: set.durationSeconds } : {}),
-          ...(set.distanceMeters != null ? { distanceMeters: set.distanceMeters } : {}),
-        })),
-      })),
+      session: done,
       removed: session.removedPlanExerciseIds ?? [],
     });
 

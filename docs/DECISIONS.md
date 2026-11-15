@@ -2277,3 +2277,21 @@ cost width on a phone for something already on screen.
 `previous` (no per-exercise sets are cached), so it falls back to the plan. Caching history per
 exercise is a separate, larger change.
 
+
+## 2026-11-16 · An ad-hoc workout is saved into a plan, not as a thing of its own
+
+**No "saved workout" entity.** What can be started again is a plan's workout, so a finished
+ad-hoc workout is offered a place in a plan: a new workout at the end of an own plan, or a new
+plan made on the spot. A second kind of template would need its own list, editor and start path
+for nothing a one-workout plan does not already do.
+
+**Same rules as updating a plan day (#15).** Offered after the recap and from History, never in
+the finish sheet (finishing stays one decision), once per workout, and planned sets never take
+weights: last time's sets already prefill the next start (#32).
+
+**The workout is not attached to the plan afterwards.** `plan` is frozen at start and stays
+absent, so the saved workout does not count as the plan's progress. Rewriting a finished
+workout's `plan` would break the rule that it is never set after the start.
+
+**Online only.** The prompt needs the server's preview and the person's plan list; nothing is
+lost by waiting, since it stays in History.

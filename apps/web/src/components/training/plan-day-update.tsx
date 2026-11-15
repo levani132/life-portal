@@ -19,7 +19,7 @@ export const planUpdateKey = (sessionId: string) => `/training/sessions/${sessio
 const DISMISSED = 'lp.planUpdate.dismissed';
 
 /** "Not now" is remembered on this device only; it changes nothing and can be undone by a refresh of storage. */
-function readDismissed(): string[] {
+export function readDismissed(): string[] {
   try {
     const parsed: unknown = JSON.parse(window.localStorage.getItem(DISMISSED) ?? '[]');
     return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
@@ -28,7 +28,7 @@ function readDismissed(): string[] {
   }
 }
 
-function writeDismissed(ids: string[]) {
+export function writeDismissed(ids: string[]) {
   try {
     window.localStorage.setItem(DISMISSED, JSON.stringify(ids.slice(-50)));
   } catch {
@@ -133,7 +133,7 @@ const LINE_BADGE: Record<NonNullable<PlanDayLine['change']>, string> = {
   changed: 'Changed',
 };
 
-function DayLines({ lines }: { lines: PlanDayLine[] }) {
+export function DayLines({ lines }: { lines: PlanDayLine[] }) {
   const unit = useWeightUnit();
   if (!lines.length) return <p className="text-xs text-ink-faint">No exercises.</p>;
   return (

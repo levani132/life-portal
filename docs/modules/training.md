@@ -275,6 +275,24 @@ position) and updates the copy's day; the ready-made plan is untouched. A delete
 available) is `invalid` with the reason; neither offers anything. Nothing else is written: the
 workout's snapshots, `planned`, sets, records, ranks and tournament entries stay as they were.
 
+**Saving a workout as a plan workout.** A finished workout that was **not** started from a plan
+can be kept as a plan workout, since a workout is not a reusable thing on its own: the plan is.
+The same preview (`GET /sessions/:id/plan-update`) answers `saveable` with the day in `after`
+when the workout is finished and has logged sets; `POST /sessions/:id/plan-save` adds it as a new
+workout at the end of one of the caller's **own** plans (`planId`) or makes a new plan holding it
+(`planName`), exactly one of the two. The day is `workoutAsPlanDay` (domain): every exercise with a
+logged set, in the order done, with the workout's own rest, and planned sets from `targetsFromSets`,
+so **never a weight**; a superset key survives only where two neighbours still share it. Nothing is
+copied from the plan side and nothing about the workout changes: it gets no `plan`, so it does not
+count as that plan's progress and is not offered a plan-day update. It is once per workout, recorded
+in the same `planUpdate` field (`copied: false`); any later `POST` returns the first result and the
+preview says `applied`, with the plan's and workout's names read live (absent once deleted). Retry
+safety does not depend on `planUpdate` being written: the new day's id is the session's id
+(`PlansService.addDay` does nothing when the plan already has it) and a new plan's `requestId` is
+`workout:<sessionId>`. A ready-made plan cannot be chosen (404, like any plan that is not the
+caller's); a full plan (14 workouts) or the plan limit refuses as usual. Online only: it is not
+queued in the outbox, and the prompt stays available from History.
+
 **The workout bar.** `components/training/workout-bar.tsx`, inside the app header (so
 `--header-offset` counts it and the rest timer still sticks under it), on every page while a
 session is open: current exercise, time, rest countdown. It reads `sessions/current` (revalidated
@@ -417,7 +435,8 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `POST` | `/sessions` `{…, planId, planWorkoutId}` | Spec 023: both or neither; copies the workout's exercises and targets. |
 | `PATCH` | `/sessions/:id/exercises/:weId` `{skipped}` | Only for an exercise with `planned` (400 otherwise). |
 | `POST` | `/sessions/:id/exercises/:weId/swap` `{requestId, exerciseId, id?}` | 409 `HAS_SETS` once a set is logged. |
-| `GET` | `/sessions/:id/plan-update` | Issue #15: `{status, revision?, changes, before, after, shared?, editedSince?, applied?, message?}`. Status `available`, `no_changes`, `applied`, `open`, `not_from_plan`, `missing`, `invalid`. |
+| `GET` | `/sessions/:id/plan-update` | Issue #15: `{status, revision?, changes, before, after, shared?, editedSince?, applied?, message?}`. Status `available`, `no_changes`, `applied`, `open`, `not_from_plan`, `saveable` (ad-hoc, finished, with sets: see `plan-save`), `missing`, `invalid`. |
+| `POST` | `/sessions/:id/plan-save` `{requestId, workoutName, planId? \| planName?}` | A finished workout not started from a plan, as a new workout of an own plan or of a new plan → `{planId, planWorkoutId, copied: false}`. 400 unless exactly one of `planId` / `planName`; 409 `NOTHING_TO_APPLY` for a plan workout, an open one, or one with no sets; once saved, returns the first result. |
 | `POST` | `/sessions/:id/plan-update` `{requestId, revision}` | Issue #15: applies to that day only → `{planId, planWorkoutId, copied}`. 409 `PLAN_CHANGED` (day moved on) or `NOTHING_TO_APPLY`; once applied, returns the first result. |
 | `PUT` | `/sessions/:id/rest-alarm` `{at: ISO \| null}` | Spec 025: 204. Sets, moves or cancels the person's rest-over push (in memory). |
 | `GET` | `/exercises/:id/rank?today=` | Issue #5b, needs `trainingRanks` (403 otherwise): `ExerciseRankView`, current and highest-ever strength rank. See Strength ranks. |
@@ -839,7 +858,11 @@ catalogue lacks. A workout from before #14 shows its machine on the card, read-o
 plan workout (right after Finish, and opened from History) shows `PlanDayUpdate`
 (`plan-day-update.tsx`, issue #15) under its header when there is something to update: Review opens
 the changes, the day after and the day now; "Not now" hides it on this device only (localStorage,
-wrapped in try/catch) and changes nothing. Once applied it says so in one line. **Workouts work offline (spec 028, issue #17).** Every workout write goes
+wrapped in try/catch) and changes nothing. Once applied it says so in one line. A finished workout
+that was **not** started from a plan shows `SaveWorkoutToPlan` (`save-to-plan.tsx`) in the same two
+places instead: "Save this workout to a plan?" opens a sheet with a plan select (own plans, most
+recent with room first, then "New plan…"), the workout's name and the exercises as they will be
+planned; "Not now" shares the same device-only list. It needs a connection. **Workouts work offline (spec 028, issue #17).** Every workout write goes
 through `trainingWrites` in `lib/training-offline.ts`, which puts it in the durable outbox
 (`docs/modules/offline.md`) with the ids it creates, chosen on the device. What the screen shows is
 the cached server copy with the outbox's writes applied (`lib/offline/training-overlay.ts`, pure),

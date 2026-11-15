@@ -10,6 +10,7 @@ import { useApi } from '../../lib/hooks';
 import { RECORD_LABELS, formatDuration, formatRecordValue, formatWeight, useTrainingProfile } from '../../lib/training';
 import { hasUnsyncedWrites, useTrainingSync, useTrainingWrites } from '../../lib/training-offline';
 import { PlanDayUpdate } from './plan-day-update';
+import { SaveWorkoutToPlan } from './save-to-plan';
 import { RankEmblem } from './rank-emblem';
 
 export const recapKey = (sessionId: string) => `/training/sessions/${sessionId}/recap`;
@@ -139,6 +140,8 @@ export function WorkoutRecapView({
 
         {/* Issue #15, after the recap and never over it. */}
         {celebrate && session.plan && !pending && <PlanDayUpdate sessionId={session.id} />}
+        {/* Not started from a plan: it can become a plan workout instead. */}
+        {celebrate && !session.plan && !pending && <SaveWorkoutToPlan sessionId={session.id} />}
 
         <button type="button" className="btn-primary w-full justify-center" onClick={onClose}>
           Done

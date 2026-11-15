@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Types } from 'mongoose';
 import { CatalogueService } from './catalogue.service';
@@ -255,5 +255,100 @@ describe('PlanDayUpdateService (issue #15)', () => {
     await f.finish(session.id);
     await expect(f.updates.preview(OTHER, session.id)).rejects.toBeInstanceOf(NotFoundException);
     await expect(f.updates.apply(OTHER, session.id, { requestId: randomUUID(), revision: 0 })).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('PlanDayUpdateService: saving an ad-hoc workout as a plan workout', () => {
+  /** An ad-hoc workout: two sets of bench, one plank, and a dip that was added but never done. */
+  const adHoc = async (f: ReturnType<typeof fixture>, finished = true) => {
+    const session = await f.service.start(ME, { requestId: randomUUID(), day: '2026-11-12' }, T0);
+    const add = (exerciseId: string) => f.service.addExercise(ME, session.id, { requestId: randomUUID(), exerciseId });
+    const bench = await add(f.bench);
+    await f.log(session.id, bench.id, { reps: 5, weightGrams: 100_000 });
+    await f.log(session.id, bench.id, { reps: 4, weightGrams: 100_000 }, min(2));
+    await add(f.dip);
+    const plank = await add(f.plank);
+    await f.log(session.id, plank.id, { durationSeconds: 50 }, min(3));
+    if (finished) await f.finish(session.id);
+    return session;
+  };
+  const ownPlans = (f: ReturnType<typeof fixture>) => f.plansModel.docs.filter((doc) => doc.userId === ME);
+
+  it('offers a finished one with logged sets, and only then', async () => {
+    const f = fixture();
+    const open = await adHoc(f, false);
+    expect((await f.preview(open.id)).status).toBe('not_from_plan');
+    await f.finish(open.id);
+    const shown = await f.preview(open.id);
+    expect(shown.status).toBe('saveable');
+    expect(shown.after.map((line) => line.name)).toEqual(['Bench Press', 'Plank']);
+
+  });
+
+  it('adds it to one of your plans as a new workout, without weights, leaving the other days alone', async () => {
+    const f = fixture();
+    const session = await adHoc(f);
+    const result = await f.updates.save(ME, session.id, { requestId: randomUUID(), workoutName: ' Push ', planId: f.planId });
+    expect(result).toEqual({ planId: f.planId, planWorkoutId: session.id, copied: false });
+    const { workouts } = f.plan();
+    expect(workouts.map((workout) => workout.name)).toEqual(['Upper', 'Lower', 'Push']);
+    expect(workouts[0].exercises).toHaveLength(3);
+    expect(workouts[2].exercises.map((exercise) => [exercise.exerciseId, exercise.targets])).toEqual([
+      [f.bench, [{ type: 'working', reps: 5 }, { type: 'working', reps: 4 }]],
+      [f.plank, [{ type: 'working', durationSeconds: 50 }]],
+    ]);
+    const after = await f.preview(session.id);
+    expect(after).toMatchObject({ status: 'applied', planName: 'Upper / Lower', workoutName: 'Push' });
+  });
+
+  it('makes a new plan on the spot', async () => {
+    const f = fixture();
+    const session = await adHoc(f);
+    const result = await f.updates.save(ME, session.id, { requestId: randomUUID(), workoutName: 'Day A', planName: 'My plan' });
+    const created = ownPlans(f).find((doc) => String(doc._id) === result.planId) as unknown as PlanDoc & { name: string };
+    expect(created.name).toBe('My plan');
+    expect(created.workouts.map((workout) => workout.name)).toEqual(['Day A']);
+    expect(created.workouts[0].id).toBe(result.planWorkoutId);
+    expect(f.plan().workouts).toHaveLength(2);
+  });
+
+  it('saves once: a second save, to any plan, returns the first and writes nothing', async () => {
+    const f = fixture();
+    const session = await adHoc(f);
+    const first = await f.updates.save(ME, session.id, { requestId: randomUUID(), workoutName: 'Day A', planName: 'My plan' });
+    expect(await f.updates.save(ME, session.id, { requestId: randomUUID(), workoutName: 'Again', planName: 'Other' })).toEqual(first);
+    expect(await f.updates.save(ME, session.id, { requestId: randomUUID(), workoutName: 'Again', planId: f.planId })).toEqual(first);
+    expect(ownPlans(f)).toHaveLength(2);
+    expect(f.plan().workouts).toHaveLength(2);
+  });
+
+  it('does not double the day when the answer was lost before the workout recorded it', async () => {
+    const f = fixture();
+    const session = await adHoc(f);
+    await f.updates.save(ME, session.id, { requestId: randomUUID(), workoutName: 'Push', planId: f.planId });
+    const stored = f.sessions.docs.find((doc) => String(doc._id) === session.id) as Record<string, unknown>;
+    delete stored.planUpdate;
+    await f.updates.save(ME, session.id, { requestId: randomUUID(), workoutName: 'Push', planId: f.planId });
+    expect(f.plan().workouts).toHaveLength(3);
+  });
+
+  it('needs exactly one of a plan and a new plan name, and only your own plan', async () => {
+    const f = fixture();
+    const session = await adHoc(f);
+    const base = { requestId: randomUUID(), workoutName: 'Push' };
+    await expect(f.updates.save(ME, session.id, base)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(f.updates.save(ME, session.id, { ...base, planId: f.planId, planName: 'Both' })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(f.updates.save(OTHER, session.id, { ...base, planName: 'Mine now' })).rejects.toBeInstanceOf(NotFoundException);
+    const shared = fixture({ own: false });
+    const theirs = await adHoc(shared);
+    await expect(shared.updates.save(ME, theirs.id, { ...base, planId: shared.planId })).rejects.toBeInstanceOf(NotFoundException);
+    expect((await shared.preview(theirs.id)).status).toBe('saveable');
+  });
+
+  it('refuses a workout started from a plan', async () => {
+    const f = fixture();
+    const session = await f.asPlanned();
+    await f.finish(session.id);
+    await expect(f.updates.save(ME, session.id, { requestId: randomUUID(), workoutName: 'Push', planName: 'New' })).rejects.toBeInstanceOf(ConflictException);
   });
 });

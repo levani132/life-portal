@@ -256,6 +256,40 @@ export class PlansService {
     if (!result.matchedCount) throw planChanged(stored.name);
   }
 
+  /**
+   * Adds a workout (day) to the end of an own plan, with the id the caller chose. Validated as a
+   * whole plan, so a full plan refuses. Adding an id the plan already has changes nothing, which
+   * is what makes a retry safe.
+   */
+  async addDay(
+    userId: string,
+    id: string,
+    day: { id: string; name: string; exercises: PlanInput['workouts'][number]['exercises'] },
+  ): Promise<void> {
+    const row = await this.own(userId, id);
+    if (row.workouts.some((workout) => workout.id === day.id)) return;
+    const input: PlanInput = {
+      name: row.name,
+      ...(row.description ? { description: row.description } : {}),
+      workouts: [
+        ...row.workouts.map((workout) => ({ id: workout.id, name: workout.name, exercises: workout.exercises.map(toExerciseInput) })),
+        day,
+      ],
+    };
+    const clean = await this.checked(
+      userId,
+      input,
+      new Map<string, unknown>([...row.workouts.map((workout) => [workout.id, workout] as const), [day.id, day]]),
+      new Map(row.workouts.flatMap((workout) => workout.exercises.map((exercise) => [exercise.id, exercise] as const))),
+    );
+    const added = clean.workouts[clean.workouts.length - 1];
+    await this.plans.updateOne(
+      { _id: row._id, userId, 'workouts.id': { $ne: day.id } },
+      { $push: { workouts: added } },
+      { runValidators: true },
+    );
+  }
+
   /** Any plan the caller can see, as a new own plan with new ids. Never linked to the original. */
   async copy(userId: string, id: string, requestId: string): Promise<PlanDetail> {
     const retried = await this.plans.findOne({ userId, requestId }).lean<PlanRow>();

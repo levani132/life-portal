@@ -47,6 +47,7 @@ import {
   CreateSetDto,
   FinishSessionDto,
   PlanDayUpdateDto,
+  PlanSaveDto,
   ReorderDto,
   ReplacePlanDto,
   StartSessionDto,
@@ -335,6 +336,13 @@ export class TrainingController {
   @HttpCode(200)
   applyPlanUpdate(@CurrentUser('userId') userId: string, @Param('id') id: string, @Body() dto: PlanDayUpdateDto) {
     return this.planUpdates.apply(userId, id, dto);
+  }
+
+  /** A finished workout not started from a plan, saved as a new plan workout. Once per workout. */
+  @Post('sessions/:id/plan-save')
+  @HttpCode(200)
+  savePlan(@CurrentUser('userId') userId: string, @Param('id') id: string, @Body() dto: PlanSaveDto) {
+    return this.planUpdates.save(userId, id, dto);
   }
 
   @Delete('sessions/:id')
