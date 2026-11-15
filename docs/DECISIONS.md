@@ -2228,3 +2228,32 @@ works.
 **The development sink refuses anything but loopback.** `MAIL_PROVIDER=dev` writes messages to
 the database. Config refuses it unless `WEB_BASE_URL` is localhost, so a misconfigured production
 cannot quietly store reset links in Mongo instead of sending them.
+
+## 2026-11-15 · Continue with Google: a bound round trip and no linking by email (issue #28)
+
+**`google-auth-library`, not `openid-client`.** Both are maintained; `openid-client` v6 and
+`jose` are ESM-only and this API compiles to CommonJS. Google's own library does PKCE, the code
+exchange and ID-token verification (keys, `iss`, `aud`, `exp`); the nonce is checked by us. It is
+given Node's `fetch`, because otherwise its HTTP layer lazy-imports `node-fetch`.
+
+**The callback ends on the web, with a code bound to the browser.** The API and the web are on
+different sites, so the API cannot set a session the web can read, and putting tokens in a URL
+leaks them into history. The callback stores the outcome and sends a one-time code in the
+fragment, and the code only works with a secret the browser kept before leaving (it sent only
+the secret's hash). That defeats login CSRF (someone else's code pushed into your browser) and
+makes a callback that lands in the wrong browser (an installed iOS app's link opening in Safari)
+fail safely instead of signing in there.
+
+**An email match never links, even a verified one.** Google's `email_verified` proves the Google
+account controls the address today, not that it is the person who made the account here. The
+account's password is required once. It costs a step for the honest case and closes the
+takeover case completely.
+
+**Keyed on `sub`.** Google emails change and can be recycled; `sub` does not. The stored email
+is display only.
+
+**Invite-only applies to Google too.** Otherwise Google would be a way around the invite code.
+
+**No lockout by construction.** Unlinking the last way in is refused; a Google-only account adds
+a password through the reset email, which already proves the inbox.
+

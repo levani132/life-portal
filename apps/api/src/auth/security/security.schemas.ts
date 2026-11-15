@@ -30,7 +30,11 @@ export type SecurityEventType =
   | 'password_reset_failed'
   | 'email_verification_sent'
   | 'email_verified'
-  | 'rate_limited';
+  | 'rate_limited'
+  | 'google_signin'
+  | 'google_linked'
+  | 'google_unlinked'
+  | 'google_failed';
 
 /**
  * A security event (issue #27 S2), kept 90 days. Never an email, a password, a token or a raw IP:

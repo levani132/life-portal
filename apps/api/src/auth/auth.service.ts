@@ -178,12 +178,20 @@ export class AuthService {
   ): Promise<{ success: true }> {
     await this.security.hit(RATE_RULES.changePasswordByUser, userId, ctx);
     const user = await this.userModel.findById(userId).select('+passwordHash');
-    if (!user || !(await bcrypt.compare(dto.currentPassword, user.passwordHash))) {
+    if (user && !user.passwordHash) {
+      // #28: an account made with Google has no password to check. Adding one goes through
+      // "Forgot password", which proves the inbox.
+      throw new BadRequestException({
+        code: 'NO_PASSWORD',
+        message: 'Your account signs in with Google and has no password yet. To add one, use "Forgot password" on the sign-in page.',
+      });
+    }
+    if (!user || !(await bcrypt.compare(dto.currentPassword, user.passwordHash as string))) {
       await this.security.record('password_change_failed', ctx, userId);
       throw new UnauthorizedException('Your current password is incorrect.');
     }
     assertPasswordPolicy(dto.newPassword, user.email);
-    if (await bcrypt.compare(dto.newPassword, user.passwordHash)) {
+    if (await bcrypt.compare(dto.newPassword, user.passwordHash as string)) {
       throw new BadRequestException({ code: 'SAME_PASSWORD', message: 'Choose a password different from your current one.' });
     }
     user.passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
@@ -197,6 +205,37 @@ export class AuthService {
     const user = await this.userModel.findById(userId);
     if (!user) throw new UnauthorizedException('Account not found.');
     return user.toJSON() as unknown as UserDto;
+  }
+
+  /** Whether registration is closed without an invite code, and whether `code` opens it. */
+  inviteAccepted(code: string | undefined): boolean {
+    return !this.config.registrationInviteCode || code === this.config.registrationInviteCode;
+  }
+
+  get inviteRequired(): boolean {
+    return Boolean(this.config.registrationInviteCode);
+  }
+
+  /** A new account without a password, for Continue with Google (#28). The caller checked the invite. */
+  async createPasswordless(input: { email: string; name: string; emailVerifiedAt: Date }, ctx: RequestContext): Promise<UserDocument> {
+    const created = await this.userModel.create({
+      email: input.email.toLowerCase().trim(),
+      name: input.name.trim().slice(0, 120) || input.email.split('@')[0],
+      roles: ['owner'],
+      cohort: 'production',
+      emailVerifiedAt: input.emailVerifiedAt,
+    });
+    await this.security.record('register', ctx, String(created._id), 'google');
+    return created;
+  }
+
+  /** Starts a normal session for someone another method has signed in (#28). */
+  async startSession(userId: string, device: string): Promise<AuthSession> {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new UnauthorizedException('Account not found.');
+    user.lastLoginAt = new Date();
+    await user.save();
+    return this.issueSession(user, device);
   }
 
   private async issueSession(user: UserDocument, device: string): Promise<AuthSession> {

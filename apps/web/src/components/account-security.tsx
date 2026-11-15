@@ -1,12 +1,14 @@
 'use client';
 
-import type { AuthCapabilities, AuthSessionInfo, User } from '@life-portal/shared-types';
+import type { AuthCapabilities, AuthSessionInfo, SignInMethods, User } from '@life-portal/shared-types';
 import { useState } from 'react';
 import useSWR from 'swr';
 import { ApiError, api } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
 import { authCapabilities } from '../lib/auth-capabilities';
+import { startGoogle } from '../lib/google-signin';
 import { ErrorNote, Field, Panel, PasswordInput, Spinner } from './ui';
+import { GoogleMark } from './google-button';
 
 const message = (caught: unknown) =>
   caught instanceof ApiError ? caught.message : 'That did not work. Check your connection and try again.';
@@ -16,6 +18,7 @@ const message = (caught: unknown) =>
  * signed in and signs every other one out, which the API does in the same request.
  */
 export function ChangePasswordPanel({ onChanged }: { onChanged?: () => void }) {
+  const methods = useSignInMethods();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [repeat, setRepeat] = useState('');
@@ -46,6 +49,18 @@ export function ChangePasswordPanel({ onChanged }: { onChanged?: () => void }) {
     }
   }
 
+  // Issue #28: an account made with Google has no password to change.
+  if (methods.data && !methods.data.password) {
+    return (
+      <Panel title="Password" description="This account signs in with Google.">
+        <p className="text-sm text-ink-muted">
+          It has no password yet. To add one, sign out and use “Forgot password?” on the sign-in page with{' '}
+          {methods.data.google ? <span className="break-all text-ink">{methods.data.google.email}</span> : 'your email'}.
+        </p>
+      </Panel>
+    );
+  }
+
   return (
     <Panel title="Change password" description="Your other devices are signed out when you change it.">
       <form onSubmit={submit} className="space-y-4">
@@ -68,6 +83,81 @@ export function ChangePasswordPanel({ onChanged }: { onChanged?: () => void }) {
           {pending ? 'Saving…' : 'Change password'}
         </button>
       </form>
+    </Panel>
+  );
+}
+
+export function useSignInMethods() {
+  return useSWR<SignInMethods>('/auth/methods', (path: string) => api.get<SignInMethods>(path), { revalidateOnFocus: false });
+}
+
+/**
+ * Google as a way to sign in (issue #28). Linking goes through Google with a short ticket from
+ * this signed-in session; unlinking is refused while Google is the only way in.
+ */
+export function GooglePanel() {
+  const methods = useSignInMethods();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const data = methods.data;
+  if (data && !data.googleAvailable && !data.google) return null;
+
+  async function link() {
+    setPending(true);
+    setError(null);
+    try {
+      const { ticket } = await api.post<{ ticket: string }>('/auth/google/link-ticket');
+      await startGoogle({ intent: 'link', ticket, returnTo: '/settings/security' });
+    } catch (caught) {
+      setError(message(caught));
+      setPending(false);
+    }
+  }
+
+  async function unlink() {
+    setPending(true);
+    setError(null);
+    try {
+      await methods.mutate(await api.delete<SignInMethods>('/auth/google'), { revalidate: false });
+    } catch (caught) {
+      setError(caught instanceof ApiError && caught.code === 'LAST_SIGN_IN_METHOD' ? 'Add a password before unlinking Google, or you could not sign in.' : message(caught));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Panel title="Google" description="Sign in with your Google account instead of typing a password.">
+      {methods.error ? (
+        <ErrorNote message={message(methods.error)} />
+      ) : !data ? (
+        <Spinner />
+      ) : data.google ? (
+        <div className="space-y-3">
+          <p className="text-sm">
+            Linked to <span className="break-all font-medium">{data.google.email}</span>
+            <span className="block text-xs text-ink-faint">since {when(data.google.linkedAt)}</span>
+          </p>
+          {data.password ? (
+            <button type="button" className="btn-danger" disabled={pending} onClick={() => void unlink()}>
+              {pending ? 'Unlinking…' : 'Unlink Google'}
+            </button>
+          ) : (
+            <p className="text-xs text-ink-faint">Google is how you sign in, so it can’t be unlinked until the account has a password.</p>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-sm text-ink-muted">Not linked. You’ll choose the Google account on Google’s page.</p>
+          <div className="max-w-xs">
+            <button type="button" className="btn-ghost w-full gap-2 text-ink" disabled={pending} onClick={() => void link()}>
+              <GoogleMark />
+              {pending ? 'Opening Google…' : 'Link Google account'}
+            </button>
+          </div>
+        </div>
+      )}
+      {error && <ErrorNote message={error} />}
     </Panel>
   );
 }

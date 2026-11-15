@@ -12,6 +12,7 @@ import {
 } from './dto/auth.dto';
 import { PasswordResetService } from './password-reset.service';
 import { EmailVerificationService } from './email-verification.service';
+import { GoogleAuthService } from './google/google-auth.service';
 import { CurrentUser, Public } from './current-user.decorator';
 import { deviceLabel } from './session-rules';
 import { SessionsService } from './sessions.service';
@@ -25,13 +26,18 @@ export class AuthController {
     private readonly security: SecurityService,
     private readonly resets: PasswordResetService,
     private readonly verification: EmailVerificationService,
+    private readonly google: GoogleAuthService,
   ) {}
 
   /** What this server can do by email, so the web app shows only what works (issue #27). */
   @Public()
   @Get('capabilities')
   capabilities(): AuthCapabilities {
-    return { passwordReset: this.resets.available, emailVerification: this.verification.available };
+    return {
+      passwordReset: this.resets.available,
+      emailVerification: this.verification.available,
+      google: this.google.enabled,
+    };
   }
 
   @Public()

@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -63,4 +63,45 @@ export class ResetPasswordDto extends ResetTokenDto {
   @MinLength(10)
   @MaxLength(200)
   password!: string;
+}
+
+/** Issue #28. Secrets the web app holds are base64url; nothing else is accepted. */
+export class GoogleExchangeDto {
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{20,200}$/)
+  code!: string;
+
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{20,200}$/)
+  binding!: string;
+}
+
+export class GoogleLinkPasswordDto {
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{20,200}$/)
+  ticket!: string;
+
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{20,200}$/)
+  binding!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  password!: string;
+}
+
+export class GoogleSignupDto {
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{20,200}$/)
+  ticket!: string;
+
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{20,200}$/)
+  binding!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  inviteCode?: string;
 }

@@ -2,6 +2,16 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-15: Continue with Google
+
+- **Sign in or sign up with Google**, once the server is set up for it. Until then the button
+  doesn't appear.
+- **An existing account is never taken over by email.** If your Google email already has an
+  account here, you enter that account's password once to link Google; after that, either works.
+- **Settings → Sign-in & security** shows whether Google is linked, and can link or unlink it.
+  You can't unlink Google while it's the only way you sign in.
+- An account made with Google has no password; "Forgot password?" on the sign-in page adds one.
+
 ## 2026-11-15: Safer sign-in
 
 - **Everyone has to sign in again once.** Signing out and changing your password didn't fully

@@ -51,7 +51,8 @@ export function mongoBase(): string {
   return uri.replace(/\/+$/, '');
 }
 
-export async function startApi(): Promise<TestApi> {
+/** `env` is applied last, so a file can turn something on (an invite code, Google) for its own API. */
+export async function startApi(env: Record<string, string> = {}): Promise<TestApi> {
   const dbName = `lp-int-${randomBytes(6).toString('hex')}`;
   process.env['MONGODB_URI'] = `${mongoBase()}/${dbName}`;
   process.env['JWT_SECRET'] = randomBytes(32).toString('hex');
@@ -63,6 +64,8 @@ export async function startApi(): Promise<TestApi> {
   process.env['MAIL_PROVIDER'] = 'dev';
   delete process.env['RESEND_API_KEY'];
   delete process.env['MAIL_FROM'];
+  for (const key of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'API_PUBLIC_URL', 'GOOGLE_OIDC_TEST_BASE']) delete process.env[key];
+  Object.assign(process.env, env);
 
   const { NestFactory } = await import('@nestjs/core');
   const { getConnectionToken } = await import('@nestjs/mongoose');

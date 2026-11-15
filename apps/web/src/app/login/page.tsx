@@ -7,6 +7,7 @@ import { ApiError, SIGNED_OUT_REASON_KEY } from '../../lib/api';
 import { authCapabilities } from '../../lib/auth-capabilities';
 import { useAuth } from '../../lib/auth-context';
 import { ErrorNote, Field, Input } from '../../components/ui';
+import { GoogleButton, OrDivider } from '../../components/google-button';
 
 export default function LoginPage() {
   const { login, user, loading } = useAuth();
@@ -18,10 +19,14 @@ export default function LoginPage() {
   const [upgraded, setUpgraded] = useState(false);
   const [resetDone, setResetDone] = useState(false);
   const [canReset, setCanReset] = useState(false);
+  const [canGoogle, setCanGoogle] = useState(false);
 
   useEffect(() => {
     setResetDone(new URLSearchParams(window.location.search).get('reset') === 'done');
-    void authCapabilities().then((caps) => setCanReset(caps.passwordReset));
+    void authCapabilities().then((caps) => {
+      setCanReset(caps.passwordReset);
+      setCanGoogle(caps.google);
+    });
   }, []);
 
   // Issue #27: everyone was signed out once when sign-in sessions were rebuilt. Say why.
@@ -79,6 +84,12 @@ export default function LoginPage() {
         )}
 
         <form onSubmit={submit} className="card space-y-4 p-5">
+          {canGoogle && (
+            <>
+              <GoogleButton />
+              <OrDivider />
+            </>
+          )}
           <Field label="Email">
             <Input
               type="email"

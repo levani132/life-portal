@@ -66,6 +66,20 @@ export interface AppConfig {
    * loopback address, so it can never run in production. Absent means no email at all.
    */
   mail?: MailConfig;
+  /**
+   * Continue with Google (issue #28). Needs `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+   * `API_PUBLIC_URL` (for the redirect URI) and `WEB_BASE_URL`; all or none. Absent hides the
+   * button. `endpoints` is set only by `GOOGLE_OIDC_TEST_BASE`, a loopback fake for tests.
+   */
+  google?: GoogleConfig;
+}
+
+export interface GoogleConfig {
+  clientId: string;
+  clientSecret: string;
+  /** `${API_PUBLIC_URL}/api/auth/google/callback`: what Google's console must list exactly. */
+  redirectUri: string;
+  endpoints?: { auth: string; token: string; certs: string };
 }
 
 export type MailConfig = { provider: 'resend'; apiKey: string; from: string } | { provider: 'dev'; from: string };
@@ -151,6 +165,40 @@ export function mailConfig(env: NodeJS.ProcessEnv, web: string | undefined): Mai
     return { provider: 'resend', apiKey, from };
   }
   throw new Error(`MAIL_PROVIDER must be "resend" or "dev", got "${provider}".`);
+}
+
+/** See `AppConfig.google`. Exported for its unit test. */
+export function googleConfig(env: NodeJS.ProcessEnv, web: string | undefined): GoogleConfig | undefined {
+  const clientId = env['GOOGLE_CLIENT_ID']?.trim() || '';
+  const clientSecret = env['GOOGLE_CLIENT_SECRET']?.trim() || '';
+  const apiUrl = env['API_PUBLIC_URL']?.trim() || '';
+  if (!clientId && !clientSecret) return undefined;
+  const missing = [!clientId && 'GOOGLE_CLIENT_ID', !clientSecret && 'GOOGLE_CLIENT_SECRET', !apiUrl && 'API_PUBLIC_URL', !web && 'WEB_BASE_URL'].filter(Boolean);
+  if (missing.length) throw new Error(`Continue with Google needs ${missing.join(', ')}.`);
+  if (!clientId.endsWith('.apps.googleusercontent.com') && !env['GOOGLE_OIDC_TEST_BASE']) {
+    throw new Error('GOOGLE_CLIENT_ID should end in .apps.googleusercontent.com. Copy it from the Google Cloud console.');
+  }
+  let api: URL;
+  try {
+    api = new URL(apiUrl);
+  } catch {
+    throw new Error(`API_PUBLIC_URL must be a URL, got "${apiUrl}".`);
+  }
+  const loopback = LOOPBACK.includes(api.hostname);
+  if (api.username || api.password || api.search || api.hash || api.pathname !== '/' || (api.protocol !== 'https:' && !(api.protocol === 'http:' && loopback))) {
+    throw new Error('API_PUBLIC_URL must be the API\'s HTTPS origin, e.g. https://life-portal-api.onrender.com (HTTP loopback is allowed for development).');
+  }
+  const config: GoogleConfig = { clientId, clientSecret, redirectUri: `${api.origin}/api/auth/google/callback` };
+  const testBase = env['GOOGLE_OIDC_TEST_BASE']?.trim();
+  if (testBase) {
+    const base = new URL(testBase);
+    if (!LOOPBACK.includes(base.hostname) || !loopback) {
+      throw new Error('GOOGLE_OIDC_TEST_BASE is for tests only and must be a loopback URL, with a loopback API_PUBLIC_URL.');
+    }
+    const root = base.href.replace(/\/+$/, '');
+    config.endpoints = { auth: `${root}/auth`, token: `${root}/token`, certs: `${root}/certs` };
+  }
+  return config;
 }
 
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
@@ -245,6 +293,7 @@ export function loadConfig(): AppConfig {
     storage: storageConfig(process.env),
     webBaseUrl: web,
     mail: mailConfig(process.env, web),
+    google: googleConfig(process.env, web),
   };
 }
 

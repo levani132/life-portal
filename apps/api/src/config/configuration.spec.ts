@@ -1,4 +1,4 @@
-import { mailConfig, storageConfig, webBaseUrl } from './configuration';
+import { googleConfig, mailConfig, storageConfig, webBaseUrl } from './configuration';
 
 describe('storageConfig', () => {
   const full = {
@@ -47,5 +47,38 @@ describe('webBaseUrl and mailConfig (issue #27)', () => {
     expect(mailConfig({ MAIL_PROVIDER: 'dev' }, 'http://localhost:4200')?.provider).toBe('dev');
     expect(() => mailConfig({ MAIL_PROVIDER: 'dev' }, 'https://portal.example.com')).toThrow('never run in production');
     expect(() => mailConfig({ MAIL_PROVIDER: 'dev' }, undefined)).toThrow();
+  });
+});
+
+describe('googleConfig (issue #28)', () => {
+  const full = {
+    GOOGLE_CLIENT_ID: '123-abc.apps.googleusercontent.com',
+    GOOGLE_CLIENT_SECRET: 'secret',
+    API_PUBLIC_URL: 'https://life-portal-api.onrender.com/',
+  };
+  const web = 'https://portal.example.com';
+
+  it('is off when no Google variable is set, and builds the exact redirect URI otherwise', () => {
+    expect(googleConfig({}, web)).toBeUndefined();
+    expect(googleConfig(full, web)).toEqual({
+      clientId: full.GOOGLE_CLIENT_ID,
+      clientSecret: 'secret',
+      redirectUri: 'https://life-portal-api.onrender.com/api/auth/google/callback',
+    });
+  });
+
+  it('refuses a partial or unsafe setup', () => {
+    expect(() => googleConfig({ GOOGLE_CLIENT_ID: full.GOOGLE_CLIENT_ID }, web)).toThrow('GOOGLE_CLIENT_SECRET');
+    expect(() => googleConfig(full, undefined)).toThrow('WEB_BASE_URL');
+    expect(() => googleConfig({ ...full, API_PUBLIC_URL: 'http://api.example.com' }, web)).toThrow('HTTPS');
+    expect(() => googleConfig({ ...full, API_PUBLIC_URL: 'https://api.example.com/api' }, web)).toThrow();
+    expect(() => googleConfig({ ...full, GOOGLE_CLIENT_ID: 'oops' }, web)).toThrow('googleusercontent');
+  });
+
+  it('allows a fake Google only on loopback', () => {
+    const local = { ...full, API_PUBLIC_URL: 'http://127.0.0.1:3333', GOOGLE_OIDC_TEST_BASE: 'http://127.0.0.1:9999/' };
+    expect(googleConfig(local, 'http://localhost:4200')?.endpoints?.token).toBe('http://127.0.0.1:9999/token');
+    expect(() => googleConfig({ ...full, GOOGLE_OIDC_TEST_BASE: 'http://127.0.0.1:9999' }, web)).toThrow('loopback');
+    expect(() => googleConfig({ ...local, GOOGLE_OIDC_TEST_BASE: 'https://evil.example.com' }, web)).toThrow('loopback');
   });
 });

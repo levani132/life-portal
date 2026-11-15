@@ -46,7 +46,7 @@ async function linkFor(email: string, after = 0): Promise<{ token: string; text:
 }
 
 it('reports that reset works on this server', async () => {
-  expect((await api.call(null, 'GET', '/auth/capabilities')).body).toEqual({ passwordReset: true, emailVerification: true });
+  expect((await api.call(null, 'GET', '/auth/capabilities')).body).toEqual({ passwordReset: true, emailVerification: true, google: false });
 });
 
 describe('asking for a link', () => {

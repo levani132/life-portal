@@ -196,18 +196,79 @@ email match alone.
 The web side is `/verify-email`, plus the Email panel on `/settings/security`, which shows
 Confirmed or Not confirmed yet and offers "Send confirmation link" only when the server can send.
 
-**For #28 (Google sign-in):**
-- link a Google identity to an existing account only when that account's `emailVerifiedAt` is
-  set **and** Google reports `email_verified`, or after the person signs in with their password;
-- a Google-only account has no `passwordHash`, so `change-password` must refuse it with a clear
-  message, and `forgot-password` should either let it set a first password or explain that it
-  signs in with Google;
-- sessions and the security log here are identity-agnostic, so reuse them rather than add a
-  second session model.
+## Continue with Google (issue #28)
+
+OpenID Connect authorization-code flow with PKCE (S256), `state` and `nonce`, exchanged on the
+server with `google-auth-library` (Google's own, CommonJS; `openid-client` and `jose` are
+ESM-only and this API is CommonJS). Off unless configured: `GET /auth/capabilities` says
+`google: false` and the web shows no button. Setup: `docs/runbooks/google-oauth.md`.
+
+**Config.** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `API_PUBLIC_URL` (the API's public
+origin, HTTPS except on loopback), plus `WEB_BASE_URL`. All or nothing: a partial setup refuses
+to boot. The redirect URI is always `API_PUBLIC_URL/api/auth/google/callback`.
+`GOOGLE_OIDC_TEST_BASE` points the client at a fake Google and is accepted only on loopback,
+with a loopback `API_PUBLIC_URL`; the integration suite uses it.
+
+**The round trip.**
+1. The web keeps a random **binding secret** in `localStorage` (`lp.google.binding`) and
+   navigates (never a popup) to `GET /auth/google/start?binding=<sha256 hex>&returnTo=…`.
+2. `start` stores an `oauth_flows` row (`kind: 'start'`, 10 min) holding the PKCE verifier,
+   the nonce and the binding hash, keyed by the hash of `state`, and redirects to Google.
+3. `GET /auth/google/callback` spends the `state` row (once), exchanges the code with the
+   verifier, verifies the ID token (signature, `iss`, `aud`, `exp`) and checks the nonce. It
+   decides what happened, stores that as a `kind: 'result'` row (5 min) bound to the binding
+   hash, and redirects to `WEB_BASE_URL/auth/google#code=<one-time code>`, or `#error=<code>`.
+   It never throws and never puts a token in a URL. Both redirects are `no-store`,
+   `Referrer-Policy: no-referrer`.
+4. `/auth/google` (web) strips the fragment and sends `POST /auth/google/exchange {code,
+   binding}`. The code works once, and only with the secret whose hash began the flow, so a
+   code opened in another browser (a forced sign-in, or a callback that lands in Safari instead
+   of the installed app) is refused (400) rather than signing anyone in.
+5. A sign-in issues an ordinary session (#27): rotation, device list and revocation are the same
+   whatever the sign-in method.
+
+**What a Google account maps to** (`decide()`), in order:
+- Google has not verified the email → `email_unverified`, nothing created.
+- **Linking from Settings** (`intent=link`, with a two-minute ticket from
+  `POST /auth/google/link-ticket`): link to that signed-in account, unless this Google account
+  is linked elsewhere (`already_linked_elsewhere`) or the account already has a different one
+  (`account_has_google`).
+- A linked identity (`user_identities`, keyed on Google's `sub`, never on email) → sign in.
+  The stored email is refreshed; a changed Google email changes nothing else.
+- **An account with the same email exists → `needs_password`.** It is never linked on the email
+  match alone, verified or not: the person enters that account's password once
+  (`POST /auth/google/link-with-password`, same per-account limits as sign-in). A wrong
+  password keeps the ticket for another try.
+- Sign-up is invite-only → `needs_invite` (`POST /auth/google/complete-signup` with the code).
+- Otherwise a new account with no password and `emailVerifiedAt` set (Google verified it).
+
+`needs_*` answers carry a five-minute ticket bound to the same binding secret.
+
+**Without lockout.** `GET /auth/methods` → `{password, google, googleAvailable}`.
+`DELETE /auth/google` unlinks, and answers 409 `LAST_SIGN_IN_METHOD` when the account has no
+password. `change-password` answers 400 `NO_PASSWORD` for a Google-only account; such an account
+adds a password through forgot-password, which sets one whether or not one existed. Revoking the
+app in the Google account only stops future Google sign-ins; sessions already issued end the
+usual ways (#27).
+
+**Schemas.** `user_identities` {userId, provider: 'google', subject, email, linkedAt,
+lastUsedAt}, unique on (provider, subject) and on (userId, provider). `oauth_flows` {kind:
+start | result | link_ticket, keyHash (unique), bindingHash, codeVerifier, nonce, intent,
+userId, returnTo, outcome, expiresAt (TTL)}: every secret is stored as a SHA-256.
+`users.passwordHash` is optional.
+
+**Logged** in `security_events` (no emails, no tokens): `google_signin`, `google_linked`,
+`google_unlinked`, `google_failed` with the error code. `start` is limited to 60 per 15 minutes
+per IP (`googleByIp`).
+
+`returnTo` is a path on the web app or nothing (`/`); the web checks it again before navigating.
 
 ## Web: Sign-in & security (issue #27 S4)
 
 `/settings/security` is linked from Settings and backed by `components/account-security.tsx`.
+- **Google** (#28) shows the linked Google email with Unlink, or a Link button. Unlink is
+  replaced by an explanation while Google is the only way in. A Google-only account sees no
+  change-password form, only how to add a password.
 - **Change password** asks for the current password and the new one twice. It has Show/Hide
   toggles (`PasswordInput`, with `aria-pressed`) and shows the API's policy messages as they
   come. On success it clears the fields and says the other devices were signed out.

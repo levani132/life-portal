@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ApiError } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
+import { authCapabilities } from '../../lib/auth-capabilities';
 import { ErrorNote, Field, Input } from '../../components/ui';
+import { GoogleButton, OrDivider } from '../../components/google-button';
 
 export default function RegisterPage() {
   const { register, user, loading } = useAuth();
@@ -13,6 +15,11 @@ export default function RegisterPage() {
   const [form, setForm] = useState({ name: '', email: '', password: '', inviteCode: '' });
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [canGoogle, setCanGoogle] = useState(false);
+
+  useEffect(() => {
+    void authCapabilities().then((caps) => setCanGoogle(caps.google));
+  }, []);
 
   useEffect(() => {
     if (!loading && user) router.replace('/');
@@ -49,6 +56,12 @@ export default function RegisterPage() {
         </p>
 
         <form onSubmit={submit} className="card space-y-4 p-5">
+          {canGoogle && (
+            <>
+              <GoogleButton label="Sign up with Google" />
+              <OrDivider />
+            </>
+          )}
           <Field label="Name">
             <Input required value={form.name} onChange={set('name')} />
           </Field>

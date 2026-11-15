@@ -42,6 +42,32 @@ export interface JwtPayload {
 export interface AuthCapabilities {
   passwordReset: boolean;
   emailVerification: boolean;
+  /** Continue with Google is configured (issue #28). */
+  google: boolean;
+}
+
+/** What `POST /auth/google/exchange` and the steps after it answer (issue #28). */
+export type GoogleExchangeResult =
+  | { kind: 'session'; session: AuthSession; returnTo: string }
+  | { kind: 'linked'; returnTo: string }
+  | { kind: 'needs_password'; email: string; ticket: string }
+  | { kind: 'needs_invite'; email: string; ticket: string }
+  | { kind: 'error'; code: GoogleErrorCode };
+
+export type GoogleErrorCode =
+  | 'cancelled'
+  | 'expired'
+  | 'email_unverified'
+  | 'already_linked_elsewhere'
+  | 'account_has_google'
+  | 'failed';
+
+/** `GET /auth/methods`: how this account can sign in (issue #28). */
+export interface SignInMethods {
+  password: boolean;
+  google: { email: string; linkedAt: string } | null;
+  /** Whether this server offers Google at all. */
+  googleAvailable: boolean;
 }
 
 /** One signed-in device, as `GET /auth/sessions` lists it. */

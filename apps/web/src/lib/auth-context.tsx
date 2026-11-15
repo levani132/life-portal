@@ -12,7 +12,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { User } from '@life-portal/shared-types';
+import type { AuthSession, User } from '@life-portal/shared-types';
 import { api, ApiError, NetworkError, tokens } from './api';
 import { unregisterThisDevice } from './push';
 import { forgetUser, rememberedUser, rememberUser } from './offline/account';
@@ -25,6 +25,8 @@ interface AuthState {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (body: { email: string; password: string; name: string; inviteCode?: string }) => Promise<void>;
+  /** Signs in with a session obtained elsewhere (Continue with Google, issue #28), then goes to `to`. */
+  adopt: (session: AuthSession, to?: string) => Promise<void>;
   /** Signs out. With unsent changes on this device it asks first (spec 027). */
   logout: () => Promise<void>;
   /** Opened from the remembered account because the server could not be reached (spec 027). */
@@ -90,30 +92,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const login = useCallback(
-    async (email: string, password: string) => {
-      const session = await api.login(email, password);
+  const adopt = useCallback(
+    async (session: AuthSession, to = '/') => {
       tokens.set(session);
       rememberUser(session.user);
       await mutate(() => true, undefined, { revalidate: false });
       setOfflineSession(false);
       setUser(session.user);
-      router.push('/');
+      router.push(to);
     },
     [router],
   );
 
+  const login = useCallback(
+    async (email: string, password: string) => adopt(await api.login(email, password)),
+    [adopt],
+  );
+
   const register = useCallback(
-    async (body: { email: string; password: string; name: string; inviteCode?: string }) => {
-      const session = await api.register(body);
-      tokens.set(session);
-      rememberUser(session.user);
-      await mutate(() => true, undefined, { revalidate: false });
-      setOfflineSession(false);
-      setUser(session.user);
-      router.push('/');
-    },
-    [router],
+    async (body: { email: string; password: string; name: string; inviteCode?: string }) => adopt(await api.register(body)),
+    [adopt],
   );
 
   /** Signs out for real. This account's offline data on this device goes with it. */
@@ -146,8 +144,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [signOut]);
 
   const value = useMemo<AuthState>(
-    () => ({ user, loading, login, register, logout, offlineSession }),
-    [user, loading, login, register, logout, offlineSession],
+    () => ({ user, loading, login, register, adopt, logout, offlineSession }),
+    [user, loading, login, register, adopt, logout, offlineSession],
   );
 
   return (

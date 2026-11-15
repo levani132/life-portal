@@ -34,7 +34,7 @@ import { WorkoutBar } from './training/workout-bar';
 import { ErrorNote } from './ui';
 
 /** Routes that render without the portal: signing in and creating an account. */
-const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email'];
+const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/auth/google'];
 
 /**
  * Pages still wrap themselves in `AppShell`, but the shell itself is mounted once, by the root

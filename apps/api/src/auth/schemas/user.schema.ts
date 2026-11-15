@@ -38,8 +38,12 @@ export class User {
   @Prop({ required: true, trim: true })
   name!: string;
 
-  @Prop({ required: true, select: false })
-  passwordHash!: string;
+  /**
+   * Absent for an account made with Google (issue #28) until a password is added through
+   * "Forgot password". Sign-in, change and unlink all handle that.
+   */
+  @Prop({ select: false })
+  passwordHash?: string;
 
   /**
    * @deprecated Never read since issue #27; sessions live in `auth_sessions`. It was a bcrypt
