@@ -61,6 +61,14 @@ export class User {
 
   @Prop()
   lastLoginAt?: Date;
+
+  /**
+   * When the person proved they read this address (issue #27): a verification link, or a
+   * password reset, which needs the inbox too. Missing on every account made before #27, which
+   * is never blocked for it. Linking another sign-in method (#28) requires it.
+   */
+  @Prop()
+  emailVerifiedAt?: Date;
 }
 
 export type UserDocument = HydratedDocument<User>;

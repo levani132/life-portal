@@ -33,7 +33,8 @@ const login = (email: string, password: string) => api.call(null, 'POST', '/auth
 /** The newest link in the sink for this address, waiting for the send that runs after the answer. */
 async function linkFor(email: string, after = 0): Promise<{ token: string; text: string; html: string; count: number }> {
   for (let i = 0; i < 50; i++) {
-    const mail = await api.db.collection('dev_mail').find({ to: email }).sort({ createdAt: -1 }).toArray();
+    // Sign-up also sends a verification email (S5); only the reset ones count here.
+    const mail = await api.db.collection('dev_mail').find({ to: email, subject: 'Reset your Life Portal password' }).sort({ createdAt: -1 }).toArray();
     if (mail.length > after) {
       const text = mail[0]['text'] as string;
       const token = /reset-password#token=([A-Za-z0-9_-]+)/.exec(text)?.[1] as string;
@@ -63,6 +64,7 @@ describe('asking for a link', () => {
     expect(mail.html).toContain('Rita &lt;b&gt;');
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(await api.db.collection('dev_mail').countDocuments({ to: unknown })).toBe(0);
+    // A reset proves the inbox, so it confirms the email too (S5).
   });
 
   it('stores only a hash of the token, and logs no token', async () => {
@@ -96,6 +98,8 @@ describe('using a link', () => {
     expect((await api.call({ ...who.session, id: who.id, email: who.email }, 'GET', '/auth/me')).status).toBe(401);
     expect((await login(who.email, who.password)).status).toBe(401);
     expect((await login(who.email, newPassword)).status).toBe(200);
+    const after = await api.db.collection('users').findOne({ email: who.email });
+    expect(after?.['emailVerifiedAt']).toBeInstanceOf(Date);
 
     const again = await reset(token, `other-${randomUUID()}`);
     expect(again.status).toBe(400);

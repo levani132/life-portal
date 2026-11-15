@@ -11,6 +11,7 @@ import { User } from './schemas/user.schema';
 import { RATE_RULES } from './security/rate-limit-rules';
 import { SecurityService, type RequestContext } from './security/security.service';
 import { SessionsService } from './sessions.service';
+import { EmailVerificationService } from './email-verification.service';
 
 export const RESET_TTL_MINUTES = 30;
 
@@ -38,6 +39,7 @@ export class PasswordResetService {
     private readonly tokens: EmailTokensService,
     private readonly sessions: SessionsService,
     private readonly security: SecurityService,
+    private readonly verification: EmailVerificationService,
   ) {}
 
   get available(): boolean {
@@ -74,6 +76,7 @@ export class PasswordResetService {
     await this.users.updateOne({ _id: spent.userId }, { $set: { passwordHash: await bcrypt.hash(password, BCRYPT_ROUNDS) } });
     await this.sessions.revokeAll(spent.userId, 'password_reset');
     await this.tokens.voidAll(spent.userId, 'password_reset');
+    await this.verification.markVerifiedByReset(spent.userId);
     await this.security.record('password_reset_completed', ctx, spent.userId);
     return { success: true };
   }

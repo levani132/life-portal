@@ -6,6 +6,8 @@ export interface User extends Timestamped {
   email: string;
   name: string;
   roles: string[];
+  /** ISO time the email was confirmed (issue #27); absent until then. Never required to sign in. */
+  emailVerifiedAt?: string;
 }
 
 export interface AuthTokens {

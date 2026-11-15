@@ -11,6 +11,7 @@ import {
   ResetTokenDto,
 } from './dto/auth.dto';
 import { PasswordResetService } from './password-reset.service';
+import { EmailVerificationService } from './email-verification.service';
 import { CurrentUser, Public } from './current-user.decorator';
 import { deviceLabel } from './session-rules';
 import { SessionsService } from './sessions.service';
@@ -23,13 +24,14 @@ export class AuthController {
     private readonly sessions: SessionsService,
     private readonly security: SecurityService,
     private readonly resets: PasswordResetService,
+    private readonly verification: EmailVerificationService,
   ) {}
 
   /** What this server can do by email, so the web app shows only what works (issue #27). */
   @Public()
   @Get('capabilities')
   capabilities(): AuthCapabilities {
-    return { passwordReset: this.resets.available, emailVerification: this.resets.available };
+    return { passwordReset: this.resets.available, emailVerification: this.verification.available };
   }
 
   @Public()
@@ -101,6 +103,21 @@ export class AuthController {
     @Ip() ip: string,
   ) {
     return this.auth.changePassword(userId, sessionId, dto, { ip });
+  }
+
+  /** Emails a link confirming the signed-in person's address (issue #27 S5). */
+  @Post('verify-email/send')
+  @HttpCode(200)
+  sendVerification(@CurrentUser('userId') userId: string, @Ip() ip: string) {
+    return this.verification.send(userId, { ip });
+  }
+
+  /** Public: the link may be opened on a device that is not signed in. */
+  @Public()
+  @Post('verify-email')
+  @HttpCode(200)
+  verifyEmail(@Body() dto: ResetTokenDto, @Ip() ip: string) {
+    return this.verification.confirm(dto.token, { ip });
   }
 
   /** The devices signed in to this account. */

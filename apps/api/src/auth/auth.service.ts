@@ -15,6 +15,7 @@ import type { AuthSession, AuthTokens, JwtPayload, RefreshRefusal, User as UserD
 import { CONFIG, type AppConfig } from '../config/configuration';
 import { User, type UserDocument } from './schemas/user.schema';
 import { SessionsService } from './sessions.service';
+import { EmailVerificationService } from './email-verification.service';
 import { tokenHash } from './session-rules';
 import type { ChangePasswordDto, LoginDto, RegisterDto } from './dto/auth.dto';
 import { RATE_RULES } from './security/rate-limit-rules';
@@ -48,6 +49,7 @@ export class AuthService {
     @Inject(CONFIG) private readonly config: AppConfig,
     private readonly sessions: SessionsService,
     private readonly security: SecurityService,
+    private readonly verification: EmailVerificationService,
   ) {
     void timingDummy();
   }
@@ -77,6 +79,7 @@ export class AuthService {
     });
 
     await this.security.record('register', ctx, String(created._id));
+    this.verification.sendAfterRegister(String(created._id), created.name, created.email, ctx);
     return this.issueSession(created, device);
   }
 

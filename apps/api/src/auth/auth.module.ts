@@ -13,6 +13,7 @@ import { SecurityService } from './security/security.service';
 import { EmailToken, EmailTokenSchema } from './schemas/email-token.schema';
 import { EmailTokensService } from './email-tokens.service';
 import { PasswordResetService } from './password-reset.service';
+import { EmailVerificationService } from './email-verification.service';
 import { MailModule } from '../mail/mail.module';
 
 @Module({
@@ -29,7 +30,7 @@ import { MailModule } from '../mail/mail.module';
     JwtModule.register({}),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, SessionsService, SecurityService, EmailTokensService, PasswordResetService],
-  exports: [AuthService, SessionsService, SecurityService],
+  providers: [AuthService, JwtStrategy, SessionsService, SecurityService, EmailTokensService, PasswordResetService, EmailVerificationService],
+  exports: [AuthService, SessionsService, SecurityService, EmailVerificationService],
 })
 export class AuthModule {}

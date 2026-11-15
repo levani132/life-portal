@@ -9,6 +9,8 @@ User-visible changes. Newest first.
   hadn't sent yet stays there and is sent after you sign in.
 - **Each device has its own session.** Signing out ends only the device you're on.
 - **Changing your password signs out your other devices** and keeps you signed in where you are.
+- **Confirm your email**: new accounts get a confirmation link, and Settings → Sign-in & security
+  can send one. Nothing is locked if you don't confirm.
 - **Settings → Sign-in & security**: change your password, see which devices are signed in and
   when they were last active, and sign out one of them, all the others, or everywhere.
 - **Too many sign-in attempts are slowed down.** After 10 tries on one account within 15 minutes,

@@ -2,7 +2,7 @@
 
 import { useSWRConfig } from 'swr';
 import { AppShell, PageHeader } from '../../../components/app-shell';
-import { ChangePasswordPanel, DevicesPanel } from '../../../components/account-security';
+import { ChangePasswordPanel, DevicesPanel, EmailPanel } from '../../../components/account-security';
 
 export default function SecurityPage() {
   return (
@@ -20,6 +20,7 @@ function Security() {
       <div className="grid gap-4 lg:grid-cols-2">
         <ChangePasswordPanel onChanged={() => void mutate('/auth/sessions')} />
         <DevicesPanel />
+        <EmailPanel />
       </div>
     </>
   );

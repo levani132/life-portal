@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { SWRConfig } from 'swr';
 import type { ReactNode } from 'react';
-import { ChangePasswordPanel, DevicesPanel } from './account-security';
+import { ChangePasswordPanel, DevicesPanel, EmailPanel } from './account-security';
 
 const post = jest.fn();
 const get = jest.fn();
@@ -26,6 +26,9 @@ jest.mock('../lib/api', () => {
 });
 const logout = jest.fn(async () => undefined);
 jest.mock('../lib/auth-context', () => ({ useAuth: () => ({ logout }) }));
+jest.mock('../lib/auth-capabilities', () => ({
+  authCapabilities: async () => ({ passwordReset: true, emailVerification: true }),
+}));
 
 const { ApiError } = jest.requireMock('../lib/api') as { ApiError: new (m: string, s: number) => Error };
 const fresh = ({ children }: { children: ReactNode }) => <SWRConfig value={{ provider: () => new Map() }}>{children}</SWRConfig>;
@@ -112,5 +115,30 @@ describe('DevicesPanel (issue #27)', () => {
     });
     expect(post).toHaveBeenCalledWith('/auth/sessions/revoke-others');
     expect(logout).toHaveBeenCalled();
+  });
+});
+
+describe('EmailPanel (issue #27)', () => {
+  it('shows an unconfirmed email and sends a link when the server can', async () => {
+    get.mockResolvedValue({ id: 'u', email: 'me@example.com', name: 'Me', roles: [] });
+    post.mockResolvedValue({ sent: true, alreadyVerified: false });
+    await act(async () => {
+      render(<EmailPanel />, { wrapper: fresh });
+    });
+    expect(screen.getByText('Not confirmed yet')).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Send confirmation link' }));
+    });
+    expect(post).toHaveBeenCalledWith('/auth/verify-email/send');
+    expect(screen.getByRole('status').textContent).toContain('me@example.com');
+  });
+
+  it('shows a confirmed email without a button', async () => {
+    get.mockResolvedValue({ id: 'u', email: 'me@example.com', name: 'Me', roles: [], emailVerifiedAt: '2026-11-15T10:00:00Z' });
+    await act(async () => {
+      render(<EmailPanel />, { wrapper: fresh });
+    });
+    expect(screen.getByText('Confirmed')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Send confirmation link' })).toBeNull();
   });
 });

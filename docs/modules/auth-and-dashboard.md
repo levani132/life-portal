@@ -8,7 +8,8 @@ The three modules that are not widgets.
 
 **Code:** `apps/api/src/auth/`
 
-`users` collection: email, name, bcrypt `passwordHash` (cost 12, `select: false`), `roles`.
+`users` collection: email, name, bcrypt `passwordHash` (cost 12, `select: false`), `roles`,
+`emailVerifiedAt` (issue #27; absent until confirmed).
 A legacy `refreshTokenHash` may still be on old rows; nothing reads it, and signing in `$unset`s
 it (issue #27).
 
@@ -32,7 +33,7 @@ annotation means a newly added controller cannot accidentally ship unauthenticat
 
 Public routes: `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`,
 `GET /auth/capabilities`, `POST /auth/forgot-password`, `POST /auth/reset-password/check`,
-`POST /auth/reset-password`, `GET /health`.
+`POST /auth/reset-password`, `POST /auth/verify-email`, `GET /health`.
 
 ## Tokens
 
@@ -171,6 +172,38 @@ is in `docs/runbooks/email.md`.
    It does not sign in: the page sends the person to `/login?reset=done`.
 
 Links last 30 minutes (`RESET_TTL_MINUTES`).
+
+## Email verification (issue #27 S5)
+
+Verification **never blocks anything**. Accounts from before #27, and new unverified ones, sign
+in and use everything as before. `emailVerifiedAt` exists so that #28 can link another sign-in
+method (Google) only to an address the person has proved they read. #28 must not link on an
+email match alone.
+
+- **After sign-up**, a link is sent when email is available. This is best effort and never
+  delays or fails the sign-up.
+- **`POST /auth/verify-email/send`** (signed in) sends a new link and voids the previous one.
+  It answers `{alreadyVerified: true}` when there is nothing to do, and it is limited to 5 an
+  hour per account.
+- **The link** is `WEB_BASE_URL/verify-email#token=…` and lasts 48 hours. It is an
+  `auth_email_tokens` row with `purpose: 'verify_email'`, holding the address it was sent to.
+- **`POST /auth/verify-email {token}`** is public, because the link may open on a device that
+  isn't signed in. It spends the token atomically and sets `emailVerifiedAt` only if the
+  account's email is still that address. Otherwise it answers 400 `VERIFY_INVALID`.
+- **A completed password reset** also sets `emailVerifiedAt` when it is missing, because it
+  needed the inbox too.
+
+The web side is `/verify-email`, plus the Email panel on `/settings/security`, which shows
+Confirmed or Not confirmed yet and offers "Send confirmation link" only when the server can send.
+
+**For #28 (Google sign-in):**
+- link a Google identity to an existing account only when that account's `emailVerifiedAt` is
+  set **and** Google reports `email_verified`, or after the person signs in with their password;
+- a Google-only account has no `passwordHash`, so `change-password` must refuse it with a clear
+  message, and `forgot-password` should either let it set a first password or explain that it
+  signs in with Google;
+- sessions and the security log here are identity-agnostic, so reuse them rather than add a
+  second session model.
 
 ## Web: Sign-in & security (issue #27 S4)
 

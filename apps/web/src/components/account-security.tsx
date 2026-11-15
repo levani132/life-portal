@@ -1,10 +1,11 @@
 'use client';
 
-import type { AuthSessionInfo } from '@life-portal/shared-types';
+import type { AuthCapabilities, AuthSessionInfo, User } from '@life-portal/shared-types';
 import { useState } from 'react';
 import useSWR from 'swr';
 import { ApiError, api } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
+import { authCapabilities } from '../lib/auth-capabilities';
 import { ErrorNote, Field, Panel, PasswordInput, Spinner } from './ui';
 
 const message = (caught: unknown) =>
@@ -162,6 +163,63 @@ export function DevicesPanel() {
           Sign out everywhere
         </button>
       </div>
+    </Panel>
+  );
+}
+
+/**
+ * The account's email and whether it is confirmed (issue #27). Confirming never gates anything
+ * today; it is what linking another sign-in method will require. Offers a link only when this
+ * server can send email.
+ */
+export function EmailPanel() {
+  const me = useSWR<User>('/auth/me', (path: string) => api.get<User>(path), { revalidateOnFocus: false });
+  const caps = useSWR<AuthCapabilities>('auth:capabilities', () => authCapabilities(), { revalidateOnFocus: false });
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function send() {
+    setPending(true);
+    setError(null);
+    try {
+      const answer = await api.post<{ sent: boolean; alreadyVerified: boolean }>('/auth/verify-email/send');
+      if (answer.alreadyVerified) await me.mutate();
+      setNote(answer.alreadyVerified ? 'Your email is already confirmed.' : `We sent a link to ${me.data?.email}. It expires in 48 hours.`);
+    } catch (caught) {
+      setError(message(caught));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Panel title="Email" description="Where password-reset links go.">
+      {!me.data ? (
+        <Spinner />
+      ) : (
+        <div className="space-y-3">
+          <p className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="min-w-0 break-all">{me.data.email}</span>
+            {me.data.emailVerifiedAt ? (
+              <span className="text-xs text-emerald-400">Confirmed</span>
+            ) : (
+              <span className="text-xs text-ink-faint">Not confirmed yet</span>
+            )}
+          </p>
+          {!me.data.emailVerifiedAt && caps.data?.emailVerification && (
+            <button type="button" className="btn" disabled={pending} onClick={() => void send()}>
+              {pending ? 'Sending…' : 'Send confirmation link'}
+            </button>
+          )}
+          {note && (
+            <p role="status" className="text-sm">
+              {note}
+            </p>
+          )}
+          {error && <ErrorNote message={error} />}
+        </div>
+      )}
     </Panel>
   );
 }
