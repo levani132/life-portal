@@ -30,7 +30,9 @@ it (issue #27).
 a valid access token unless it is marked `@Public()`. Guarding by default rather than by
 annotation means a newly added controller cannot accidentally ship unauthenticated.
 
-Public routes: `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `GET /health`.
+Public routes: `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`,
+`GET /auth/capabilities`, `POST /auth/forgot-password`, `POST /auth/reset-password/check`,
+`POST /auth/reset-password`, `GET /health`.
 
 ## Tokens
 
@@ -132,6 +134,43 @@ A break is a 400 `WEAK_PASSWORD` with a `reason`. Changing to the current passwo
 **Timing.** An unknown email is checked against a real cost-12 bcrypt hash of a random secret,
 made once at boot. The placeholder string used before was not a valid hash, so bcrypt answered
 in about 1 ms instead of about 280 ms, which revealed which emails exist.
+
+## Forgot / reset password (issue #27 S3)
+
+Email goes through `MAILER` (`apps/api/src/mail/`). It is `ResendMailer`, or `DevMailer`, or
+`null` when `MAIL_PROVIDER` is unset. `DevMailer` stores messages in `dev_mail` for a day, and
+config refuses it unless `WEB_BASE_URL` is loopback. No mailer ever logs a body. Reset is
+available only with a mailer **and** `WEB_BASE_URL`, and `GET /auth/capabilities` says so. Setup
+is in `docs/runbooks/email.md`.
+
+`auth_email_tokens` holds one-time tokens for both resets and verifications:
+- `purpose`, `userId`, `tokenHash` (SHA-256; the token itself is never stored);
+- `email` (verification only);
+- `createdAt`, `expiresAt` (TTL), `usedAt`.
+
+1. **`POST /auth/forgot-password {email}`** always answers **202** with the same message.
+   - It is rate-limited by IP and by email.
+   - For an existing account, the token and the email are made *after* answering, so timing
+     reveals nothing either.
+   - Asking again voids the previous link.
+   - A send failure goes to the log and to `security_events` (`send_failed`), never to the
+     person.
+2. **The link** is `WEB_BASE_URL/reset-password#token=…`. The token is 32 random bytes in the
+   **fragment**, which browsers never send to a server, so it stays out of logs and `Referer`.
+   The page removes it from the address bar at once.
+3. **`POST /auth/reset-password/check {token}`** tells the page whether the link still works.
+4. **`POST /auth/reset-password {token, password}`** answers 400 `RESET_INVALID` for a link
+   that is expired, used, replaced or made up. Otherwise it:
+   1. checks the password policy *before* spending the link, so a weak password does not burn it;
+   2. spends the link with an atomic `findOneAndUpdate` (two concurrent resets change the
+      password once);
+   3. sets the bcrypt hash;
+   4. **ends every session**;
+   5. voids all other reset links.
+
+   It does not sign in: the page sends the person to `/login?reset=done`.
+
+Links last 30 minutes (`RESET_TTL_MINUTES`).
 
 ## Other details worth keeping
 

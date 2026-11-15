@@ -1,7 +1,16 @@
 import { Body, Controller, Delete, Get, Headers, HttpCode, Ip, Param, Post } from '@nestjs/common';
-import type { AuthSession, AuthSessionInfo, AuthTokens, User } from '@life-portal/shared-types';
+import type { AuthCapabilities, AuthSession, AuthSessionInfo, AuthTokens, User } from '@life-portal/shared-types';
 import { AuthService } from './auth.service';
-import { ChangePasswordDto, LoginDto, RefreshDto, RegisterDto } from './dto/auth.dto';
+import {
+  ChangePasswordDto,
+  ForgotPasswordDto,
+  LoginDto,
+  RefreshDto,
+  RegisterDto,
+  ResetPasswordDto,
+  ResetTokenDto,
+} from './dto/auth.dto';
+import { PasswordResetService } from './password-reset.service';
 import { CurrentUser, Public } from './current-user.decorator';
 import { deviceLabel } from './session-rules';
 import { SessionsService } from './sessions.service';
@@ -13,7 +22,36 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly sessions: SessionsService,
     private readonly security: SecurityService,
+    private readonly resets: PasswordResetService,
   ) {}
+
+  /** What this server can do by email, so the web app shows only what works (issue #27). */
+  @Public()
+  @Get('capabilities')
+  capabilities(): AuthCapabilities {
+    return { passwordReset: this.resets.available, emailVerification: this.resets.available };
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(202)
+  forgotPassword(@Body() dto: ForgotPasswordDto, @Ip() ip: string) {
+    return this.resets.request(dto.email, { ip });
+  }
+
+  @Public()
+  @Post('reset-password/check')
+  @HttpCode(200)
+  checkReset(@Body() dto: ResetTokenDto, @Ip() ip: string) {
+    return this.resets.check(dto.token, { ip });
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(200)
+  resetPassword(@Body() dto: ResetPasswordDto, @Ip() ip: string) {
+    return this.resets.reset(dto.token, dto.password, { ip });
+  }
 
   @Public()
   @Post('register')

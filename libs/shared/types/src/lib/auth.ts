@@ -36,6 +36,12 @@ export interface JwtPayload {
   exp?: number;
 }
 
+/** `GET /auth/capabilities`: what works by email on this server (issue #27). */
+export interface AuthCapabilities {
+  passwordReset: boolean;
+  emailVerification: boolean;
+}
+
 /** One signed-in device, as `GET /auth/sessions` lists it. */
 export interface AuthSessionInfo {
   id: Id;

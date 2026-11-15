@@ -21,7 +21,7 @@ import { RATE_RULES } from './security/rate-limit-rules';
 import { PASSWORD_MESSAGES, passwordProblem } from './security/password-policy';
 import { SecurityService, type RequestContext } from './security/security.service';
 
-const BCRYPT_ROUNDS = 12;
+export const BCRYPT_ROUNDS = 12;
 
 /**
  * A real bcrypt hash of a random secret, made once. An unknown email is checked against it so the

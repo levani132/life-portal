@@ -44,3 +44,23 @@ export class ChangePasswordDto {
   @MaxLength(200)
   newPassword!: string;
 }
+
+export class ForgotPasswordDto {
+  @IsEmail()
+  @MaxLength(254)
+  email!: string;
+}
+
+export class ResetTokenDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  token!: string;
+}
+
+export class ResetPasswordDto extends ResetTokenDto {
+  @IsString()
+  @MinLength(10)
+  @MaxLength(200)
+  password!: string;
+}

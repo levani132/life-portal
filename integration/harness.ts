@@ -58,6 +58,11 @@ export async function startApi(): Promise<TestApi> {
   process.env['DISABLE_SCHEDULES'] = 'true';
   delete process.env['REGISTRATION_INVITE_CODE'];
   delete process.env['MCP_OAUTH_ISSUER'];
+  // #27: emailed links go to the development sink (`dev_mail`), which only runs on loopback.
+  process.env['WEB_BASE_URL'] = 'http://localhost:4200';
+  process.env['MAIL_PROVIDER'] = 'dev';
+  delete process.env['RESEND_API_KEY'];
+  delete process.env['MAIL_FROM'];
 
   const { NestFactory } = await import('@nestjs/core');
   const { getConnectionToken } = await import('@nestjs/mongoose');

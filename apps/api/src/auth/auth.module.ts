@@ -10,6 +10,10 @@ import { AuthSessionRecord, AuthSessionSchema } from './schemas/auth-session.sch
 import { SessionsService } from './sessions.service';
 import { RateLimitCounter, RateLimitCounterSchema, SecurityEvent, SecurityEventSchema } from './security/security.schemas';
 import { SecurityService } from './security/security.service';
+import { EmailToken, EmailTokenSchema } from './schemas/email-token.schema';
+import { EmailTokensService } from './email-tokens.service';
+import { PasswordResetService } from './password-reset.service';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
@@ -18,12 +22,14 @@ import { SecurityService } from './security/security.service';
       { name: AuthSessionRecord.name, schema: AuthSessionSchema },
       { name: RateLimitCounter.name, schema: RateLimitCounterSchema },
       { name: SecurityEvent.name, schema: SecurityEventSchema },
+      { name: EmailToken.name, schema: EmailTokenSchema },
     ]),
+    MailModule,
     PassportModule,
     JwtModule.register({}),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, SessionsService, SecurityService],
+  providers: [AuthService, JwtStrategy, SessionsService, SecurityService, EmailTokensService, PasswordResetService],
   exports: [AuthService, SessionsService, SecurityService],
 })
 export class AuthModule {}

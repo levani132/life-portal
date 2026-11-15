@@ -11,6 +11,9 @@ User-visible changes. Newest first.
 - **Changing your password signs out your other devices** and keeps you signed in where you are.
 - **Too many sign-in attempts are slowed down.** After 10 tries on one account within 15 minutes,
   sign-in waits a little before it lets you try again.
+- **Forgot your password?** Once email is set up on the server, the sign-in page offers a link
+  that emails you a reset link. It works once, for 30 minutes, and using it signs you out
+  everywhere. Until email is set up, the option doesn't appear.
 - **New passwords must not be common**, and they can be at most 72 bytes (about 24 Georgian
   letters). Existing passwords keep working.
 

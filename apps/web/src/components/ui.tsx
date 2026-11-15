@@ -104,6 +104,28 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...rest} onChange={handleChange} className={clsx('field', props.className)} />;
 }
 
+/**
+ * A password field with a Show/Hide toggle (issue #27). The toggle is a real button with
+ * `aria-pressed`, so screen readers announce the state; it never submits the form.
+ */
+export function PasswordInput(props: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>) {
+  const [shown, setShown] = useState(false);
+  return (
+    <span className="relative block">
+      <Input {...props} type={shown ? 'text' : 'password'} className={clsx('pr-16', props.className)} />
+      <button
+        type="button"
+        className="absolute inset-y-0 right-0 px-3 text-xs font-medium text-ink-muted hover:text-ink"
+        aria-pressed={shown}
+        aria-label={shown ? 'Hide password' : 'Show password'}
+        onClick={() => setShown((value) => !value)}
+      >
+        {shown ? 'Hide' : 'Show'}
+      </button>
+    </span>
+  );
+}
+
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} className={clsx('field', props.className)} rows={props.rows ?? 3} />;
 }

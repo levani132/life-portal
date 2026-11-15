@@ -55,7 +55,20 @@ export interface AppConfig {
    * absent hides media in posts; a partial set refuses to boot.
    */
   storage?: { endpoint: string; bucket: string; accessKeyId: string; secretAccessKey: string };
+  /**
+   * Where the web app is served (`WEB_BASE_URL`), for links in emails (issue #27). HTTPS, except
+   * plain HTTP on a loopback host for development. Absent means emailed links are unavailable.
+   */
+  webBaseUrl?: string;
+  /**
+   * How email is sent (`MAIL_PROVIDER`). `resend` needs `RESEND_API_KEY` and `MAIL_FROM`; `dev`
+   * stores messages in the `dev_mail` collection and is refused unless `WEB_BASE_URL` is a
+   * loopback address, so it can never run in production. Absent means no email at all.
+   */
+  mail?: MailConfig;
 }
+
+export type MailConfig = { provider: 'resend'; apiKey: string; from: string } | { provider: 'dev'; from: string };
 
 function positiveInt(name: string, value: string | undefined, fallback: number): number {
   if (value == null || value.trim() === '') return fallback;
@@ -94,6 +107,50 @@ function oauthIssuer(): string | undefined {
     throw new Error('MCP_OAUTH_ISSUER must be an HTTPS origin (HTTP loopback is allowed for development).');
   }
   return url.origin;
+}
+
+const LOOPBACK = ['localhost', '127.0.0.1', '[::1]'];
+
+/** See `AppConfig.webBaseUrl`. Exported for its unit test. */
+export function webBaseUrl(env: NodeJS.ProcessEnv): string | undefined {
+  const value = env['WEB_BASE_URL']?.trim();
+  if (!value) return undefined;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`WEB_BASE_URL must be a URL, got "${value}".`);
+  }
+  const loopback = LOOPBACK.includes(url.hostname);
+  if (url.username || url.password || url.search || url.hash || (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback))) {
+    throw new Error('WEB_BASE_URL must be an HTTPS URL without credentials, query or fragment (HTTP loopback is allowed for development).');
+  }
+  return `${url.origin}${url.pathname.replace(/\/+$/, '')}`;
+}
+
+/** See `AppConfig.mail`. Exported for its unit test. */
+export function mailConfig(env: NodeJS.ProcessEnv, web: string | undefined): MailConfig | undefined {
+  const provider = env['MAIL_PROVIDER']?.trim().toLowerCase() || '';
+  const apiKey = env['RESEND_API_KEY']?.trim() || '';
+  const from = env['MAIL_FROM']?.trim() || '';
+  if (!provider) {
+    if (apiKey || from) throw new Error('RESEND_API_KEY or MAIL_FROM is set without MAIL_PROVIDER. Set MAIL_PROVIDER=resend.');
+    return undefined;
+  }
+  if (provider === 'dev') {
+    const host = web ? new URL(web).hostname : '';
+    if (!LOOPBACK.includes(host)) {
+      throw new Error('MAIL_PROVIDER=dev only works with a loopback WEB_BASE_URL. It keeps messages in the database and must never run in production.');
+    }
+    return { provider: 'dev', from: from || 'Life Portal <dev@localhost>' };
+  }
+  if (provider === 'resend') {
+    const missing = [!apiKey && 'RESEND_API_KEY', !from && 'MAIL_FROM'].filter(Boolean);
+    if (missing.length) throw new Error(`MAIL_PROVIDER=resend needs ${missing.join(' and ')}.`);
+    if (!/@[^@\s>]+\.[^@\s>]+>?$/.test(from)) throw new Error('MAIL_FROM must be an address on your verified domain, e.g. "Life Portal <no-reply@example.com>".');
+    return { provider: 'resend', apiKey, from };
+  }
+  throw new Error(`MAIL_PROVIDER must be "resend" or "dev", got "${provider}".`);
 }
 
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
@@ -166,6 +223,7 @@ export function loadConfig(): AppConfig {
     throw new Error('JWT_SECRET must be at least 32 characters. Generate one with `openssl rand -hex 32`.');
   }
 
+  const web = webBaseUrl(process.env);
   return {
     port: positiveInt('API_PORT', process.env['API_PORT'] ?? process.env['PORT'], 3333),
     mcpOAuthIssuer: oauthIssuer(),
@@ -185,6 +243,8 @@ export function loadConfig(): AppConfig {
     disableSchedules: process.env['DISABLE_SCHEDULES'] === 'true',
     push: pushConfig(process.env),
     storage: storageConfig(process.env),
+    webBaseUrl: web,
+    mail: mailConfig(process.env, web),
   };
 }
 

@@ -2207,3 +2207,24 @@ which emails were registered. A real cost-12 hash of a random secret is made onc
 **The 72-byte password limit is enforced.** bcrypt ignores everything after byte 72, so a longer
 password is silently a shorter one. New passwords are capped at 72 UTF-8 bytes; existing ones
 are untouched.
+
+## 2026-11-15 · Password reset: answer first, token in the fragment, no sign-in after (issue #27 S3)
+
+**No guessing in the answer or its timing.** `forgot-password` answers before doing anything
+account-specific. The token and the email happen afterwards, so neither the answer nor its
+timing depends on whether the email exists. The price is that a send failure is invisible to the
+person; it is logged and recorded instead.
+
+**The token travels in the fragment, not the query.** `#token=` is never sent to the web host,
+so it cannot end up in access logs or a `Referer`. The page strips it from the address bar.
+
+**The password is checked before the link is spent.** Otherwise a typo against the policy would
+force the person to request a new email.
+
+**A reset ends every session and does not sign in.** Someone who could read the inbox could
+otherwise skip straight into the account. Signing in once with the new password also confirms it
+works.
+
+**The development sink refuses anything but loopback.** `MAIL_PROVIDER=dev` writes messages to
+the database. Config refuses it unless `WEB_BASE_URL` is localhost, so a misconfigured production
+cannot quietly store reset links in Mongo instead of sending them.
