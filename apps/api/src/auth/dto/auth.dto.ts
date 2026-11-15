@@ -7,7 +7,7 @@ export class RegisterDto {
   @IsString()
   @MinLength(10, { message: 'Use at least 10 characters — this guards your financial data.' })
   @MaxLength(200)
-  password!: string;
+  password!: string; // and `passwordProblem()`: at most 72 bytes, not common (issue #27)
 
   @IsString()
   @MinLength(1)

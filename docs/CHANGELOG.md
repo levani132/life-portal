@@ -9,6 +9,10 @@ User-visible changes. Newest first.
   hadn't sent yet stays there and is sent after you sign in.
 - **Each device has its own session.** Signing out ends only the device you're on.
 - **Changing your password signs out your other devices** and keeps you signed in where you are.
+- **Too many sign-in attempts are slowed down.** After 10 tries on one account within 15 minutes,
+  sign-in waits a little before it lets you try again.
+- **New passwords must not be common**, and they can be at most 72 bytes (about 24 Georgian
+  letters). Existing passwords keep working.
 
 ## 2026-11-15: More room during a workout
 

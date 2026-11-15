@@ -2183,3 +2183,27 @@ explains why.
 **Not done here.** Tokens stay in `localStorage`. httpOnly cookies would stop an XSS bug from
 reading them, but would bring in CSRF protection and change the offline and MCP flows. That is a
 separate follow-up.
+
+## 2026-11-15 · Sign-in rate limits in Mongo, always behind one proxy hop (issue #27 S2)
+
+**Counters live in Mongo, not in memory.** They are fixed-window counters in `auth_rate_limits`.
+An in-memory limiter forgets on every deploy and counts separately on each instance, so a limit
+would really be "per process". One upsert per hit is cheap next to the bcrypt compare it guards.
+A fixed window can let through up to 2× the limit across a boundary, which is acceptable for
+slowing guessing down.
+
+**Subjects are HMAC-hashed.** The HMAC key is derived from `JWT_SECRET`, so neither the counters
+nor `security_events` hold an email or an IP. Groups can still be counted.
+
+**`trust proxy` is always set now.** It used to be set only when MCP OAuth was enabled. Behind
+Render, every request would then carry the proxy's address, and the per-IP limit would throttle
+everyone at once. `TRUST_PROXY_HOPS` defaults to 1. Set it to 0 where clients connect directly,
+or they could pick their own IP with `X-Forwarded-For`. Per-account limits hold either way.
+
+**Unknown emails get a real dummy hash.** The placeholder hash for unknown emails was not valid
+bcrypt, so bcrypt rejected it in about 1 ms instead of about 280 ms. That timing told anyone
+which emails were registered. A real cost-12 hash of a random secret is made once at boot.
+
+**The 72-byte password limit is enforced.** bcrypt ignores everything after byte 72, so a longer
+password is silently a shorter one. New passwords are capped at 72 UTF-8 bytes; existing ones
+are untouched.

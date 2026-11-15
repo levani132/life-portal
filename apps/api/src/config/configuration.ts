@@ -28,6 +28,11 @@ export interface AppConfig {
   /** When set, registration requires this code. Keeps a public deploy from being open. */
   registrationInviteCode?: string;
   corsOrigins: string[];
+  /**
+   * Reverse-proxy hops in front of the API (`TRUST_PROXY_HOPS`, default 1 for Render; 0 when
+   * clients connect directly). Decides which X-Forwarded-For entry is `req.ip`.
+   */
+  trustProxyHops: number;
   finnhubApiKey?: string;
   /**
    * Sent as `User-Agent` on every Open Food Facts request.
@@ -146,6 +151,15 @@ export function storageConfig(env: NodeJS.ProcessEnv): AppConfig['storage'] {
   };
 }
 
+function proxyHops(value: string | undefined): number {
+  if (value == null || value.trim() === '') return 1;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 5) {
+    throw new Error(`TRUST_PROXY_HOPS must be a whole number from 0 to 5, got "${value}".`);
+  }
+  return parsed;
+}
+
 export function loadConfig(): AppConfig {
   const jwtSecret = required('JWT_SECRET', process.env['JWT_SECRET']);
   if (jwtSecret.length < 32) {
@@ -165,6 +179,7 @@ export function loadConfig(): AppConfig {
       .split(',')
       .map((o) => o.trim())
       .filter(Boolean),
+    trustProxyHops: proxyHops(process.env['TRUST_PROXY_HOPS']),
     finnhubApiKey: process.env['FINNHUB_API_KEY']?.trim() || undefined,
     offUserAgent: openFoodFactsUserAgent(),
     disableSchedules: process.env['DISABLE_SCHEDULES'] === 'true',

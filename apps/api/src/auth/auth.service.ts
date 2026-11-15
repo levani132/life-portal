@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Inject,
@@ -8,7 +9,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import * as bcrypt from 'bcryptjs';
 import type { AuthSession, AuthTokens, JwtPayload, RefreshRefusal, User as UserDto } from '@life-portal/shared-types';
 import { CONFIG, type AppConfig } from '../config/configuration';
@@ -16,8 +17,28 @@ import { User, type UserDocument } from './schemas/user.schema';
 import { SessionsService } from './sessions.service';
 import { tokenHash } from './session-rules';
 import type { ChangePasswordDto, LoginDto, RegisterDto } from './dto/auth.dto';
+import { RATE_RULES } from './security/rate-limit-rules';
+import { PASSWORD_MESSAGES, passwordProblem } from './security/password-policy';
+import { SecurityService, type RequestContext } from './security/security.service';
 
 const BCRYPT_ROUNDS = 12;
+
+/**
+ * A real bcrypt hash of a random secret, made once. An unknown email is checked against it so the
+ * answer takes as long as for a known one. (The string used before #27 was not a valid hash, so
+ * bcrypt gave up at once: about 1 ms against 280 ms, which revealed which emails exist.)
+ */
+let dummyHash: Promise<string> | undefined;
+function timingDummy(): Promise<string> {
+  dummyHash ??= bcrypt.hash(randomBytes(16).toString('hex'), BCRYPT_ROUNDS);
+  return dummyHash;
+}
+
+/** Throws a 400 with a readable message when `password` breaks the policy. */
+export function assertPasswordPolicy(password: string, email?: string): void {
+  const problem = passwordProblem(password, email);
+  if (problem) throw new BadRequestException({ code: 'WEAK_PASSWORD', reason: problem, message: PASSWORD_MESSAGES[problem] });
+}
 
 @Injectable()
 export class AuthService {
@@ -26,9 +47,13 @@ export class AuthService {
     private readonly jwt: JwtService,
     @Inject(CONFIG) private readonly config: AppConfig,
     private readonly sessions: SessionsService,
-  ) {}
+    private readonly security: SecurityService,
+  ) {
+    void timingDummy();
+  }
 
-  async register(dto: RegisterDto, device = 'Unknown device'): Promise<AuthSession> {
+  async register(dto: RegisterDto, device = 'Unknown device', ctx: RequestContext = {}): Promise<AuthSession> {
+    await this.security.hit(RATE_RULES.registerByIp, ctx.ip, ctx);
     // When an invite code is configured, registration is closed without it. This is what
     // keeps a publicly deployed instance from accepting strangers.
     if (this.config.registrationInviteCode && dto.inviteCode !== this.config.registrationInviteCode) {
@@ -36,6 +61,9 @@ export class AuthService {
     }
 
     const email = dto.email.toLowerCase().trim();
+    assertPasswordPolicy(dto.password, email);
+    // Accepted for now (#27): registration is invite-only, and a clear answer helps invitees.
+    // Make it generic before sign-up is opened to the public.
     if (await this.userModel.exists({ email })) {
       throw new ConflictException('That email is already registered.');
     }
@@ -48,24 +76,30 @@ export class AuthService {
       cohort: 'production',
     });
 
+    await this.security.record('register', ctx, String(created._id));
     return this.issueSession(created, device);
   }
 
-  async login(dto: LoginDto, device = 'Unknown device'): Promise<AuthSession> {
-    return this.issueSession(await this.authenticateCredentials(dto), device);
+  async login(dto: LoginDto, device = 'Unknown device', ctx: RequestContext = {}): Promise<AuthSession> {
+    await this.security.hit(RATE_RULES.loginByIp, ctx.ip, ctx);
+    const user = await this.authenticateCredentials(dto, ctx);
+    await this.security.record('login_succeeded', ctx, String(user._id));
+    return this.issueSession(user, device);
   }
 
-  /** Verify an OAuth sign-in without rotating the dashboard session. */
-  async authenticateCredentials(dto: LoginDto): Promise<UserDocument> {
-    const user = await this.userModel
-      .findOne({ email: dto.email.toLowerCase().trim() })
-      .select('+passwordHash');
+  /**
+   * Checks an email and password. Used by sign-in and by the MCP OAuth page, so both share the
+   * per-account limit. The answer and the work are the same whether or not the email exists.
+   */
+  async authenticateCredentials(dto: LoginDto, ctx: RequestContext = {}): Promise<UserDocument> {
+    const email = dto.email.toLowerCase().trim();
+    await this.security.hit(RATE_RULES.loginByAccount, email, ctx);
+    const user = await this.userModel.findOne({ email }).select('+passwordHash');
 
-    // Same message and roughly the same work either way, so the response cannot be used to
-    // discover which emails exist.
-    const hash = user?.passwordHash ?? '$2a$12$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidin';
+    const hash = user?.passwordHash ?? (await timingDummy());
     const matches = await bcrypt.compare(dto.password, hash);
     if (!user || !matches) {
+      await this.security.record('login_failed', ctx, user ? String(user._id) : undefined);
       throw new UnauthorizedException('Incorrect email or password.');
     }
 
@@ -79,7 +113,8 @@ export class AuthService {
    * session's current token; see `SessionsService.rotate` for how a race differs from a replay.
    * A token from before sessions existed (no `sid`) is refused: those could not be revoked.
    */
-  async refresh(refreshToken: string): Promise<AuthTokens> {
+  async refresh(refreshToken: string, ctx: RequestContext = {}): Promise<AuthTokens> {
+    await this.security.hit(RATE_RULES.refreshByIp, ctx.ip, ctx);
     let payload: JwtPayload;
     try {
       payload = await this.jwt.verifyAsync<JwtPayload>(refreshToken, { secret: this.config.jwtSecret });
@@ -105,6 +140,7 @@ export class AuthService {
       expiresAt: this.sessionExpiry(),
     });
     if (refusal) {
+      if (refusal === 'REFRESH_REUSED') await this.security.record('refresh_replay', ctx, String(user._id));
       if (refusal === 'REFRESH_SUPERSEDED') {
         throw new ConflictException({
           code: refusal,
@@ -117,26 +153,40 @@ export class AuthService {
   }
 
   /** Signs this device out. Other devices stay signed in. */
-  async logout(userId: string, sessionId: string): Promise<{ success: true }> {
+  async logout(userId: string, sessionId: string, ctx: RequestContext = {}): Promise<{ success: true }> {
     await this.sessions.revoke(userId, sessionId, 'logout');
+    await this.security.record('logout', ctx, userId);
     return { success: true };
   }
 
   /** Signs every device out, this one included. */
-  async logoutAll(userId: string): Promise<{ success: true; ended: number }> {
+  async logoutAll(userId: string, ctx: RequestContext = {}): Promise<{ success: true; ended: number }> {
     const ended = await this.sessions.revokeAll(userId, 'logout_all');
+    await this.security.record('logout_all', ctx, userId);
     return { success: true, ended };
   }
 
   /** Changing the password keeps this session and signs every other one out. */
-  async changePassword(userId: string, sessionId: string, dto: ChangePasswordDto): Promise<{ success: true }> {
+  async changePassword(
+    userId: string,
+    sessionId: string,
+    dto: ChangePasswordDto,
+    ctx: RequestContext = {},
+  ): Promise<{ success: true }> {
+    await this.security.hit(RATE_RULES.changePasswordByUser, userId, ctx);
     const user = await this.userModel.findById(userId).select('+passwordHash');
     if (!user || !(await bcrypt.compare(dto.currentPassword, user.passwordHash))) {
+      await this.security.record('password_change_failed', ctx, userId);
       throw new UnauthorizedException('Your current password is incorrect.');
+    }
+    assertPasswordPolicy(dto.newPassword, user.email);
+    if (await bcrypt.compare(dto.newPassword, user.passwordHash)) {
+      throw new BadRequestException({ code: 'SAME_PASSWORD', message: 'Choose a password different from your current one.' });
     }
     user.passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
     await user.save();
     await this.sessions.revokeAll(userId, 'password_change', sessionId);
+    await this.security.record('password_changed', ctx, userId);
     return { success: true };
   }
 

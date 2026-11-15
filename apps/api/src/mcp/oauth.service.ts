@@ -111,11 +111,16 @@ export class McpOAuthService implements OAuthServerProvider {
         }
         let userId: string;
         try {
-          const user = await this.auth.authenticateCredentials({ email, password });
+          const user = await this.auth.authenticateCredentials({ email, password }, { ip: req.ip });
           userId = String(user._id);
         } catch (error) {
-          if (!(error instanceof Error) || !('getStatus' in error) ||
-              (error as { getStatus(): number }).getStatus() !== 401) throw error;
+          const status = error instanceof Error && 'getStatus' in error ? (error as { getStatus(): number }).getStatus() : 0;
+          // #27: the consent page shares sign-in's per-account limit.
+          if (status === 429) {
+            res.status(429).type('html').send(consentPage(ticket, redirect.origin, 'Too many attempts. Try again in a little while.'));
+            return;
+          }
+          if (status !== 401) throw error;
           res.status(401).type('html').send(consentPage(ticket, redirect.origin, 'Incorrect email or password.'));
           return;
         }

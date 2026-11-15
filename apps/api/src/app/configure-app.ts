@@ -12,12 +12,13 @@ import { healthValidationException } from '../nutrition/health-validation';
  */
 export function configureApp(app: NestExpressApplication, config: AppConfig): void {
   app.setGlobalPrefix('api');
+  // Render terminates TLS one proxy hop away, so `req.ip` must come from that hop's
+  // X-Forwarded-For. Needed by the OAuth server and, since #27, by sign-in's per-IP rate limits:
+  // without it every request would carry the proxy's address and share one limit. Never trust
+  // more hops than really exist, or a client could choose its own IP.
+  if (config.trustProxyHops > 0) app.getHttpAdapter().getInstance().set('trust proxy', config.trustProxyHops);
   const oauth = app.get(McpOAuthService);
-  if (oauth.enabled) {
-    // Render terminates TLS one proxy hop away. Never trust arbitrary forwarded hosts.
-    app.getHttpAdapter().getInstance().set('trust proxy', 1);
-    app.use(oauth.router());
-  }
+  if (oauth.enabled) app.use(oauth.router());
 
   // Trace only Health uploads; never log login bodies, credentials or health sample values.
   app.use((req: Request, res: Response, next: NextFunction) => {

@@ -55,7 +55,7 @@ export default function RegisterPage() {
           <Field label="Email">
             <Input type="email" autoComplete="email" required value={form.email} onChange={set('email')} />
           </Field>
-          <Field label="Password" hint="At least 10 characters.">
+          <Field label="Password" hint="At least 10 characters, and not a common password.">
             <Input
               type="password"
               autoComplete="new-password"

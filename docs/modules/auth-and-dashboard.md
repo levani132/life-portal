@@ -79,10 +79,66 @@ on the device and are sent after the same account signs in (spec 027).
 | `POST /auth/sessions/revoke-others` | ends every session except this one |
 | `POST /auth/change-password` | needs the current password; keeps this session and ends the others |
 
+## Abuse protection (issue #27 S2)
+
+**Rate limits.** `SecurityService.hit()` counts fixed windows in `auth_rate_limits`, one upsert
+per hit, and a TTL index removes each counter when its window ends. Subjects are HMAC-hashed with
+a key derived from `JWT_SECRET`, so the collection holds no email or IP. Over the limit, the
+answer is 429 `RATE_LIMITED`, with the same message for every subject and the seconds to wait in
+`retryAfter`.
+
+| Rule | Subject | Limit |
+|---|---|---|
+| `login:ip` | IP | 30 / 15 min |
+| `login:acct` | email; covers the MCP consent page too | 10 / 15 min |
+| `register:ip` | IP | 10 / hour |
+| `refresh:ip` | IP | 300 / 15 min |
+| `pwchange:user` | account | 10 / hour |
+| `forgot:ip`, `forgot:acct` | IP, email | 10 / hour, 3 / hour |
+| `reset:ip` | IP | 20 / hour |
+| `verify:user` | account | 5 / hour |
+
+The values are in `security/rate-limit-rules.ts`. The per-account limit counts every attempt,
+successful or not: 10 sign-ins in 15 minutes is already unusual. `req.ip` depends on
+`TRUST_PROXY_HOPS` (default 1, for Render). It used to be set only when MCP OAuth was enabled.
+Without it, every request behind the proxy would share one IP limit.
+
+**Security events.** `security_events` keeps `type`, `userId` (when known), `ipHash`, a short
+fixed `detail` (such as the rate-limit bucket) and `at`, and expires them after 90 days. It never
+holds an email, a password, a token or a raw IP. Recorded types:
+- `register`;
+- `login_succeeded`, `login_failed`;
+- `logout`, `logout_all`;
+- `session_revoked`, `sessions_revoked_others`;
+- `refresh_replay`;
+- `password_changed`, `password_change_failed`;
+- `rate_limited`;
+- the reset and verification events, once S3 and S5 add them.
+
+`record()` never throws.
+
+**Password policy** (`security/password-policy.ts`) applies wherever a password is *set*:
+registration, change and reset. Signing in never checks it.
+- at least 10 characters, counted as characters;
+- at most 72 bytes of UTF-8, which bcrypt would otherwise silently cut short (about 24 Georgian
+  letters);
+- not on the bundled common list;
+- at least 4 distinct characters;
+- not the email address.
+
+A break is a 400 `WEAK_PASSWORD` with a `reason`. Changing to the current password is a 400
+`SAME_PASSWORD`.
+
+**Timing.** An unknown email is checked against a real cost-12 bcrypt hash of a random secret,
+made once at boot. The placeholder string used before was not a valid hash, so bcrypt answered
+in about 1 ms instead of about 280 ms, which revealed which emails exist.
+
 ## Other details worth keeping
 
-- Login compares against a dummy hash when the email does not exist, so response timing and the
-  error message do not reveal which emails are registered.
+- Login compares against a real dummy hash when the email does not exist (see Timing above), so
+  neither the timing nor the message reveals which emails are registered. Registration does say
+  "already registered" (409). That is accepted while sign-up is invite-only; reconsider before
+  opening it.
 - The `User` schema's `toJSON` deletes `passwordHash` and the legacy `refreshTokenHash` on the way
   out, so even a controller that returned a raw user could not leak them.
 - Refresh tokens are hashed with SHA-256, not bcrypt. bcrypt only reads the first 72 bytes, and

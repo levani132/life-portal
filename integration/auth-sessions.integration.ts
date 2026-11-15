@@ -20,16 +20,19 @@ interface Person {
   password: string;
 }
 
+// A fresh address per person, so the per-IP sign-in limits (S2) never get in the way here.
+const ip = () => `10.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;
+
 async function person(): Promise<Person> {
   const email = `s-${randomUUID().slice(0, 8)}@int.test`;
   const password = `pw-${randomUUID()}`;
-  const registered = await api.call(null, 'POST', '/auth/register', { email, password, name: 'S' });
+  const registered = await api.call(null, 'POST', '/auth/register', { email, password, name: 'S' }, { 'X-Forwarded-For': ip() });
   expect(registered.status).toBe(201);
   return { email, password };
 }
 
 async function signIn(who: Person, userAgent = 'Mozilla/5.0 (Macintosh) Chrome/130.0 Safari/537.36'): Promise<Account> {
-  const answer = await api.call<AuthSession>(null, 'POST', '/auth/login', who, { 'User-Agent': userAgent });
+  const answer = await api.call<AuthSession>(null, 'POST', '/auth/login', who, { 'User-Agent': userAgent, 'X-Forwarded-For': ip() });
   expect(answer.status).toBe(200);
   return { id: answer.body.user.id, email: who.email, ...answer.body };
 }

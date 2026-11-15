@@ -96,10 +96,13 @@ export async function startApi(): Promise<TestApi> {
   const account: TestApi['account'] = async (name = 'person') => {
     const email = `${name}-${randomUUID().slice(0, 8)}@int.test`;
     const password = `pw-${randomUUID()}`;
-    const registered = await call(null, 'POST', '/auth/register', { email, password, name });
+    // #27: sign-in is rate-limited per IP. Each test account comes from its own address (the
+    // API trusts one proxy hop), so a file that makes many accounts is never throttled.
+    const from = { 'X-Forwarded-For': `10.${randomBytes(3).join('.')}` };
+    const registered = await call(null, 'POST', '/auth/register', { email, password, name }, from);
     if (registered.status >= 300) throw new Error(`register ${registered.status}: ${JSON.stringify(registered.body)}`);
     await db.collection('users').updateOne({ email }, { $set: { cohort: 'internal' } });
-    const login = await call<{ accessToken: string; refreshToken: string }>(null, 'POST', '/auth/login', { email, password });
+    const login = await call<{ accessToken: string; refreshToken: string }>(null, 'POST', '/auth/login', { email, password }, from);
     const sub = JSON.parse(Buffer.from(login.body.accessToken.split('.')[1], 'base64url').toString()).sub as string;
     return { id: sub, email, accessToken: login.body.accessToken, refreshToken: login.body.refreshToken };
   };
