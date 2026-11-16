@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-16: A security policy for the web app, watching only for now
+
+- **Every page now declares which scripts and servers it may use** (a Content-Security-Policy).
+  For now it only reports what it would block, in the browser's console, and blocks nothing, so
+  nothing you do changes. It is switched on after it has been checked on real devices.
+
 ## 2026-11-16: Your session can no longer be read by scripts
 
 - **Once the deployment is switched over** (`docs/runbooks/web-api-proxy.md`), the app talks to

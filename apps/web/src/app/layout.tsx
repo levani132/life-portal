@@ -1,5 +1,6 @@
 import './global.css';
 import type { Metadata, Viewport } from 'next';
+import { headers } from 'next/headers';
 import type { ReactNode } from 'react';
 import { ThemeSync } from '../components/theme-preference';
 import { AuthProvider } from '../lib/auth-context';
@@ -49,12 +50,15 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Issue #33: the per-request nonce from `proxy.ts`. Reading it renders every page on request.
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         {/* Resolve the saved preference before the first paint. No user data is interpolated. */}
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var p=localStorage.getItem('lp.theme.v1');document.documentElement.dataset.theme=p==='light'||p==='dark'?p:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){}})()`,
           }}

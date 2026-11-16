@@ -2348,3 +2348,31 @@ to know whose session the cookie is. The id is not a credential.
 
 **CSP is its own change.** Next.js needs nonces for its inline scripts, and a wrong policy breaks
 the whole app at load. It ships separately so it can be rolled back separately.
+
+## 2026-11-16 · Content-Security-Policy by nonce, report-only first (issue #33)
+
+**Decision:** every page gets a Content-Security-Policy whose scripts are allowed by a nonce made
+per request, with `'strict-dynamic'` so the scripts Next loads from them are allowed too
+(`apps/web/src/lib/csp.ts`, `apps/web/src/proxy.ts`). It ships as
+`Content-Security-Policy-Report-Only`; `CSP_ENFORCE=true` enforces it, after the checks in
+`docs/runbooks/content-security-policy.md`.
+
+**Why not hashes:** a static, hash-based policy would keep pages on the CDN. It was tried with
+Next's experimental `sri` option in a production build: none of the 15 external scripts got an
+integrity attribute, and the page carried 7 inline scripts, 6 of them `self.__next_f.push` data
+that differ per page and per build. No fixed list allows those, so the nonce is the only way to a
+policy without `'unsafe-inline'`.
+
+**The cost:** a nonce is new per response, so every page renders on request (the root layout
+reads `headers()`) and the HTML is `no-store`. That is one Vercel function call per page load and
+no CDN-cached HTML; about 4 ms of render locally. Assets, icons, the manifest and `sw.js` stay
+static and outside the proxy. The service worker's cached shell keeps the headers it was stored
+with, so its nonce and policy always match.
+
+**Other choices:** `'unsafe-eval'` only in development (React's dev tooling), never in production.
+Styles keep `'unsafe-inline'`: React `style` attributes need it and a style cannot run code. The
+storage origin comes from `NEXT_PUBLIC_STORAGE_ORIGIN` and is accepted only as a bare origin
+(no path, wildcard or credentials), so a mistyped value narrows the policy rather than widening
+it. There is no report endpoint: reports carry URLs, and a blocked URL can be a signed storage
+link, so violations are read in the browser console instead.
+
