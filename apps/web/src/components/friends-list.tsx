@@ -29,7 +29,7 @@ export function Friends() {
         }
       />
       <div
-        className="mb-5 flex gap-1 rounded-xl border border-border p-1"
+        className="glass-tabs mb-5 flex gap-1 rounded-2xl border p-1"
         role="tablist"
         aria-label="Connections"
       >
@@ -39,7 +39,7 @@ export function Friends() {
             key={value}
             role="tab"
             aria-selected={kind === value}
-            className={`min-h-11 flex-1 rounded-lg px-2 text-sm ${kind === value ? 'bg-surface-raised text-ink' : 'text-ink-muted'}`}
+            className={`min-h-11 flex-1 rounded-xl border px-2 text-sm ${kind === value ? 'glass-tab-on font-medium' : 'border-transparent text-ink-muted'}`}
             onClick={() => {
               setKind(value);
               setSkip(0);

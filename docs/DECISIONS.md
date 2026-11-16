@@ -2437,3 +2437,20 @@ outage sent people to the sign-in page.
   only. Caching just its Training and Food cards would move that boundary, so it is left for a
   separate decision.
 
+## 2026-11-17 · Glass surfaces, and a floating tab bar
+
+**Glass is the app's raised surface for chrome and summary cards** (owner direction, after the
+Home widget cards): a translucent, slightly lit surface with a bright top edge and a hairline
+border. The classes are in `global.css`: `.glass` / `.home-widget` (cards), `.glass-tabs` with
+`.glass-tab-on` (in-page tab strips: Training, Food, profile sections, connections) and
+`.glass-bar` with `.glass-bar-pill` (the bottom bar). "For You / Friends" on Home stays an
+underline, by the owner's choice.
+
+**The bottom bar floats.** It is a capsule inset from the screen's edges, above the safe area;
+the page scrolls under it, so its blur is stronger than in-page glass. The band beside it is
+`pointer-events-none` so the page stays touchable there. A pill sits behind the open tab and
+slides to the next one with a small overshoot (`transform` only, one element, no layout), and an
+icon scales down while pressed; both are off under `prefers-reduced-motion`. The pill is
+positioned from the cell count, so New post in the middle is a cell it passes over and never
+rests on. Hiding the bar on scroll moves it 140% of its height, enough to clear the inset.
+

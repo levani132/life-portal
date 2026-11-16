@@ -25,6 +25,10 @@ User-visible changes. Newest first.
 - **Each meal has its own colour and icon**: breakfast, lunch, dinner, snacks and anything else.
   Its calories and macros sit in the header, and each food is a row with icon buttons to share,
   edit and remove.
+- **The bottom bar is a floating glass capsule.** The page scrolls underneath it, and a pill
+  slides to the tab you open, with a small bounce, the way an iPhone app's tab bar does. Icons dip
+  under your finger.
+- **The tabs on your profile and on the friends page are glass too.**
 - **The tab strips on Training and Food are glass**, like the Home cards: the selected tab is a
   lit, accent-tinted pane instead of a solid block.
 - **Today, Foods and You are a tab strip with icons**, with the AI assistant and Log food at its

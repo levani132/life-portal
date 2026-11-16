@@ -481,7 +481,7 @@ export function ProfileView({ userId }: { userId?: string }) {
       )}
       {tabs.length > 1 && (
         <div
-          className="mt-5 inline-flex rounded-full border border-border bg-surface-raised p-1"
+          className="glass-tabs mt-5 inline-flex gap-1 rounded-full border p-1"
           role="tablist"
           aria-label="Profile sections"
         >
@@ -493,8 +493,8 @@ export function ProfileView({ userId }: { userId?: string }) {
               aria-selected={shown === value}
               className={
                 shown === value
-                  ? 'rounded-full bg-accent-solid px-4 py-1.5 text-sm font-medium text-on-accent'
-                  : 'rounded-full px-4 py-1.5 text-sm text-ink-muted hover:text-ink'
+                  ? 'glass-tab-on rounded-full border px-4 py-1.5 text-sm font-medium'
+                  : 'rounded-full border border-transparent px-4 py-1.5 text-sm text-ink-muted hover:text-ink'
               }
               onClick={() => setTab(value)}
             >

@@ -120,6 +120,9 @@ function Portal({ children }: { children: ReactNode }) {
     pathname === `/people/${user.id}`;
   const tabs = tabsFor(portal.data.access, pathname, inMenu);
   const current = tabs.findIndex((tab) => tab.href === pathname);
+  // The bar's cells (the tabs, with New post in the middle) and which one the pill sits under.
+  const bar = withNewPost(tabs, canPost);
+  const barIndex = bar.findIndex((tab) => tab !== NEW_POST && tab.active);
   return (
     <div className="min-h-screen">
       {/* A conversation has its own header (back, the person, mute), and only that. */}
@@ -178,34 +181,46 @@ function Portal({ children }: { children: ReactNode }) {
           )}
         </main>
       </PullToRefresh>
+      {/* A floating glass capsule, in the manner of iOS's tab bars: the page scrolls under it,
+          and a pill slides to the open tab. Only the capsule takes touches; the band beside
+          it lets them through to the page. */}
       <nav
         hidden={inChat}
         aria-label="Main navigation"
         onFocusCapture={revealChrome}
         className={clsx(
-          'portal-tabbar fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur transition-transform duration-200',
-          chromeHidden && 'translate-y-full',
+          'portal-tabbar pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] transition-transform duration-300',
+          chromeHidden && 'translate-y-[140%]',
         )}
       >
-        <div className="mx-auto flex max-w-xl">
-          {withNewPost(tabs, canPost).map((tab) =>
+        <div className="glass-bar pointer-events-auto relative mx-auto flex max-w-md rounded-full border p-1.5">
+          <span
+            aria-hidden
+            className="glass-bar-pill"
+            style={{
+              width: `calc((100% - 0.75rem) / ${bar.length})`,
+              transform: `translateX(${Math.max(0, barIndex) * 100}%)`,
+              opacity: barIndex < 0 ? 0 : 1,
+            }}
+          />
+          {bar.map((tab) =>
             tab === NEW_POST ? (
               <Link
                 key="new"
                 href="/new"
                 scroll={false}
                 aria-label="New post"
-                className="flex min-h-16 flex-1 items-center justify-center"
+                className="relative z-10 flex min-h-[3.25rem] flex-1 items-center justify-center"
               >
-                <span className="flex h-11 w-16 items-center justify-center rounded-2xl bg-ink text-surface shadow-sm active:scale-95">
-                  <Plus size={24} strokeWidth={2.5} aria-hidden />
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-ink text-surface shadow-sm transition-transform duration-150 active:scale-90">
+                  <Plus size={22} strokeWidth={2.5} aria-hidden />
                 </span>
               </Link>
             ) : (
             <TabLink key={tab.href} tab={tab} pathname={pathname}>
                 {tab.label === 'Messages' && unreadMessages > 0 && (
                   <span
-                    className="ml-1 rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] text-white"
+                    className="absolute left-1/2 top-1 ml-1.5 rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] leading-none text-white"
                     aria-label={`${unreadMessages} unread conversations`}
                   >
                     {unreadMessages > 99 ? '99+' : unreadMessages}
@@ -213,7 +228,7 @@ function Portal({ children }: { children: ReactNode }) {
                 )}
                 {tab.href === LAST_TAB_HREF.profile && !!requests.data?.count && (
                   <span
-                    className="ml-1 rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] text-white"
+                    className="absolute left-1/2 top-1 ml-1.5 rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] leading-none text-white"
                     aria-label={`${requests.data.count} pending friend requests`}
                   >
                     {requests.data.count}
@@ -372,15 +387,19 @@ function TabLink({
       }}
       aria-current={active ? 'page' : undefined}
       className={clsx(
-        'flex min-h-16 flex-1 flex-col items-center justify-center gap-1 text-xs',
-        active ? 'text-accent' : 'text-ink-muted',
+        'group relative z-10 flex min-h-[3.25rem] flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors duration-200',
+        active ? 'text-ink' : 'text-ink-muted',
       )}
     >
-      <Icon size={21} aria-hidden />
-      <span>
-        {label}
-        {children}
-      </span>
+      {/* The icon dips under the finger and springs back, as a native tab does. */}
+      <Icon
+        size={21}
+        strokeWidth={active ? 2.4 : 2}
+        aria-hidden
+        className="transition-transform duration-200 ease-[cubic-bezier(0.3,1.6,0.5,1)] group-active:scale-[0.82]"
+      />
+      <span>{label}</span>
+      {children}
     </Link>
   );
 }
