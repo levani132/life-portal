@@ -14,9 +14,13 @@ calls Render directly and keeps tokens as before.
 |---|---|
 | Web origin | `https://life-portal-tan.vercel.app` |
 | API origin | `https://life-portal.onrender.com` |
-| Where Vercel forwards `/api` | `https://life-portal.onrender.com/api` (in `vercel.json`) |
+| Where Vercel forwards `/api` | `https://life-portal.onrender.com/api` (in `apps/web/vercel.json`) |
+| Vercel Root Directory | `apps/web` |
 
-If the API's origin changes, edit `dest` in both `vercel.json` and `apps/web/vercel.json`.
+Vercel reads `vercel.json` only from the project's **Root Directory**, which is `apps/web` here, so
+the route that counts is `apps/web/vercel.json`. The repo-root `vercel.json` has the same route for
+a project rooted at the repository; a test keeps the two identical. If the API's origin changes,
+edit `dest` in both.
 
 ## 1. A shared secret
 
@@ -56,13 +60,23 @@ Then **redeploy**. `NEXT_PUBLIC_*` values are baked in at build time, so a redep
 
 ## 4. Check it
 
-1. Open `https://life-portal-tan.vercel.app/api/health`. It should say `"proxied": true`.
-   - `false` means the request reached the API without the secret. The two values differ, or
-     `LP_PROXY_SECRET` is missing on Vercel (it is then sent as the literal text
-     `$LP_PROXY_SECRET`).
-   - **The app's sign-in page (or its "not found" page) means the route is not active**: Vercel
-     handed `/api/health` to the web app, which has no such page. Signing in then fails with
-     "Request failed". See "If `/api` shows the app" below.
+1. Open `https://life-portal-tan.vercel.app/api/health`. It should say `"proxied": true` and
+   `"proxy": "ok"`. Otherwise `proxy` names the step that failed, never a value:
+   - `unconfigured`: Render has no `WEB_PROXY_SECRET` (or the API has not restarted since).
+   - `no-header`: the request arrived without `x-lp-proxy`; the route's header transform did not
+     run.
+   - `unsubstituted`: Vercel sent the literal `$LP_PROXY_SECRET`, so the variable is missing for
+     this environment, or the deployment predates it. Redeploy after setting it.
+   - `mismatch`: both sides have a secret, but the values differ. Paste the same value into both,
+     with no trailing space or newline.
+   - `no-ip`: the secret matched but no visitor address was found: neither a valid `x-real-ip`
+     nor an `x-forwarded-for` entry before the `TRUST_PROXY_HOPS` trusted hops. Render's front
+     proxy rewrites `x-real-ip`, so on Render the address comes from `x-forwarded-for`; if Render
+     adds another hop, raise `TRUST_PROXY_HOPS` to match.
+   - The app's own page (the sign-in screen, or a page that says it was not found) means the
+     route is not active and Next.js answered instead: `vercel.json` is not in the project's Root
+     Directory (Settings → Build and Deployment), or the deployment predates it. Sign-in then
+     says "Request failed".
 2. Reload the app. You should still be signed in: the first refresh moves your stored session
    into the cookie.
 3. In the browser's developer tools:

@@ -120,6 +120,10 @@ describe('the web app proxy proof', () => {
     expect((await health({ 'x-lp-proxy': SECRET, 'x-real-ip': '203.0.113.9' })).body['proxied']).toBe(true);
     expect((await health({ 'x-lp-proxy': 'nope', 'x-real-ip': '203.0.113.9' })).body['proxied']).toBe(false);
     expect((await health({})).body['proxied']).toBe(false);
+    // Which step failed, without any value (issue #29's production diagnosis).
+    expect((await health({ 'x-lp-proxy': 'nope', 'x-real-ip': '203.0.113.9' })).body['proxy']).toBe('mismatch');
+    expect((await health({ 'x-lp-proxy': SECRET })).body['proxy']).toBe('no-ip');
+    expect((await health({})).body['proxy']).toBe('no-header');
   });
 
   it('gives each visitor their own sign-in limit, by the address Vercel saw', async () => {

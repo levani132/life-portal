@@ -113,9 +113,9 @@ first-party. A cookie on `onrender.com` would be third-party to `vercel.app`: ne
 addresses, which would put everyone in one per-IP sign-in limit. The rewrite adds `x-lp-proxy`
 with a shared secret (`LP_PROXY_SECRET` on Vercel, `WEB_PROXY_SECRET` on the API). Only with the
 right secret does the API take the visitor's address from Vercel's `x-real-ip`
-(`app/web-proxy.ts`). Anything else, including direct calls to Render, keeps the `trust proxy`
+(`app/web-proxy.ts`). The visitor is `x-real-ip` when it is an address, otherwise the `x-forwarded-for` entry just before the `TRUST_PROXY_HOPS` trusted hops: Render's front proxy rewrites `x-real-ip` but appends to `x-forwarded-for`, which Vercel overwrites on the way in. Anything else, including direct calls to Render, keeps the `trust proxy`
 address, so a direct caller still cannot pick its own IP. `GET /api/health` reports
-`proxied: true` for a request that proved itself. Setup: `docs/runbooks/web-api-proxy.md`.
+`proxied: true` for a request that proved itself. `proxy` names the step a request reached (`ok`, `unconfigured`, `no-header`, `unsubstituted`, `mismatch`, `no-ip`), never a value. Setup: `docs/runbooks/web-api-proxy.md`.
 
 Clients outside the browser keep the Render URL: Settings → MCP and the Shortcut ingest page show
 `NEXT_PUBLIC_API_PUBLIC_URL` (`externalApiUrl()`), and link previews read `API_INTERNAL_URL`

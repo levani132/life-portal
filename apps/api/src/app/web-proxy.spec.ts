@@ -1,4 +1,4 @@
-import { PROXY_HEADER, proxiedClientIp, webProxyMiddleware, type ProxiedRequest } from './web-proxy';
+import { PROXY_HEADER, checkProxy, proxiedClientIp, webProxyMiddleware, type ProxiedRequest } from './web-proxy';
 
 const SECRET = 'a'.repeat(40);
 
@@ -38,3 +38,50 @@ describe('the web app proxy proof (#29)', () => {
     expect(req.headers[PROXY_HEADER]).toBeUndefined();
   });
 });
+
+describe('what /api/health says about the proxy (#29)', () => {
+  const ip = { 'x-real-ip': '203.0.113.7' };
+  it.each([
+    ['unconfigured', { [PROXY_HEADER]: SECRET, ...ip }, undefined],
+    ['no-header', { ...ip }, SECRET],
+    ['unsubstituted', { [PROXY_HEADER]: '$LP_PROXY_SECRET', ...ip }, SECRET],
+    ['mismatch', { [PROXY_HEADER]: 'b'.repeat(40), ...ip }, SECRET],
+    ['no-ip', { [PROXY_HEADER]: SECRET }, SECRET],
+    ['ok', { [PROXY_HEADER]: SECRET, ...ip }, SECRET],
+  ] as const)('%s', (expected, headers, secret) => {
+    expect(checkProxy(headers, secret).check).toBe(expected);
+  });
+
+  it('records the step on the request without keeping the secret', () => {
+    const req = { headers: { [PROXY_HEADER]: 'b'.repeat(40) }, ip: '76.76.21.21' } as unknown as ProxiedRequest;
+    webProxyMiddleware(SECRET)(req, {} as never, jest.fn());
+    expect(req.proxyCheck).toBe('mismatch');
+    expect(req.viaWebProxy).toBeUndefined();
+    expect(JSON.stringify(req)).not.toContain('b'.repeat(40));
+  });
+});
+
+describe('the visitor address behind Render (#29)', () => {
+  const proof = { [PROXY_HEADER]: SECRET };
+
+  it('falls back to the forwarded entry Vercel wrote when x-real-ip is gone', () => {
+    // visitor (by Vercel), Vercel's egress (appended by Render's front proxy): one trusted hop.
+    expect(proxiedClientIp({ ...proof, 'x-forwarded-for': '203.0.113.7, 76.76.21.21' }, SECRET, 1)).toBe('203.0.113.7');
+    expect(proxiedClientIp({ ...proof, 'x-forwarded-for': '203.0.113.7, 10.0.0.1, 76.76.21.21' }, SECRET, 2)).toBe('203.0.113.7');
+  });
+
+  it('prefers a valid x-real-ip', () => {
+    expect(proxiedClientIp({ ...proof, 'x-real-ip': '198.51.100.4', 'x-forwarded-for': '203.0.113.7, 76.76.21.21' }, SECRET, 1)).toBe('198.51.100.4');
+  });
+
+  it('finds no address when there is no entry before the trusted hops, or it is not an IP', () => {
+    expect(checkProxy({ ...proof, 'x-forwarded-for': '76.76.21.21' }, SECRET, 1).check).toBe('no-ip');
+    expect(checkProxy({ ...proof, 'x-forwarded-for': 'garbage, 76.76.21.21' }, SECRET, 1).check).toBe('no-ip');
+  });
+
+  it('never reads x-forwarded-for without the right secret', () => {
+    expect(proxiedClientIp({ [PROXY_HEADER]: 'b'.repeat(40), 'x-forwarded-for': '203.0.113.7, 76.76.21.21' }, SECRET, 1)).toBeUndefined();
+    expect(proxiedClientIp({ 'x-forwarded-for': '203.0.113.7, 76.76.21.21' }, SECRET, 1)).toBeUndefined();
+  });
+});
+

@@ -12,7 +12,9 @@
             "key": "x-lp-proxy"
           },
           "args": "$LP_PROXY_SECRET",
-          "env": ["LP_PROXY_SECRET"]
+          "env": [
+            "LP_PROXY_SECRET"
+          ]
         }
       ]
     }
