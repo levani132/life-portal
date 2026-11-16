@@ -14,9 +14,13 @@ calls Render directly and keeps tokens as before.
 |---|---|
 | Web origin | `https://life-portal-tan.vercel.app` |
 | API origin | `https://life-portal.onrender.com` |
-| Where Vercel forwards `/api` | `https://life-portal.onrender.com/api` (in `vercel.json`) |
+| Where Vercel forwards `/api` | `https://life-portal.onrender.com/api` (in `apps/web/vercel.json`) |
+| Vercel Root Directory | `apps/web` |
 
-If the API's origin changes, edit `dest` in `vercel.json` too.
+Vercel reads `vercel.json` only from the project's **Root Directory**, which is `apps/web` here, so
+the route that counts is `apps/web/vercel.json`. The repo-root `vercel.json` has the same route for
+a project rooted at the repository; a test keeps the two identical. If the API's origin changes,
+edit `dest` in both.
 
 ## 1. A shared secret
 
@@ -60,7 +64,10 @@ Then **redeploy**. `NEXT_PUBLIC_*` values are baked in at build time, so a redep
    - `false` means the request reached the API without the secret. The two values differ, or
      `LP_PROXY_SECRET` is missing on Vercel (it is then sent as the literal text
      `$LP_PROXY_SECRET`).
-   - A Vercel 404 page means the `vercel.json` route is not active.
+   - The app's own page (the sign-in screen, or a page that says it was not found) means the
+     route is not active and Next.js answered instead: `vercel.json` is not in the project's Root
+     Directory (Settings → Build and Deployment), or the deployment predates it. Sign-in then
+     says "Request failed".
 2. Reload the app. You should still be signed in: the first refresh moves your stored session
    into the cookie.
 3. In the browser's developer tools:

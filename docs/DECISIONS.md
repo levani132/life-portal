@@ -2376,3 +2376,17 @@ storage origin comes from `NEXT_PUBLIC_STORAGE_ORIGIN` and is accepted only as a
 it. There is no report endpoint: reports carry URLs, and a blocked URL can be a signed storage
 link, so violations are read in the browser console instead.
 
+## 2026-11-16 · The `/api` route lives in `apps/web/vercel.json` (issue #29)
+
+**What happened:** with `NEXT_PUBLIC_API_URL=/api` live, `/api/health` on Vercel rendered the
+app's not-found page (`x-matched-path: /_not-found`) and sign-in said "Request failed". The route
+in the repo-root `vercel.json` was valid against Vercel's schema but never applied: Vercel reads
+`vercel.json` only from the project's Root Directory, and this project's is `apps/web` (that is
+why `outputDirectory` `.next` works, while Nx writes the build to `apps/web/.next`).
+
+**Decision:** the route is in `apps/web/vercel.json`, which holds only `routes` so the build stays
+under the project settings. The repo-root file keeps the same route for a project rooted at the
+repository; exactly one of them is read, and `apps/web/src/lib/vercel-config.spec.ts` fails if they
+differ. The CSP proxy (`apps/web/src/proxy.ts`) never matches `/api`, so nothing in Next sits in
+front of the route.
+

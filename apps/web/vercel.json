@@ -1,0 +1,22 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "routes": [
+    {
+      "src": "^/api/(.*)$",
+      "dest": "https://life-portal.onrender.com/api/$1",
+      "transforms": [
+        {
+          "type": "request.headers",
+          "op": "set",
+          "target": {
+            "key": "x-lp-proxy"
+          },
+          "args": "$LP_PROXY_SECRET",
+          "env": [
+            "LP_PROXY_SECRET"
+          ]
+        }
+      ]
+    }
+  ]
+}
