@@ -27,21 +27,37 @@ const same = (a: string, b: string) => {
  */
 export type ProxyCheck = 'ok' | 'unconfigured' | 'no-header' | 'unsubstituted' | 'mismatch' | 'no-ip';
 
-export function checkProxy(headers: Request['headers'], secret: string | undefined): { check: ProxyCheck; ip?: string } {
+/**
+ * The visitor's address as Vercel wrote it. `x-real-ip` when it is an address; otherwise the
+ * `x-forwarded-for` entry just before the `hops` that `trust proxy` already accounts for. Render's
+ * own front proxy rewrites `x-real-ip` (production answered `no-ip` with the right secret), but it
+ * appends to `x-forwarded-for`, where Vercel's entry (Vercel overwrites the header on the way in,
+ * so the visitor cannot plant one) sits one place before Vercel's own address.
+ */
+function vercelVisitor(headers: Request['headers'], hops: number): string | undefined {
+  const real = headers['x-real-ip'];
+  const ip = typeof real === 'string' ? real.trim() : '';
+  if (isIP(ip)) return ip;
+  const forwarded = headers['x-forwarded-for'];
+  const list = (Array.isArray(forwarded) ? forwarded.join(',') : forwarded ?? '').split(',').map((part) => part.trim()).filter(Boolean);
+  const entry = list[list.length - hops - 1];
+  return entry && isIP(entry) ? entry : undefined;
+}
+
+export function checkProxy(headers: Request['headers'], secret: string | undefined, hops = 1): { check: ProxyCheck; ip?: string } {
   if (!secret) return { check: 'unconfigured' };
   const proof = headers[PROXY_HEADER];
   if (typeof proof !== 'string' || proof === '') return { check: 'no-header' };
   // Vercel sends a variable it does not have as its literal name.
   if (proof.startsWith('$')) return { check: 'unsubstituted' };
   if (!same(proof, secret)) return { check: 'mismatch' };
-  const real = headers['x-real-ip'];
-  const ip = typeof real === 'string' ? real.trim() : '';
-  return isIP(ip) ? { check: 'ok', ip } : { check: 'no-ip' };
+  const ip = vercelVisitor(headers, hops);
+  return ip ? { check: 'ok', ip } : { check: 'no-ip' };
 }
 
 /** The visitor's address when the request provably came through the web app's proxy. */
-export function proxiedClientIp(headers: Request['headers'], secret: string | undefined): string | undefined {
-  return checkProxy(headers, secret).ip;
+export function proxiedClientIp(headers: Request['headers'], secret: string | undefined, hops = 1): string | undefined {
+  return checkProxy(headers, secret, hops).ip;
 }
 
 /** Marks a request that came through the web app's proxy. */
@@ -50,9 +66,9 @@ export interface ProxiedRequest extends Request {
   proxyCheck?: ProxyCheck;
 }
 
-export function webProxyMiddleware(secret: string | undefined) {
+export function webProxyMiddleware(secret: string | undefined, hops = 1) {
   return (req: ProxiedRequest, _res: Response, next: NextFunction) => {
-    const { check, ip } = checkProxy(req.headers, secret);
+    const { check, ip } = checkProxy(req.headers, secret, hops);
     req.proxyCheck = check;
     // The secret is never visible past this point, whatever it held.
     delete req.headers[PROXY_HEADER];

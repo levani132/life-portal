@@ -2390,3 +2390,10 @@ repository; exactly one of them is read, and `apps/web/src/lib/vercel-config.spe
 differ. The CSP proxy (`apps/web/src/proxy.ts`) never matches `/api`, so nothing in Next sits in
 front of the route.
 
+**Follow-up, the same day:** with the route live, `/api/health` answered `proxy: no-ip`: the secret
+matched, but Render's front proxy had replaced `x-real-ip`, so every visitor still looked like
+Vercel. A proven request now takes the visitor from `x-forwarded-for`, the entry just before the
+trusted hops (Vercel overwrites that header on the way in, so a visitor cannot plant it; Render
+appends Vercel's address after it). Without the proof, `x-forwarded-for` beyond `trust proxy` is
+still never read.
+

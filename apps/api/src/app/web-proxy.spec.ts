@@ -60,3 +60,28 @@ describe('what /api/health says about the proxy (#29)', () => {
     expect(JSON.stringify(req)).not.toContain('b'.repeat(40));
   });
 });
+
+describe('the visitor address behind Render (#29)', () => {
+  const proof = { [PROXY_HEADER]: SECRET };
+
+  it('falls back to the forwarded entry Vercel wrote when x-real-ip is gone', () => {
+    // visitor (by Vercel), Vercel's egress (appended by Render's front proxy): one trusted hop.
+    expect(proxiedClientIp({ ...proof, 'x-forwarded-for': '203.0.113.7, 76.76.21.21' }, SECRET, 1)).toBe('203.0.113.7');
+    expect(proxiedClientIp({ ...proof, 'x-forwarded-for': '203.0.113.7, 10.0.0.1, 76.76.21.21' }, SECRET, 2)).toBe('203.0.113.7');
+  });
+
+  it('prefers a valid x-real-ip', () => {
+    expect(proxiedClientIp({ ...proof, 'x-real-ip': '198.51.100.4', 'x-forwarded-for': '203.0.113.7, 76.76.21.21' }, SECRET, 1)).toBe('198.51.100.4');
+  });
+
+  it('finds no address when there is no entry before the trusted hops, or it is not an IP', () => {
+    expect(checkProxy({ ...proof, 'x-forwarded-for': '76.76.21.21' }, SECRET, 1).check).toBe('no-ip');
+    expect(checkProxy({ ...proof, 'x-forwarded-for': 'garbage, 76.76.21.21' }, SECRET, 1).check).toBe('no-ip');
+  });
+
+  it('never reads x-forwarded-for without the right secret', () => {
+    expect(proxiedClientIp({ [PROXY_HEADER]: 'b'.repeat(40), 'x-forwarded-for': '203.0.113.7, 76.76.21.21' }, SECRET, 1)).toBeUndefined();
+    expect(proxiedClientIp({ 'x-forwarded-for': '203.0.113.7, 76.76.21.21' }, SECRET, 1)).toBeUndefined();
+  });
+});
+

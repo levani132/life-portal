@@ -19,7 +19,7 @@ export function configureApp(app: NestExpressApplication, config: AppConfig): vo
   // more hops than really exist, or a client could choose its own IP.
   if (config.trustProxyHops > 0) app.getHttpAdapter().getInstance().set('trust proxy', config.trustProxyHops);
   // Issue #29: requests through the web app's own `/api` carry a proof and the visitor's address.
-  app.use(webProxyMiddleware(config.webProxySecret));
+  app.use(webProxyMiddleware(config.webProxySecret, config.trustProxyHops));
   const oauth = app.get(McpOAuthService);
   if (oauth.enabled) app.use(oauth.router());
 
