@@ -2314,7 +2314,8 @@ a translucent, slightly lit surface with a bright top edge and a hairline border
 inset light only, because the strip clips exactly at the cards' edges). The strip has 4 px
 gutters on a phone and clips with the cards' own radius, so a card leaving it is cut on a curve.
 Where a card is cut by an edge, its outline is closed there by a line in the card's border colour
-that follows that curve, with a short fade, so the card reads as sliding behind glass. The wall
+that follows that curve, so the card reads as sliding behind glass (the line only: a fade behind
+it was tried and dropped, it read as a shadow on the card). The wall
 shows only while a card actually crosses that edge: never over the gap between two cards, never at
 the start or end of the strip, and with no fade-out, because a lingering line over empty space is
 exactly what was asked not to happen. This is the one thing scrolling drives: `cutEdges()` (pure,

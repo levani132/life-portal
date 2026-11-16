@@ -33,7 +33,7 @@ function snapAlign(index: number, count: number): 'start' | 'center' | 'end' {
  * was the thing people noticed. See docs/DECISIONS.md.
  *
  * The strip's two edges are "walls": the strip clips with rounded corners, and where a card is
- * cut by an edge its outline is closed there by a rounded line with a short fade, so the card
+ * cut by an edge its outline is closed there by a rounded line, so the card
  * reads as sliding behind glass. A wall shows only while a card is
  * actually crossing it, never over the gap between cards or at either end of the strip. That is
  * the one thing scrolling drives, and it is two attributes written straight to the DOM (no React

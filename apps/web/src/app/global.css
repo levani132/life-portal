@@ -362,8 +362,8 @@
 /*
  * The walls. Where a card is cut by an edge (`data-cut-*`, written by the carousel as it
  * scrolls), its outline is closed there: a line in the card's own border colour that follows the
- * strip's rounded corners, with a short fade behind it, so the card reads as sliding behind
- * glass. No transition: over the gap between two cards, or at either end of the strip, there
+ * strip's rounded corners, so the card reads as sliding behind glass. The line only: a fade
+ * behind it was tried and read as a shadow on the card. No transition: over the gap between two cards, or at either end of the strip, there
  * must be no line at all, not a fading one.
  */
 .widget-wall {
@@ -379,13 +379,11 @@
   left: 0;
   border-left-width: 1px;
   border-radius: 1rem 0 0 1rem;
-  background: linear-gradient(to right, rgb(var(--surface) / 0.55), transparent);
 }
 .widget-wall-right {
   right: 0;
   border-right-width: 1px;
   border-radius: 0 1rem 1rem 0;
-  background: linear-gradient(to left, rgb(var(--surface) / 0.55), transparent);
 }
 .widget-carousel-walls[data-cut-left] .widget-wall-left,
 .widget-carousel-walls[data-cut-right] .widget-wall-right {
