@@ -2309,6 +2309,15 @@ snapping do all the moving (`widget-carousel.tsx` has no layout code; widths are
 **Snap points: first card left, last card right, the rest centred**, so a middle card shows a
 slice of both neighbours and the ends never leave an empty gutter.
 
+**The edges are walls (owner request, 2026-11-17).** The strip has 4 px gutters on a phone and a
+straight cut at each edge (no rounded clip). Where a card is cut by an edge, a hairline and a
+short fade are drawn there, so the card reads as sliding behind glass. The wall shows only while
+a card actually crosses that edge: never over the gap between two cards, never at the start or
+end of the strip, and with no fade-out, because a lingering line over empty space is exactly what
+was asked not to happen. This is the one thing scrolling drives: `cutEdges()` (pure, tested) and
+two attributes written straight to the DOM, with no React state and no layout change, so the
+"plain pager" rule above still holds.
+
 **Still opens on Food** wherever it sits in the order, as spec 008 asked. Long-press to arrange
 is unchanged. Dragging the strip with a mouse was dropped with the rest: dots, arrow keys and a
 trackpad cover desktop.

@@ -2,6 +2,19 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-17: A more colourful Food page, and Home widgets that slide behind glass
+
+- **The Food page has the look of Training.** The day opens with a colourful card showing what's
+  left to eat, calories, protein and how many items are logged, with the day arrows on it.
+- **Each meal has its own colour and icon**: breakfast, lunch, dinner, snacks and anything else.
+  Its calories and macros sit in the header, and each food is a row with icon buttons to share,
+  edit and remove.
+- **Today, Foods and You are a tab strip with icons**, with the AI assistant and Log food at its
+  end, on screen in every view.
+- **Home's widgets have a little more room at the sides**, and a card that runs off the edge
+  now looks like it slides behind glass: a thin line and a soft fade appear only where a card is
+  actually cut, never over the gap between cards or at either end.
+
 ## 2026-11-16: A security policy for the web app, watching only for now
 
 - **Every page now declares which scripts and servers it may use** (a Content-Security-Policy).

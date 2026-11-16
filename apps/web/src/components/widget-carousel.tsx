@@ -27,7 +27,20 @@ function snapAlign(index: number, count: number): 'start' | 'center' | 'end' {
  * is deliberately no scroll-driven layout here: an earlier version resized the cards under the
  * finger and swapped their content once the strip came to rest, and that wait after every swipe
  * was the thing people noticed. See docs/DECISIONS.md.
+ *
+ * The strip's two edges are "walls": where a card is cut by an edge, a thin line and a short fade
+ * are drawn there, so the card reads as sliding behind glass. A wall shows only while a card is
+ * actually crossing it, never over the gap between cards or at either end of the strip. That is
+ * the one thing scrolling drives, and it is two attributes written straight to the DOM (no React
+ * state, no layout change).
  */
+
+/** Which edges of a `width`-wide view a card at `left`..`left + size` is cut by. */
+export function cutEdges(cards: readonly { left: number; size: number }[], width: number): { left: boolean; right: boolean } {
+  const crosses = (edge: number) => cards.some((card) => card.left < edge - 0.5 && card.left + card.size > edge + 0.5);
+  return { left: crosses(0), right: crosses(width) };
+}
+
 export function WidgetCarousel({
   cards,
   editing,
@@ -37,6 +50,7 @@ export function WidgetCarousel({
   children,
 }: Props) {
   const viewport = useRef<HTMLDivElement>(null);
+  const walls = useRef<HTMLDivElement>(null);
   // Home opens on Food wherever the person has put it (spec 008); after that the strip stays
   // where it was left.
   const [active, setActive] = useState(() =>
@@ -76,6 +90,18 @@ export function WidgetCarousel({
     });
   };
 
+  /** Shows a wall exactly where a card is cut by that edge. */
+  const markWalls = () => {
+    const view = viewport.current;
+    if (!view || !walls.current) return;
+    const cut = cutEdges(
+      slots().map((el) => ({ left: el.offsetLeft - view.scrollLeft, size: el.offsetWidth })),
+      view.clientWidth,
+    );
+    walls.current.toggleAttribute('data-cut-left', cut.left);
+    walls.current.toggleAttribute('data-cut-right', cut.right);
+  };
+
   // The dot is already right from the first render; this only moves the strip under it.
   const opened = useRef(false);
   useLayoutEffect(() => {
@@ -83,18 +109,29 @@ export function WidgetCarousel({
     opened.current = true;
     if (active > 0) go(active, true);
   });
+  // After every render (cards added, reordered, resized) and when the strip itself resizes.
+  useLayoutEffect(markWalls);
+  useEffect(() => {
+    const view = viewport.current;
+    if (!view || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(markWalls);
+    observer.observe(view);
+    return () => observer.disconnect();
+    // Once: `markWalls` reads refs only.
+  }, []);
 
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
   if (!count) return null;
   const current = Math.min(active, count - 1);
-  // On phones the strip runs almost edge to edge (2px gutters), like the feed below it.
+  // On phones the strip runs almost edge to edge (4px gutters), like the feed below it.
   return (
     <section
       aria-label="Home widgets"
       aria-roledescription="carousel"
-      className="-mx-3.5 sm:mx-0"
+      className="-mx-3 sm:mx-0"
     >
+      <div ref={walls} className="widget-carousel-walls relative">
       <div
         ref={viewport}
         className="widget-carousel-viewport relative overflow-x-auto"
@@ -102,6 +139,7 @@ export function WidgetCarousel({
         tabIndex={editing ? -1 : 0}
         aria-label={`${cards[current]?.title} selected. Scroll or use left and right arrow keys to browse widgets.`}
         onScroll={() => {
+          markWalls();
           cancelAnimationFrame(frame.current);
           frame.current = requestAnimationFrame(() => {
             const view = viewport.current;
@@ -144,6 +182,9 @@ export function WidgetCarousel({
         >
           {(card, state) => children(card, state)}
         </SortableGrid>
+      </div>
+      <span aria-hidden className="widget-wall widget-wall-left" />
+      <span aria-hidden className="widget-wall widget-wall-right" />
       </div>
       {count > 1 && (
         <div className="flex h-7 items-center justify-center">

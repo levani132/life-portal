@@ -366,6 +366,25 @@ food photos yet.
 because the new post page creates an archived food for a post that is not saved to the list. The
 database kind still publishes only live foods.
 
+## Web: the look of the Today view
+
+The Food page shares Training's visual language (owner request, 2026-11-17). Display only; nothing
+here is stored or changes a figure.
+
+- **Tab strip** (`app/nutrition/page.tsx`): Today, Foods and You with icons, in the same rounded
+  strip as Training's tabs, followed by two trailing cells: the AI assistant link and **Log food**
+  (the accent cell, on screen in every view).
+- **`FoodHero`** (`components/food-day.tsx`) opens Today: the day on a gradient with the day
+  arrows, "Today" and Share, a headline (kcal left, over, or eaten when there is no target) and
+  three figures (kcal, protein, items logged). It reads the same `dayTotals` and `targets` as the
+  rings below it.
+- **A meal's colour and icon come from its slot** (`SLOT_STYLES`): breakfast, lunch, dinner,
+  snacks, anything else. The hues are Training's `train-*` tokens, the theme-aware set. Each meal
+  is a card with that colour on its left edge and icon; its header carries the kcal and
+  `MacroLine` (P, C, F in the one macro palette, `lib/macro-colors.ts`); each entry is a row with
+  icon buttons for share, edit and remove. Suggestions take the meal's tint.
+- **Macro tiles** are tinted with their own macro colour.
+
 ## Offline (spec 029, issue #18)
 
 Built on `docs/modules/offline.md`. `lib/nutrition-offline.ts` turns logging, correcting and

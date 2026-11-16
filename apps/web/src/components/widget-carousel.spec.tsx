@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { WidgetCard } from '@life-portal/shared-types';
-import { WidgetCarousel } from './widget-carousel';
+import { WidgetCarousel, cutEdges } from './widget-carousel';
 
 const scrollTo = jest.fn();
 const VIEW = 360;
@@ -166,4 +166,28 @@ it('retains the long-press shortcut to arrangement mode', () => {
   });
   expect(onEditingChange).toHaveBeenCalledWith(true);
   jest.useRealTimers();
+});
+
+describe('the strip\'s walls', () => {
+  const at = (scroll: number) => cutEdges([0, 1, 2].map((index) => ({ left: index * (CARD + GAP) - scroll, size: CARD })), VIEW);
+
+  it('shows a wall only where a card is cut, never at an end of the strip or over a gap', () => {
+    // At rest on the first card: nothing is cut on the left, the next card is cut on the right.
+    expect(at(0)).toEqual({ left: false, right: true });
+    // Mid-strip: a card on both sides.
+    expect(at(CARD / 2)).toEqual({ left: true, right: true });
+    // The gap between the first and second card sits on the left edge: no wall there.
+    expect(at(CARD + GAP / 2).left).toBe(false);
+    // The gap between the second and third card sits on the right edge: no wall there.
+    expect(at(CARD + GAP / 2 + CARD + GAP - VIEW).right).toBe(false);
+    // Scrolled to the very end: nothing is cut on the right.
+    expect(at(3 * CARD + 2 * GAP - VIEW)).toEqual({ left: true, right: false });
+  });
+
+  it('marks the walls on the strip as it renders', () => {
+    mount();
+    const walls = viewport().parentElement as HTMLElement;
+    expect(walls.hasAttribute('data-cut-right')).toBe(true);
+    expect(walls.hasAttribute('data-cut-left')).toBe(false);
+  });
 });

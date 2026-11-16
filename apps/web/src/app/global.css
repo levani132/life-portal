@@ -355,8 +355,53 @@
   touch-action: pan-x pan-y pinch-zoom;
   scrollbar-width: none;
   overscroll-behavior-x: contain;
-  border-radius: 1rem;
+  /* A straight cut, not a rounded one: a card leaving the strip slides behind a wall. */
   container-type: inline-size;
+}
+/*
+ * The walls: a hairline and a short fade at an edge, shown only while a card is cut by it
+ * (`data-cut-*`, written by the carousel as it scrolls). No transition: over the gap between two
+ * cards, or at either end of the strip, there must be no line at all, not a fading one.
+ */
+.widget-wall {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  pointer-events: none;
+  opacity: 0;
+}
+.widget-wall::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgb(var(--ink) / 0.3) 16%,
+    rgb(var(--ink) / 0.3) 84%,
+    transparent
+  );
+}
+.widget-wall-left {
+  left: 0;
+  background: linear-gradient(to right, rgb(var(--surface) / 0.75), transparent);
+}
+.widget-wall-left::after {
+  left: 0;
+}
+.widget-wall-right {
+  right: 0;
+  background: linear-gradient(to left, rgb(var(--surface) / 0.75), transparent);
+}
+.widget-wall-right::after {
+  right: 0;
+}
+.widget-carousel-walls[data-cut-left] .widget-wall-left,
+.widget-carousel-walls[data-cut-right] .widget-wall-right {
+  opacity: 1;
 }
 .widget-carousel-viewport::-webkit-scrollbar {
   display: none;

@@ -5,7 +5,7 @@ import { MACRO_COLORS } from '../../lib/macro-colors';
 import { useIsIOS } from '../../lib/ios-device';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { BookmarkPlus, Bot, Info, Plus, Search, Share2 } from 'lucide-react';
+import { Apple, BookmarkPlus, Bot, Info, Pencil, Plus, Search, Share2, Sparkles, UserRound, Utensils, X, Zap, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type {
   PortalState,
@@ -23,7 +23,6 @@ import type {
   TargetFigure,
 } from '@life-portal/shared-types';
 import {
-  addDays,
   figureValue,
   formatDay,
   GOAL_PLAN,
@@ -34,6 +33,7 @@ import {
 import { AppShell } from '../../components/app-shell';
 import { CheatQueue } from '../../components/cheat-queue';
 import { FoodCard } from '../../components/food-card';
+import { FoodHero, MacroLine, SLOT_STYLES } from '../../components/food-day';
 import { FoodForm } from '../../components/food-form';
 import { FoodPicker } from '../../components/food-picker';
 import { LogFoodModal } from '../../components/log-food-modal';
@@ -89,6 +89,11 @@ const MISSING_INPUT_LABELS: Record<string, string> = {
 };
 
 type Tab = 'today' | 'foods' | 'you';
+const TABS: readonly { id: Tab; label: string; icon: LucideIcon }[] = [
+  { id: 'today', label: 'Today', icon: Utensils },
+  { id: 'foods', label: 'Foods', icon: Apple },
+  { id: 'you', label: 'You', icon: UserRound },
+];
 
 export default function NutritionPage() {
   return (
@@ -154,56 +159,50 @@ function Nutrition() {
 
   return (
     <>
-      <header className="mb-3 space-y-3">
-        <div
-          className="flex items-center gap-1.5 overflow-x-auto pb-1"
-          aria-label="Food controls"
-        >
-          <div
-            className="flex h-10 shrink-0 items-center rounded-lg border border-border p-0.5 text-xs"
-            role="group"
-            aria-label="Food views"
-          >
-            {(['today', 'foods', 'you'] as Tab[]).map((option) => (
+      {/* The same strip as Training: the views as tabs, then the page's own actions as trailing
+          cells. Logging is the accent cell, on screen in every view. */}
+      <header
+        className="mb-4 flex items-stretch gap-1 rounded-2xl border border-border bg-surface-raised p-1 shadow-sm"
+        aria-label="Food controls"
+        data-no-tab-swipe
+      >
+        <div role="group" aria-label="Food views" className="grid min-w-0 flex-1 grid-cols-3 gap-1">
+          {TABS.map((option) => {
+            const Icon = option.icon;
+            const selected = tab === option.id;
+            return (
               <button
-                key={option}
+                key={option.id}
                 type="button"
-                onClick={() => setTab(option)}
-                aria-pressed={tab === option}
+                onClick={() => setTab(option.id)}
+                aria-pressed={selected}
                 className={clsx(
-                  'h-full rounded-md px-2',
-                  tab === option
-                    ? 'bg-surface-raised text-ink'
-                    : 'text-ink-muted hover:text-ink',
+                  'flex min-h-[3rem] flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-xs font-semibold transition-colors',
+                  selected ? 'bg-accent-solid text-on-accent shadow' : 'text-ink-muted hover:bg-surface hover:text-ink',
                 )}
               >
-                {option === 'today'
-                  ? 'Today'
-                  : option === 'foods'
-                    ? 'Foods'
-                    : 'You'}
+                <Icon className="h-4 w-4" aria-hidden />
+                <span className="truncate">{option.label}</span>
               </button>
-            ))}
-          </div>
-          <div className="flex-1" />
-          <Link
-            href="/settings/mcp"
-            className="flex h-10 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-ink-muted hover:text-ink"
-            aria-label="Connect AI assistant"
-            title="Connect AI assistant"
-          >
-            <Bot size={18} />
-          </Link>
-          <button
-            type="button"
-            className="flex h-10 shrink-0 items-center gap-1 rounded-lg bg-accent-solid px-2.5 text-xs font-medium text-on-accent hover:bg-accent-solid-hover"
-            onClick={() =>
-              setLogging({ slot: mealContextNow(dayStartHour).slot })
-            }
-          >
-            <Plus size={15} /> Log food
-          </button>
+            );
+          })}
         </div>
+        <Link
+          href="/settings/mcp"
+          className="flex min-h-[3rem] w-11 shrink-0 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-surface hover:text-ink"
+          aria-label="Connect AI assistant"
+          title="Connect AI assistant"
+        >
+          <Bot size={18} aria-hidden />
+        </Link>
+        <button
+          type="button"
+          className="flex min-h-[3rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl bg-gradient-to-br from-train-legs-solid to-train-core-solid px-3 text-xs font-semibold text-white shadow transition-opacity hover:opacity-90"
+          onClick={() => setLogging({ slot: mealContextNow(dayStartHour).slot })}
+        >
+          <Plus className="h-4 w-4" aria-hidden />
+          <span>Log food</span>
+        </button>
       </header>
 
       {canPost && recentEntry && (
@@ -224,11 +223,13 @@ function Nutrition() {
         </div>
       )}
       {tab === 'today' && (
-        <div className="space-y-3">
-          <DayNavigator
+        <div className="space-y-4">
+          <FoodHero
             day={day}
             today={today}
             onChange={setDay}
+            totals={dayTotals.totals}
+            targets={targets}
             entryCount={dayTotals.entryCount}
             onShare={
               canPost && dayTotals.entryCount > 0
@@ -250,7 +251,7 @@ function Nutrition() {
           )}
 
           <div className="grid gap-5 lg:grid-cols-3">
-            <div className="space-y-5 lg:col-span-2">
+            <div className="space-y-3 lg:col-span-2">
               {dayTotals.slots.map((slot) => (
                 <SlotSection
                   key={slot.slot}
@@ -337,73 +338,6 @@ function Nutrition() {
 
 // ------------------------------------------------------------------ today
 
-function DayNavigator({
-  day,
-  today,
-  onChange,
-  entryCount,
-  onShare,
-}: {
-  onShare?: () => void;
-  day: string;
-  today: string;
-  onChange: (day: string) => void;
-  entryCount: number;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          className="btn-ghost"
-          onClick={() => onChange(addDays(day, -1))}
-          aria-label="Previous day"
-        >
-          ←
-        </button>
-        <div className="text-center">
-          <p className="text-sm font-medium">{formatDay(day)}</p>
-          <p className="text-xs text-ink-faint">
-            {day === today ? 'today' : relativeDays(today, day)} ·{' '}
-            {entryCount === 0 ? 'nothing logged' : `${entryCount} logged`}
-          </p>
-        </div>
-        <button
-          type="button"
-          className="btn-ghost"
-          onClick={() => onChange(addDays(day, 1))}
-          disabled={day >= today}
-          aria-label="Next day"
-        >
-          →
-        </button>
-      </div>
-      <div className="flex shrink-0 items-center gap-1">
-        {onShare && (
-          <button
-            type="button"
-            className="flex h-10 w-10 items-center justify-center rounded-lg text-ink-muted hover:bg-surface-raised"
-            aria-label="Share this day"
-            title="Share this day"
-            onClick={onShare}
-          >
-            <Share2 size={17} />
-          </button>
-        )}
-        {day !== today && (
-          <button
-            type="button"
-            className="btn-ghost"
-            onClick={() => onChange(today)}
-          >
-            Today
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function MacroTiles({
   totals,
   targets,
@@ -453,11 +387,13 @@ function MacroTiles({
   const colors = [MACRO_COLORS.kcal, MACRO_COLORS.protein, MACRO_COLORS.carbs, MACRO_COLORS.fat];
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {tiles.map((tile, i) => (
           <div
             key={tile.label}
-            className="card bg-gradient-to-br from-violet-500/10 to-sky-500/5 p-4"
+            className="card p-4"
+            // Each tile carries its own macro's colour, from the one palette.
+            style={{ backgroundImage: `linear-gradient(135deg, ${colors[i]}24, transparent 70%)`, borderColor: `${colors[i]}47` }}
           >
             <NutritionRing
               metric={{
@@ -477,8 +413,13 @@ function MacroTiles({
       </div>
       {ios && (
         <>
-          <div className="card flex items-center justify-between gap-2 border-violet-400/30 bg-violet-500/10 px-3 py-2">
-            <span className="text-sm">⚡ Activity adjustment</span>
+          <div className="card flex items-center justify-between gap-2 border-train-arms/40 bg-train-arms/10 px-3 py-2">
+            <span className="flex items-center gap-2 text-sm font-medium">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-train-arms-solid text-white">
+                <Zap className="h-4 w-4" aria-hidden />
+              </span>
+              Activity adjustment
+            </span>
             <div className="flex items-center gap-2">
               <strong className="whitespace-nowrap text-sm">
                 {(targets.activity?.adjustmentKcal ?? 0) >= 0 ? '+' : ''}
@@ -487,7 +428,7 @@ function MacroTiles({
               <HealthSyncButton />
               <button
                 type="button"
-                className="flex h-10 w-10 items-center justify-center rounded-full text-violet-400 hover:bg-violet-500/10"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-train-arms hover:bg-train-arms/10"
                 aria-label="Activity adjustment and Apple Health details"
                 title="Activity and Apple Health details"
                 onClick={() => setHealthOpen(true)}
@@ -579,21 +520,38 @@ function SlotSection({
       }
     });
 
+  const { icon: SlotIcon, style } = SLOT_STYLES[slot.slot];
+  const label = SLOT_LABELS[slot.slot];
+  const action = 'flex h-10 w-9 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface hover:text-ink active:scale-95';
+  const rowAction = 'flex h-9 w-8 items-center justify-center rounded-lg text-ink-faint transition hover:bg-surface hover:text-ink';
+
   return (
-    <Panel
-      title={SLOT_LABELS[slot.slot]}
-      description={
-        slot.entries.length === 0
-          ? undefined
-          : `${slot.totals.energyKcal} kcal · P ${mgToG(slot.totals.proteinMg)}g · C ${mgToG(slot.totals.carbMg)}g · F ${mgToG(slot.totals.fatMg)}g`
-      }
-      actions={
-        <>
+    <section className={clsx('card overflow-hidden border-l-4', style.edge)} aria-label={label}>
+      <header className="flex items-center gap-3 p-3 sm:p-4">
+        <span
+          className={clsx('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow', style.gradient)}
+          aria-hidden
+        >
+          <SlotIcon className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-bold">{label}</h2>
+          {slot.entries.length === 0 ? (
+            <p className="text-xs text-ink-faint">Nothing yet</p>
+          ) : (
+            <p className="truncate text-xs text-ink-faint">
+              <span className={clsx('font-semibold tabular', style.text)}>{slot.totals.energyKcal.toLocaleString()} kcal</span>
+              {' · '}
+              <MacroLine totals={slot.totals} />
+            </p>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center">
           {onShare && slot.entries.length > 0 && (
             <button
               type="button"
-              className="flex h-11 w-10 items-center justify-center rounded-lg text-ink-muted transition hover:bg-violet-500/10 hover:text-ink active:scale-95"
-              aria-label={`Share ${SLOT_LABELS[slot.slot].toLowerCase()}`}
+              className={action}
+              aria-label={`Share ${label.toLowerCase()}`}
               title="Share meal"
               onClick={() => onShare({ kind: 'meal', day, slot: slot.slot })}
             >
@@ -603,9 +561,9 @@ function SlotSection({
           {slot.entries.length > 0 && (
             <button
               type="button"
-              className="flex h-11 w-10 items-center justify-center rounded-lg text-ink-muted transition hover:bg-violet-500/10 hover:text-ink active:scale-95"
+              className={action}
               onClick={() => setSaving(true)}
-              aria-label={`Save ${SLOT_LABELS[slot.slot].toLowerCase()} as a meal`}
+              aria-label={`Save ${label.toLowerCase()} as a meal`}
               title="Save as meal"
             >
               <BookmarkPlus size={18} aria-hidden="true" />
@@ -613,85 +571,70 @@ function SlotSection({
           )}
           <button
             type="button"
-            className="flex h-11 w-10 items-center justify-center rounded-lg text-accent transition hover:bg-violet-500/10 active:scale-95"
-            title={`Add to ${SLOT_LABELS[slot.slot].toLowerCase()}`}
+            className={clsx('ml-1 flex h-10 w-10 items-center justify-center rounded-xl transition active:scale-95', style.tint, style.text)}
+            title={`Add to ${label.toLowerCase()}`}
             onClick={onAdd}
-            aria-label={`Add to ${SLOT_LABELS[slot.slot]}`}
+            aria-label={`Add to ${label}`}
           >
             <Plus size={20} aria-hidden="true" />
           </button>
-        </>
-      }
-    >
-      {slot.entries.length === 0 ? (
-        <p className="text-sm text-ink-faint">Nothing yet.</p>
-      ) : (
-        <ul className="divide-y divide-border">
+        </div>
+      </header>
+
+      {slot.entries.length > 0 && (
+        <ul className="space-y-1.5 px-3 pb-3 sm:px-4">
           {slot.entries.map((entry) => (
-            <li
-              key={entry.id}
-              className="flex items-center justify-between gap-3 py-2 text-sm"
-            >
-              <div className="min-w-0">
-                <p className="truncate">
+            <li key={entry.id} className="flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-sm">
+              <span className={clsx('h-8 w-1 shrink-0 rounded-full', style.dot)} aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">
                   {entry.facts.name}
-                  {entry.facts.brand && (
-                    <span className="ml-1 text-xs text-ink-faint">
-                      {entry.facts.brand}
-                    </span>
-                  )}
+                  {entry.facts.brand && <span className="ml-1 text-xs font-normal text-ink-faint">{entry.facts.brand}</span>}
                 </p>
-                <p className="text-xs text-ink-faint">
+                <p className="truncate text-xs text-ink-faint">
                   {entry.amount} {entry.unit}
-                  {entry.servings > 0 &&
-                    ` · ${entry.servings} serving${entry.servings === 1 ? '' : 's'}`}
-                  {' · P '}
-                  {mgToG(entry.totals.proteinMg)}g C{' '}
-                  {mgToG(entry.totals.carbMg)}g F {mgToG(entry.totals.fatMg)}g
+                  {entry.servings > 0 && ` · ${entry.servings} serving${entry.servings === 1 ? '' : 's'}`}
+                  {' · '}
+                  <MacroLine totals={entry.totals} />
                 </p>
                 {isUnsaved(entry) && (
-                  <p className="text-[11px] font-medium text-amber-700 dark:text-amber-400">
-                    Not saved yet · on this device
+                  <p className="text-[11px] font-medium text-amber-700 dark:text-amber-400">Not saved yet · on this device</p>
+                )}
+                {updatedAfterSync.has(entry.id) && updatedAfterSync.get(entry.id) !== entry.totals.energyKcal && (
+                  <p className="text-[11px] text-ink-faint">
+                    Updated after sync: the food changed since, so it was saved at {entry.totals.energyKcal} kcal, not{' '}
+                    {updatedAfterSync.get(entry.id)}.
                   </p>
                 )}
-                {updatedAfterSync.has(entry.id) &&
-                  updatedAfterSync.get(entry.id) !== entry.totals.energyKcal && (
-                    <p className="text-[11px] text-ink-faint">
-                      Updated after sync: the food changed since, so it was saved at{' '}
-                      {entry.totals.energyKcal} kcal, not {updatedAfterSync.get(entry.id)}.
-                    </p>
-                  )}
               </div>
-              <div className="flex shrink-0 items-center gap-3">
-                <span className="tabular text-ink-muted">
-                  {entry.totals.energyKcal} kcal
-                </span>
+              <span className="shrink-0 text-right leading-tight">
+                <span className="tabular block font-bold">{entry.totals.energyKcal}</span>
+                <span className="block text-[10px] text-ink-faint">kcal</span>
+              </span>
+              <div className="flex shrink-0 items-center">
                 {onShare && !isUnsaved(entry) && (
                   <button
-                    className="text-xs text-accent"
-                    onClick={() =>
-                      onShare({ kind: 'entry', entryId: entry.id })
-                    }
+                    type="button"
+                    className={rowAction}
+                    onClick={() => onShare({ kind: 'entry', entryId: entry.id })}
                     aria-label={`Share ${entry.facts.name}`}
+                    title="Share"
                   >
-                    share
+                    <Share2 size={15} aria-hidden="true" />
                   </button>
                 )}
-                <button
-                  type="button"
-                  className="text-xs text-ink-faint hover:text-ink"
-                  onClick={() => onEdit(entry)}
-                >
-                  edit
+                <button type="button" className={rowAction} onClick={() => onEdit(entry)} aria-label={`Edit ${entry.facts.name}`} title="Edit">
+                  <Pencil size={15} aria-hidden="true" />
                 </button>
                 <button
                   type="button"
-                  className="p-1 text-xs text-ink-faint hover:text-rose-300"
+                  className={clsx(rowAction, 'hover:text-rose-400')}
                   onClick={() => remove(entry)}
                   disabled={pending}
                   aria-label={`Remove ${entry.facts.name}`}
+                  title="Remove"
                 >
-                  ✕
+                  <X size={16} aria-hidden="true" />
                 </button>
               </div>
             </li>
@@ -703,6 +646,7 @@ function SlotSection({
         suggestions={suggestions}
         foods={foods}
         day={day}
+        slot={slot.slot}
         slotLabel={SLOT_LABELS[slot.slot]}
         onChanged={onChanged}
       />
@@ -728,7 +672,7 @@ function SlotSection({
           later uses whatever those foods say then.
         </p>
       </Modal>
-    </Panel>
+    </section>
   );
 }
 
@@ -743,12 +687,14 @@ function SlotSuggestions({
   suggestions,
   foods,
   day,
+  slot,
   slotLabel,
   onChanged,
 }: {
   suggestions: MealSuggestion[];
   foods: FoodWithUsage[];
   day: string;
+  slot: MealSlot;
   slotLabel: string;
   onChanged: () => void;
 }) {
@@ -766,9 +712,12 @@ function SlotSuggestions({
       if (ok) onChanged();
     });
 
+  const { style } = SLOT_STYLES[slot];
   return (
-    <div className="mt-3 rounded-xl border border-dashed border-violet-500/25 bg-violet-500/5 p-3">
-      <p className="text-xs font-medium text-ink-muted">Suggestions</p>
+    <div className={clsx('mx-3 mb-3 rounded-xl border border-dashed p-3 sm:mx-4', style.border, style.tint)}>
+      <p className={clsx('flex items-center gap-1.5 text-xs font-semibold', style.text)}>
+        <Sparkles className="h-3.5 w-3.5" aria-hidden /> Suggestions
+      </p>
       <p className="mb-2 mt-0.5 text-[11px] text-ink-faint">
         From your recent meals · Tap to add to {slotLabel.toLowerCase()}.
       </p>
@@ -777,7 +726,7 @@ function SlotSuggestions({
           <button
             key={suggestion.foodId}
             type="button"
-            className="flex min-h-11 max-w-full items-center gap-3 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-left text-xs text-ink-muted transition hover:border-lime-500/40 hover:text-ink active:scale-95 disabled:opacity-50"
+            className="flex min-h-11 max-w-full items-center gap-3 rounded-lg border border-border bg-surface-raised px-2.5 py-1.5 text-left text-xs text-ink-muted transition hover:text-ink active:scale-95 disabled:opacity-50"
             aria-label={`Add suggested ${suggestion.name} to ${slotLabel.toLowerCase()}`}
             onClick={() => log(suggestion)}
             disabled={pending}
@@ -797,11 +746,7 @@ function SlotSuggestions({
                 {suggestion.dayCount > 1 && ` · ${suggestion.dayCount} days`}
               </span>
             </span>
-            <Plus
-              size={15}
-              className="shrink-0 text-accent"
-              aria-hidden="true"
-            />
+            <Plus size={15} className={clsx('shrink-0', style.text)} aria-hidden="true" />
           </button>
         ))}
       </div>
