@@ -21,24 +21,39 @@ const same = (a: string, b: string) => {
   return left.length === right.length && timingSafeEqual(left, right);
 };
 
-/** The visitor's address when the request provably came through the web app's proxy. */
-export function proxiedClientIp(headers: Request['headers'], secret: string | undefined): string | undefined {
-  if (!secret) return undefined;
+/**
+ * Why a request did or did not count as proxied, for `/api/health` (issue #29). It names a step,
+ * never a value: a caller learns only what it sent itself, and whether the API expects a proof.
+ */
+export type ProxyCheck = 'ok' | 'unconfigured' | 'no-header' | 'unsubstituted' | 'mismatch' | 'no-ip';
+
+export function checkProxy(headers: Request['headers'], secret: string | undefined): { check: ProxyCheck; ip?: string } {
+  if (!secret) return { check: 'unconfigured' };
   const proof = headers[PROXY_HEADER];
-  if (typeof proof !== 'string' || !same(proof, secret)) return undefined;
+  if (typeof proof !== 'string' || proof === '') return { check: 'no-header' };
+  // Vercel sends a variable it does not have as its literal name.
+  if (proof.startsWith('$')) return { check: 'unsubstituted' };
+  if (!same(proof, secret)) return { check: 'mismatch' };
   const real = headers['x-real-ip'];
   const ip = typeof real === 'string' ? real.trim() : '';
-  return isIP(ip) ? ip : undefined;
+  return isIP(ip) ? { check: 'ok', ip } : { check: 'no-ip' };
+}
+
+/** The visitor's address when the request provably came through the web app's proxy. */
+export function proxiedClientIp(headers: Request['headers'], secret: string | undefined): string | undefined {
+  return checkProxy(headers, secret).ip;
 }
 
 /** Marks a request that came through the web app's proxy. */
 export interface ProxiedRequest extends Request {
   viaWebProxy?: boolean;
+  proxyCheck?: ProxyCheck;
 }
 
 export function webProxyMiddleware(secret: string | undefined) {
   return (req: ProxiedRequest, _res: Response, next: NextFunction) => {
-    const ip = proxiedClientIp(req.headers, secret);
+    const { check, ip } = checkProxy(req.headers, secret);
+    req.proxyCheck = check;
     // The secret is never visible past this point, whatever it held.
     delete req.headers[PROXY_HEADER];
     if (ip) {

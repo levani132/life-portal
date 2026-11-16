@@ -115,7 +115,7 @@ with a shared secret (`LP_PROXY_SECRET` on Vercel, `WEB_PROXY_SECRET` on the API
 right secret does the API take the visitor's address from Vercel's `x-real-ip`
 (`app/web-proxy.ts`). Anything else, including direct calls to Render, keeps the `trust proxy`
 address, so a direct caller still cannot pick its own IP. `GET /api/health` reports
-`proxied: true` for a request that proved itself. Setup: `docs/runbooks/web-api-proxy.md`.
+`proxied: true` for a request that proved itself. `proxy` names the step a request reached (`ok`, `unconfigured`, `no-header`, `unsubstituted`, `mismatch`, `no-ip`), never a value. Setup: `docs/runbooks/web-api-proxy.md`.
 
 Clients outside the browser keep the Render URL: Settings → MCP and the Shortcut ingest page show
 `NEXT_PUBLIC_API_PUBLIC_URL` (`externalApiUrl()`), and link previews read `API_INTERNAL_URL`

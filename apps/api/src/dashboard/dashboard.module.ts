@@ -67,7 +67,7 @@ export class DashboardController {
   @Public()
   @Get('health')
   health(@Req() req: ProxiedRequest) {
-    return { status: 'ok', uptimeSeconds: Math.round(process.uptime()), proxied: req.viaWebProxy === true };
+    return { status: 'ok', uptimeSeconds: Math.round(process.uptime()), proxied: req.viaWebProxy === true, proxy: req.proxyCheck };
   }
 }
 
