@@ -2296,3 +2296,25 @@ instead also reads `planUpdate` on sessions that have no `plan`. Derived on read
 
 **Online only.** The prompt needs the server's preview and the person's plan list; nothing is
 lost by waiting, since it stays in History.
+
+
+## 2026-11-16 · Home's widget strip is a plain pager
+
+**One face per widget, no scroll-driven layout.** The focus strip (spec 008) gave every widget a
+narrow and a full layout, resized the cards under the finger and showed the full layout only once
+the strip had stopped. That wait after every swipe was built into the design, so no timer tuning
+removed it, and the narrow layout was cramped at 56 px. The owner's call: less is more. Now every
+card is one fixed width that always shows its whole summary, and the browser's own scrolling and
+snapping do all the moving (`widget-carousel.tsx` has no layout code; widths are CSS).
+
+**Snap points: first card left, last card right, the rest centred**, so a middle card shows a
+slice of both neighbours and the ends never leave an empty gutter.
+
+**Still opens on Food** wherever it sits in the order, as spec 008 asked. Long-press to arrange
+is unchanged. Dragging the strip with a mouse was dropped with the rest: dots, arrow keys and a
+trackpad cover desktop.
+
+**A widget's colour is identity only**: its icon tile and quick action, never a figure, because
+green and red already mean good and bad on money and the macros have their own colours. For now
+the six hues are Training's `train-*` tokens (the only theme-aware set); giving them general
+names belongs to the wider redesign.

@@ -2,6 +2,16 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-16: Home widgets are a simple swipe
+
+- **Every widget on Home is now one full card.** Swipe sideways and the next one is already
+  complete; nothing shrinks, grows or waits for the swipe to finish. The first card rests on the
+  left, the last on the right, and the ones between sit in the middle with a slice of each
+  neighbour showing.
+- **Each widget has its own icon and colour**, and its quick action (log food, start workout)
+  uses that colour.
+- **Dots replace the "Food · 1 / 2" line.** Tap one to jump to that widget.
+
 ## 2026-11-16: Save a workout to a plan
 
 - **A workout you started empty can be saved to a plan** once it's finished. After the recap

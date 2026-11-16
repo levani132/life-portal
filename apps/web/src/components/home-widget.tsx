@@ -2,12 +2,7 @@
 
 import clsx from 'clsx';
 import { MACRO_COLORS } from '../lib/macro-colors';
-import {
-  useLayoutEffect,
-  useRef,
-  type CSSProperties,
-  type MouseEvent,
-} from 'react';
+import type { MouseEvent } from 'react';
 import Link from 'next/link';
 import {
   MoreHorizontal,
@@ -43,20 +38,7 @@ function remainingText({ value, target, unit }: NutritionMetric) {
   return `${Math.abs(remaining)} ${unit} ${remaining < 0 ? 'over' : 'left'}`;
 }
 
-export function NutritionRing({
-  metric,
-  compact = false,
-  shared = false,
-  stagger,
-}: {
-  metric: NutritionMetric;
-  /** Ring and number only, for the small food card on Home. */
-  compact?: boolean;
-  /** The calories ring on Home: the one piece that moves between the widget's two faces. */
-  shared?: boolean;
-  /** Position in the staggered entrance on Home's food widget. */
-  stagger?: number;
-}) {
+export function NutritionRing({ metric }: { metric: NutritionMetric }) {
   const { value, target, unit, label } = metric;
   const ratio =
     target !== undefined && target > 0
@@ -66,18 +48,9 @@ export function NutritionRing({
         : 0;
   const over = target !== undefined && value > target;
   return (
-    <div
-      className="min-w-0 text-center"
-      data-fade={stagger !== undefined || undefined}
-      style={
-        stagger !== undefined
-          ? ({ '--stagger': stagger } as CSSProperties)
-          : undefined
-      }
-    >
+    <div className="min-w-0 text-center">
       <div
-        className={clsx('nutrition-ring', compact && 'nutrition-ring-compact')}
-        data-shared={shared || undefined}
+        className="nutrition-ring"
         role="img"
         aria-label={`${label}: ${value} ${unit} consumed. ${remainingText(metric)}.`}
       >
@@ -103,37 +76,25 @@ export function NutritionRing({
             transform="rotate(-90 40 40)"
           />
         </svg>
-        <span className="nutrition-ring-text absolute inset-0 flex flex-col items-center justify-center tabular leading-tight">
-          <strong className={compact ? 'text-[10px]' : 'nutrition-ring-value'}>
+        <span className="absolute inset-0 flex flex-col items-center justify-center tabular leading-tight">
+          <strong className="nutrition-ring-value">
             {value?.toLocaleString() ?? '—'}
           </strong>
-          {!compact && (
-            <span className="text-[10px] text-ink-faint sm:text-[10px]">
-              {unit}
-            </span>
-          )}
+          <span className="text-[10px] text-ink-faint">{unit}</span>
         </span>
       </div>
-      {!compact && (
-        // Beside a moving ring, its captions fade in with the first of the macros.
-        <div
-          data-fade={shared || undefined}
-          style={shared ? ({ '--stagger': 1 } as CSSProperties) : undefined}
-        >
-          <p className="mt-1 truncate text-[10px] font-medium sm:text-xs">
-            {label}
-          </p>
-          <p
-            className={clsx(
-              'text-[10px] leading-tight sm:text-[11px]',
-              over ? 'text-rose-400' : 'text-ink-muted',
-            )}
-          >
-            {remainingText(metric)}
-            {metric.basis && <EstimateMark basis={metric.basis} />}
-          </p>
-        </div>
-      )}
+      <p className="mt-1 truncate text-[10px] font-medium sm:text-xs">
+        {label}
+      </p>
+      <p
+        className={clsx(
+          'text-[10px] leading-tight sm:text-[11px]',
+          over ? 'text-rose-400' : 'text-ink-muted',
+        )}
+      >
+        {remainingText(metric)}
+        {metric.basis && <EstimateMark basis={metric.basis} />}
+      </p>
     </div>
   );
 }
@@ -151,24 +112,71 @@ const ICONS = {
   training: Dumbbell,
 };
 
+/**
+ * Each widget's own colour, for its icon tile and its quick action: identity only, never a
+ * figure (green and red already mean good and bad on money, and the macros have their own
+ * colours). These are the six theme-aware hues Training introduced (spec 024); the class names
+ * are written out in full so Tailwind sees them.
+ */
+const HUES: Record<WidgetCard['key'], { tile: string; hover: string }> = {
+  nutrition: {
+    tile: 'bg-train-legs/10 text-train-legs',
+    hover: 'hover:bg-train-legs/20',
+  },
+  training: {
+    tile: 'bg-train-arms/10 text-train-arms',
+    hover: 'hover:bg-train-arms/20',
+  },
+  cashflow: {
+    tile: 'bg-train-pull/10 text-train-pull',
+    hover: 'hover:bg-train-pull/20',
+  },
+  spending: {
+    tile: 'bg-train-cardio/10 text-train-cardio',
+    hover: 'hover:bg-train-cardio/20',
+  },
+  stocks: {
+    tile: 'bg-train-core/10 text-train-core',
+    hover: 'hover:bg-train-core/20',
+  },
+  loans: {
+    tile: 'bg-train-push/10 text-train-push',
+    hover: 'hover:bg-train-push/20',
+  },
+  items: {
+    tile: 'bg-train-core/10 text-train-core',
+    hover: 'hover:bg-train-core/20',
+  },
+  personal: {
+    tile: 'bg-train-cardio/10 text-train-cardio',
+    hover: 'hover:bg-train-cardio/20',
+  },
+  projects: {
+    tile: 'bg-train-pull/10 text-train-pull',
+    hover: 'hover:bg-train-pull/20',
+  },
+  board: {
+    tile: 'bg-train-pull/10 text-train-pull',
+    hover: 'hover:bg-train-pull/20',
+  },
+};
+
+/** One widget on Home's strip: a single card that always shows its whole summary. */
 export function HomeWidget({
   card,
   nutrition,
   state,
-  expanded,
-  onSelect,
   onMenu,
   onQuickAction,
 }: {
   card: WidgetCard;
   nutrition?: NutritionSummary;
   state: SortableState;
-  expanded: boolean;
-  onSelect: () => void;
   onMenu: () => void;
   onQuickAction?: () => void;
 }) {
   const Icon = ICONS[card.key];
+  const hue = HUES[card.key];
   const metrics: NutritionMetric[] | undefined = nutrition && [
     {
       label: 'Calories',
@@ -203,79 +211,15 @@ export function HomeWidget({
       basis: nutrition.targetBasis?.fat,
     },
   ];
-  const root = useRef<HTMLElement>(null);
-  const wasExpanded = useRef(expanded);
-  // The calories ring is the same piece of content in both faces, so instead of crossfading it
-  // flies and scales from where it was to where it now is (a FLIP), while everything else fades
-  // around it. Its number is styled differently in each face, so that part crossfades in flight.
-  useLayoutEffect(() => {
-    if (wasExpanded.current === expanded) return;
-    wasExpanded.current = expanded;
-    const el = root.current;
-    if (!el || !metrics) return;
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-    const from = el.querySelector<HTMLElement>(
-      '.widget-face[data-shown="false"] [data-shared]',
-    );
-    const to = el.querySelector<HTMLElement>(
-      '.widget-face[data-shown="true"] [data-shared]',
-    );
-    if (!from || !to || typeof to.animate !== 'function') return;
-    const cancel = (node: HTMLElement) =>
-      node
-        .getAnimations?.({ subtree: true })
-        .forEach((animation) => animation.cancel());
-    cancel(to);
-    const a = from.getBoundingClientRect();
-    const b = to.getBoundingClientRect();
-    cancel(from);
-    if (!b.width || !b.height) return;
-    const dx = a.left + a.width / 2 - (b.left + b.width / 2);
-    const dy = a.top + a.height / 2 - (b.top + b.height / 2);
-    to.animate(
-      [
-        {
-          transform: `translate(${dx}px, ${dy}px) scale(${a.width / b.width})`,
-        },
-        { transform: 'none' },
-      ],
-      { duration: 460, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' },
-    );
-    to.querySelector('.nutrition-ring-text')?.animate(
-      [{ opacity: 0 }, { opacity: 1 }],
-      { duration: 240, delay: 40, easing: 'ease-out', fill: 'backwards' },
-    );
-  });
-  const select = (event: MouseEvent) => {
-    event.preventDefault();
-    if (!state.editing) onSelect();
-  };
+  // In edit mode the links stay links with their click cancelled: replacing the node under the
+  // finger would cancel the touch that is dragging it (see sortable-grid.tsx).
   const open = (event: MouseEvent) => {
     if (state.editing) event.preventDefault();
   };
-  const menuButton = (
-    <button
-      type="button"
-      data-widget-action
-      aria-label={`${card.title} widget options`}
-      className="flex h-8 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-surface"
-      onClick={onMenu}
-    >
-      {state.editing ? (
-        <GripVertical size={17} aria-hidden />
-      ) : (
-        <MoreHorizontal size={19} aria-hidden />
-      )}
-    </button>
-  );
-  // Both faces stay mounted and are laid out at their final sizes (the carousel provides
-  // --widget-full and --widget-peek), so resizing the card never reflows them: the carousel
-  // changes the frame and the widget crossfades between faces. See widget-carousel.tsx.
   return (
     <article
-      ref={root}
       className={clsx(
-        'card home-widget relative h-full overflow-hidden rounded-2xl',
+        'card home-widget flex h-full flex-col overflow-hidden rounded-2xl px-3 pb-2 pt-2.5 sm:px-4',
         state.editing && !state.dragging && 'widget-jiggle',
         state.dragging && 'border-accent shadow-xl',
       )}
@@ -284,190 +228,130 @@ export function HomeWidget({
           ? { animationDelay: `${(state.index % 4) * 90}ms` }
           : undefined
       }
-      data-expanded={expanded}
     >
-      <div
-        className={clsx(
-          'widget-face widget-face-full flex flex-col px-3 pb-2 pt-2.5 sm:px-5',
-          metrics && 'widget-face-staged',
-        )}
-        data-shown={expanded}
-        aria-hidden={!expanded}
-        inert={!expanded}
-      >
-        <div
-          className="mb-1.5 flex w-full items-center justify-between gap-2"
-          data-fade
-        >
-          <Link
-            href={card.href}
-            draggable={false}
-            tabIndex={state.editing ? -1 : undefined}
-            aria-label={`Open ${card.title}`}
-            onClick={open}
-            className="text-sm font-semibold hover:text-accent"
-          >
-            {card.title}
-            {card.key === 'nutrition' && (
-              <span className="widget-today ml-2 text-xs font-normal text-ink-faint">
-                Today
-              </span>
-            )}
-          </Link>
-          <div className="flex shrink-0 items-center gap-1">
-            {onQuickAction && (
-              <button
-                type="button"
-                data-widget-action
-                aria-label={card.quickAction?.label ?? 'Log food'}
-                title={card.quickAction?.label ?? 'Log food'}
-                className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                onClick={onQuickAction}
-              >
-                {card.quickAction?.kind === 'log-food' || !card.quickAction ? (
-                  <Plus size={19} aria-hidden />
-                ) : (
-                  <Play size={17} aria-hidden />
-                )}
-              </button>
-            )}
-            {menuButton}
-          </div>
-        </div>
+      <div className="mb-1.5 flex w-full items-center justify-between gap-2">
         <Link
           href={card.href}
           draggable={false}
           tabIndex={state.editing ? -1 : undefined}
-          title={`View ${card.title} details`}
+          aria-label={`Open ${card.title}`}
           onClick={open}
-          className="flex min-h-0 flex-1 flex-col overflow-hidden [justify-content:safe_center]"
+          className="flex items-center gap-2 text-sm font-semibold hover:text-accent"
         >
-          {metrics ? (
-            <div>
-              <div className="grid grid-cols-4 items-start gap-1 sm:gap-4">
-                {metrics.map((metric, index) =>
-                  index === 0 ? (
-                    <NutritionRing key={metric.label} metric={metric} shared />
-                  ) : (
-                    <NutritionRing
-                      key={metric.label}
-                      metric={metric}
-                      stagger={index}
-                    />
-                  ),
-                )}
-              </div>
-            </div>
-          ) : (
-            <>
-              {card.subtitle && (
-                <p className="mb-2 truncate text-xs text-ink-muted">
-                  {card.subtitle}
-                </p>
-              )}
-              <dl className="grid grid-cols-3 gap-2">
-                {card.stats.map((stat) => (
-                  <div key={stat.label}>
-                    <dd
-                      className={clsx(
-                        'break-words text-sm font-semibold leading-tight tabular sm:text-lg',
-                        TONE_TEXT[stat.tone ?? 'neutral'],
-                      )}
-                    >
-                      {stat.value}
-                      {stat.estimated && <EstimateMark />}
-                    </dd>
-                    <dt
-                      className="mt-1 truncate text-[10px] leading-tight text-ink-faint sm:text-xs"
-                      title={stat.label}
-                    >
-                      {stat.label}
-                    </dt>
-                  </div>
-                ))}
-              </dl>
-              {card.progress !== undefined && (
-                <div className="mt-3">
-                  <ProgressBar ratio={card.progress} />
-                </div>
-              )}
-            </>
+          <span
+            className={clsx(
+              'flex h-8 w-8 shrink-0 items-center justify-center rounded-xl',
+              hue.tile,
+            )}
+          >
+            <Icon size={17} aria-hidden />
+          </span>
+          <span className="truncate">{card.title}</span>
+          {card.key === 'nutrition' && (
+            <span className="widget-today shrink-0 text-xs font-normal text-ink-faint">
+              Today
+            </span>
           )}
         </Link>
-        {card.alert && !metrics && (
-          <div className="mt-2 line-clamp-1 text-[10px] leading-tight text-ink-muted">
-            {card.alert}
-          </div>
-        )}
-        {nutrition && !nutrition.targetsAvailable && (
-          <Link
-            className="mt-1 text-center text-[10px] text-accent"
-            href="/nutrition?tab=you"
-            data-fade
-            style={{ '--stagger': 4 } as CSSProperties}
+        <div className="flex shrink-0 items-center gap-1">
+          {onQuickAction && (
+            <button
+              type="button"
+              data-widget-action
+              aria-label={card.quickAction?.label ?? 'Log food'}
+              title={card.quickAction?.label ?? 'Log food'}
+              className={clsx(
+                'flex h-8 w-8 items-center justify-center rounded-xl',
+                hue.tile,
+                hue.hover,
+              )}
+              onClick={onQuickAction}
+            >
+              {card.quickAction?.kind === 'log-food' || !card.quickAction ? (
+                <Plus size={19} aria-hidden />
+              ) : (
+                <Play size={17} aria-hidden />
+              )}
+            </button>
+          )}
+          <button
+            type="button"
+            data-widget-action
+            aria-label={`${card.title} widget options`}
+            className="flex h-8 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-surface"
+            onClick={onMenu}
           >
-            Set nutrition goals →
-          </Link>
-        )}
-      </div>
-      <div
-        className={clsx(
-          'widget-face widget-face-compact flex flex-col items-center px-1 py-2',
-          metrics && 'widget-face-staged',
-        )}
-        data-shown={!expanded}
-        aria-hidden={expanded}
-        inert={expanded}
-      >
-        <div
-          className="mb-1 flex flex-col-reverse items-center gap-1"
-          data-fade
-        >
-          <Link
-            href={card.href}
-            draggable={false}
-            tabIndex={state.editing ? -1 : undefined}
-            aria-label={`Select ${card.title} widget`}
-            onClick={select}
-            className="line-clamp-2 text-center text-[10px] font-semibold leading-tight hover:text-accent"
-          >
-            {card.title}
-          </Link>
-          {menuButton}
+            {state.editing ? (
+              <GripVertical size={17} aria-hidden />
+            ) : (
+              <MoreHorizontal size={19} aria-hidden />
+            )}
+          </button>
         </div>
-        <Link
-          href={card.href}
-          draggable={false}
-          tabIndex={state.editing ? -1 : undefined}
-          aria-label={`Select ${card.title} widget summary`}
-          onClick={select}
-          className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-2"
-        >
-          {metrics ? (
-            <>
-              <NutritionRing metric={metrics[0]} compact shared />
-              <span
-                className="text-center text-[10px] leading-tight text-ink-muted"
-                data-fade
-              >
-                {nutrition?.leftKcal !== undefined
-                  ? `${Math.abs(nutrition.leftKcal)} kcal ${nutrition.leftKcal < 0 ? 'over' : 'left'}`
-                  : `${nutrition?.eatenKcal} kcal eaten`}
-              </span>
-            </>
-          ) : (
-            <>
-              <Icon size={21} className="text-ink-muted" aria-hidden />
-              <strong className="w-full break-words text-center text-xs tabular">
-                {card.stats[0]?.value}
-              </strong>
-              <span className="text-center text-[10px] leading-tight text-ink-faint">
-                {card.stats[0]?.label}
-              </span>
-            </>
-          )}
-        </Link>
       </div>
+      <Link
+        href={card.href}
+        draggable={false}
+        tabIndex={state.editing ? -1 : undefined}
+        title={`View ${card.title} details`}
+        onClick={open}
+        className="flex min-h-0 flex-1 flex-col overflow-hidden [justify-content:safe_center]"
+      >
+        {metrics ? (
+          <div className="grid grid-cols-4 items-start gap-1 sm:gap-3">
+            {metrics.map((metric) => (
+              <NutritionRing key={metric.label} metric={metric} />
+            ))}
+          </div>
+        ) : (
+          <>
+            {card.subtitle && (
+              <p className="mb-2 truncate text-xs text-ink-muted">
+                {card.subtitle}
+              </p>
+            )}
+            <dl className="grid grid-cols-3 gap-2">
+              {card.stats.map((stat) => (
+                <div key={stat.label}>
+                  <dd
+                    className={clsx(
+                      'break-words text-base font-bold leading-tight tabular sm:text-lg',
+                      TONE_TEXT[stat.tone ?? 'neutral'],
+                    )}
+                  >
+                    {stat.value}
+                    {stat.estimated && <EstimateMark />}
+                  </dd>
+                  <dt
+                    className="mt-1 truncate text-[11px] leading-tight text-ink-faint sm:text-xs"
+                    title={stat.label}
+                  >
+                    {stat.label}
+                  </dt>
+                </div>
+              ))}
+            </dl>
+            {card.progress !== undefined && (
+              <div className="mt-3">
+                <ProgressBar ratio={card.progress} />
+              </div>
+            )}
+          </>
+        )}
+      </Link>
+      {card.alert && !metrics && (
+        <div className="mt-2 line-clamp-1 text-[11px] leading-tight text-ink-muted">
+          {card.alert}
+        </div>
+      )}
+      {nutrition && !nutrition.targetsAvailable && (
+        <Link
+          className="mt-1 text-center text-[11px] text-accent"
+          href="/nutrition?tab=you"
+        >
+          Set nutrition goals →
+        </Link>
+      )}
     </article>
   );
 }

@@ -137,15 +137,13 @@ export function Dashboard() {
           onOrderChange={setPendingOrder}
           onCommit={(order) => void save(order)}
         >
-          {(card, state, expanded, select) => (
+          {(card, state) => (
             <HomeWidget
               card={card}
               nutrition={
                 card.key === 'nutrition' ? data.summaries.nutrition : undefined
               }
               state={state}
-              expanded={expanded}
-              onSelect={select}
               onMenu={() => {
                 setSaveError(null);
                 setMenuCard(card);

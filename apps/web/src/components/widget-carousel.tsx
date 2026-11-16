@@ -1,15 +1,7 @@
 'use client';
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import clsx from 'clsx';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { WidgetCard } from '@life-portal/shared-types';
 import { SortableGrid, type SortableState } from './sortable-grid';
 
@@ -19,40 +11,22 @@ interface Props {
   onEditingChange: (value: boolean) => void;
   onOrderChange: (ids: string[]) => void;
   onCommit: (ids: string[]) => void;
-  children: (
-    card: WidgetCard,
-    state: SortableState,
-    expanded: boolean,
-    select: () => void,
-  ) => ReactNode;
+  children: (card: WidgetCard, state: SortableState) => ReactNode;
 }
 
-/** With a finger down, moving this far off the resting widget hands its content over to compact. */
-const MOVE_SLOP_PX = 6;
-/** Without one (trackpad, the tail of a snap) it takes more, so a landing never re-collapses. */
-const FREE_SLOP_PX = 16;
-/**
- * A released strip this close to a snap point and moving this slowly has landed. Snapping ends
- * in a long sub-pixel tail; waiting for it to stop made the full view arrive visibly late.
- */
-const ARRIVE_PX = 10;
-const ARRIVE_SPEED_PX = 6;
-/** Fallback: quiet time after the last scroll event before the strip counts as at rest. */
-const SETTLE_MS = 90;
+/** Where a card snaps: the first to the left edge, the last to the right, the rest centred. */
+function snapAlign(index: number, count: number): 'start' | 'center' | 'end' {
+  return index === 0 ? 'start' : index === count - 1 ? 'end' : 'center';
+}
 
 /**
- * Home's focus strip: one widget at full size, its neighbours peeking in at the edges.
+ * Home's widget strip: a plain pager.
  *
- * Native scrolling is only the *input* here. The scroll container holds an invisible spacer
- * with one snap point per widget; the visible strip is pinned in place with `position: sticky`
- * and laid out from the scroll progress. That split is what makes the gesture follow the hand:
- * one widget's worth of scroll is exactly the distance the incoming widget's leading edge has to
- * travel, so the gap between the shrinking and the growing widget stays under the finger, and
- * the browser still supplies momentum, rubber-banding and snapping.
- *
- * The cards' content never reflows mid-gesture. The resting widget is told to go compact as soon
- * as the strip moves, and the incoming one only expands once the strip has come to rest — the
- * widget animates between its two faces, the strip only changes the frame around them.
+ * Every widget is one fixed-size card that always shows its full content; the browser's own
+ * scrolling and snapping do all the moving, and the next card shows as a slice of itself. There
+ * is deliberately no scroll-driven layout here: an earlier version resized the cards under the
+ * finger and swapped their content once the strip came to rest, and that wait after every swipe
+ * was the thing people noticed. See docs/DECISIONS.md.
  */
 export function WidgetCarousel({
   cards,
@@ -62,193 +36,58 @@ export function WidgetCarousel({
   onCommit,
   children,
 }: Props) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [width, setWidth] = useState(0);
-  const [dragging, setDragging] = useState(false);
-  const [moving, setMoving] = useState(false);
   const viewport = useRef<HTMLDivElement>(null);
-  const stage = useRef<HTMLDivElement>(null);
-  const progress = useRef(0);
-  const restIndex = useRef(0);
-  const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined,
+  // Home opens on Food wherever the person has put it (spec 008); after that the strip stays
+  // where it was left.
+  const [active, setActive] = useState(() =>
+    Math.max(
+      0,
+      cards.findIndex((card) => card.key === 'nutrition'),
+    ),
   );
-  const settleTries = useRef(0);
-  const lastLeft = useRef(0);
-  const movingNow = useRef(false);
-  /** Where a button, key or tap is sending the strip; a gesture may land anywhere. */
-  const target = useRef<number | null>(null);
-  movingNow.current = moving;
-  const touching = useRef(false);
-  const swipeClick = useRef(false);
-  const mouse = useRef<{
-    pointerId: number;
-    x: number;
-    y: number;
-    left: number;
-    moved: boolean;
-  } | null>(null);
-  const touch = useRef<{ x: number; y: number } | null>(null);
-
+  const frame = useRef(0);
   const count = cards.length;
-  const activeId = cards.some((card) => card.id === selectedId)
-    ? selectedId
-    : (cards.find((card) => card.key === 'nutrition')?.id ?? cards[0]?.id);
-  const activeIndex = cards.findIndex((card) => card.id === activeId);
-  const gap = width >= 640 ? 12 : 8;
-  const peek = width >= 640 ? 128 : 56;
-  const peekStep = peek + gap;
-  // The distance the incoming widget's leading edge travels, from peeking at the right edge to
-  // its resting place. Scrolling exactly that far per widget keeps the motion 1:1.
-  const step = count > 1 ? Math.max(1, width - 2 * peek - gap) : 1;
-  const restWidth = (index: number) =>
-    count === 1
-      ? width
-      : width - (index > 0 ? peekStep : 0) - (index < count - 1 ? peekStep : 0);
-  const order = cards.map((card) => card.id).join(':');
 
-  // Every edge moves linearly between two resting layouts, so nothing outruns the finger.
-  const geometry = useRef({ peek, peekStep, restWidth });
-  geometry.current = { peek, peekStep, restWidth };
-  const applyLayout = useCallback((p: number) => {
-    const grid = stage.current?.firstElementChild as HTMLElement | null;
-    if (!grid) return;
-    const { peek, peekStep, restWidth } = geometry.current;
-    grid.style.transform = `translate3d(${-Math.max(0, p - 1) * peekStep}px, 0, 0)`;
-    Array.from(grid.children).forEach((child, index) => {
-      const share = Math.max(0, 1 - Math.abs(index - p));
-      (child as HTMLElement).style.width =
-        `${peek + (restWidth(index) - peek) * share}px`;
-    });
-  }, []);
-
-  const reducedMotion = () =>
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const scrollTo = (index: number, immediate = false) => {
+  const slots = () =>
+    Array.from(
+      viewport.current?.querySelectorAll<HTMLElement>('[role="listitem"]') ??
+        [],
+    );
+  /** The scroll position that puts a card on its snap point. */
+  const restFor = (el: HTMLElement, index: number) => {
+    const view = viewport.current;
+    if (!view) return 0;
+    const align = snapAlign(index, count);
+    const spare = view.clientWidth - el.offsetWidth;
+    return (
+      el.offsetLeft -
+      (align === 'start' ? 0 : align === 'end' ? spare : spare / 2)
+    );
+  };
+  const go = (index: number, immediate = false) => {
+    const el = slots()[index];
+    if (!el) return;
+    const reduced = window.matchMedia?.(
+      '(prefers-reduced-motion: reduce)',
+    ).matches;
     viewport.current?.scrollTo({
-      left: index * step,
-      behavior: immediate || reducedMotion() ? 'instant' : 'smooth',
+      left: restFor(el, index),
+      behavior: immediate || reduced ? 'instant' : 'smooth',
     });
   };
 
-  const navigation = useRef({ editing, step, cards });
-  navigation.current = { editing, step, cards };
-
-  const settle = useCallback(() => {
-    clearTimeout(settleTimer.current);
-    const el = viewport.current;
-    const { step, cards } = navigation.current;
-    if (!el || touching.current || mouse.current?.moved) return;
-    const index = Math.max(
-      0,
-      Math.min(cards.length - 1, Math.round(el.scrollLeft / step)),
-    );
-    // A snap that has not started yet would otherwise expand a widget that is still moving.
-    if (
-      Math.abs(el.scrollLeft - index * step) > ARRIVE_PX &&
-      settleTries.current < 4
-    ) {
-      settleTries.current += 1;
-      settleTimer.current = setTimeout(settle, SETTLE_MS);
-      return;
-    }
-    settleTries.current = 0;
-    target.current = null;
-    restIndex.current = index;
-    const card = cards[index];
-    if (card) setSelectedId(card.id);
-    setMoving(false);
-  }, []);
-  const scheduleSettle = useCallback(
-    (delay = SETTLE_MS) => {
-      clearTimeout(settleTimer.current);
-      settleTimer.current = setTimeout(settle, delay);
-    },
-    [settle],
-  );
-
-  const select = (index: number) => {
-    const card = cards[index];
-    if (!card) return;
-    setSelectedId(card.id);
-    if (index !== Math.round(progress.current) && !editing) {
-      movingNow.current = true;
-      target.current = index;
-      setMoving(true);
-      // Normally the scroll events re-arm this; it only covers a scroll that never happens.
-      scheduleSettle(800);
-    }
-    scrollTo(index);
-  };
-
+  // The dot is already right from the first render; this only moves the strip under it.
+  const opened = useRef(false);
   useLayoutEffect(() => {
-    const el = viewport.current;
-    if (!el) return;
-    const measure = () => setWidth(el.clientWidth);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+    if (opened.current || !count) return;
+    opened.current = true;
+    if (active > 0) go(active, true);
+  });
 
-  // Re-anchor on the selected widget whenever the geometry or the order changes.
-  useLayoutEffect(() => {
-    if (!width) return;
-    if (!editing) {
-      progress.current = Math.max(0, activeIndex);
-      restIndex.current = progress.current;
-      viewport.current?.scrollTo({
-        left: progress.current * step,
-        behavior: 'instant',
-      });
-    }
-    applyLayout(progress.current);
-    // activeIndex is read on purpose only when the geometry or order changes.
-  }, [width, step, order, editing, applyLayout]);
-
-  useEffect(() => {
-    if (editing) setMoving(false);
-  }, [editing]);
-
-  useEffect(() => {
-    const el = viewport.current;
-    if (!el) return;
-    // Horizontal wheels/trackpads scroll natively. Shift-wheel is a continuous mouse fallback.
-    const wheel = (event: WheelEvent) => {
-      if (navigation.current.editing || !event.shiftKey || event.deltaX) return;
-      const scale =
-        event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? el.clientWidth : 1;
-      event.preventDefault();
-      el.scrollLeft += event.deltaY * scale;
-    };
-    const ended = () => settle();
-    el.addEventListener('wheel', wheel, { passive: false });
-    el.addEventListener('scrollend', ended);
-    return () => {
-      el.removeEventListener('wheel', wheel);
-      el.removeEventListener('scrollend', ended);
-      clearTimeout(settleTimer.current);
-    };
-  }, [settle]);
-
-  const finishDrag = () => {
-    const gesture = mouse.current;
-    mouse.current = null;
-    setDragging(false);
-    if (!gesture?.moved) return;
-    const el = viewport.current;
-    if (!el) return;
-    if (el.hasPointerCapture?.(gesture.pointerId))
-      el.releasePointerCapture(gesture.pointerId);
-    const index = Math.max(
-      0,
-      Math.min(cards.length - 1, Math.round(el.scrollLeft / step)),
-    );
-    el.style.scrollSnapType = 'x mandatory';
-    select(index);
-  };
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
   if (!count) return null;
+  const current = Math.min(active, count - 1);
   // On phones the strip runs almost edge to edge (2px gutters), like the feed below it.
   return (
     <section
@@ -258,204 +97,75 @@ export function WidgetCarousel({
     >
       <div
         ref={viewport}
-        className={`widget-carousel-viewport overflow-x-auto ${editing ? '' : 'cursor-grab'} ${dragging ? 'cursor-grabbing select-none' : ''}`}
-        style={{ scrollSnapType: editing || dragging ? 'none' : 'x mandatory' }}
+        className="widget-carousel-viewport relative overflow-x-auto"
+        style={{ scrollSnapType: editing ? 'none' : 'x mandatory' }}
         tabIndex={editing ? -1 : 0}
-        aria-label={`${cards[activeIndex]?.title} selected. Scroll or use left and right arrow keys to browse widgets.`}
-        onScroll={(event) => {
-          if (!width) return;
-          const left = event.currentTarget.scrollLeft;
-          const p = Math.max(0, Math.min(count - 1, left / step));
-          progress.current = p;
-          applyLayout(p);
-          if (editing) return;
-          const speed = Math.abs(left - lastLeft.current);
-          lastLeft.current = left;
-          const held = touching.current || !!mouse.current?.moved;
-          const away = Math.abs(p - restIndex.current) * step;
-          if (away > (held ? MOVE_SLOP_PX : FREE_SLOP_PX)) {
-            movingNow.current = true;
-            setMoving(true);
-          }
-          const nearest = Math.round(p);
-          if (
-            movingNow.current &&
-            !held &&
-            speed < ARRIVE_SPEED_PX &&
-            Math.abs(left - nearest * step) < ARRIVE_PX &&
-            (target.current === null || target.current === nearest)
-          ) {
-            target.current = null;
-            // Landed: expand now rather than after the snap's tail has died out.
-            clearTimeout(settleTimer.current);
-            settleTries.current = 0;
-            restIndex.current = nearest;
-            movingNow.current = false;
-            const landed = cards[nearest];
-            if (landed) setSelectedId(landed.id);
-            setMoving(false);
-            return;
-          }
-          // The footer names the widget nearest the middle while the strip is still moving.
-          const card = cards[Math.round(p)];
-          if (card && card.id !== activeId) setSelectedId(card.id);
-          scheduleSettle();
+        aria-label={`${cards[current]?.title} selected. Scroll or use left and right arrow keys to browse widgets.`}
+        onScroll={() => {
+          cancelAnimationFrame(frame.current);
+          frame.current = requestAnimationFrame(() => {
+            const view = viewport.current;
+            if (!view) return;
+            // The card resting nearest its own snap point is the one the dots name.
+            let nearest = 0;
+            let best = Infinity;
+            slots().forEach((el, index) => {
+              const distance = Math.abs(restFor(el, index) - view.scrollLeft);
+              if (distance < best) {
+                best = distance;
+                nearest = index;
+              }
+            });
+            setActive(nearest);
+          });
         }}
         onKeyDown={(event) => {
           if (editing || event.target !== event.currentTarget) return;
           if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
             event.preventDefault();
-            select(activeIndex + (event.key === 'ArrowRight' ? 1 : -1));
+            go(current + (event.key === 'ArrowRight' ? 1 : -1));
           }
-        }}
-        onPointerDown={(event) => {
-          swipeClick.current = false;
-          if (editing || event.pointerType !== 'mouse' || event.button !== 0)
-            return;
-          mouse.current = {
-            pointerId: event.pointerId,
-            x: event.clientX,
-            y: event.clientY,
-            left: event.currentTarget.scrollLeft,
-            moved: false,
-          };
-        }}
-        onPointerMove={(event) => {
-          const gesture = mouse.current;
-          if (!gesture || gesture.pointerId !== event.pointerId || editing)
-            return;
-          const dx = event.clientX - gesture.x;
-          if (!gesture.moved) {
-            if (Math.abs(dx) < 8) return;
-            if (Math.abs(dx) < Math.abs(event.clientY - gesture.y)) {
-              mouse.current = null;
-              return;
-            }
-            gesture.moved = true;
-            swipeClick.current = true;
-            event.currentTarget.setPointerCapture(event.pointerId);
-            // Disable snap synchronously so every drag movement follows the pointer.
-            event.currentTarget.style.scrollSnapType = 'none';
-            setDragging(true);
-          }
-          event.preventDefault();
-          event.currentTarget.scrollLeft = gesture.left - dx;
-        }}
-        onPointerUp={finishDrag}
-        onPointerCancel={finishDrag}
-        onLostPointerCapture={finishDrag}
-        onClickCapture={(event) => {
-          if (!swipeClick.current) return;
-          swipeClick.current = false;
-          event.preventDefault();
-          event.stopPropagation();
-        }}
-        onTouchStart={(event) => {
-          swipeClick.current = false;
-          touching.current = true;
-          target.current = null;
-          clearTimeout(settleTimer.current);
-          const first = event.touches[0];
-          touch.current =
-            !editing && event.touches.length === 1 && first
-              ? { x: first.clientX, y: first.clientY }
-              : null;
-        }}
-        onTouchMove={(event) => {
-          const start = touch.current;
-          const current = event.touches[0];
-          if (!start || !current) return;
-          const dx = Math.abs(current.clientX - start.x);
-          if (dx > 10 && dx > Math.abs(current.clientY - start.y))
-            swipeClick.current = true;
-        }}
-        onTouchEnd={(event) => {
-          touch.current = null;
-          if (event.touches.length) return;
-          touching.current = false;
-          // Released exactly on a snap point, no further scroll event will arrive.
-          if (!editing) scheduleSettle();
-        }}
-        onTouchCancel={() => {
-          touch.current = null;
-          touching.current = false;
-          if (!editing) scheduleSettle();
         }}
       >
-        <div
-          className="relative"
-          style={{
-            width: width ? width + (count - 1) * step : undefined,
-          }}
+        <SortableGrid
+          items={cards}
+          getId={(card) => card.id}
+          getLabel={(card) => card.title}
+          editing={editing}
+          onEditingChange={onEditingChange}
+          onOrderChange={onOrderChange}
+          onCommit={onCommit}
+          className="flex h-[184px] w-max items-stretch gap-2 sm:gap-3"
+          // Card widths come from CSS (`.widget-carousel-viewport .widget-slot`).
+          getItemStyle={(_card, index) => ({
+            flexShrink: 0,
+            scrollSnapAlign: snapAlign(index, count),
+          })}
         >
-          {/* One snap point per widget; the spacer only exists to be scrolled. */}
-          {cards.map((card, index) => (
-            <span
-              key={card.id}
-              aria-hidden="true"
-              className="pointer-events-none absolute top-0 h-px w-px"
-              style={{ left: index * step, scrollSnapAlign: 'start' }}
-            />
-          ))}
-          <div
-            ref={stage}
-            className="sticky left-0 overflow-x-clip"
-            style={{ width: width || undefined }}
-          >
-            <SortableGrid
-              items={cards}
-              getId={(card) => card.id}
-              getLabel={(card) => card.title}
-              editing={editing}
-              onEditingChange={onEditingChange}
-              onOrderChange={onOrderChange}
-              onCommit={onCommit}
-              className="flex h-[184px] items-stretch"
-              getItemStyle={(_card, index) =>
-                ({
-                  flexShrink: 0,
-                  marginRight: index < count - 1 ? gap : 0,
-                  // The faces are laid out at their final sizes, so they never reflow.
-                  '--widget-full': `${restWidth(index)}px`,
-                  '--widget-peek': `${peek}px`,
-                }) as CSSProperties
-              }
-            >
-              {(card, state) =>
-                children(
-                  card,
-                  state,
-                  card.id === activeId && (editing || !moving),
-                  () => select(state.index),
-                )
-              }
-            </SortableGrid>
-          </div>
-        </div>
+          {(card, state) => children(card, state)}
+        </SortableGrid>
       </div>
       {count > 1 && (
-        <div className="flex h-8 items-center justify-center gap-3 text-xs text-ink-faint">
-          <button
-            type="button"
-            className="flex h-8 w-8 items-center justify-center rounded-lg hover:text-ink disabled:opacity-25"
-            disabled={activeIndex <= 0 || editing}
-            aria-label="Previous widget"
-            onClick={() => select(activeIndex - 1)}
-          >
-            <ChevronLeft size={16} aria-hidden />
-          </button>
-          <span aria-live="polite" aria-atomic="true">
-            {cards[activeIndex]?.title} · {activeIndex + 1} / {count}
-          </span>
-          <button
-            type="button"
-            className="flex h-8 w-8 items-center justify-center rounded-lg hover:text-ink disabled:opacity-25"
-            disabled={activeIndex >= count - 1 || editing}
-            aria-label="Next widget"
-            onClick={() => select(activeIndex + 1)}
-          >
-            <ChevronRight size={16} aria-hidden />
-          </button>
+        <div className="flex h-7 items-center justify-center">
+          {cards.map((card, index) => (
+            <button
+              key={card.id}
+              type="button"
+              className="flex h-7 w-5 items-center justify-center"
+              aria-label={`Show ${card.title}`}
+              aria-current={index === current || undefined}
+              disabled={editing}
+              onClick={() => go(index)}
+            >
+              <span
+                aria-hidden
+                className={clsx(
+                  'h-1.5 rounded-full transition-[width,background-color] duration-200 motion-reduce:transition-none',
+                  index === current ? 'w-4 bg-ink' : 'w-1.5 bg-border',
+                )}
+              />
+            </button>
+          ))}
         </div>
       )}
     </section>
