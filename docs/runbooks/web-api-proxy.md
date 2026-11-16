@@ -16,7 +16,7 @@ calls Render directly and keeps tokens as before.
 | API origin | `https://life-portal.onrender.com` |
 | Where Vercel forwards `/api` | `https://life-portal.onrender.com/api` (in `vercel.json`) |
 
-If the API's origin changes, edit `dest` in `vercel.json` too.
+If the API's origin changes, edit `dest` in both `vercel.json` and `apps/web/vercel.json`.
 
 ## 1. A shared secret
 
@@ -60,7 +60,9 @@ Then **redeploy**. `NEXT_PUBLIC_*` values are baked in at build time, so a redep
    - `false` means the request reached the API without the secret. The two values differ, or
      `LP_PROXY_SECRET` is missing on Vercel (it is then sent as the literal text
      `$LP_PROXY_SECRET`).
-   - A Vercel 404 page means the `vercel.json` route is not active.
+   - **The app's sign-in page (or its "not found" page) means the route is not active**: Vercel
+     handed `/api/health` to the web app, which has no such page. Signing in then fails with
+     "Request failed". See "If `/api` shows the app" below.
 2. Reload the app. You should still be signed in: the first refresh moves your stored session
    into the cookie.
 3. In the browser's developer tools:
@@ -71,6 +73,22 @@ Then **redeploy**. `NEXT_PUBLIC_*` values are baked in at build time, so a redep
 4. On the iPhone, from the installed app, open it and reload: still signed in. Sign out and in
    again. Then turn on airplane mode and open the app: it opens as you, offline, as before.
 5. Settings → MCP shows the `onrender.com` address, not `/api`.
+
+## If `/api` shows the app
+
+Vercel reads `vercel.json` only from the project's **Root Directory** (Settings → Build and
+Deployment). A file anywhere else is ignored without a warning, and the deployment still says
+Ready. The route is therefore kept in two files with the same `routes`, `vercel.json` and
+`apps/web/vercel.json`, so it is active whether the project is rooted at the repo or at
+`apps/web` (a test fails if they differ).
+
+1. Check which Root Directory the project uses, and that the deployment is of a commit that has
+   the route in that directory's `vercel.json`.
+2. In the deployment's **Source** tab, open that `vercel.json` and confirm `routes` is there.
+3. Redeploy and open `/api/health` again.
+
+Until it works, roll back (below): sign-in is broken while the web calls a `/api` that nothing
+forwards.
 
 ## Rolling back
 
