@@ -14,9 +14,13 @@ interface Props {
   children: (card: WidgetCard, state: SortableState) => ReactNode;
 }
 
-/** Where a card snaps: the first to the left edge, the last to the right, the rest centred. */
-function snapAlign(index: number, count: number): 'start' | 'center' | 'end' {
-  return index === 0 ? 'start' : index === count - 1 ? 'end' : 'center';
+/**
+ * Where a card snaps: to the left edge, so the next card always shows the same slice of itself
+ * (its icon and the padding either side of it). The last card snaps to the right edge instead,
+ * so the strip never ends on an empty gutter.
+ */
+function snapAlign(index: number, count: number): 'start' | 'end' {
+  return count > 1 && index === count - 1 ? 'end' : 'start';
 }
 
 /**
@@ -28,8 +32,9 @@ function snapAlign(index: number, count: number): 'start' | 'center' | 'end' {
  * finger and swapped their content once the strip came to rest, and that wait after every swipe
  * was the thing people noticed. See docs/DECISIONS.md.
  *
- * The strip's two edges are "walls": where a card is cut by an edge, a thin line and a short fade
- * are drawn there, so the card reads as sliding behind glass. A wall shows only while a card is
+ * The strip's two edges are "walls": the strip clips with rounded corners, and where a card is
+ * cut by an edge its outline is closed there by a rounded line with a short fade, so the card
+ * reads as sliding behind glass. A wall shows only while a card is
  * actually crossing it, never over the gap between cards or at either end of the strip. That is
  * the one thing scrolling drives, and it is two attributes written straight to the DOM (no React
  * state, no layout change).
@@ -73,10 +78,7 @@ export function WidgetCarousel({
     if (!view) return 0;
     const align = snapAlign(index, count);
     const spare = view.clientWidth - el.offsetWidth;
-    return (
-      el.offsetLeft -
-      (align === 'start' ? 0 : align === 'end' ? spare : spare / 2)
-    );
+    return el.offsetLeft - (align === 'end' ? spare : 0);
   };
   const go = (index: number, immediate = false) => {
     const el = slots()[index];

@@ -11,9 +11,13 @@ User-visible changes. Newest first.
   edit and remove.
 - **Today, Foods and You are a tab strip with icons**, with the AI assistant and Log food at its
   end, on screen in every view.
-- **Home's widgets have a little more room at the sides**, and a card that runs off the edge
-  now looks like it slides behind glass: a thin line and a soft fade appear only where a card is
-  actually cut, never over the gap between cards or at either end.
+- **Home's widgets are glass cards**: a translucent, softly lit surface with a bright top edge,
+  like the cards on an iPhone.
+- **The next widget shows its icon** at the edge of the strip, with the same space around it as
+  inside its card. Every widget now rests against the left edge; the last one against the right.
+- **A widget that runs off the edge slides behind glass.** The strip still cuts it on a curve,
+  and its outline is closed there by a thin rounded line, only where a card is actually cut: never
+  over the gap between cards or at either end. The strip also has a little more room at the sides.
 
 ## 2026-11-16: A security policy for the web app, watching only for now
 

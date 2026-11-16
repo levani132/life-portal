@@ -2309,14 +2309,24 @@ snapping do all the moving (`widget-carousel.tsx` has no layout code; widths are
 **Snap points: first card left, last card right, the rest centred**, so a middle card shows a
 slice of both neighbours and the ends never leave an empty gutter.
 
-**The edges are walls (owner request, 2026-11-17).** The strip has 4 px gutters on a phone and a
-straight cut at each edge (no rounded clip). Where a card is cut by an edge, a hairline and a
-short fade are drawn there, so the card reads as sliding behind glass. The wall shows only while
-a card actually crosses that edge: never over the gap between two cards, never at the start or
-end of the strip, and with no fade-out, because a lingering line over empty space is exactly what
-was asked not to happen. This is the one thing scrolling drives: `cutEdges()` (pure, tested) and
-two attributes written straight to the DOM, with no React state and no layout change, so the
-"plain pager" rule above still holds.
+**Glass cards and walls (owner requests, 2026-11-17).** The cards are glass in the manner of iOS:
+a translucent, slightly lit surface with a bright top edge and a hairline border (`.home-widget`,
+inset light only, because the strip clips exactly at the cards' edges). The strip has 4 px
+gutters on a phone and clips with the cards' own radius, so a card leaving it is cut on a curve.
+Where a card is cut by an edge, its outline is closed there by a line in the card's border colour
+that follows that curve, with a short fade, so the card reads as sliding behind glass. The wall
+shows only while a card actually crosses that edge: never over the gap between two cards, never at
+the start or end of the strip, and with no fade-out, because a lingering line over empty space is
+exactly what was asked not to happen. This is the one thing scrolling drives: `cutEdges()` (pure,
+tested) and two attributes written straight to the DOM, with no React state and no layout change,
+so the "plain pager" rule above still holds. A first version cut the strip straight; the owner
+preferred the rounded cut.
+
+**The slice of the next card is its icon and its padding** (same request). Cards are 65 px
+narrower than the strip on a phone: border, padding, the 32 px icon, padding, and the gap. For
+that slice to be the same on every card, **every card now snaps to the left edge, and only the
+last to the right**; this replaces "the rest centred" above, where a middle card showed half a
+slice of each neighbour.
 
 **Still opens on Food** wherever it sits in the order, as spec 008 asked. Long-press to arrange
 is unchanged. Dragging the strip with a mouse was dropped with the rest: dots, arrow keys and a
