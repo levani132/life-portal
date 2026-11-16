@@ -371,8 +371,8 @@ database kind still publishes only live foods.
 The Food page shares Training's visual language (owner request, 2026-11-17). Display only; nothing
 here is stored or changes a figure.
 
-- **Tab strip** (`app/nutrition/page.tsx`): Today, Foods and You with icons, in the same rounded
-  strip as Training's tabs, followed by two trailing cells: the AI assistant link and **Log food**
+- **Tab strip** (`app/nutrition/page.tsx`): Today, Foods and You with icons, in the same glass
+  strip as Training's tabs (`.glass-tabs`, selected tab `.glass-tab-on`, in `global.css`), followed by two trailing cells: the AI assistant link and **Log food**
   (the accent cell, on screen in every view).
 - **`FoodHero`** (`components/food-day.tsx`) opens Today: the day on a gradient with the day
   arrows, "Today" and Share, and **the current week as seven days to tap** (`overview.week`). A

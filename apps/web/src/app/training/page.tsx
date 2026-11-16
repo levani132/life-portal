@@ -68,7 +68,7 @@ function Training() {
         action={<TrainingSettingsButton placement="hero" onClick={() => setSettings(true)} />}
       />
       <div
-        className="mb-4 flex items-stretch gap-1 rounded-2xl border border-border bg-surface-raised p-1 shadow-sm"
+        className="glass-tabs mb-4 flex items-stretch gap-1 rounded-2xl border p-1"
         data-no-tab-swipe
       >
         <div role="tablist" aria-label="Training" className="grid min-w-0 flex-1 grid-cols-4 gap-1">
@@ -82,8 +82,8 @@ function Training() {
                 role="tab"
                 aria-selected={selected}
                 className={clsx(
-                  'flex min-h-[3rem] flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-xs font-semibold transition-colors',
-                  selected ? 'bg-accent-solid text-on-accent shadow' : 'text-ink-muted hover:bg-surface hover:text-ink',
+                  'flex min-h-[3rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-transparent px-1 py-1.5 text-xs font-semibold transition-colors',
+                  selected ? 'glass-tab-on' : 'text-ink-muted hover:bg-ink/5 hover:text-ink',
                 )}
                 onClick={() => setTab(item.id)}
               >

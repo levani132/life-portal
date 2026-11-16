@@ -24,7 +24,7 @@ export function TrainingSettingsButton({ placement, onClick }: { placement: 'her
         placement === 'hero'
           ? 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition-colors hover:bg-white/25'
           : // Issue #30: the trailing cell of Training's tab strip, quieter than the tabs.
-            'flex min-h-[3rem] w-11 shrink-0 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-surface hover:text-ink'
+            'flex min-h-[3rem] w-11 shrink-0 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-ink/5 hover:text-ink'
       }
       onClick={onClick}
       aria-label="Training settings"

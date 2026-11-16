@@ -162,7 +162,7 @@ function Nutrition() {
       {/* The same strip as Training: the views as tabs, then the page's own actions as trailing
           cells. Logging is the accent cell, on screen in every view. */}
       <header
-        className="mb-4 flex items-stretch gap-1 rounded-2xl border border-border bg-surface-raised p-1 shadow-sm"
+        className="glass-tabs mb-4 flex items-stretch gap-1 rounded-2xl border p-1"
         aria-label="Food controls"
         data-no-tab-swipe
       >
@@ -177,8 +177,8 @@ function Nutrition() {
                 onClick={() => setTab(option.id)}
                 aria-pressed={selected}
                 className={clsx(
-                  'flex min-h-[3rem] flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-xs font-semibold transition-colors',
-                  selected ? 'bg-accent-solid text-on-accent shadow' : 'text-ink-muted hover:bg-surface hover:text-ink',
+                  'flex min-h-[3rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-transparent px-1 py-1.5 text-xs font-semibold transition-colors',
+                  selected ? 'glass-tab-on' : 'text-ink-muted hover:bg-ink/5 hover:text-ink',
                 )}
               >
                 <Icon className="h-4 w-4" aria-hidden />
@@ -189,7 +189,7 @@ function Nutrition() {
         </div>
         <Link
           href="/settings/mcp"
-          className="flex min-h-[3rem] w-11 shrink-0 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-surface hover:text-ink"
+          className="flex min-h-[3rem] w-11 shrink-0 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-ink/5 hover:text-ink"
           aria-label="Connect AI assistant"
           title="Connect AI assistant"
         >
