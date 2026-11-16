@@ -2,6 +2,7 @@ import type { Measure, PlanTarget } from '@life-portal/shared-types';
 import {
   planDayUpdate,
   targetsFromSets,
+  workoutAsPlanDay,
   type PlanDayExercise,
   type PlanUpdateSessionExercise,
   type PlanUpdateSet,
@@ -192,5 +193,40 @@ describe('planDayUpdate', () => {
     const diff = planDayUpdate({ day, lookup, session: [asPlanned(day[0])], removed: ['p2'] });
     expect(diff.before.map((line) => line.name)).toEqual(['Bench press', 'Barbell row', 'Cable fly']);
     expect(diff.after.map((line) => line.name)).toEqual(['Bench press', 'Cable fly']);
+  });
+});
+
+describe('workoutAsPlanDay', () => {
+  const row = (exerciseId: string, sets: PlanUpdateSessionExercise['sets'], extra: Partial<PlanUpdateSessionExercise> = {}): PlanUpdateSessionExercise => ({
+    exerciseId,
+    name: exerciseId,
+    measure: 'weight_reps',
+    sets,
+    ...extra,
+  });
+
+  it('keeps exercises with logged sets, in order, with targets that never carry a weight', () => {
+    const day = workoutAsPlanDay([
+      row('bench', [{ type: 'warmup', reps: 10 }, { type: 'working', reps: 5 }], { restSeconds: 120 }),
+      row('untouched', []),
+      row('plank', [{ type: 'working', durationSeconds: 45, reps: 3 }], { measure: 'duration' }),
+    ]);
+    expect(day.exercises).toEqual([
+      { exerciseId: 'bench', restSeconds: 120, targets: [{ type: 'warmup', reps: 10 }, { type: 'working', reps: 5 }] },
+      { exerciseId: 'plank', targets: [{ type: 'working', durationSeconds: 45 }] },
+    ]);
+    expect(day.lines.map((item) => item.name)).toEqual(['bench', 'plank']);
+    expect(day.lines.every((item) => item.change === undefined)).toBe(true);
+  });
+
+  it('drops a superset key left without a neighbour', () => {
+    const one = [{ type: 'working', reps: 8 }];
+    const day = workoutAsPlanDay([
+      row('a', one, { superset: 's1' }),
+      row('b', one, { superset: 's1' }),
+      row('c', one, { superset: 's2' }),
+      row('d', [], { superset: 's2' }),
+    ]);
+    expect(day.exercises.map((exercise) => exercise.superset)).toEqual(['s1', 's1', undefined]);
   });
 });

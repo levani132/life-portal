@@ -235,3 +235,11 @@ export class PlanDayUpdateDto {
   @IsUUID() requestId!: string;
   @IsInt() @Min(0) revision!: number;
 }
+
+/** Save a finished ad-hoc workout as a new workout of an own plan (`planId`) or of a new plan (`planName`). */
+export class PlanSaveDto {
+  @IsUUID() requestId!: string;
+  @IsString() @MinLength(1) @MaxLength(PLAN_LIMITS.name) workoutName!: string;
+  @IsOptional() @IsMongoId() planId?: string;
+  @IsOptional() @IsString() @MaxLength(PLAN_LIMITS.name) planName?: string;
+}

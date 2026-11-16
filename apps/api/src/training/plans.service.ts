@@ -38,26 +38,32 @@ export class PlansService {
   ) {}
 
   /**
-   * The caller's sessions started from a plan, as progress reads them (research R8). Open ones
-   * count; deleted ones are simply gone. `filter` narrows by plan or by day.
+   * The caller's sessions that count for a plan, as progress reads them (research R8): those
+   * started from one, and ad-hoc ones saved into one afterwards (`planUpdate` with no `plan`),
+   * which count for the workout they became. Open ones count; deleted ones are simply gone.
+   * A plan workout that updated its day (#15) still counts only for the plan it was started from.
    */
-  private async sessionRefs(userId: string, filter: Record<string, unknown>): Promise<PlanSessionRef[]> {
+  private async sessionRefs(userId: string, { planIds, since }: { planIds?: string[]; since?: string }): Promise<PlanSessionRef[]> {
     if (!this.sessions) return [];
-    const rows = await this.sessions
-      .find({ userId, 'plan.planId': { $exists: true }, ...filter })
-      .select('plan.planId plan.planWorkoutId day startedAt')
-      .lean<{ plan: { planId: string; planWorkoutId: string }; day: string; startedAt?: Date }[]>();
-    return rows.map((row) => ({
-      planId: row.plan.planId,
-      planWorkoutId: row.plan.planWorkoutId,
-      day: row.day,
-      startedAt: row.startedAt ? new Date(row.startedAt).getTime() : 0,
-    }));
+    type Ref = { planId: string; planWorkoutId: string };
+    type Row = { plan?: Ref; planUpdate?: Ref; day: string; startedAt?: Date };
+    const of = planIds ? { $in: planIds } : { $exists: true };
+    const day = since ? { day: { $gte: since } } : {};
+    const fields = 'plan.planId plan.planWorkoutId planUpdate.planId planUpdate.planWorkoutId day startedAt';
+    const [started, saved] = await Promise.all([
+      this.sessions.find({ userId, 'plan.planId': of, ...day }).select(fields).lean<Row[]>(),
+      this.sessions.find({ userId, 'plan.planId': { $exists: false }, 'planUpdate.planId': of, ...day }).select(fields).lean<Row[]>(),
+    ]);
+    return [...started, ...saved].flatMap((row) => {
+      const ref = row.plan ?? row.planUpdate;
+      if (!ref) return [];
+      return [{ planId: ref.planId, planWorkoutId: ref.planWorkoutId, day: row.day, startedAt: row.startedAt ? new Date(row.startedAt).getTime() : 0 }];
+    });
   }
 
   private async withProgress(userId: string, rows: PlanRow[]): Promise<PlanListItem[]> {
     const ids = rows.map((row) => String(row._id));
-    const sessions = ids.length ? await this.sessionRefs(userId, { 'plan.planId': { $in: ids } }) : [];
+    const sessions = ids.length ? await this.sessionRefs(userId, { planIds: ids }) : [];
     return rows.map((row) => {
       const item = toListItem(row);
       const id = String(row._id);
@@ -77,7 +83,7 @@ export class PlansService {
 
   /** Up to three plans the caller used in the 28 days up to `today`, most recent first. */
   async suggested(userId: string, today: string): Promise<PlanListItem[]> {
-    const sessions = await this.sessionRefs(userId, { day: { $gte: addDays(today, -27) } });
+    const sessions = await this.sessionRefs(userId, { since: addDays(today, -27) });
     // Plans deleted or archived since drop out; look at a few more so three can still show.
     const ids = recentPlanIds(sessions, today, 28, 10).filter(isValidObjectId);
     if (!ids.length) return [];
@@ -124,7 +130,7 @@ export class PlansService {
     const byId = new Map(exercises.map((exercise) => [String(exercise._id), exercise]));
     const progress = planProgress(
       row.workouts.map((workout) => workout.id),
-      await this.sessionRefs(userId, { 'plan.planId': String(row._id) }),
+      await this.sessionRefs(userId, { planIds: [String(row._id)] }),
     );
     return {
       id: String(row._id),
@@ -254,6 +260,40 @@ export class PlansService {
       { arrayFilters: [{ 'day.id': workoutId }], runValidators: true },
     );
     if (!result.matchedCount) throw planChanged(stored.name);
+  }
+
+  /**
+   * Adds a workout (day) to the end of an own plan, with the id the caller chose. Validated as a
+   * whole plan, so a full plan refuses. Adding an id the plan already has changes nothing, which
+   * is what makes a retry safe.
+   */
+  async addDay(
+    userId: string,
+    id: string,
+    day: { id: string; name: string; exercises: PlanInput['workouts'][number]['exercises'] },
+  ): Promise<void> {
+    const row = await this.own(userId, id);
+    if (row.workouts.some((workout) => workout.id === day.id)) return;
+    const input: PlanInput = {
+      name: row.name,
+      ...(row.description ? { description: row.description } : {}),
+      workouts: [
+        ...row.workouts.map((workout) => ({ id: workout.id, name: workout.name, exercises: workout.exercises.map(toExerciseInput) })),
+        day,
+      ],
+    };
+    const clean = await this.checked(
+      userId,
+      input,
+      new Map<string, unknown>([...row.workouts.map((workout) => [workout.id, workout] as const), [day.id, day]]),
+      new Map(row.workouts.flatMap((workout) => workout.exercises.map((exercise) => [exercise.id, exercise] as const))),
+    );
+    const added = clean.workouts[clean.workouts.length - 1];
+    await this.plans.updateOne(
+      { _id: row._id, userId, 'workouts.id': { $ne: day.id } },
+      { $push: { workouts: added } },
+      { runValidators: true },
+    );
   }
 
   /** Any plan the caller can see, as a new own plan with new ids. Never linked to the original. */

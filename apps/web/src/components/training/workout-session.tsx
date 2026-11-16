@@ -68,6 +68,7 @@ import { exerciseRest, sessionFocus, setGoal } from '../../lib/training-workout'
 import { SetForm, type SetFormValue } from './set-row';
 import { SetTable } from './set-table';
 import { PlanDayUpdate } from './plan-day-update';
+import { SaveWorkoutToPlan } from './save-to-plan';
 import { FinishSheet } from './finish-sheet';
 import { WorkoutRecapView } from './workout-recap';
 
@@ -415,6 +416,8 @@ export function WorkoutSession({
 
       {/* Issue #15: a finished plan workout may offer to update its plan day. Never blocks. */}
       {!open && session.plan && <PlanDayUpdate sessionId={session.id} />}
+      {/* One not started from a plan may be saved as a plan workout. */}
+      {!open && !session.plan && <SaveWorkoutToPlan sessionId={session.id} />}
 
       {/* Outside the card, so it can stick while the exercises scroll (see RestTimer). */}
       {open && <RestTimer since={session.lastSetAt} seconds={focus.restSeconds} next={upNext} />}

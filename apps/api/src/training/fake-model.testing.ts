@@ -3,7 +3,7 @@ import { Types } from 'mongoose';
 /**
  * A tiny in-memory stand-in for a Mongoose model, for the training service specs. It supports
  * the query shapes those services use (equality, `$in`, `$ne`, `$lt`, `$exists`, `$or`, `$elemMatch`,
- * `$addToSet`, `$[name]` array filters,
+ * `$addToSet`, `$push`, `$[name]` array filters,
  * sort/limit/skip/select/lean) and unique indexes, which is what the invariants under test
  * depend on. It is not a general Mongo emulator.
  */
@@ -64,7 +64,10 @@ export function matches(doc: Doc, filter: Filter): boolean {
     if (key === '$or') return (condition as Filter[]).some((branch) => matches(doc, branch));
     // Like Mongo, a dotted path reaches through arrays ("workouts.exercises.exerciseId").
     const values = walk(doc, key.split('.'));
-    return values.length === 1 ? matchesValue(values[0], condition) : values.some((value) => matchesValue(value, condition));
+    if (values.length === 1) return matchesValue(values[0], condition);
+    // Like Mongo, `$ne` across an array means no element equals it.
+    const negated = Boolean(condition && typeof condition === 'object' && '$ne' in (condition as object));
+    return negated ? values.every((value) => matchesValue(value, condition)) : values.some((value) => matchesValue(value, condition));
   });
 }
 
@@ -158,6 +161,10 @@ export class FakeModel {
       const { at, last } = parent(path);
       const list = ((at[last] as unknown[] | undefined) ??= []);
       if (!list.some((item) => same(item, value))) list.push(clone(value));
+    }
+    for (const [path, value] of Object.entries(update['$push'] ?? {})) {
+      const { at, last } = parent(path);
+      ((at[last] as unknown[] | undefined) ??= []).push(clone(value));
     }
     for (const path of Object.keys(update['$unset'] ?? {})) {
       const { at, last } = parent(path);

@@ -91,6 +91,34 @@ export function targetsFromSets(measure: Measure, sets: readonly PlanUpdateSet[]
   });
 }
 
+/**
+ * A finished ad-hoc workout as a plan day: every exercise with at least one logged set, in the
+ * order done, with planned sets from the logged ones (`targetsFromSets`, so never a weight) and
+ * the workout's own rest. A superset key is kept only where two neighbours still share it.
+ */
+export function workoutAsPlanDay(session: readonly PlanUpdateSessionExercise[]): {
+  exercises: PlanExerciseInput[];
+  lines: PlanDayLine[];
+} {
+  const done = session.filter((row) => row.sets.length);
+  const exercises: PlanExerciseInput[] = [];
+  const lines: PlanDayLine[] = [];
+  done.forEach((row, index) => {
+    const paired =
+      row.superset !== undefined && (done[index - 1]?.superset === row.superset || done[index + 1]?.superset === row.superset);
+    const superset = paired ? row.superset : undefined;
+    const targets = targetsFromSets(row.measure, row.sets);
+    exercises.push({
+      exerciseId: row.exerciseId,
+      ...(row.restSeconds != null ? { restSeconds: row.restSeconds } : {}),
+      ...(superset ? { superset } : {}),
+      targets,
+    });
+    lines.push(line(row.name, row.measure, targets, row.restSeconds, superset));
+  });
+  return { exercises, lines };
+}
+
 /** Indices (into `seq`) of one longest increasing subsequence: the items that did not move. */
 function longestIncreasing(seq: readonly number[]): Set<number> {
   const tails: number[] = [];

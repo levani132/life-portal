@@ -560,8 +560,10 @@ export type PlanDayUpdateStatus =
   | 'open'
   /** This workout already updated its plan day; it does so once. */
   | 'applied'
-  /** Not started from a plan (ad-hoc): never offered. */
+  /** Not started from a plan (ad-hoc) and nothing to save: open, or no logged sets. */
   | 'not_from_plan'
+  /** A finished ad-hoc workout with logged sets: it can be saved as a new plan workout. */
+  | 'saveable'
   /** The plan or the day is gone. */
   | 'missing'
   /** The change would leave the day invalid (e.g. a superset split up); nothing is offered. */
@@ -590,6 +592,17 @@ export interface PlanDayUpdatePreview {
 export interface PlanDayUpdateInput {
   requestId: string;
   revision: number;
+}
+
+/**
+ * Save a finished ad-hoc workout as a new workout (day) of a plan: an own plan (`planId`), or a
+ * new plan made on the spot (`planName`). Exactly one of the two.
+ */
+export interface PlanSaveInput {
+  requestId: string;
+  workoutName: string;
+  planId?: string;
+  planName?: string;
 }
 
 export interface PlanDayUpdateResult {
