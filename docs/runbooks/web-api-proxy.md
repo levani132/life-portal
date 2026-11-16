@@ -88,22 +88,6 @@ Then **redeploy**. `NEXT_PUBLIC_*` values are baked in at build time, so a redep
    again. Then turn on airplane mode and open the app: it opens as you, offline, as before.
 5. Settings → MCP shows the `onrender.com` address, not `/api`.
 
-## If `/api` shows the app
-
-Vercel reads `vercel.json` only from the project's **Root Directory** (Settings → Build and
-Deployment). A file anywhere else is ignored without a warning, and the deployment still says
-Ready. The route is therefore kept in two files with the same `routes`, `vercel.json` and
-`apps/web/vercel.json`, so it is active whether the project is rooted at the repo or at
-`apps/web` (a test fails if they differ).
-
-1. Check which Root Directory the project uses, and that the deployment is of a commit that has
-   the route in that directory's `vercel.json`.
-2. In the deployment's **Source** tab, open that `vercel.json` and confirm `routes` is there.
-3. Redeploy and open `/api/health` again.
-
-Until it works, roll back (below): sign-in is broken while the web calls a `/api` that nothing
-forwards.
-
 ## Rolling back
 
 Set `NEXT_PUBLIC_API_URL` back to `https://life-portal.onrender.com/api` on Vercel and redeploy.

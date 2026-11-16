@@ -2327,17 +2327,6 @@ by Safari, which is the installed iPhone app. The owner chose a Vercel rewrite o
 for now; a single domain behind a load balancer keeps the same `/api` shape later. The rewrite is a
 `vercel.json` route, which runs at the CDN with no function and no cold start.
 
-**The route lives in two `vercel.json` files (found after the switch, 2026-11-16).** After the
-owner switched production over, `/api/health` rendered the app's sign-in page: Vercel had given
-the request to Next.js, so the route was not active, although the deployment was Ready. Vercel
-reads `vercel.json` only from the project's Root Directory. The 2026-08-18 entry says that is the
-repo root, but the committed `outputDirectory` has been `.next` since "Fix output dir" that same
-day, and Nx writes the build to `apps/web/.next`, which only resolves from a Root Directory of
-`apps/web`. From there the root `vercel.json` is never read. The same `routes` are now also in
-`apps/web/vercel.json`, with a test that the two match, so the route is active from either root.
-This was diagnosed from the repository, without access to the Vercel project; the runbook says how
-to confirm it there.
-
 **Cookie mode follows the build, not a flag.** It is on exactly when `NEXT_PUBLIC_API_URL` is
 relative. Shipping the code first changes nothing; switching the variable turns it on. A stored
 token moves into the cookie on its first refresh, so nobody is signed out, and the API keeps
