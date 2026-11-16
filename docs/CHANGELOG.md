@@ -2,6 +2,19 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-17: Home no longer goes blank on a bad connection
+
+- **A failed refresh keeps your Home cards** and shows "Showing what was last loaded" with
+  Try again, instead of replacing everything with "No connection."
+- **Home comes back by itself** when you return to the app, when the network comes back, or a few
+  seconds after a dropped request or a server error.
+- **Errors say what happened:** you're offline, the server can't be reached, or the server is having
+  trouble.
+- **Offline, Home explains that it needs a connection** (its figures aren't kept on the device) and
+  links to Training and Food, which work offline.
+- **A server outage no longer signs you out.** Opening the app while the server had trouble used to
+  show the sign-in page.
+
 ## 2026-11-17: A more colourful Food page, and Home widgets that slide behind glass
 
 - **The Food page has the look of Training.** The day opens with a colourful card showing what's

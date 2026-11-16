@@ -5,6 +5,7 @@ import useSWR, { mutate as globalMutate, type SWRConfiguration } from 'swr';
 import type { Currency, UserSettings } from '@life-portal/shared-types';
 import { ApiError, NetworkError } from './api';
 import { getWithOfflineCopy } from './offline/reads';
+import { loadErrorKind, retriesOnItsOwn, retryDelayMs } from './load-error';
 
 /**
  * SWR bound to the API client.
@@ -21,6 +22,25 @@ export function useApi<T>(path: string | null, config?: SWRConfiguration<T>) {
     ...config,
   });
 }
+
+/**
+ * Issue #34: for a screen that must come back on its own after a failed read (Home, the shell).
+ * Reads again when the app becomes visible or the network returns, and retries a dropped request
+ * or a 5xx with backoff while visible. A 4xx, an ended session or being offline are not retried:
+ * the next attempt would answer the same, and coming back online reads again anyway.
+ */
+export const RECOVERS: SWRConfiguration = {
+  revalidateOnFocus: true,
+  revalidateOnReconnect: true,
+  shouldRetryOnError: true,
+  onErrorRetry: (error, _key, _config, revalidate, { retryCount }) => {
+    if (!retriesOnItsOwn(loadErrorKind(error))) return;
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    const delay = retryDelayMs(retryCount);
+    if (delay === undefined) return;
+    setTimeout(() => void revalidate({ retryCount }), delay);
+  },
+};
 
 /**
  * The currency a new record should default to.

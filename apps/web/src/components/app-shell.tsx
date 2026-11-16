@@ -17,7 +17,7 @@ import {
 import type { PortalState } from '@life-portal/shared-types';
 import { moduleForPath } from '@life-portal/shared-domain';
 import { useAuth } from '../lib/auth-context';
-import { useApi } from '../lib/hooks';
+import { RECOVERS, useApi } from '../lib/hooks';
 import { Dashboard } from './home-dashboard';
 import { MenuContent } from './menu-content';
 import { Inbox, messagingAvailable, useUnreadMessages } from './messages';
@@ -31,7 +31,7 @@ import { ProfileView } from './social';
 import { useBadgeCheckOnStart } from '../lib/badges';
 import { TabHost, type HostTab } from './tab-host';
 import { WorkoutBar } from './training/workout-bar';
-import { ErrorNote } from './ui';
+import { LoadProblem } from './load-problem';
 
 /** Routes that render without the portal: signing in and creating an account. */
 const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/auth/google'];
@@ -56,7 +56,7 @@ function Portal({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const portalLive = useApi<PortalState>(user ? '/portal' : null, {
-    revalidateOnFocus: true,
+    ...RECOVERS,
     refreshInterval: 30000,
   });
   // Spec 027: without a connection the shell opens from the last portal state this account saw.
@@ -85,11 +85,8 @@ function Portal({ children }: { children: ReactNode }) {
   if (portal.error)
     return (
       <div className="mx-auto max-w-lg p-6">
-        <ErrorNote message={(portal.error as Error).message} />
-        <button className="btn mt-4" onClick={() => void portal.mutate()}>
-          Try again
-        </button>
-        <button className="btn ml-3 mt-4" onClick={() => void logout()}>
+        <LoadProblem error={portal.error} onRetry={() => void portal.mutate()} />
+        <button className="btn mt-4" onClick={() => void logout()}>
           Sign out
         </button>
       </div>
