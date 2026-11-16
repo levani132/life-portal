@@ -396,7 +396,9 @@
 }
 /*
  * The slice of the next card is its icon with its padding on both sides: border 1 + padding 12 +
- * icon 32 + padding 12 = 57px, plus the 8px gap (wider padding and gap from `sm`). Change the
+ * icon 32 + padding 12 = 57px, plus the 8px gap (wider padding and gap from `sm`). That is what
+ * shows beside the first card; a centred card splits it between its two neighbours, so their
+ * icons are cut. Change the
  * card's `px-*` or icon size in `home-widget.tsx` and these with it.
  */
 .widget-carousel-viewport .widget-slot {

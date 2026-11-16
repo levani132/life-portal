@@ -2322,11 +2322,12 @@ tested) and two attributes written straight to the DOM, with no React state and 
 so the "plain pager" rule above still holds. A first version cut the strip straight; the owner
 preferred the rounded cut.
 
-**The slice of the next card is its icon and its padding** (same request). Cards are 65 px
-narrower than the strip on a phone: border, padding, the 32 px icon, padding, and the gap. For
-that slice to be the same on every card, **every card now snaps to the left edge, and only the
-last to the right**; this replaces "the rest centred" above, where a middle card showed half a
-slice of each neighbour.
+**Beside the first card, the next one shows its icon and its padding** (same request). Cards are
+65 px narrower than the strip on a phone: border, padding, the 32 px icon, padding, and the gap.
+The snap points are unchanged (first left, last right, the rest centred), so a centred card
+splits that width between its two neighbours and their icons are cut; the owner asked for exactly
+that. A version that snapped every card to the left, to show the whole icon each time, was
+rejected the same day.
 
 **Still opens on Food** wherever it sits in the order, as spec 008 asked. Long-press to arrange
 is unchanged. Dragging the strip with a mouse was dropped with the rest: dots, arrow keys and a

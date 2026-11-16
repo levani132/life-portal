@@ -68,11 +68,11 @@ beforeEach(() => {
 });
 afterEach(() => jest.restoreAllMocks());
 
-it('snaps every card to the left edge and the last one to the right', () => {
+it('snaps the first card to the left, the last to the right and the rest to the middle', () => {
   mount();
   expect(
     screen.getAllByRole('listitem').map((el) => el.style.scrollSnapAlign),
-  ).toEqual(['start', 'start', 'end']);
+  ).toEqual(['start', 'center', 'end']);
   expect(viewport().style.scrollSnapType).toBe('x mandatory');
 });
 
@@ -82,11 +82,11 @@ it('shows no dots for a single widget', () => {
   expect(screen.queryByRole('button', { name: /^Show / })).toBeNull();
 });
 
-it('opens on Food, against the left edge, without animating', () => {
+it('opens on Food, centred, without animating', () => {
   mount();
-  // Food is the middle card: its own left edge.
+  // Food is the middle card: its left edge minus half the spare width.
   expect(scrollTo).toHaveBeenCalledWith({
-    left: CARD + GAP,
+    left: CARD + GAP - (VIEW - CARD) / 2,
     behavior: 'instant',
   });
   expect(

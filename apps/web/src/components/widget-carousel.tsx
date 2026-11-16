@@ -15,12 +15,12 @@ interface Props {
 }
 
 /**
- * Where a card snaps: to the left edge, so the next card always shows the same slice of itself
- * (its icon and the padding either side of it). The last card snaps to the right edge instead,
- * so the strip never ends on an empty gutter.
+ * Where a card snaps: the first to the left edge, the last to the right, the rest centred. On the
+ * first card the next one shows its whole icon; on a centred card each neighbour shows a thinner
+ * slice, with its icon cut.
  */
-function snapAlign(index: number, count: number): 'start' | 'end' {
-  return count > 1 && index === count - 1 ? 'end' : 'start';
+function snapAlign(index: number, count: number): 'start' | 'center' | 'end' {
+  return index === 0 ? 'start' : index === count - 1 ? 'end' : 'center';
 }
 
 /**
@@ -78,7 +78,7 @@ export function WidgetCarousel({
     if (!view) return 0;
     const align = snapAlign(index, count);
     const spare = view.clientWidth - el.offsetWidth;
-    return el.offsetLeft - (align === 'end' ? spare : 0);
+    return el.offsetLeft - (align === 'start' ? 0 : align === 'end' ? spare : spare / 2);
   };
   const go = (index: number, immediate = false) => {
     const el = slots()[index];

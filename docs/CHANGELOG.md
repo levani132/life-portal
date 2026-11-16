@@ -13,8 +13,8 @@ User-visible changes. Newest first.
   end, on screen in every view.
 - **Home's widgets are glass cards**: a translucent, softly lit surface with a bright top edge,
   like the cards on an iPhone.
-- **The next widget shows its icon** at the edge of the strip, with the same space around it as
-  inside its card. Every widget now rests against the left edge; the last one against the right.
+- **Beside the first widget, the next one shows its icon**, with the same space around it as
+  inside its card. A widget in the middle still sits centred, with a slice of each neighbour.
 - **A widget that runs off the edge slides behind glass.** The strip still cuts it on a curve,
   and its outline is closed there by a thin rounded line, only where a card is actually cut: never
   over the gap between cards or at either end. The strip also has a little more room at the sides.
