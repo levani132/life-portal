@@ -29,9 +29,11 @@ export class LoginDto {
 }
 
 export class RefreshDto {
+  /** Absent when the web sends it as the `lp_refresh` cookie instead (issue #29). */
+  @IsOptional()
   @IsString()
   @MinLength(1)
-  refreshToken!: string;
+  refreshToken?: string;
 }
 
 export class ChangePasswordDto {

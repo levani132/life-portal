@@ -15,12 +15,10 @@ import {
   Panel,
   Spinner,
 } from '../../../components/ui';
-import { api } from '../../../lib/api';
+import { api, externalApiUrl } from '../../../lib/api';
 import { useAction, useApi } from '../../../lib/hooks';
 
-const INGEST_URL = `${
-  process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3333/api'
-}/spending/ingest`;
+const ingestUrl = () => `${externalApiUrl()}/spending/ingest`;
 
 export default function IngestTokensPage() {
   return (
@@ -280,8 +278,8 @@ function SetupInstructions({ token }: { token?: string }) {
         <div className="rounded-lg border border-border bg-surface p-3">
           <p className="label">Endpoint</p>
           <div className="flex flex-wrap items-center gap-2">
-            <code className="min-w-0 flex-1 break-all text-xs text-ink">{INGEST_URL}</code>
-            <CopyButton value={INGEST_URL} label="Copy URL" />
+            <code className="min-w-0 flex-1 break-all text-xs text-ink">{ingestUrl()}</code>
+            <CopyButton value={ingestUrl()} label="Copy URL" />
           </div>
           {token ? (
             <div className="mt-3">

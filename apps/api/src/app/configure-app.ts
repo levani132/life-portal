@@ -4,6 +4,7 @@ import type { Request, Response, NextFunction } from 'express';
 import type { AppConfig } from '../config/configuration';
 import { McpOAuthService } from '../mcp/oauth.service';
 import { healthValidationException } from '../nutrition/health-validation';
+import { webProxyMiddleware } from './web-proxy';
 
 /**
  * Everything `main.ts` does to the app between creating it and listening. Shared with the
@@ -17,6 +18,8 @@ export function configureApp(app: NestExpressApplication, config: AppConfig): vo
   // without it every request would carry the proxy's address and share one limit. Never trust
   // more hops than really exist, or a client could choose its own IP.
   if (config.trustProxyHops > 0) app.getHttpAdapter().getInstance().set('trust proxy', config.trustProxyHops);
+  // Issue #29: requests through the web app's own `/api` carry a proof and the visitor's address.
+  app.use(webProxyMiddleware(config.webProxySecret));
   const oauth = app.get(McpOAuthService);
   if (oauth.enabled) app.use(oauth.router());
 

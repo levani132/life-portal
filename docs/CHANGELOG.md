@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-16: Your session can no longer be read by scripts
+
+- **Once the deployment is switched over** (`docs/runbooks/web-api-proxy.md`), the app talks to
+  the API through its own address. Your sign-in then lives in a cookie that no script on the
+  page can read, instead of in browser storage. You stay signed in through the change.
+- Settings → MCP and the Shortcut page keep showing the API's direct address for those apps.
+
 ## 2026-11-16: Home widgets are a simple swipe
 
 - **Every widget on Home is now one full card.** Swipe sideways and the next one is already

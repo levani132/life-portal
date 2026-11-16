@@ -1,5 +1,7 @@
-import { Body, Controller, Delete, Get, Headers, HttpCode, Ip, Post, Query, Res } from '@nestjs/common';
-import type { Response } from 'express';
+import { Body, Controller, Delete, Get, Headers, HttpCode, Inject, Ip, Post, Query, Req, Res } from '@nestjs/common';
+import type { Request, Response } from 'express';
+import { CONFIG, type AppConfig } from '../../config/configuration';
+import { SessionCookies } from '../session-cookie';
 import type { GoogleExchangeResult, SignInMethods } from '@life-portal/shared-types';
 import { CurrentUser, Public } from '../current-user.decorator';
 import { GoogleExchangeDto, GoogleLinkPasswordDto, GoogleSignupDto } from '../dto/auth.dto';
@@ -9,7 +11,19 @@ import { GoogleAuthService } from './google-auth.service';
 /** Continue with Google (issue #28). See docs/modules/auth-and-dashboard.md. */
 @Controller('auth')
 export class GoogleController {
-  constructor(private readonly google: GoogleAuthService) {}
+  /** Issue #29: a session from Google reaches the web app the same way as any other. */
+  private readonly cookies: SessionCookies;
+
+  constructor(
+    private readonly google: GoogleAuthService,
+    @Inject(CONFIG) config: AppConfig,
+  ) {
+    this.cookies = new SessionCookies(config.corsOrigins, config.refreshTokenTtlSeconds);
+  }
+
+  private deliver(req: Request, res: Response, result: GoogleExchangeResult): GoogleExchangeResult {
+    return result.kind === 'session' ? { ...result, session: this.cookies.deliver(req, res, result.session) } : result;
+  }
 
   /** Top-level navigation from the web app. Sends the browser on to Google. */
   @Public()
@@ -36,22 +50,40 @@ export class GoogleController {
   @Public()
   @Post('google/exchange')
   @HttpCode(200)
-  exchange(@Body() dto: GoogleExchangeDto, @Ip() ip: string, @Headers('user-agent') userAgent?: string): Promise<GoogleExchangeResult> {
-    return this.google.exchange(dto, deviceLabel(userAgent), { ip });
+  async exchange(
+    @Body() dto: GoogleExchangeDto,
+    @Ip() ip: string,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Headers('user-agent') userAgent?: string,
+  ): Promise<GoogleExchangeResult> {
+    return this.deliver(req, res, await this.google.exchange(dto, deviceLabel(userAgent), { ip }));
   }
 
   @Public()
   @Post('google/link-with-password')
   @HttpCode(200)
-  linkWithPassword(@Body() dto: GoogleLinkPasswordDto, @Ip() ip: string, @Headers('user-agent') userAgent?: string): Promise<GoogleExchangeResult> {
-    return this.google.linkWithPassword(dto, deviceLabel(userAgent), { ip });
+  async linkWithPassword(
+    @Body() dto: GoogleLinkPasswordDto,
+    @Ip() ip: string,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Headers('user-agent') userAgent?: string,
+  ): Promise<GoogleExchangeResult> {
+    return this.deliver(req, res, await this.google.linkWithPassword(dto, deviceLabel(userAgent), { ip }));
   }
 
   @Public()
   @Post('google/complete-signup')
   @HttpCode(200)
-  completeSignup(@Body() dto: GoogleSignupDto, @Ip() ip: string, @Headers('user-agent') userAgent?: string): Promise<GoogleExchangeResult> {
-    return this.google.completeSignup(dto, deviceLabel(userAgent), { ip });
+  async completeSignup(
+    @Body() dto: GoogleSignupDto,
+    @Ip() ip: string,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Headers('user-agent') userAgent?: string,
+  ): Promise<GoogleExchangeResult> {
+    return this.deliver(req, res, await this.google.completeSignup(dto, deviceLabel(userAgent), { ip }));
   }
 
   /** Signed in: a two-minute ticket to start linking Google to this account. */

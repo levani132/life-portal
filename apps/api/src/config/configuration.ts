@@ -33,6 +33,12 @@ export interface AppConfig {
    * clients connect directly). Decides which X-Forwarded-For entry is `req.ip`.
    */
   trustProxyHops: number;
+  /**
+   * Issue #29 (`WEB_PROXY_SECRET`): the secret Vercel's `/api` rewrite sends as `x-lp-proxy`. With
+   * it, such requests take the visitor's address from `x-real-ip`. Unset: they all carry
+   * Vercel's address, as any request does. At least 32 characters.
+   */
+  webProxySecret?: string;
   finnhubApiKey?: string;
   /**
    * Sent as `User-Agent` on every Open Food Facts request.
@@ -256,6 +262,15 @@ export function storageConfig(env: NodeJS.ProcessEnv): AppConfig['storage'] {
   };
 }
 
+function webProxySecret(value: string | undefined): string | undefined {
+  const secret = value?.trim();
+  if (!secret) return undefined;
+  if (secret.length < 32) {
+    throw new Error('WEB_PROXY_SECRET must be at least 32 characters. Generate one with `openssl rand -hex 32`.');
+  }
+  return secret;
+}
+
 function proxyHops(value: string | undefined): number {
   if (value == null || value.trim() === '') return 1;
   const parsed = Number(value);
@@ -286,6 +301,7 @@ export function loadConfig(): AppConfig {
       .map((o) => o.trim())
       .filter(Boolean),
     trustProxyHops: proxyHops(process.env['TRUST_PROXY_HOPS']),
+    webProxySecret: webProxySecret(process.env['WEB_PROXY_SECRET']),
     finnhubApiKey: process.env['FINNHUB_API_KEY']?.trim() || undefined,
     offUserAgent: openFoodFactsUserAgent(),
     disableSchedules: process.env['DISABLE_SCHEDULES'] === 'true',

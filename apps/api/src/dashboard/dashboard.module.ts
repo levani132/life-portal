@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Module, Put } from '@nestjs/common';
+import { Body, Controller, Get, Module, Put, Req } from '@nestjs/common';
+import type { ProxiedRequest } from '../app/web-proxy';
 import { ArrayMaxSize, IsArray, Matches } from 'class-validator';
 import type { DashboardResponse, UserSettings } from '@life-portal/shared-types';
 import { CurrentUser, Public } from '../auth/current-user.decorator';
@@ -58,11 +59,15 @@ export class DashboardController {
     return { order: settings.widgetOrder };
   }
 
-  /** Unauthenticated liveness probe, so a free host's health check does not need a token. */
+  /**
+   * Unauthenticated liveness probe, so a free host's health check does not need a token.
+   * `proxied` (issue #29) says whether this request came through the web app's own `/api` with a
+   * valid proof, which is how the setup is checked after deploying.
+   */
   @Public()
   @Get('health')
-  health() {
-    return { status: 'ok', uptimeSeconds: Math.round(process.uptime()) };
+  health(@Req() req: ProxiedRequest) {
+    return { status: 'ok', uptimeSeconds: Math.round(process.uptime()), proxied: req.viaWebProxy === true };
   }
 }
 

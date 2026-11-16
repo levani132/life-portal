@@ -14,8 +14,51 @@ import type { AuthSession, AuthTokens } from '@life-portal/shared-types';
  */
 
 export const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3333/api';
+
+/**
+ * The API's address for something outside this app: an MCP client, an iOS Shortcut (issue #29).
+ * The web app itself may reach the API through its own origin (`/api`, proxied), which means
+ * nothing to those clients, so they get `NEXT_PUBLIC_API_PUBLIC_URL`, or an absolute `API_URL`.
+ */
+export function externalApiUrl(): string {
+  const configured = process.env['NEXT_PUBLIC_API_PUBLIC_URL'];
+  if (configured) return configured.replace(/\/$/, '');
+  if (/^https?:\/\//.test(API_URL)) return API_URL.replace(/\/$/, '');
+  return typeof window === 'undefined' ? API_URL : `${window.location.origin}${API_URL}`;
+}
 const ACCESS_KEY = 'lp.accessToken';
 const REFRESH_KEY = 'lp.refreshToken';
+
+/**
+ * Issue #29: with the API on this app's own origin (`/api`, proxied to the API host), the refresh
+ * token is an `HttpOnly` cookie and the access token lives in memory only, so no script can read
+ * either from storage. Storage keeps only `lp.session`: the signed-in account's id, a hint that a
+ * session cookie may exist (and whose), never a credential. With an absolute `API_URL` (another
+ * site) a cookie could not be first-party, so tokens stay in storage as before.
+ */
+export const cookieSession = API_URL.startsWith('/');
+const SESSION_HINT_KEY = 'lp.session';
+/** Sent with every request in cookie mode; the API keeps the refresh token in the cookie. */
+const SESSION_HEADERS: Record<string, string> = cookieSession ? { 'x-lp-session': 'cookie' } : {};
+let memoryAccess: string | null = null;
+
+/** The account a token was issued to (`sub`), without verifying it. */
+export function subjectOf(token: string | null | undefined): string | undefined {
+  const payload = token?.split('.')[1];
+  if (!payload) return undefined;
+  try {
+    const sub = (JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as { sub?: unknown }).sub;
+    return typeof sub === 'string' ? sub : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const storage = {
+  get: (key: string) => (typeof window === 'undefined' ? null : window.localStorage.getItem(key)),
+  set: (key: string, value: string) => window.localStorage.setItem(key, value),
+  remove: (key: string) => window.localStorage.removeItem(key),
+};
 
 export class ApiError extends Error {
   constructor(
@@ -35,18 +78,41 @@ export class ApiError extends Error {
 
 export const tokens = {
   get access(): string | null {
-    return typeof window === 'undefined' ? null : window.localStorage.getItem(ACCESS_KEY);
+    return cookieSession ? memoryAccess : storage.get(ACCESS_KEY);
   },
+  /**
+   * The refresh token readable by this page: in storage outside cookie mode; in cookie mode only
+   * a token left from before #29, sent once to move it into the cookie.
+   */
   get refresh(): string | null {
-    return typeof window === 'undefined' ? null : window.localStorage.getItem(REFRESH_KEY);
+    return storage.get(REFRESH_KEY);
   },
-  set(next: { accessToken: string; refreshToken: string }): void {
-    window.localStorage.setItem(ACCESS_KEY, next.accessToken);
-    window.localStorage.setItem(REFRESH_KEY, next.refreshToken);
+  /** Whether this device may have a session, before asking the server. */
+  get present(): boolean {
+    return Boolean(this.access || this.refresh || (cookieSession && storage.get(SESSION_HINT_KEY)));
+  },
+  /** The account the session belongs to, as far as this device knows; for spec 034's replay check. */
+  get subject(): string | undefined {
+    return subjectOf(this.access) ?? (cookieSession ? storage.get(SESSION_HINT_KEY) ?? undefined : subjectOf(this.refresh));
+  },
+  set(next: { accessToken: string; refreshToken?: string }): void {
+    if (cookieSession) {
+      memoryAccess = next.accessToken;
+      const subject = subjectOf(next.accessToken);
+      if (subject) storage.set(SESSION_HINT_KEY, subject);
+      // The cookie holds the session now: nothing readable stays behind.
+      storage.remove(ACCESS_KEY);
+      storage.remove(REFRESH_KEY);
+      return;
+    }
+    storage.set(ACCESS_KEY, next.accessToken);
+    if (next.refreshToken) storage.set(REFRESH_KEY, next.refreshToken);
   },
   clear(): void {
-    window.localStorage.removeItem(ACCESS_KEY);
-    window.localStorage.removeItem(REFRESH_KEY);
+    memoryAccess = null;
+    storage.remove(ACCESS_KEY);
+    storage.remove(REFRESH_KEY);
+    storage.remove(SESSION_HINT_KEY);
   },
 };
 
@@ -83,24 +149,31 @@ export const SIGNED_OUT_REASON_KEY = 'lp.signedOutReason';
  * the lock after another one refreshed just picks up the stored tokens.
  */
 async function refreshSession(): Promise<'ok' | 'refused' | 'unreachable'> {
-  const sent = tokens.refresh;
-  if (!sent) return 'refused';
+  const sent = cookieSession ? tokens.access : tokens.refresh;
+  if (!cookieSession && !sent) return 'refused';
   const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
   if (!locks) return refreshWith(sent);
   return locks.request('lp.refresh', () => refreshWith(sent));
 }
 
-async function refreshWith(sent: string): Promise<'ok' | 'refused' | 'unreachable'> {
-  const current = tokens.refresh;
-  if (!current) return 'refused';
+/**
+ * `sent` is what this tab held when it decided to refresh: the refresh token, or in cookie mode
+ * the access token in memory. If it changed while waiting for the lock, a refresh already
+ * happened and there is nothing to do.
+ */
+async function refreshWith(sent: string | null): Promise<'ok' | 'refused' | 'unreachable'> {
+  const current = cookieSession ? tokens.access : tokens.refresh;
+  if (!cookieSession && !current) return 'refused';
   if (current !== sent) return 'ok';
 
+  // Cookie mode sends no token, except one left in storage from before #29, once.
+  const bodyToken = cookieSession ? tokens.refresh : sent;
   let response: Response;
   try {
     response = await fetch(`${API_URL}/auth/refresh`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: sent }),
+      headers: { 'Content-Type': 'application/json', ...SESSION_HEADERS },
+      body: JSON.stringify(bodyToken ? { refreshToken: bodyToken } : {}),
     });
   } catch {
     return 'unreachable';
@@ -116,8 +189,11 @@ async function refreshWith(sent: string): Promise<'ok' | 'refused' | 'unreachabl
     .then((body: { code?: unknown }) => (typeof body.code === 'string' ? body.code : undefined))
     .catch(() => undefined);
   // Another tab refreshed with this token a moment ago (a browser without Web Locks): its new
-  // tokens are about to land in storage. Wait for them rather than signing out.
-  if (code === 'REFRESH_SUPERSEDED' && (await tokensReplaced(sent))) return 'ok';
+  // tokens are about to land in storage, or in cookie mode the cookie already moved on.
+  if (code === 'REFRESH_SUPERSEDED') {
+    if (!cookieSession && sent && (await tokensReplaced(sent))) return 'ok';
+    if (cookieSession && bodyToken === null && (await retryWithCookie())) return 'ok';
+  }
   if (code === 'LEGACY_SESSION') {
     try {
       window.localStorage.setItem(SIGNED_OUT_REASON_KEY, 'upgrade');
@@ -127,6 +203,23 @@ async function refreshWith(sent: string): Promise<'ok' | 'refused' | 'unreachabl
   }
   tokens.clear();
   return 'refused';
+}
+
+/** Cookie mode: another tab's refresh rotated the cookie under this one; try once with the new one. */
+async function retryWithCookie(): Promise<boolean> {
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  try {
+    const response = await fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...SESSION_HEADERS },
+      body: '{}',
+    });
+    if (!response.ok) return false;
+    tokens.set((await response.json()) as AuthTokens);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function tokensReplaced(sent: string, waitMs = 2000): Promise<boolean> {
@@ -176,7 +269,7 @@ interface RequestOptions {
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, anonymous, isRetry } = options;
 
-  const headers: Record<string, string> = { ...options.headers };
+  const headers: Record<string, string> = { ...SESSION_HEADERS, ...options.headers };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (!anonymous) {
     const access = tokens.access;

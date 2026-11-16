@@ -1,4 +1,7 @@
-import { Body, Controller, Delete, Get, Headers, HttpCode, Ip, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, HttpCode, Inject, Ip, Param, Post, Req, Res } from '@nestjs/common';
+import type { Request, Response } from 'express';
+import { CONFIG, type AppConfig } from '../config/configuration';
+import { SessionCookies } from './session-cookie';
 import type { AuthCapabilities, AuthSession, AuthSessionInfo, AuthTokens, User } from '@life-portal/shared-types';
 import { AuthService } from './auth.service';
 import {
@@ -27,7 +30,13 @@ export class AuthController {
     private readonly resets: PasswordResetService,
     private readonly verification: EmailVerificationService,
     private readonly google: GoogleAuthService,
-  ) {}
+    @Inject(CONFIG) config: AppConfig,
+  ) {
+    this.cookies = new SessionCookies(config.corsOrigins, config.refreshTokenTtlSeconds);
+  }
+
+  /** Issue #29: the web app's refresh token travels as an HttpOnly cookie. */
+  private readonly cookies: SessionCookies;
 
   /** What this server can do by email, so the web app shows only what works (issue #27). */
   @Public()
@@ -63,35 +72,74 @@ export class AuthController {
 
   @Public()
   @Post('register')
-  register(@Body() dto: RegisterDto, @Ip() ip: string, @Headers('user-agent') userAgent?: string): Promise<AuthSession> {
-    return this.auth.register(dto, deviceLabel(userAgent), { ip });
+  async register(
+    @Body() dto: RegisterDto,
+    @Ip() ip: string,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Headers('user-agent') userAgent?: string,
+  ): Promise<AuthSession> {
+    return this.cookies.deliver(req, res, await this.auth.register(dto, deviceLabel(userAgent), { ip }));
   }
 
   @Public()
   @Post('login')
   @HttpCode(200)
-  login(@Body() dto: LoginDto, @Ip() ip: string, @Headers('user-agent') userAgent?: string): Promise<AuthSession> {
-    return this.auth.login(dto, deviceLabel(userAgent), { ip });
+  async login(
+    @Body() dto: LoginDto,
+    @Ip() ip: string,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Headers('user-agent') userAgent?: string,
+  ): Promise<AuthSession> {
+    return this.cookies.deliver(req, res, await this.auth.login(dto, deviceLabel(userAgent), { ip }));
   }
 
   @Public()
   @Post('refresh')
   @HttpCode(200)
-  refresh(@Body() dto: RefreshDto, @Ip() ip: string): Promise<AuthTokens> {
-    return this.auth.refresh(dto.refreshToken, { ip });
+  async refresh(
+    @Body() dto: RefreshDto,
+    @Ip() ip: string,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthTokens> {
+    // A refused refresh token is useless: drop the cookie so the browser stops sending it.
+    let fromCookie = false;
+    try {
+      const sent = this.cookies.refreshTokenOf(req, dto.refreshToken);
+      fromCookie = sent.fromCookie;
+      return this.cookies.deliver(req, res, await this.auth.refresh(sent.token, { ip }));
+    } catch (error) {
+      if (fromCookie || !dto.refreshToken) this.cookies.clear(req, res);
+      throw error;
+    }
   }
 
   /** Signs this device out. */
   @Post('logout')
   @HttpCode(200)
-  logout(@CurrentUser('userId') userId: string, @CurrentUser('sessionId') sessionId: string, @Ip() ip: string) {
+  logout(
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('sessionId') sessionId: string,
+    @Ip() ip: string,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    this.cookies.clear(req, res);
     return this.auth.logout(userId, sessionId, { ip });
   }
 
   /** Signs every device out, this one included. */
   @Post('logout-all')
   @HttpCode(200)
-  logoutAll(@CurrentUser('userId') userId: string, @Ip() ip: string) {
+  logoutAll(
+    @CurrentUser('userId') userId: string,
+    @Ip() ip: string,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    this.cookies.clear(req, res);
     return this.auth.logoutAll(userId, { ip });
   }
 

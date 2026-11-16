@@ -34,7 +34,8 @@ async function person(): Promise<Person> {
 async function signIn(who: Person, userAgent = 'Mozilla/5.0 (Macintosh) Chrome/130.0 Safari/537.36'): Promise<Account> {
   const answer = await api.call<AuthSession>(null, 'POST', '/auth/login', who, { 'User-Agent': userAgent, 'X-Forwarded-For': ip() });
   expect(answer.status).toBe(200);
-  return { id: answer.body.user.id, email: who.email, ...answer.body };
+  // Body mode (no `x-lp-session` header), so the refresh token is always in the answer (#29).
+  return { id: answer.body.user.id, email: who.email, ...answer.body, refreshToken: answer.body.refreshToken as string };
 }
 
 const refresh = (token: string) => api.call<AuthTokens & { code?: string }>(null, 'POST', '/auth/refresh', { refreshToken: token });

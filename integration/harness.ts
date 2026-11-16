@@ -27,7 +27,8 @@ export interface TestApi {
   app: INestApplication;
   db: Connection;
   call<T = Record<string, unknown>>(
-    who: Account | null,
+    /** Only its access token is sent. */
+    who: (Pick<Account, 'accessToken'> & Partial<Account>) | null,
     method: string,
     path: string,
     body?: unknown,
@@ -64,7 +65,7 @@ export async function startApi(env: Record<string, string> = {}): Promise<TestAp
   process.env['MAIL_PROVIDER'] = 'dev';
   delete process.env['RESEND_API_KEY'];
   delete process.env['MAIL_FROM'];
-  for (const key of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'API_PUBLIC_URL', 'GOOGLE_OIDC_TEST_BASE']) delete process.env[key];
+  for (const key of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'API_PUBLIC_URL', 'GOOGLE_OIDC_TEST_BASE', 'WEB_PROXY_SECRET']) delete process.env[key];
   Object.assign(process.env, env);
 
   const { NestFactory } = await import('@nestjs/core');

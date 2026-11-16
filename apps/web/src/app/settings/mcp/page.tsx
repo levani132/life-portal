@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { AppShell, PageHeader } from '../../../components/app-shell';
 import { ErrorNote, Panel, Spinner } from '../../../components/ui';
-import { api } from '../../../lib/api';
+import { api, externalApiUrl } from '../../../lib/api';
 import { useAction, useApi } from '../../../lib/hooks';
 
 export default function McpPage() {
@@ -37,8 +37,8 @@ function McpSetup() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const apiUrl = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3333/api';
-  const mcpUrl = `${apiUrl.replace(/\/$/, '')}/mcp`;
+  const apiUrl = externalApiUrl();
+  const mcpUrl = `${apiUrl}/mcp`;
 
   const copyServerUrl = () => run(async () => {
     await navigator.clipboard.writeText(mcpUrl);

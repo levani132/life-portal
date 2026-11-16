@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     async function restore() {
-      if (!tokens.access && !tokens.refresh) {
+      if (!tokens.present) {
         if (!cancelled) setLoading(false);
         return;
       }

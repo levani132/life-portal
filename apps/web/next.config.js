@@ -21,7 +21,8 @@ const nextConfig = {
           return [
             {
               source: '/api/:path*',
-              destination: 'http://127.0.0.1:3333/api/:path*',
+              // API_DEV_TARGET: another API port, when 3333 is taken by a second checkout.
+              destination: `${process.env.API_DEV_TARGET ?? 'http://127.0.0.1:3333/api'}/:path*`,
             },
           ];
         },

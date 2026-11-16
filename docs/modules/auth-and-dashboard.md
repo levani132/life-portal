@@ -73,6 +73,54 @@ tab's tokens to land in storage before giving up. `LEGACY_SESSION` leaves `lp.si
 so the login page can say why everyone had to sign in again once. Writes still in the outbox stay
 on the device and are sent after the same account signs in (spec 027).
 
+### Where the web keeps them (issue #29)
+
+**No token is readable from JavaScript once the web reaches the API on its own origin.** The web
+calls `/api` on its own host; `vercel.json` rewrites that to the API on Render, at the CDN, with
+no function in between. The browser and the API are then one site, so a cookie can be
+first-party. A cookie on `onrender.com` would be third-party to `vercel.app`: never sent with
+`SameSite=Strict`, and blocked by Safari altogether.
+
+- **Cookie mode is fixed at build time:** it is on when `NEXT_PUBLIC_API_URL` is relative (`/api`),
+  `cookieSession` in `apps/web/src/lib/api.ts`. With an absolute URL (another site), tokens stay
+  in `localStorage` as before, so the deploy order of the API and the web cannot sign anyone out.
+- **The refresh token is the `lp_refresh` cookie**: `HttpOnly; SameSite=Strict; Path=/api/auth;
+  Max-Age=` the refresh lifetime, and `Secure` everywhere except plain-http localhost
+  (`session-cookie.ts`). The access token lives in memory only, so a reload starts with one
+  refresh.
+- **Opt-in per request.** The web sends `x-lp-session: cookie` with every request. On register,
+  login, refresh and the Google exchange steps, the API then sets the cookie and leaves
+  `refreshToken` out of the body. A request without the header (the integration tests, an older
+  app version) gets tokens in the body as before, and no cookie.
+- **CSRF.** A refresh from the cookie needs the header *and* an `Origin` in `CORS_ORIGINS`.
+  Another site cannot add the header without a CORS preflight, which the API refuses for
+  origins it does not list, and `SameSite=Strict` keeps the cookie off cross-site requests
+  anyway. Data routes still take the bearer access token, which a browser never attaches by
+  itself. A refused cookie refresh clears the cookie; `logout` and `logout-all` clear it too.
+- **Storage keeps only `lp.session`**: the signed-in account's id, a hint that a cookie may
+  exist and whose. It is not a credential. It decides whether the app tries to restore a session
+  at boot (`tokens.present`), and it is what spec 034's replay check compares while no access
+  token is in memory yet (`tokens.subject`, `offline/send.ts`). Offline start still opens as the
+  remembered user (spec 027).
+- **Moving over.** A token left in `localStorage` from before is sent once in the body of the
+  first refresh, with the header; the answer sets the cookie and the web deletes both stored
+  tokens. Nobody is signed out by the change.
+- **Tabs** still take turns under the `lp.refresh` Web Lock: the cookie is shared, so a tab that
+  waited just refreshes with the newest one. Without Web Locks, a `REFRESH_SUPERSEDED` in cookie
+  mode retries once after 300 ms.
+
+**The visitor's address behind the proxy.** Requests through Vercel arrive at Render from Vercel's
+addresses, which would put everyone in one per-IP sign-in limit. The rewrite adds `x-lp-proxy`
+with a shared secret (`LP_PROXY_SECRET` on Vercel, `WEB_PROXY_SECRET` on the API). Only with the
+right secret does the API take the visitor's address from Vercel's `x-real-ip`
+(`app/web-proxy.ts`). Anything else, including direct calls to Render, keeps the `trust proxy`
+address, so a direct caller still cannot pick its own IP. `GET /api/health` reports
+`proxied: true` for a request that proved itself. Setup: `docs/runbooks/web-api-proxy.md`.
+
+Clients outside the browser keep the Render URL: Settings → MCP and the Shortcut ingest page show
+`NEXT_PUBLIC_API_PUBLIC_URL` (`externalApiUrl()`), and link previews read `API_INTERNAL_URL`
+server-side.
+
 | Route | What it does |
 |---|---|
 | `POST /auth/logout` | ends this session |
@@ -291,8 +339,9 @@ per IP (`googleByIp`).
 - Refresh tokens are hashed with SHA-256, not bcrypt. bcrypt only reads the first 72 bytes, and
   every refresh token of one user shares those (the JWT header and the start of the payload,
   which is the user id). See `docs/DECISIONS.md`.
-- Tokens are kept in `localStorage`, which an XSS bug could read. Moving them to httpOnly cookies is
-  a separate follow-up: it would bring CSRF into play, which the current bearer header does not.
+- Since #29 the web keeps no token where a script can read it, once it reaches the API through
+  its own `/api` (see "Where the web keeps them"). A Content-Security-Policy is a separate
+  follow-up.
 - `REGISTRATION_INVITE_CODE`, when set, closes registration. Set it in production.
 
 ---

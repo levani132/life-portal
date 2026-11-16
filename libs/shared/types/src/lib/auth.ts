@@ -12,7 +12,11 @@ export interface User extends Timestamped {
 
 export interface AuthTokens {
   accessToken: string;
-  refreshToken: string;
+  /**
+   * Absent when the web app asked for its session in a cookie (`x-lp-session: cookie`, issue #29):
+   * then it is in an `HttpOnly` cookie and no script can read it.
+   */
+  refreshToken?: string;
   /** Access-token lifetime in seconds. */
   expiresIn: number;
 }

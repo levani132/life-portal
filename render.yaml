@@ -71,6 +71,10 @@ services:
         sync: false
       - key: FINNHUB_API_KEY
         sync: false
+      # Issue #29: the shared secret Vercel's /api rewrite sends, so requests through the web app
+      # count against each visitor's own sign-in limit. docs/runbooks/web-api-proxy.md.
+      - key: WEB_PROXY_SECRET
+        sync: false
 
       # ---- Continue with Google (issue #28): all of these, or none. ----
       # Setup: docs/runbooks/google-oauth.md. The secret lives in the dashboard only.

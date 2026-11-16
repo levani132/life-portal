@@ -2297,7 +2297,6 @@ instead also reads `planUpdate` on sessions that have no `plan`. Derived on read
 **Online only.** The prompt needs the server's preview and the person's plan list; nothing is
 lost by waiting, since it stays in History.
 
-
 ## 2026-11-16 · Home's widget strip is a plain pager
 
 **One face per widget, no scroll-driven layout.** The focus strip (spec 008) gave every widget a
@@ -2318,3 +2317,34 @@ trackpad cover desktop.
 green and red already mean good and bad on money and the macros have their own colours. For now
 the six hues are Training's `train-*` tokens (the only theme-aware set); giving them general
 names belongs to the wider redesign.
+
+## 2026-11-16 · Session in an HttpOnly cookie, through the web app's own `/api` (issue #29)
+
+**The API is reached through the web's origin, because a cookie on the API's own site would be
+third-party.** `vercel.app` and `onrender.com` are separate sites (both on the Public Suffix List).
+A `SameSite=Strict` cookie from Render is never sent from the web, and `SameSite=None` is blocked
+by Safari, which is the installed iPhone app. The owner chose a Vercel rewrite over a custom domain
+for now; a single domain behind a load balancer keeps the same `/api` shape later. The rewrite is a
+`vercel.json` route, which runs at the CDN with no function and no cold start.
+
+**Cookie mode follows the build, not a flag.** It is on exactly when `NEXT_PUBLIC_API_URL` is
+relative. Shipping the code first changes nothing; switching the variable turns it on. A stored
+token moves into the cookie on its first refresh, so nobody is signed out, and the API keeps
+answering body-mode clients unchanged.
+
+**The CSRF barrier is a custom header plus `Origin`.** `x-lp-session: cookie` both opts into
+cookie mode and cannot be sent cross-site without a preflight, which CORS refuses for unlisted
+origins. A cookie refresh also needs a listed `Origin`. Data routes stay bearer-only, with the
+access token in memory, so they gain no CSRF exposure at all.
+
+**The visitor's address needs proof, not another trusted hop.** Raising `TRUST_PROXY_HOPS` to 2
+would let anyone calling Render directly name their own IP. Instead the rewrite sends a shared
+secret, and only a request carrying it may use Vercel's `x-real-ip`. Direct requests are treated
+exactly as before.
+
+**Only a user id stays in storage** (`lp.session`). After a reload no access token is in memory
+until the first refresh, and spec 034's "never replay under another account" check still needs
+to know whose session the cookie is. The id is not a credential.
+
+**CSP is its own change.** Next.js needs nonces for its inline scripts, and a wrong policy breaks
+the whole app at load. It ships separately so it can be rolled back separately.

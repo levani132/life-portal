@@ -11,6 +11,11 @@ import type { OutboxItem } from './types';
  * until A signs in again. Each write also says how long it waited (`X-Queued-Age`). Its own module so the integration tests (issue #22) drive exactly this.
  */
 export const sendAs = (userId: string, now: () => number = Date.now) => (item: OutboxItem, save: (body: unknown) => Promise<void>) => {
+  // Issue #29: in cookie mode no token may be in hand yet after a reload; the account it belongs
+  // to is still known (`tokens.subject`).
+  const subject = tokens.subject;
+  if (subject !== undefined && subject !== userId)
+    return Promise.reject(new ApiError('Signed in as another account.', 401));
   if (!mayReplayAs(userId, tokens.access ?? tokens.refresh))
     return Promise.reject(new ApiError('Signed in as another account.', 401));
   return item.kind === POST_DRAFT_KIND

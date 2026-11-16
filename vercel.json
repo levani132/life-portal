@@ -2,5 +2,20 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "buildCommand": "npx nx build web",
-  "outputDirectory": ".next"
+  "outputDirectory": ".next",
+  "routes": [
+    {
+      "src": "^/api/(.*)$",
+      "dest": "https://life-portal.onrender.com/api/$1",
+      "transforms": [
+        {
+          "type": "request.headers",
+          "op": "set",
+          "target": { "key": "x-lp-proxy" },
+          "args": "$LP_PROXY_SECRET",
+          "env": ["LP_PROXY_SECRET"]
+        }
+      ]
+    }
+  ]
 }
