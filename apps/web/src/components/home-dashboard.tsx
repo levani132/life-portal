@@ -28,14 +28,17 @@ import {
   Spinner,
 } from './ui';
 import { api } from '../lib/api';
-import { revalidate, useApi } from '../lib/hooks';
+import { RECOVERS, revalidate, useApi } from '../lib/hooks';
+import { LoadProblem, LoadProblemBar } from './load-problem';
+import { loadErrorKind } from '../lib/load-error';
 import { mealContextNow } from '../lib/local-day';
 import { useStartWorkout } from '../lib/training-offline';
 import { useNutritionDay } from '../lib/nutrition-offline';
 
 
 export function Dashboard() {
-  const { data, error, isLoading } = useApi<DashboardResponse>('/dashboard');
+  // Issue #34: Home reads again on its own after a failure (resume, reconnect, backoff).
+  const { data, error, isLoading, mutate: reload } = useApi<DashboardResponse>('/dashboard', RECOVERS);
   const portal = useApi<PortalState>('/portal');
   const [logging, setLogging] = useState<MealSlot | null>(null);
   const router = useRouter();
@@ -106,9 +109,38 @@ export function Dashboard() {
     return () => window.removeEventListener('keydown', onKey);
   }, [editing]);
 
-  if (isLoading) return <Spinner label="Opening Home…" />;
-  if (error) return <ErrorNote message={(error as Error).message} />;
-  if (!data) return null;
+  if (isLoading && !data) return <Spinner label="Opening Home…" />;
+  if (!data) {
+    if (!error) return null;
+    // Home's cards mix money, stocks and work with food and training, so none of it is kept on
+    // the device (spec 027). Offline, point at the parts that do work offline.
+    const offline = loadErrorKind(error) === 'offline';
+    return (
+      <div className="pt-4">
+        <LoadProblem error={error} onRetry={() => void reload()}>
+          {offline && (
+            <>
+              <p className="mt-2 text-rose-200/80">Home needs a connection: its figures aren’t kept on this device.</p>
+              {(portal.data?.access.training || portal.data?.access.nutrition) && (
+                <p className="mt-2 flex flex-wrap gap-3">
+                  {portal.data?.access.training && (
+                    <Link className="underline" href="/training">
+                      Training works offline
+                    </Link>
+                  )}
+                  {portal.data?.access.nutrition && (
+                    <Link className="underline" href="/nutrition">
+                      Food works offline
+                    </Link>
+                  )}
+                </p>
+              )}
+            </>
+          )}
+        </LoadProblem>
+      </div>
+    );
+  }
   const canReadPosts =
     portal.data?.access.social &&
     portal.data.access.nutrition &&
@@ -117,6 +149,8 @@ export function Dashboard() {
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="sr-only">Home</h1>
+      {/* A failed refresh keeps the cards that were loaded (issue #34). */}
+      {error && <LoadProblemBar error={error} onRetry={() => void reload()} />}
       {(saveError || startError) && (
         <div className="mb-3" role="alert">
           <ErrorNote message={(saveError || startError) as string} />

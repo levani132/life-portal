@@ -72,7 +72,9 @@ hidden behind an old copy). It never returns another account's copy.
 
 - `localStorage['lp.offline.user']` remembers the last confirmed `User` (id, name, email — what
   `/auth/me` returns). When `/auth/me` gets no answer, the app opens as that user with
-  `offlineSession: true`; an `ApiError` still signs out.
+  `offlineSession: true`. The same happens on a 5xx or 429 (issue #34): only a refusal (401, 403,
+  `endsSession()` in `lib/load-error.ts`) signs out, so an API outage never sends anyone to the
+  sign-in page.
 - `lib/api.ts`: a token refresh that gets no answer (network error or 5xx) keeps the tokens and
   throws `NetworkError`; only a refusal clears them.
 - One store per account. Switching accounts closes the old store without deleting it, so A's
@@ -263,6 +265,19 @@ navigation offline falls back to the same page with any query, then to `/`.
   An edit refused with `STALE_EDIT` or `ROW_DELETED` shows yours against theirs and the choices
   above instead of Retry (spec 030).
 - `components/pending-logout.tsx`, `components/offline-data-settings.tsx`.
+- **Failed reads on Home and the shell (issue #34)**, `components/load-problem.tsx` and
+  `lib/load-error.ts`:
+  - Each failure is named for what it was: offline (the request never left), can't reach the
+    server, a server error (5xx), or an ended session. "No connection" is no longer the label for
+    every failure.
+  - A failed refresh keeps what was loaded and shows `LoadProblemBar` ("Showing what was last
+    loaded", Try again).
+  - `RECOVERS` (`lib/hooks.ts`) reads again when the app becomes visible or the network returns,
+    and retries dropped requests and 5xx with backoff (2, 4, 8, 16, 30 s) while visible. A 4xx
+    is never retried.
+  - **Home is intentionally not available offline.** `/dashboard` mixes money, stocks, loans and
+    work with training and food, and only the last two may be kept on a device. Offline with
+    nothing loaded, Home says so and links to Training and Food, which work offline.
 
 ## Dependencies
 

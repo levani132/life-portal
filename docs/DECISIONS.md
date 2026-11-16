@@ -2416,3 +2416,22 @@ trusted hops (Vercel overwrites that header on the way in, so a visitor cannot p
 appends Vercel's address after it). Without the proof, `x-forwarded-for` beyond `trust proxy` is
 still never read.
 
+## 2026-11-17 · Home keeps what it loaded, recovers on its own, and is not kept offline (issue #34)
+
+**What happened:** the installed iPhone app sometimes showed an empty Home with "No connection."
+Home rendered its error instead of its data whenever the `/dashboard` read had an error. SWR keeps
+the last good data next to the error, but Home checked the error first. `useApi` also turns off
+focus revalidation and error retries, and Home is a tab root that never unmounts, so one dropped
+request (typical while an installed app resumes) stayed on screen until a pull to refresh.
+Separately, the startup session check treated any `ApiError` as "signed out", so a 5xx from an API
+outage sent people to the sign-in page.
+
+**Decision:**
+- Data on screen wins over a later error. The error becomes a status line.
+- Home and the shell use `RECOVERS`: read again on focus and reconnect, and retry network and 5xx
+  failures with backoff. Other screens keep `useApi`'s quiet defaults.
+- Only a 401 or 403 ends a session on start.
+- Home's dashboard is still **not** kept on the device. It mixes modules that spec 027 keeps online
+  only. Caching just its Training and Food cards would move that boundary, so it is left for a
+  separate decision.
+

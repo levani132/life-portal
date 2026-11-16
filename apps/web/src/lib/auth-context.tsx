@@ -15,6 +15,7 @@ import {
 import type { AuthSession, User } from '@life-portal/shared-types';
 import { api, ApiError, NetworkError, tokens } from './api';
 import { unregisterThisDevice } from './push';
+import { endsSession } from './load-error';
 import { forgetUser, rememberedUser, rememberUser } from './offline/account';
 import { deleteOfflineData, endOffline, outbox, startOffline } from './offline/runtime';
 import { PendingLogout } from '../components/pending-logout';
@@ -70,11 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         rememberUser(me);
         if (!cancelled) setUser(me);
       } catch (error) {
-        if (error instanceof ApiError) {
-          // The server answered: this session is over.
+        if (endsSession(error)) {
+          // The server refused this session: it is over.
           tokens.clear();
         } else {
-          // No answer (offline): open as the account this device last confirmed, if any.
+          // No answer (offline), or the server is having trouble (a 5xx, issue #34): open as the
+          // account this device last confirmed, if any.
           // The tokens stay; the next request that reaches the server checks them.
           const remembered = rememberedUser();
           if (remembered && !cancelled) {
