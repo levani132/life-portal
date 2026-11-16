@@ -429,7 +429,9 @@
 .home-widget {
   container-type: inline-size;
 }
-/* Not while it is being dragged: that state has its own border and shadow. */
+/* Not while it is being dragged: that state has its own border and shadow. `.glass` is the same
+   surface for cards elsewhere (the Food page's macro tiles). */
+.glass,
 .home-widget:not(.border-accent) {
   border-color: rgb(var(--ink) / 0.16);
   background-color: rgb(var(--surface-raised) / 0.72);
@@ -459,6 +461,15 @@
 }
 .home-widget .nutrition-ring-value {
   font-size: clamp(10px, 22cqi, 13px);
+}
+/* The Food page's macro tiles, four across: the ring fills its tile and sizes its number to
+   itself, as on Home, but may grow on a wide screen. */
+.macro-tile .nutrition-ring {
+  width: clamp(40px, 100%, 88px);
+  container-type: inline-size;
+}
+.macro-tile .nutrition-ring-value {
+  font-size: clamp(10px, 22cqi, 18px);
 }
 /* The log-food modal's rings: solid for what is eaten, a faded pulse for the meal being added. */
 .meal-impact-arc,

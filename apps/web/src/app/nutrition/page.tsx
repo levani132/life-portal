@@ -228,9 +228,7 @@ function Nutrition() {
             day={day}
             today={today}
             onChange={setDay}
-            totals={dayTotals.totals}
-            targets={targets}
-            entryCount={dayTotals.entryCount}
+            week={data.week}
             onShare={
               canPost && dayTotals.entryCount > 0
                 ? () => setSharing({ kind: 'day', day })
@@ -386,14 +384,18 @@ function MacroTiles({
 
   const colors = [MACRO_COLORS.kcal, MACRO_COLORS.protein, MACRO_COLORS.carbs, MACRO_COLORS.fat];
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="space-y-3">
+      {/* Four across, as on Home's Food card: glass tiles, each lit from above in its own
+          macro's colour (the one palette). */}
+      <div className="grid grid-cols-4 gap-1.5 sm:gap-3">
         {tiles.map((tile, i) => (
           <div
             key={tile.label}
-            className="card p-4"
-            // Each tile carries its own macro's colour, from the one palette.
-            style={{ backgroundImage: `linear-gradient(135deg, ${colors[i]}24, transparent 70%)`, borderColor: `${colors[i]}47` }}
+            className="card glass macro-tile rounded-2xl px-1 py-2.5 sm:p-4"
+            style={{
+              backgroundImage: `radial-gradient(130% 80% at 50% 0%, ${colors[i]}33, transparent 62%)`,
+              borderColor: `${colors[i]}4d`,
+            }}
           >
             <NutritionRing
               metric={{
@@ -413,7 +415,7 @@ function MacroTiles({
       </div>
       {ios && (
         <>
-          <div className="card flex items-center justify-between gap-2 border-train-arms/40 bg-train-arms/10 px-3 py-2">
+          <div className="card glass flex items-center justify-between gap-2 rounded-2xl px-3 py-2">
             <span className="flex items-center gap-2 text-sm font-medium">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-train-arms-solid text-white">
                 <Zap className="h-4 w-4" aria-hidden />

@@ -17,8 +17,11 @@ User-visible changes. Newest first.
 
 ## 2026-11-17: A more colourful Food page, and Home widgets that slide behind glass
 
-- **The Food page has the look of Training.** The day opens with a colourful card showing what's
-  left to eat, calories, protein and how many items are logged, with the day arrows on it.
+- **The Food page has the look of Training.** The day opens with a colourful card holding the
+  day arrows and this week as seven days: tap one to see it, and each shows how much of that
+  day's target was eaten.
+- **Calories and macros are four glass rings in one row**, like Home's Food card, so the meals
+  start higher up the page.
 - **Each meal has its own colour and icon**: breakfast, lunch, dinner, snacks and anything else.
   Its calories and macros sit in the header, and each food is a row with icon buttons to share,
   edit and remove.

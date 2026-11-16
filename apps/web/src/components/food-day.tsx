@@ -5,19 +5,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Cookie,
-  Flame,
-  ListChecks,
   MoonStar,
   Salad,
   Share2,
   Sunrise,
   Utensils,
   UtensilsCrossed,
-  Zap,
   type LucideIcon,
 } from 'lucide-react';
-import type { MealSlot, NutritionTargets, SlotTotals } from '@life-portal/shared-types';
-import { addDays, figureValue, formatDay, mgToG, relativeDays } from '@life-portal/shared-domain';
+import type { MealSlot, SlotTotals, WeekBalance } from '@life-portal/shared-types';
+import { addDays, formatDay, mgToG, relativeDays, weekdayOf } from '@life-portal/shared-domain';
 import { MACRO_TEXT } from '../lib/macro-colors';
 import { GROUP_STYLES, type GroupStyle } from '../lib/training-colors';
 
@@ -53,47 +50,36 @@ export function MacroLine({ totals, className }: { totals: SlotTotals['totals'];
   );
 }
 
+const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
+
 /**
- * The top of the Today view: the day on a gradient, with the day switcher, what is left to eat
- * and three figures. Its controls are the day arrows, "Today" and Share; everything else only
- * shows where the day stands.
+ * The top of the Today view: the day on a gradient, with the day arrows and the current week as
+ * seven days to tap. It says which day this is and how the week is going, and nothing the rings
+ * below already say: an earlier version repeated their calories and protein here.
+ *
+ * A day's bar is what was eaten against the daily target (full at the target); without a target,
+ * a logged day is a dot. The week is always the current one (`overview.week`), so on an older day
+ * none of the seven is selected and "Today" brings it back.
  */
 export function FoodHero({
   day,
   today,
   onChange,
   onShare,
-  totals,
-  targets,
-  entryCount,
+  week,
 }: {
   day: string;
   today: string;
   onChange: (day: string) => void;
   onShare?: () => void;
-  totals: SlotTotals['totals'];
-  targets: NutritionTargets;
-  entryCount: number;
+  week: WeekBalance;
 }) {
-  const target = targets.available ? figureValue(targets.energyKcal) : undefined;
-  const proteinTarget = targets.available ? figureValue(targets.proteinG) : undefined;
-  const left = target === undefined ? undefined : target - totals.energyKcal;
-  const line =
-    entryCount === 0
-      ? day === today
-        ? 'Nothing logged yet. Start with your first meal.'
-        : 'Nothing was logged on this day.'
-      : left === undefined
-        ? `${totals.energyKcal.toLocaleString()} kcal eaten`
-        : left >= 0
-          ? `${left.toLocaleString()} kcal left to eat`
-          : `${Math.abs(left).toLocaleString()} kcal over the target`;
+  const dayTarget = week.targetKcal != null ? week.targetKcal / 7 : undefined;
   const round = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition-colors hover:bg-white/25 disabled:opacity-40';
 
   return (
-    <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-train-legs-solid via-train-core-solid to-train-push-solid p-4 text-white shadow-lg shadow-train-core-solid/20 sm:p-5">
+    <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-train-legs-solid via-train-core-solid to-train-push-solid p-3 text-white shadow-lg shadow-train-core-solid/20 sm:p-4">
       <div aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-white/10" />
-      <div aria-hidden className="pointer-events-none absolute -bottom-16 right-16 h-32 w-32 rounded-full bg-white/10" />
       <div className="relative">
         <div className="flex items-center gap-2">
           <button type="button" className={round} onClick={() => onChange(addDays(day, -1))} aria-label="Previous day">
@@ -106,18 +92,6 @@ export function FoodHero({
             </p>
             <p className="truncate text-sm font-semibold">{formatDay(day)}</p>
           </div>
-          <button
-            type="button"
-            className={round}
-            onClick={() => onChange(addDays(day, 1))}
-            disabled={day >= today}
-            aria-label="Next day"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="mt-3 flex items-center gap-2">
-          <p className="flex-1 truncate text-base font-semibold sm:text-lg">{line}</p>
           {day !== today && (
             <button
               type="button"
@@ -132,34 +106,49 @@ export function FoodHero({
               <Share2 className="h-4 w-4" />
             </button>
           )}
+          <button
+            type="button"
+            className={round}
+            onClick={() => onChange(addDays(day, 1))}
+            disabled={day >= today}
+            aria-label="Next day"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
         </div>
-        <dl className="mt-4 grid grid-cols-3 gap-2">
-          <HeroStat
-            icon={<Flame className="h-4 w-4" />}
-            value={totals.energyKcal.toLocaleString()}
-            label={target === undefined ? 'kcal eaten' : `of ${target.toLocaleString()} kcal`}
-          />
-          <HeroStat
-            icon={<Zap className="h-4 w-4" />}
-            value={`${mgToG(totals.proteinMg)}g`}
-            label={proteinTarget === undefined ? 'protein' : `of ${proteinTarget}g protein`}
-          />
-          <HeroStat icon={<ListChecks className="h-4 w-4" />} value={String(entryCount)} label={entryCount === 1 ? 'item logged' : 'items logged'} />
-        </dl>
+        <div className="mt-3 grid grid-cols-7 gap-1.5" role="group" aria-label="This week">
+          {week.days.map((item) => {
+            const selected = item.day === day;
+            const future = item.day > today;
+            const fill = dayTarget ? Math.min(1, item.eatenKcal / dayTarget) : item.logged ? 1 : 0;
+            return (
+              <button
+                key={item.day}
+                type="button"
+                disabled={future}
+                aria-pressed={selected}
+                aria-label={`${formatDay(item.day)}${item.logged ? `, ${item.eatenKcal.toLocaleString()} kcal` : ', nothing logged'}`}
+                onClick={() => onChange(item.day)}
+                className={clsx(
+                  'flex flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 transition-colors disabled:opacity-40',
+                  selected ? 'bg-white text-slate-900 shadow' : 'bg-white/15 text-white hover:bg-white/25',
+                )}
+              >
+                <span className={clsx('text-[10px] font-semibold', selected ? 'text-slate-500' : 'text-white/75')}>
+                  {WEEKDAYS[weekdayOf(item.day)]}
+                </span>
+                <span className="text-sm font-bold tabular-nums leading-tight">{Number(item.day.slice(8, 10))}</span>
+                <span className={clsx('mt-0.5 h-1 w-full overflow-hidden rounded-full', selected ? 'bg-slate-900/15' : 'bg-white/25')} aria-hidden>
+                  <span
+                    className={clsx('block h-full rounded-full', selected ? 'bg-train-legs-solid' : 'bg-white')}
+                    style={{ width: `${Math.round(fill * 100)}%` }}
+                  />
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </section>
-  );
-}
-
-function HeroStat({ icon, value, label }: { icon: React.ReactNode; value: string; label: string }) {
-  return (
-    <div className="rounded-xl bg-white/15 px-3 py-2 backdrop-blur-sm">
-      <dt className="sr-only">{label}</dt>
-      <dd>
-        <span className="flex items-center gap-1 text-white/80">{icon}</span>
-        <span className="mt-1 block truncate text-xl font-bold tabular-nums leading-tight">{value}</span>
-        <span className="block truncate text-[11px] text-white/80">{label}</span>
-      </dd>
-    </div>
   );
 }

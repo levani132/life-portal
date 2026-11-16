@@ -375,15 +375,17 @@ here is stored or changes a figure.
   strip as Training's tabs, followed by two trailing cells: the AI assistant link and **Log food**
   (the accent cell, on screen in every view).
 - **`FoodHero`** (`components/food-day.tsx`) opens Today: the day on a gradient with the day
-  arrows, "Today" and Share, a headline (kcal left, over, or eaten when there is no target) and
-  three figures (kcal, protein, items logged). It reads the same `dayTotals` and `targets` as the
-  rings below it.
+  arrows, "Today" and Share, and **the current week as seven days to tap** (`overview.week`). A
+  day's bar is what was eaten against the daily target (full at the target); without a target, a
+  logged day is a full bar. It deliberately carries no calories or macros: a first version did,
+  and it repeated the rings directly below (owner feedback).
 - **A meal's colour and icon come from its slot** (`SLOT_STYLES`): breakfast, lunch, dinner,
   snacks, anything else. The hues are Training's `train-*` tokens, the theme-aware set. Each meal
   is a card with that colour on its left edge and icon; its header carries the kcal and
   `MacroLine` (P, C, F in the one macro palette, `lib/macro-colors.ts`); each entry is a row with
   icon buttons for share, edit and remove. Suggestions take the meal's tint.
-- **Macro tiles** are tinted with their own macro colour.
+- **Macro tiles** are four across on every width, as on Home's Food card: glass tiles (`.glass`,
+  the surface Home's widget cards use), each lit from above in its own macro colour.
 
 ## Offline (spec 029, issue #18)
 
