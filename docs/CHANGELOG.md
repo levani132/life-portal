@@ -28,6 +28,10 @@ User-visible changes. Newest first.
 - **Swipe a logged food left for its actions.** On a phone, Share, Edit and Remove are behind
   the row: swipe left to show them, or swipe most of the way to remove it. With a mouse the three
   buttons stay visible.
+- **Glass tabs slide.** On Training, Food, your profile and the friends page, the lit pane
+  glides to the tab you pick.
+- **The bottom bar's pill follows your finger** when you swipe between tabs: it leans and
+  stretches towards the next tab as you drag, and finishes the move when you let go.
 - **The bottom bar is a floating glass capsule.** The page scrolls underneath it, and a pill
   slides to the tab you open, with a small bounce, the way an iPhone app's tab bar does. Icons dip
   under your finger.

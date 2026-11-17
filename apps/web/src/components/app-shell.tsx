@@ -4,7 +4,7 @@ import { HealthSyncBridge } from './apple-health';
 import clsx from 'clsx';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   Home,
   Menu,
@@ -197,11 +197,15 @@ function Portal({ children }: { children: ReactNode }) {
           <span
             aria-hidden
             className="glass-bar-pill"
-            style={{
-              width: `calc((100% - 0.75rem) / ${bar.length})`,
-              transform: `translateX(${Math.max(0, barIndex) * 100}%)`,
-              opacity: barIndex < 0 ? 0 : 1,
-            }}
+            style={
+              {
+                '--n': bar.length,
+                '--i': Math.max(0, barIndex),
+                '--next': swipeCells(bar, barIndex, 1),
+                '--prev': swipeCells(bar, barIndex, -1),
+                opacity: barIndex < 0 ? 0 : 1,
+              } as CSSProperties
+            }
           />
           {bar.map((tab) =>
             tab === NEW_POST ? (
@@ -359,6 +363,17 @@ const LAST_TAB_HREF = { profile: '/profile', menu: '/menu' } as const;
 
 function OwnProfile() {
   return <ProfileView />;
+}
+
+/**
+ * How many cells the pill travels to the tab a swipe in `direction` leads to: usually one, two
+ * when New post sits between them, none at either end.
+ */
+function swipeCells(bar: (Tab | typeof NEW_POST)[], from: number, direction: 1 | -1): number {
+  for (let index = from + direction; from >= 0 && index >= 0 && index < bar.length; index += direction) {
+    if (bar[index] !== NEW_POST) return Math.abs(index - from);
+  }
+  return 0;
 }
 
 /** The tabs with the New post button in the middle. It is a link, not a tab: swiping skips it. */

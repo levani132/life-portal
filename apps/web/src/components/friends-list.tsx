@@ -1,4 +1,5 @@
 'use client';
+import { GlassPill } from './glass-pill';
 import Link from 'next/link';
 import { useState } from 'react';
 import type { ConnectionList, PeoplePage } from '@life-portal/shared-types';
@@ -29,17 +30,18 @@ export function Friends() {
         }
       />
       <div
-        className="glass-tabs mb-5 flex gap-1 rounded-2xl border p-1"
+        className="glass-tabs relative mb-5 flex gap-1 rounded-2xl border p-1"
         role="tablist"
         aria-label="Connections"
       >
+        <GlassPill />
         {(Object.keys(LABELS) as ConnectionList[]).map((value) => (
           <button
             type="button"
             key={value}
             role="tab"
             aria-selected={kind === value}
-            className={`min-h-11 flex-1 rounded-xl border px-2 text-sm ${kind === value ? 'glass-tab-on font-medium' : 'border-transparent text-ink-muted'}`}
+            className={`min-h-11 flex-1 rounded-xl border border-transparent px-2 text-sm ${kind === value ? 'glass-tab-on font-medium' : 'text-ink-muted'}`}
             onClick={() => {
               setKind(value);
               setSkip(0);

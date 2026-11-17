@@ -2450,7 +2450,13 @@ underline, by the owner's choice.
 the page scrolls under it, so its blur is stronger than in-page glass. The band beside it is
 `pointer-events-none` so the page stays touchable there. A pill sits behind the open tab and
 slides to the next one with a small overshoot (`transform` only, one element, no layout), and an
-icon scales down while pressed; both are off under `prefers-reduced-motion`. The pill is
+icon scales down while pressed; both are off under `prefers-reduced-motion`. **During a tab swipe
+the pill follows the finger**: `TabHost` writes the swipe's progress to the root as `--tab-swipe`
+(and `data-tab-swiping` while a finger drives it), and the pill's CSS leans 45% of the way and
+stretches, as Instagram's does, then completes with the bounce when the route changes. The
+property is cleared in the same layout effect that switches the tab, so the pill never jumps back.
+**In-page glass tabs slide too**: `GlassPill` is one absolutely positioned pane that takes the
+selected tab's box (measured, written straight to its style, no state). The pill is
 positioned from the cell count, so New post in the middle is a cell it passes over and never
 rests on. Hiding the bar on scroll moves it 140% of its height, enough to clear the inset.
 

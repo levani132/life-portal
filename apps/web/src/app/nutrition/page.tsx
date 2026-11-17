@@ -33,6 +33,7 @@ import {
 import { AppShell } from '../../components/app-shell';
 import { CheatQueue } from '../../components/cheat-queue';
 import { FoodCard } from '../../components/food-card';
+import { GlassPill } from '../../components/glass-pill';
 import { FoodHero, MacroLine, SLOT_STYLES } from '../../components/food-day';
 import { SwipeRow, type SwipeAction } from '../../components/swipe-row';
 import { FoodForm } from '../../components/food-form';
@@ -167,7 +168,8 @@ function Nutrition() {
         aria-label="Food controls"
         data-no-tab-swipe
       >
-        <div role="group" aria-label="Food views" className="grid min-w-0 flex-1 grid-cols-3 gap-1">
+        <div role="group" aria-label="Food views" className="relative grid min-w-0 flex-1 grid-cols-3 gap-1">
+          <GlassPill />
           {TABS.map((option) => {
             const Icon = option.icon;
             const selected = tab === option.id;

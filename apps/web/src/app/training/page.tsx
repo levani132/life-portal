@@ -8,6 +8,7 @@ import { addDays, diffDays, formatDay, weekdayOf } from '@life-portal/shared-dom
 import { AppShell } from '../../components/app-shell';
 import { ExerciseLibrary } from '../../components/training/exercise-library';
 import { Plans } from '../../components/training/plans';
+import { GlassPill } from '../../components/glass-pill';
 import { TrainingHero } from '../../components/training/training-hero';
 import { TrainingSettingsButton, TrainingSettingsModal } from '../../components/training/training-settings';
 import { CurrentWorkout, WorkoutSession } from '../../components/training/workout-session';
@@ -71,7 +72,8 @@ function Training() {
         className="glass-tabs mb-4 flex items-stretch gap-1 rounded-2xl border p-1"
         data-no-tab-swipe
       >
-        <div role="tablist" aria-label="Training" className="grid min-w-0 flex-1 grid-cols-4 gap-1">
+        <div role="tablist" aria-label="Training" className="relative grid min-w-0 flex-1 grid-cols-4 gap-1">
+          <GlassPill />
           {TABS.map((item) => {
             const Icon = item.icon;
             const selected = tab === item.id;

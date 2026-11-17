@@ -61,6 +61,10 @@ const BROWSER_EDGE = 24;
  *   inside the tab, and a transformed ancestor would pin them to it.
  * - `touchmove` is registered non-passive **at mount**, for the same reason as pull-to-refresh.
  */
+/** Set on the root element during a tab swipe, for the tab bar's pill (`.glass-bar-pill`). */
+const SWIPE_PROGRESS = '--tab-swipe';
+const SWIPING = 'data-tab-swiping';
+
 export function TabHost({
   tabs,
   active,
@@ -121,6 +125,9 @@ export function TabHost({
       const inner = el.firstElementChild as HTMLElement | null;
       if (inner) inner.style.transform = '';
     }
+    // The pill's swipe offset ends in the same frame its tab changes, so it never jumps back.
+    document.documentElement.style.removeProperty(SWIPE_PROGRESS);
+    document.documentElement.removeAttribute(SWIPING);
     shown.current = active;
     window.scrollTo(0, active ? (scrolls.current.get(active) ?? 0) : 0);
   }, [active]);
@@ -143,6 +150,7 @@ export function TabHost({
     };
     const reduced =
       window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+    const root = document.documentElement;
 
     const layers = () => {
       const { active: href } = live.current;
@@ -154,6 +162,10 @@ export function TabHost({
     };
 
     const place = (offset: number, ms = 0) => {
+      // The tab bar's pill follows the same gesture: how far towards the next tab (1) or the
+      // previous one (-1), and whether a finger is driving it (then it must not ease).
+      root.style.setProperty(SWIPE_PROGRESS, g.width ? String(-offset / g.width) : '0');
+      root.toggleAttribute(SWIPING, ms === 0);
       for (const [el, side] of layers()) {
         if (!el) continue;
         el.style.transition = ms
@@ -170,6 +182,8 @@ export function TabHost({
         el.style.transform = '';
         if (side !== 0) el.style.visibility = '';
       }
+      root.style.removeProperty(SWIPE_PROGRESS);
+      root.removeAttribute(SWIPING);
       g.settling = false;
     };
 

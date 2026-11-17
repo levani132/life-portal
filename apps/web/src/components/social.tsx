@@ -1,4 +1,5 @@
 'use client';
+import { GlassPill } from './glass-pill';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
@@ -481,10 +482,11 @@ export function ProfileView({ userId }: { userId?: string }) {
       )}
       {tabs.length > 1 && (
         <div
-          className="glass-tabs mt-5 inline-flex gap-1 rounded-full border p-1"
+          className="glass-tabs relative mt-5 inline-flex gap-1 rounded-full border p-1"
           role="tablist"
           aria-label="Profile sections"
         >
+          <GlassPill />
           {tabs.map((value) => (
             <button
               type="button"
@@ -493,7 +495,7 @@ export function ProfileView({ userId }: { userId?: string }) {
               aria-selected={shown === value}
               className={
                 shown === value
-                  ? 'glass-tab-on rounded-full border px-4 py-1.5 text-sm font-medium'
+                  ? 'glass-tab-on rounded-full border border-transparent px-4 py-1.5 text-sm font-medium'
                   : 'rounded-full border border-transparent px-4 py-1.5 text-sm text-ink-muted hover:text-ink'
               }
               onClick={() => setTab(value)}
