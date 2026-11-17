@@ -159,6 +159,28 @@ function Themes() {
           })}
         </ul>
       )}
+      {list.data && list.data.presets.length > 0 && (
+        <Panel title="Ready-made themes" description="Adds an editable copy to the list. Nothing changes for anyone until you activate it.">
+          <div className="flex flex-wrap gap-2">
+            {list.data.presets.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                className="btn-ghost"
+                disabled={!!busy}
+                onClick={() =>
+                  void run(`preset:${preset.id}`, async () => {
+                    const created = await api.post<Theme>('/themes', { name: preset.name, from: `preset:${preset.id}` });
+                    setEditingId(created.id);
+                  })
+                }
+              >
+                <Copy className="h-4 w-4" /> Add {preset.name}
+              </button>
+            ))}
+          </div>
+        </Panel>
+      )}
       {editing && (
         <ThemeEditor
           key={`${editing.id}@${editing.version}`}

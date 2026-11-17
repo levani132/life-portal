@@ -1,4 +1,4 @@
-import { THEME_ROLES, THEME_V0 } from '@life-portal/shared-types';
+import { THEME_PRESETS, THEME_ROLE_IDS as ROLE_IDS, THEME_ROLES, THEME_V0 } from '@life-portal/shared-types';
 import { colourToHex, completeValues, contrastRatio, hexToColour, themeBootScript, themeCss, themeProblems, THEME_STORAGE_KEY, validColour, valuesProblem } from './theme';
 
 describe('validColour', () => {
@@ -102,5 +102,15 @@ describe('themeBootScript', () => {
     expect(style.textContent).not.toContain('--ink:0');
     expect(style.textContent).not.toContain('300');
     expect(style.textContent).toContain('--border:');
+  });
+});
+
+describe('presets', () => {
+  it.each(THEME_PRESETS.map((preset) => [preset.name, preset] as const))('%s has a valid colour for every role and no readability problem', (_name, preset) => {
+    for (const mode of ['light', 'dark'] as const) {
+      expect(Object.keys(preset[mode]).sort()).toEqual([...ROLE_IDS].sort());
+      expect(valuesProblem(preset[mode])).toBeNull();
+    }
+    expect(themeProblems(preset)).toEqual([]);
   });
 });

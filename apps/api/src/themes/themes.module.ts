@@ -19,6 +19,8 @@ import { IsInt, IsObject, IsOptional, IsString, MaxLength, Min, MinLength } from
 import { isValidObjectId, Schema as MongooseSchema, type Model } from 'mongoose';
 import {
   THEME_NAME_MAX,
+  THEME_PRESET_PREFIX,
+  THEME_PRESETS,
   THEME_V0,
   THEME_V0_ID,
   THEME_V0_NAME,
@@ -61,8 +63,8 @@ export const ThemeSettingSchema = SchemaFactory.createForClass(ThemeSetting);
 
 export class CreateThemeDto {
   @IsString() @MinLength(1) @MaxLength(THEME_NAME_MAX) name!: string;
-  /** The theme to start from: an id or `v0`. */
-  @IsOptional() @IsString() @MaxLength(40) from?: string;
+  /** The theme to start from: an id, `v0` or `preset:<id>`. */
+  @IsOptional() @IsString() @MaxLength(60) from?: string;
 }
 
 export class UpdateThemeDto {
@@ -108,6 +110,11 @@ export class ThemesService {
 
   private async find(id: string): Promise<Theme> {
     if (id === THEME_V0_ID) return V0;
+    if (id.startsWith(THEME_PRESET_PREFIX)) {
+      const preset = THEME_PRESETS.find((item) => item.id === id.slice(THEME_PRESET_PREFIX.length));
+      if (!preset) throw new NotFoundException('Theme not found.');
+      return { ...V0, id, name: preset.name, light: completeValues(preset.light, 'light'), dark: completeValues(preset.dark, 'dark') };
+    }
     const row = isValidObjectId(id) ? await this.themes.findById(id).lean<Row>() : null;
     if (!row) throw new NotFoundException('Theme not found.');
     return this.toTheme(row);
@@ -134,7 +141,11 @@ export class ThemesService {
       this.themes.find().sort({ name: 1 }).limit(THEMES_MAX).lean<Row[]>(),
       this.activeId(),
     ]);
-    return { activeId, themes: [V0, ...rows.map((row) => this.toTheme(row))] };
+    return {
+      activeId,
+      themes: [V0, ...rows.map((row) => this.toTheme(row))],
+      presets: THEME_PRESETS.map(({ id, name }) => ({ id, name })),
+    };
   }
 
   /** A new theme is always a copy: of `from`, or of v0. */
@@ -204,6 +215,7 @@ export class ThemesService {
   /** Makes a theme the one everyone sees. Refused while it fails a readability check. */
   async activate(userId: string, id: string): Promise<ThemeList> {
     this.access.requireDeveloper(userId);
+    if (id.startsWith(THEME_PRESET_PREFIX)) throw new NotFoundException('Theme not found.');
     const theme = await this.find(id);
     const problems = themeProblems(theme);
     if (problems.length)

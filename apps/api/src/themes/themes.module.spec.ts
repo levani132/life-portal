@@ -153,4 +153,13 @@ describe('themes', () => {
     await expect(service.remove(DEV, ID)).resolves.toEqual({ success: true });
     await expect(service.remove(DEV, ID)).resolves.toEqual({ success: true });
   });
+
+  it('adds a preset as an ordinary theme, and never activates a preset itself', async () => {
+    const { service } = fixture();
+    const theme = await service.create(DEV, { name: 'Crisp', from: 'preset:crisp' });
+    expect(theme).toMatchObject({ id: ID, builtIn: false, light: { ink: '0 0 0' } });
+    await expect(service.create(DEV, { name: 'x', from: 'preset:nope' })).rejects.toThrow('Theme not found.');
+    await expect(service.activate(DEV, 'preset:crisp')).rejects.toThrow('Theme not found.');
+    expect((await service.list(DEV)).presets).toEqual([{ id: 'crisp', name: 'Crisp' }]);
+  });
 });

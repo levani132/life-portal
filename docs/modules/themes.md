@@ -55,7 +55,7 @@ v0.
 | --- | --- | --- |
 | `GET /themes/active` | any signed-in account | `{ id, version, light, dark }`, every role present, `no-store` |
 | `GET /themes` | developer | `{ activeId, themes }`, v0 first |
-| `POST /themes` | developer | `{ name, from? }`: a copy of `from` (default v0). At most 50 |
+| `POST /themes` | developer | `{ name, from? }`: a copy of `from` (a theme id, `v0` or `preset:<id>`; default v0). At most 50 |
 | `PATCH /themes/:id` | developer | `{ name?, light?, dark?, baseVersion }`. Sent roles replace stored ones |
 | `DELETE /themes/:id` | developer | Not v0, not the active one. Already gone: success |
 | `POST /themes/:id/activate` | developer | Refused while the theme fails a readability check |
@@ -95,3 +95,11 @@ sign-out and is not one of spec 027's offline stores.
 `/settings/themes` (menu → Themes, developer only): list with swatches, Activate, Edit,
 Duplicate, Delete. The editor has a colour picker and hex field per role, a light/dark switch, a
 live preview (a subtree whose variables are the unsaved values) and the readability problems.
+
+## Ready-made themes
+
+`THEME_PRESETS` (shared types) are themes shipped with the app, currently **Crisp**: black on
+white, neutral greys, saturated colour, true black in dark. A preset is only a source: the admin
+adds a copy ("Add Crisp"), which is an ordinary editable theme, and activates that. A preset is
+never active itself and is not a row. A test requires each preset to have every role and no
+readability problem. To add a look, add a preset; do not change v0.

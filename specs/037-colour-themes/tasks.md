@@ -26,5 +26,5 @@
 
 ## Phase 5: The new look
 
-- [ ] T013 Concept sheet: v0 beside the new theme on sample screens, both modes
-- [ ] T014 Add the approved theme; docs (`docs/modules/themes.md`, `DECISIONS.md`, `CHANGELOG.md`, `CLAUDE.md`)
+- [x] T013 Concept sheet: v0 beside the new theme on sample screens, both modes
+- [x] T014 Add the approved theme; docs (`docs/modules/themes.md`, `DECISIONS.md`, `CHANGELOG.md`, `CLAUDE.md`)

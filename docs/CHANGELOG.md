@@ -9,6 +9,8 @@ User-visible changes. Newest first.
   one theme active for everyone. The active theme reaches each device the next time the app is
   opened or brought back to the front, and is kept on the device, so it also shows offline.
 - **A theme that would make text hard to read cannot be activated.** The page lists what fails.
+- **A new look, Crisp, is ready to add.** True black text on white, neutral greys, stronger
+  colours, and a true black dark mode. On the Themes page press "Add Crisp", then Activate.
 - **Today's look is kept as "v0 (original)"** and cannot be edited or deleted. A few
   near-identical shades were merged, so some coloured text in dark mode is slightly stronger,
   and the meal colours in the log-food sheet now match the Food page.

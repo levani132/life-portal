@@ -109,4 +109,117 @@ export interface ActiveTheme {
 export interface ThemeList {
   activeId: string;
   themes: Theme[];
+  /** Ready-made themes that can be added as a copy (`POST /themes { from: 'preset:<id>' }`). */
+  presets: { id: string; name: string }[];
 }
+
+/**
+ * Ready-made themes shipped with the app. A preset is not a theme anyone sees: the admin adds a
+ * copy of it (an ordinary, editable theme) and activates that. Values must pass `themeProblems`.
+ */
+export interface ThemePreset {
+  id: string;
+  name: string;
+  light: ThemeValues;
+  dark: ThemeValues;
+}
+
+export const THEME_PRESET_PREFIX = 'preset:';
+
+export const THEME_PRESETS: readonly ThemePreset[] = [
+  {
+    // Black on white, neutral greys, saturated colour used as signal; true black in dark.
+    id: 'crisp',
+    name: 'Crisp',
+    light: {
+      'surface': '250 250 250',
+      'surface-raised': '255 255 255',
+      'border': '219 219 222',
+      'ink': '0 0 0',
+      'ink-muted': '82 82 91',
+      'ink-faint': '115 115 122',
+      'accent': '0 100 224',
+      'accent-hover': '0 78 184',
+      'accent-solid': '0 100 224',
+      'accent-solid-hover': '0 78 184',
+      'on-accent': '255 255 255',
+      'success': '0 128 60',
+      'success-solid': '22 178 90',
+      'warning': '176 80 0',
+      'warning-solid': '255 149 0',
+      'danger': '214 0 50',
+      'danger-solid': '240 40 70',
+      'info': '0 108 204',
+      'info-solid': '0 149 246',
+      'special': '112 48 224',
+      'special-solid': '131 58 240',
+      'fresh': '62 128 0',
+      'fresh-solid': '110 196 20',
+      'macro-kcal': '22 178 90',
+      'macro-protein': '131 58 240',
+      'macro-carbs': '0 149 246',
+      'macro-fat': '255 159 10',
+      'macro-kcal-text': '0 128 60',
+      'macro-protein-text': '112 48 224',
+      'macro-carbs-text': '0 108 204',
+      'macro-fat-text': '176 80 0',
+      'train-push': '204 62 0',
+      'train-pull': '0 92 220',
+      'train-legs': '0 128 60',
+      'train-core': '168 84 0',
+      'train-arms': '112 48 224',
+      'train-cardio': '206 16 96',
+      'train-push-solid': '240 80 10',
+      'train-pull-solid': '0 110 240',
+      'train-legs-solid': '10 150 76',
+      'train-core-solid': '200 108 0',
+      'train-arms-solid': '131 58 240',
+      'train-cardio-solid': '232 30 112',
+    },
+    dark: {
+      'surface': '0 0 0',
+      'surface-raised': '18 18 20',
+      'border': '46 46 50',
+      'ink': '250 250 250',
+      'ink-muted': '168 168 174',
+      'ink-faint': '128 128 136',
+      'accent': '88 172 255',
+      'accent-hover': '150 204 255',
+      'accent-solid': '0 112 238',
+      'accent-solid-hover': '30 132 250',
+      'on-accent': '255 255 255',
+      'success': '50 215 120',
+      'success-solid': '34 190 100',
+      'warning': '255 180 40',
+      'warning-solid': '255 159 10',
+      'danger': '255 92 112',
+      'danger-solid': '255 55 85',
+      'info': '84 180 255',
+      'info-solid': '0 149 246',
+      'special': '176 142 255',
+      'special-solid': '139 92 246',
+      'fresh': '170 235 70',
+      'fresh-solid': '130 210 30',
+      'macro-kcal': '50 215 120',
+      'macro-protein': '160 120 255',
+      'macro-carbs': '40 160 255',
+      'macro-fat': '255 180 40',
+      'macro-kcal-text': '50 215 120',
+      'macro-protein-text': '176 142 255',
+      'macro-carbs-text': '84 180 255',
+      'macro-fat-text': '255 180 40',
+      'train-push': '255 140 60',
+      'train-pull': '90 165 255',
+      'train-legs': '50 215 120',
+      'train-core': '255 190 50',
+      'train-arms': '176 142 255',
+      'train-cardio': '255 110 180',
+      'train-push-solid': '240 80 10',
+      'train-pull-solid': '0 110 240',
+      'train-legs-solid': '10 150 76',
+      'train-core-solid': '200 108 0',
+      'train-arms-solid': '131 58 240',
+      'train-cardio-solid': '232 30 112',
+    },
+  },
+];
