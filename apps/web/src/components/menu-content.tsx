@@ -10,6 +10,7 @@ import {
   Flag,
   Users,
   Bell,
+  Palette,
 } from 'lucide-react';
 import { MODULES, type PortalState } from '@life-portal/shared-types';
 import { PageHeader } from './page-header';
@@ -62,6 +63,7 @@ export function MenuContent() {
       ? [
           { href: '/settings/access', label: 'Feature access', icon: Flag },
           { href: '/settings/sync-health', label: 'Sync health', icon: Flag },
+          { href: '/settings/themes', label: 'Themes', icon: Palette },
           ...(data.access.foodPosts &&
           data.access.social &&
           data.access.nutrition

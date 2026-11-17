@@ -2515,3 +2515,40 @@ bar and header add it with the `translate` property (so it composes with their h
 while the page is pinch-zoomed. It compares against `window.innerHeight`, which follows Safari's
 collapsing toolbars like the visual viewport does, so a browser tab is unaffected.
 
+
+## 2026-11-17 · Colours are roles, and a theme is data (spec 037)
+
+**Why:** the owner wants to change the app's whole look, more than once, without a code change
+per colour. Colours were ~640 palette classes and a dozen literals across 78 files.
+
+**Every colour is a role** (`THEME_ROLES`, 43 of them), a CSS variable holding `r g b`. A theme
+is a value per role for light and dark. v0 is today's look, lives in code and in `global.css`,
+and is never a database row, so a broken or deleted theme always falls back to something whole.
+
+**v0 is not pixel-identical to before.** Near-identical shades were merged into one role each:
+dark-mode text in emerald/amber/rose/lime used shades 100 to 400 and is now the 400 shade (lime
+200); fills and borders used 400 and 500 and are now 500; the log-food sheet's meal colours now
+match the Food page's. The alternative, a role per shade, would have made a theme ~150 values
+nobody could reason about.
+
+**One theme for the whole app, set by the developer account.** Not a per-member choice; members
+still choose light, dark or system. Per-member themes can be added later on the same roles.
+
+**No public route.** `GET /themes/active` needs a session like everything else. The sign-in
+screens use what the device kept, or v0. A first-ever visit therefore signs in on v0.
+
+**The kept theme is in `localStorage`, outside spec 027's offline stores.** Those stores hold a
+person's data and are limited to three modules. A theme is colours and a version, identical for
+every account, and must be readable by a script that runs before the page loads; IndexedDB is
+asynchronous and would flash.
+
+**Values are checked three times** (save, read, stylesheet build) because they end up in a
+`<style>` element on every device: only `--role: r g b` can be written. Applying needs
+`style-src 'unsafe-inline'`, which the policy already had; the pre-paint script uses the nonce.
+
+**Readability gates activation**, so a theme cannot make the app unusable for everyone at once.
+The thresholds are WCAG's (4.5:1 body text, 3:1 for faint and status text).
+
+**Fixed colours stay fixed** where a theme has no business: brand colours, photos' overlays,
+rank materials, and images drawn for outside the page. The list is the allowlist in
+`apps/web/src/lib/theme-roles.spec.ts`.

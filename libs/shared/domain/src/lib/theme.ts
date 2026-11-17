@@ -48,13 +48,38 @@ const declarations = (values: ThemeValues) =>
 /**
  * The stylesheet a theme becomes: its light values on the root, its dark values for an explicit
  * dark choice and for a dark system without an explicit light choice. The same three places
- * `global.css` declares v0 in, so it overrides them and nothing else. Values are completed and
+ * `global.css` declares v0 in, each one step more specific (`html:root`), so it overrides them
+ * wherever the element sits in the page and overrides nothing else. Values are completed and
  * re-validated here, so this can only ever emit `--role:r g b;`.
  */
 export function themeCss(theme: { light?: Partial<ThemeValues>; dark?: Partial<ThemeValues> }): string {
   const light = declarations(completeValues(theme.light, 'light'));
   const dark = declarations(completeValues(theme.dark, 'dark'));
-  return `:root{${light}}:root[data-theme='dark']{${dark}}@media (prefers-color-scheme: dark){:root:not([data-theme='light']){${dark}}}`;
+  return `html:root{${light}}html:root[data-theme='dark']{${dark}}@media (prefers-color-scheme: dark){html:root:not([data-theme='light']){${dark}}}`;
+}
+
+/** Where a device keeps the active theme: colours only, so it is the same for every account. */
+export const THEME_STORAGE_KEY = 'lp.theme.active.v1';
+/** The `<style>` element a theme is applied through. */
+export const THEME_STYLE_ID = 'lp-theme';
+
+/**
+ * The script the page runs before its first paint: reads the kept theme and applies it, so the
+ * app opens in its colours with no flash of v0 and with no connection. It cannot import
+ * anything, so it repeats `themeCss` in plain JavaScript, checking every value the same way; a
+ * test runs it and compares the two. A kept theme that cannot be read applies nothing (v0).
+ */
+export function themeBootScript(): string {
+  const roles = JSON.stringify(THEME_ROLES.map((role) => role.id));
+  return (
+    `(function(){try{var t=JSON.parse(localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)})||'null');if(!t||typeof t!=='object')return;` +
+    `var R=${roles},x=/^(\\d{1,3}) (\\d{1,3}) (\\d{1,3})$/;` +
+    `function d(v){var s='';if(!v||typeof v!=='object')return s;for(var i=0;i<R.length;i++){var c=v[R[i]],m=typeof c==='string'&&x.exec(c);` +
+    `if(m&&+m[1]<=255&&+m[2]<=255&&+m[3]<=255)s+='--'+R[i]+':'+c+';'}return s}` +
+    `var l=d(t.light),k=d(t.dark),e=document.createElement('style');e.id=${JSON.stringify(THEME_STYLE_ID)};` +
+    `e.textContent="html:root{"+l+"}html:root[data-theme='dark']{"+k+"}@media (prefers-color-scheme: dark){html:root:not([data-theme='light']){"+k+"}}";` +
+    `document.head.appendChild(e)}catch(e){}})()`
+  );
 }
 
 const channel = (value: number) => {

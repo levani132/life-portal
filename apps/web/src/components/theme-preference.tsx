@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useSyncExternalStore } from 'react';
+import { THEME_APPLIED_EVENT } from '../lib/theme-runtime';
 import { Field, Panel, Select } from './ui';
 
 const STORAGE_KEY = 'lp.theme.v1';
@@ -56,7 +57,11 @@ export function ThemeSync() {
     }
     apply();
     media.addEventListener('change', apply);
-    return () => media.removeEventListener('change', apply);
+    window.addEventListener(THEME_APPLIED_EVENT, apply);
+    return () => {
+      media.removeEventListener('change', apply);
+      window.removeEventListener(THEME_APPLIED_EVENT, apply);
+    };
   }, [preference]);
   return null;
 }

@@ -244,6 +244,13 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   bounded key, count: refusal keys come from `SYNC_REFUSAL_CODES` or `http_<status>`, ages are
   buckets. Never add an account, path, body or value to it. `npm run test:integration` creates and
   drops `lp-int-*` databases: never point `INTEGRATION_MONGODB_URI` at real data.
+- **Never write a palette colour or a literal in the web app** (spec 037). Every colour is a
+  role from `THEME_ROLES` (`text-ink`, `bg-danger-solid/10`, `rgb(var(--macro-kcal))`), because
+  the active theme is data: `text-emerald-400` would ignore it. A plain role is text; its
+  `-solid` twin is a fill, border or tint. A role exists in three places kept in step by
+  `theme-roles.spec.ts`, which also holds the allowlist of fixed colours. Theme values are only
+  ever `r g b` and are re-checked wherever they are written into a stylesheet; v0 is code, never
+  a row; there is no public themes route. See `docs/modules/themes.md`.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for

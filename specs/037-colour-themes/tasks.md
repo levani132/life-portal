@@ -11,18 +11,18 @@
 
 ## Phase 2: Themes as data
 
-- [ ] T007 `themes` module: schema, v0 seeding, `GET /themes/active`
-- [ ] T008 Admin routes: list, duplicate, update with `baseVersion`, delete, activate; validation; tests
+- [x] T007 `themes` module: schema, v0 seeding, `GET /themes/active`
+- [x] T008 Admin routes: list, duplicate, update with `baseVersion`, delete, activate; validation; tests
 
 ## Phase 3: Applying
 
-- [ ] T009 `lib/theme-runtime.ts`: apply, keep, re-validate; pre-paint script in the root layout
-- [ ] T010 Fetch on sign-in and on return to the foreground; status-bar colour follows the surface
+- [x] T009 `lib/theme-runtime.ts`: apply, keep, re-validate; pre-paint script in the root layout
+- [x] T010 Fetch on sign-in and on return to the foreground; status-bar colour follows the surface
 
 ## Phase 4: Admin page
 
-- [ ] T011 `/settings/themes`: list, duplicate, rename, delete, activate
-- [ ] T012 Editor with live preview in both modes and readability problems
+- [x] T011 `/settings/themes`: list, duplicate, rename, delete, activate
+- [x] T012 Editor with live preview in both modes and readability problems
 
 ## Phase 5: The new look
 

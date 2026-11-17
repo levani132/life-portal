@@ -2,6 +2,17 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-17: Colour themes
+
+- **The app's colours can now be changed as a whole.** The admin has a new Themes page (menu →
+  Themes) to copy a theme, change any colour for light and dark with a live preview, and make
+  one theme active for everyone. The active theme reaches each device the next time the app is
+  opened or brought back to the front, and is kept on the device, so it also shows offline.
+- **A theme that would make text hard to read cannot be activated.** The page lists what fails.
+- **Today's look is kept as "v0 (original)"** and cannot be edited or deleted. A few
+  near-identical shades were merged, so some coloured text in dark mode is slightly stronger,
+  and the meal colours in the log-food sheet now match the Food page.
+
 ## 2026-11-17: An added set counts
 
 - **Adding a set to an exercise now makes it part of the exercise.** If you add a fourth set to a

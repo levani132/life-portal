@@ -2,6 +2,8 @@ import './global.css';
 import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
 import type { ReactNode } from 'react';
+import { themeBootScript } from '@life-portal/shared-domain';
+import { ThemeLoader } from '../components/theme-loader';
 import { ThemeSync } from '../components/theme-preference';
 import { AuthProvider } from '../lib/auth-context';
 import { PortalShell } from '../components/app-shell';
@@ -63,10 +65,13 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             __html: `(function(){try{var p=localStorage.getItem('lp.theme.v1');document.documentElement.dataset.theme=p==='light'||p==='dark'?p:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){}})()`,
           }}
         />
+        {/* Spec 037: the kept colour theme, before the first paint. Values are re-checked. */}
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeBootScript() }} />
       </head>
       <body>
         <ThemeSync />
         <AuthProvider>
+          <ThemeLoader />
           <PortalShell>{children}</PortalShell>
         </AuthProvider>
         <ServiceWorkerRegistration />
