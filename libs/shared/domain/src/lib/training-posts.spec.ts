@@ -110,7 +110,8 @@ describe('copying a published plan', () => {
     expect(copyNeedsPlanChoice(plan)).toBe(false);
     expect(copyNeedsPlanChoice({ ...plan, plan: { ...plan.plan!, workouts: [plan.plan!.workouts[0]] } })).toBe(true);
     expect(copyNeedsPlanChoice(workout())).toBe(true);
-    expect(copyNeedsPlanChoice({ kind: 'exercise', label: 'Plank', exercises: [plank], exercise: { key: '1' } })).toBe(false);
+    const exercise: TrainingPublication = { kind: 'exercise', label: 'Plank', exercises: [plank], exercise: { key: '1' } };
+    expect(copyNeedsPlanChoice(exercise)).toBe(false);
   });
 });
 
