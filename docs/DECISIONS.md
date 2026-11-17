@@ -2501,3 +2501,17 @@ hash when sent. Building the preview on the device is a possible later step, not
 **Viewing still needs Food.** Every post route requires `nutrition`. The spec says viewing needs
 only Social and posts; the existing gate was left alone, because changing it changes all posts.
 
+## 2026-11-17 · The tab bar and header follow a drifted screen on iOS
+
+**Seen:** in the installed iPhone app the floating tab bar was sometimes drawn a third of the way
+up the screen, with the header gone. **Likely cause** (not reproduced; diagnosed from a
+screenshot): after the keyboard has been open, iOS can leave the visual viewport offset inside
+the layout viewport. `position: fixed` and `sticky` are laid out against the layout viewport, so
+both edges are off by that offset. The composer already compensates for the same thing.
+
+`lib/viewport-drift.ts` publishes the drift as `--vv-bottom-shift` and `--vv-top-shift`, and the
+bar and header add it with the `translate` property (so it composes with their hide-on-scroll
+`transform`). Nothing moves while a field has focus (the difference is then the keyboard) or
+while the page is pinch-zoomed. It compares against `window.innerHeight`, which follows Safari's
+collapsing toolbars like the visual viewport does, so a browser tab is unaffected.
+

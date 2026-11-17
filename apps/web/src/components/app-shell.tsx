@@ -21,6 +21,7 @@ import { RECOVERS, useApi } from '../lib/hooks';
 import { Dashboard } from './home-dashboard';
 import { MenuContent } from './menu-content';
 import { Inbox, messagingAvailable, useUnreadMessages } from './messages';
+import { useViewportDrift } from '../lib/viewport-drift';
 import { ActivityBell, NotificationsBridge } from './notifications';
 import { PeopleSearch } from './people-search';
 import { PortalLoader } from './portal-loader';
@@ -79,6 +80,8 @@ function Portal({ children }: { children: ReactNode }) {
     else if (needsSetup && pathname !== '/setup') router.replace('/setup');
   }, [loading, user, needsSetup, pathname, router]);
   const [chromeHidden, revealChrome] = useScrollHidden(pathname === '/');
+  // iOS can leave the screen shifted after the keyboard: the bar and header follow it.
+  useViewportDrift();
   const unreadMessages = useUnreadMessages(portal.data?.access ?? NO_ACCESS);
   if (loading || !user || portal.isLoading)
     return <PortalLoader label="Opening your portal…" />;
@@ -192,6 +195,8 @@ function Portal({ children }: { children: ReactNode }) {
           'portal-tabbar pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] transition-transform duration-300',
           chromeHidden && 'translate-y-[140%]',
         )}
+        // The `translate` property, so it adds to the hide-on-scroll transform instead of replacing it.
+        style={{ translate: '0 var(--vv-bottom-shift, 0px)' }}
       >
         <div className="glass-bar pointer-events-auto relative mx-auto flex max-w-md rounded-full border p-1.5">
           <BarPill
@@ -324,6 +329,8 @@ function ScrollHeader({
     <header
       ref={ref}
       onFocusCapture={onReveal}
+      // Follows a shifted screen (see `lib/viewport-drift.ts`), on top of its own hide transform.
+      style={{ translate: '0 var(--vv-top-shift, 0px)' }}
       className={clsx(
         'portal-header sticky top-0 z-40 bg-surface/95 pt-[var(--top-chrome)] backdrop-blur transition-transform duration-200',
         hidden && '-translate-y-full',
