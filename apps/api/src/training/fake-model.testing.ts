@@ -252,5 +252,9 @@ export function fakeMedia() {
     deleteKey: async (key?: string) => {
       if (key) deleted.push(key);
     },
+    copyStored: async (from: string, prefix: string) => {
+      if (from.includes('broken')) throw new Error('That photo can no longer be used.');
+      return `${prefix}copy.jpg`;
+    },
   };
 }

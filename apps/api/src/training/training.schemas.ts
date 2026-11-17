@@ -28,6 +28,18 @@ const integerValidator = {
 const optionalInt = (min: number, max: number) =>
   ({ type: Number, min, max, validate: integerValidator }) as const;
 
+/**
+ * Spec 036: where a copy came from (someone's post). Kept on the copy itself, so it survives the
+ * post's deletion; `label` is the author's name as it was. Informational: never followed for data.
+ */
+@Schema({ _id: false, versionKey: false })
+class SharedByDoc {
+  @Prop({ required: true, maxlength: 200 }) label!: string;
+  @Prop() postId?: string;
+  @Prop() authorId?: string;
+}
+const SharedBySchema = SchemaFactory.createForClass(SharedByDoc);
+
 /** A photo of a private exercise or machine. `key` never leaves the API. */
 class StoredImage {
   @Prop({ required: true }) key!: string;
@@ -62,9 +74,17 @@ export class Exercise {
   @Prop() seedKey?: string;
   @Prop() seedVersion?: number;
   @Prop({ default: false }) archived!: boolean;
+  /**
+   * Spec 036: set on an own exercise copied from a post: `<author id>:<their exercise id>`, so a
+   * member gets one copy per source however many posts carry it. Not unique: a deleted (archived)
+   * copy keeps its key and a new copy may be made.
+   */
+  @Prop() postImportKey?: string;
+  @Prop({ type: SharedBySchema }) sharedBy?: SharedByDoc;
 }
 
 export const ExerciseSchema = SchemaFactory.createForClass(Exercise);
+ExerciseSchema.index({ userId: 1, postImportKey: 1 }, { partialFilterExpression: { postImportKey: { $exists: true } } });
 ExerciseSchema.index(
   { seedKey: 1 },
   { unique: true, partialFilterExpression: { seedKey: { $exists: true } } },
@@ -148,6 +168,8 @@ class PlanWorkoutDoc {
    * days never changed since; read as 0. No default, so an old row and a new one read the same.
    */
   @Prop({ type: Number, min: 0 }) revision?: number;
+  /** Spec 036: this workout was copied into the plan from a post (its id is then the post's). */
+  @Prop({ type: SharedBySchema }) sharedBy?: SharedByDoc;
 }
 const PlanWorkoutSchema = SchemaFactory.createForClass(PlanWorkoutDoc);
 
@@ -172,6 +194,9 @@ export class TrainingPlan {
   /** Where a copy came from. Informational only; never followed for data. */
   @Prop({ type: CopiedFromDoc }) copiedFrom?: CopiedFromDoc;
   @Prop() requestId?: string;
+  /** Spec 036: the post this whole plan was copied from. One live copy per member and post. */
+  @Prop() postImportKey?: string;
+  @Prop({ type: SharedBySchema }) sharedBy?: SharedByDoc;
   /** Shared plans dropped from the seed file. Hidden from lists, still readable by id. */
   @Prop({ default: false }) archived!: boolean;
 }
@@ -184,6 +209,7 @@ TrainingPlanSchema.index(
   { unique: true, partialFilterExpression: { requestId: { $exists: true } } },
 );
 TrainingPlanSchema.index({ userId: 1, 'workouts.exercises.exerciseId': 1 });
+TrainingPlanSchema.index({ userId: 1, postImportKey: 1 }, { partialFilterExpression: { postImportKey: { $exists: true } } });
 
 class SessionPlanDoc {
   @Prop({ required: true }) planId!: string;

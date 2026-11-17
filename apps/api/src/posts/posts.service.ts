@@ -2,6 +2,7 @@ import { CONFIG, type AppConfig } from '../config/configuration';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -56,6 +57,7 @@ import type {
   PostListDto,
   PreviewPostDto,
   ReportPostDto,
+  TrainingCopyDto,
   UpdatePostDto,
 } from './posts.dto';
 
@@ -853,6 +855,31 @@ export class PostsService {
       dto.saveAsMeal,
       dto.mealName?.trim() || row.title || row.publication.label,
     );
+  }
+  /**
+   * Spec 036: the checks every copy passes, at the time of the copy. The viewer can read the post
+   * now (`read()`: audience, friendship, blocks, reports, deletion); it is not their own; it still
+   * carries a Training attachment its author may share; copying is allowed; and the viewer has
+   * Training. A refusal creates nothing.
+   */
+  private async copyable(userId: string, id: string) {
+    const { row, author } = await this.read(userId, id);
+    if (row.userId === userId)
+      throw new BadRequestException('This is already yours.');
+    if (!row.training || !(await this.trainingOn(row.userId)))
+      throw new BadRequestException('This post has nothing from Training to copy.');
+    if (row.allowCopy === false)
+      throw new ForbiddenException({ code: 'COPY_OFF', message: 'The author turned copying off for this post.' });
+    await this.requireTrainingPosts(userId);
+    return { row, author, training: row.training };
+  }
+  async trainingCopyPreview(userId: string, id: string) {
+    const { row, training } = await this.copyable(userId, id);
+    return this.training.copyPreview(userId, id, row.userId, training);
+  }
+  async trainingCopy(userId: string, id: string, dto: TrainingCopyDto) {
+    const { row, author, training } = await this.copyable(userId, id);
+    return this.training.copy(userId, { id, authorId: row.userId, authorName: author.displayName }, training, dto);
   }
   /**
    * "Not interested" (`post`) or "Hide this author from For You" (`author`), and their undo.

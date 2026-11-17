@@ -78,12 +78,37 @@ function fixture(overrides: { session?: unknown; plan?: unknown } = {}) {
     deleteKey: jest.fn(async (key?: string) => void (key && deleted.push(key))),
   };
   const sessions = { detail: jest.fn(async () => overrides.session ?? session()) };
-  const plans = { readable: jest.fn(async () => overrides.plan ?? plan) };
+  // The copier's side: what they already hold, and what a copy creates.
+  const imported = new Map<string, string>();
+  const made = { plans: [] as { input: { name: string; workouts: unknown[]; description?: string }; source: unknown }[], days: [] as { planId: string; day: { name: string }; source: unknown }[] };
+  const discarded: string[] = [];
+  let copyOf: { planId: string; planWorkoutId?: string } | undefined;
+  const plans = {
+    readable: jest.fn(async () => overrides.plan ?? plan),
+    copyOfPost: jest.fn(async () => copyOf),
+    importFromPost: jest.fn(async (_userId: string, input: { name: string; workouts: unknown[] }, source: unknown) => {
+      if (input.name === 'boom') throw new Error('plan limit');
+      made.plans.push({ input, source });
+      copyOf = { planId: 'new-plan' };
+      return 'new-plan';
+    }),
+    importDayFromPost: jest.fn(async (_userId: string, planId: string, day: { name: string }, source: unknown) => {
+      made.days.push({ planId, day, source });
+      copyOf = { planId, planWorkoutId: 'post-1' };
+    }),
+  };
   const catalogue = {
     publishable: jest.fn(async (userId: string, ids: string[]) => rows.filter((row) => ids.includes(row._id) && (!row.userId || row.userId === userId))),
+    importedFrom: jest.fn(async (_userId: string, keys: string[]) => keys.filter((key) => imported.has(key)).map((key) => ({ key, id: imported.get(key) as string }))),
+    importFromPost: jest.fn(async (_userId: string, key: string) => {
+      if (imported.has(key)) return { id: imported.get(key) as string, created: false };
+      imported.set(key, `copy-of-${key}`);
+      return { id: `copy-of-${key}`, created: true };
+    }),
+    discardImported: jest.fn(async (_userId: string, ids: string[]) => void discarded.push(...ids)),
   };
   const service = new TrainingPublicationService(sessions as never, plans as never, catalogue as never, media as never);
-  return { service, media, copied, deleted };
+  return { service, media, copied, deleted, plans, catalogue, made, imported, discarded };
 }
 
 describe('TrainingPublicationService.snapshot (spec 036)', () => {
@@ -194,5 +219,79 @@ describe('photos', () => {
     const two = { ...publication, exercises: [publication.exercises[0], { ...publication.exercises[0], key: '1', image: { key: 'broken', width: 1, height: 1 } }] };
     await expect(f.service.withOwnPhotos(ME, two)).rejects.toThrow('storage down');
     expect(f.deleted).toEqual(['posts/me/training/0.jpg']);
+  });
+});
+
+describe('TrainingPublicationService.copy (spec 036)', () => {
+  const VIEWER = 'viewer';
+  const POST = { id: 'post-1', authorId: ME, authorName: 'Ana' };
+  const sharedBy = { label: 'Shared by Ana', postId: 'post-1', authorId: ME };
+  const KEY = `${ME}:${MINE}`;
+
+  it('copies a whole plan as a new plan of the copier\'s, with their own copy of the author\'s exercise', async () => {
+    const f = fixture();
+    const publication = await f.service.snapshot(ME, { kind: 'plan', planId: id('9') });
+    const preview = await f.service.copyPreview(VIEWER, POST.id, POST.authorId, publication);
+    expect(preview).toEqual({ kind: 'plan', needsPlanChoice: false, newExercises: ['My cable fly'] });
+
+    const result = await f.service.copy(VIEWER, POST, publication, { requestId: 'r1' });
+    expect(result).toEqual({ kind: 'plan', planId: 'new-plan', reused: false });
+    const [{ input, source }] = f.made.plans;
+    expect(input).toMatchObject({ name: 'PPL', description: 'Six days', requestId: 'r1' });
+    expect(source).toEqual({ postId: 'post-1', sharedBy });
+    // A catalogue exercise is used as it is; the author's own one becomes the copier's.
+    const push = (input.workouts as { exercises: { exerciseId: string }[] }[])[0];
+    expect(push.exercises.map((row) => row.exerciseId)).toEqual([BENCH, `copy-of-${KEY}`]);
+    expect(f.catalogue.importFromPost).toHaveBeenCalledWith(VIEWER, KEY, expect.objectContaining({ name: 'My cable fly' }), sharedBy);
+  });
+
+  it('returns the copy already made instead of making a second one', async () => {
+    const f = fixture();
+    const publication = await f.service.snapshot(ME, { kind: 'plan', planId: id('9') });
+    await f.service.copy(VIEWER, POST, publication, { requestId: 'r1' });
+    expect(await f.service.copy(VIEWER, POST, publication, { requestId: 'r2' })).toEqual({ kind: 'plan', planId: 'new-plan', reused: true });
+    expect(f.made.plans).toHaveLength(1);
+    expect((await f.service.copyPreview(VIEWER, POST.id, POST.authorId, publication)).existing).toEqual({ kind: 'plan', planId: 'new-plan', reused: true });
+  });
+
+  it('puts a single workout into the plan the copier chose, or a new one they name, never both or neither', async () => {
+    const f = fixture();
+    const publication = await f.service.snapshot(ME, { kind: 'workout', sessionId: id('1') });
+    expect((await f.service.copyPreview(VIEWER, POST.id, POST.authorId, publication)).needsPlanChoice).toBe(true);
+    await expect(f.service.copy(VIEWER, POST, publication, { requestId: 'r1' })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(f.service.copy(VIEWER, POST, publication, { requestId: 'r1', planId: id('7'), planName: 'New' })).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(await f.service.copy(VIEWER, POST, publication, { requestId: 'r1', planId: id('7') })).toEqual({ kind: 'workout', planId: id('7'), planWorkoutId: 'post-1', reused: false });
+    const [{ day }] = f.made.days as unknown as { day: { name: string; exercises: { targets: unknown[] }[] } }[];
+    expect(day.name).toBe('Push day');
+    // The author's sets were not shared: the copy has their number and type, and no weight.
+    expect(day.exercises[0].targets).toEqual([{ type: 'warmup', reps: 10 }, { type: 'working', reps: 10 }]);
+    expect(JSON.stringify(f.made.days)).not.toMatch(/weightGrams|100000/);
+
+    const named = fixture();
+    await named.service.copy(VIEWER, POST, publication, { requestId: 'r1', planName: '  From Ana ' });
+    expect(named.made.plans[0].input.name).toBe('From Ana');
+  });
+
+  it('refuses a plan choice for a whole plan', async () => {
+    const f = fixture();
+    const publication = await f.service.snapshot(ME, { kind: 'plan', planId: id('9') });
+    await expect(f.service.copy(VIEWER, POST, publication, { requestId: 'r1', planName: 'Mine' })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('copies an exercise once per copier and source, however many posts carry it', async () => {
+    const f = fixture();
+    const publication = await f.service.snapshot(ME, { kind: 'exercise', exerciseId: MINE });
+    expect(await f.service.copy(VIEWER, POST, publication, { requestId: 'r1' })).toEqual({ kind: 'exercise', exerciseId: `copy-of-${KEY}`, reused: false });
+    expect(await f.service.copy(VIEWER, { ...POST, id: 'post-2' }, publication, { requestId: 'r2' })).toEqual({ kind: 'exercise', exerciseId: `copy-of-${KEY}`, reused: true });
+    expect(f.catalogue.importFromPost).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves nothing behind when the plan cannot be made', async () => {
+    const f = fixture({ plan: { ...plan, name: 'boom' } });
+    const publication = await f.service.snapshot(ME, { kind: 'plan', planId: id('9') });
+    await expect(f.service.copy(VIEWER, POST, publication, { requestId: 'r1' })).rejects.toThrow('plan limit');
+    expect(f.discarded).toEqual([`copy-of-${KEY}`]);
+    expect(f.made.plans).toHaveLength(0);
   });
 });

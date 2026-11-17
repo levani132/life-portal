@@ -281,3 +281,38 @@ describe('CatalogueService.offlineList (spec 028)', () => {
     for (const item of list) expect(typeof item.searchName).toBe('string');
   });
 });
+
+describe('exercises copied from posts (spec 036)', () => {
+  const published = { name: ' Cable fly ', primaryMuscles: ['chest'], secondaryMuscles: ['shoulders'], equipmentType: 'cable', measure: 'weight_reps', instructions: ['Squeeze'] };
+  const sharedBy = { label: 'Shared by Ana', postId: 'p1', authorId: 'ana' };
+
+  it('creates one own exercise per source, with its own copy of the photo and where it came from', async () => {
+    const f = fixture();
+    const first = await f.catalogue.importFromPost('me', 'ana:x1', { ...published, image: { key: 'posts/ana/training/a.jpg', width: 8, height: 6 } }, sharedBy);
+    expect(first.created).toBe(true);
+    const row = f.exercises.docs.find((doc) => String(doc._id) === first.id);
+    expect(row).toMatchObject({ userId: 'me', name: 'Cable fly', postImportKey: 'ana:x1', sharedBy, archived: false });
+    expect((row as { image?: { key: string } }).image?.key).toBe(`training/me/exercises/${first.id}-copy.jpg`);
+    expect((await f.catalogue.get('me', first.id)).sharedBy).toEqual(sharedBy);
+    // A second post carrying the same exercise reuses it.
+    expect(await f.catalogue.importFromPost('me', 'ana:x1', published, { ...sharedBy, postId: 'p2' })).toEqual({ id: first.id, created: false });
+    expect(await f.catalogue.importedFrom('me', ['ana:x1', 'ana:other'])).toEqual([{ key: 'ana:x1', id: first.id }]);
+    // Another member gets their own.
+    expect((await f.catalogue.importFromPost('you', 'ana:x1', published, sharedBy)).created).toBe(true);
+  });
+
+  it('undoes the row when the photo cannot be copied', async () => {
+    const f = fixture();
+    await expect(f.catalogue.importFromPost('me', 'ana:x2', { ...published, image: { key: 'broken', width: 1, height: 1 } }, sharedBy)).rejects.toThrow();
+    expect(f.exercises.docs.filter((doc) => doc.userId === 'me')).toHaveLength(0);
+  });
+
+  it('discards only exercises that came from a post', async () => {
+    const f = fixture();
+    const copy = await f.catalogue.importFromPost('me', 'ana:x3', { ...published, image: { key: 'k', width: 1, height: 1 } }, sharedBy);
+    const mine = await f.catalogue.create('me', { name: 'My own', primaryMuscles: ['chest'], equipmentType: 'cable', measure: 'weight_reps' } as never);
+    await f.catalogue.discardImported('me', [copy.id, mine.id]);
+    expect(f.exercises.docs.map((doc) => doc.name)).toEqual(['My own']);
+    expect(f.media.deleted).toEqual([`training/me/exercises/${copy.id}-copy.jpg`]);
+  });
+});

@@ -249,6 +249,70 @@ export class CatalogueService {
     }
   }
 
+  /**
+   * Spec 036: someone's own exercise, from their post, as one of the caller's own. One live copy
+   * per member and source (`key`): a second post carrying the same exercise reuses it. The photo
+   * is copied into the caller's files; without it the row is undone, as in `create`.
+   */
+  async importFromPost(
+    userId: string,
+    key: string,
+    published: {
+      name: string;
+      primaryMuscles: string[];
+      secondaryMuscles?: string[];
+      equipmentType: string;
+      measure: string;
+      instructions?: string[];
+      image?: { key: string; width: number; height: number };
+    },
+    sharedBy: { label: string; postId?: string; authorId?: string },
+  ): Promise<{ id: string; created: boolean }> {
+    const existing = await this.exercises.findOne({ userId, postImportKey: key, archived: false }).lean<ExerciseRow>();
+    if (existing) return { id: String(existing._id), created: false };
+    const created = await this.exercises.create({
+      userId,
+      name: published.name.trim(),
+      aliases: [],
+      searchName: searchNameFor(published.name, []),
+      primaryMuscles: unique(published.primaryMuscles),
+      secondaryMuscles: unique(published.secondaryMuscles ?? []),
+      equipmentType: published.equipmentType,
+      measure: published.measure,
+      ...(cleanList(published.instructions).length ? { instructions: cleanList(published.instructions) } : {}),
+      archived: false,
+      postImportKey: key,
+      sharedBy,
+    });
+    const id = String(created._id);
+    if (!published.image) return { id, created: true };
+    try {
+      const copy = await this.media.copyStored(published.image.key, `training/${userId}/exercises/${id}-`);
+      await this.exercises.updateOne({ _id: created._id, userId }, { $set: { image: { key: copy, width: published.image.width, height: published.image.height } } });
+      return { id, created: true };
+    } catch (error) {
+      await this.exercises.deleteOne({ _id: created._id, userId });
+      throw error;
+    }
+  }
+
+  /** Spec 036: which of these import keys the caller already has a live copy of. */
+  async importedFrom(userId: string, keys: readonly string[]): Promise<{ key: string; id: string }[]> {
+    if (!keys.length) return [];
+    const rows = await this.exercises.find({ userId, postImportKey: { $in: [...keys] }, archived: false }).lean<ExerciseRow[]>();
+    return rows.map((row) => ({ key: row.postImportKey as string, id: String(row._id) }));
+  }
+
+  /** Spec 036: undoes exercises a failed copy created, with their photos. Own rows only. */
+  async discardImported(userId: string, ids: readonly string[]): Promise<void> {
+    for (const id of ids) {
+      const row = await this.exercises.findOne({ _id: id, userId, postImportKey: { $exists: true } }).lean<ExerciseRow>();
+      if (!row) continue;
+      await this.exercises.deleteOne({ _id: id, userId });
+      await this.media.deleteKey(row.image?.key);
+    }
+  }
+
   async update(userId: string, id: string, patch: ExercisePatch): Promise<ExerciseDto> {
     const row = await this.own(userId, id);
     if (patch.measure !== undefined && patch.measure !== row.measure && (await this.isLogged(userId, id))) {
@@ -354,6 +418,7 @@ export class CatalogueService {
       instructions: row.instructions,
       archived: row.archived,
       attribution: row.seedKey ? { ...CATALOGUE_CREDIT } : undefined,
+      ...(row.sharedBy ? { sharedBy: { label: row.sharedBy.label, ...(row.sharedBy.postId ? { postId: row.sharedBy.postId } : {}), ...(row.sharedBy.authorId ? { authorId: row.sharedBy.authorId } : {}) } } : {}),
       image: await signImage(this.media, row.image),
     };
   }

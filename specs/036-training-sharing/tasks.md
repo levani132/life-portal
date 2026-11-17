@@ -7,7 +7,7 @@ Order follows the plan's phases. `[P]` can run in parallel with its neighbours.
 - [x] T001 Add `trainingPosts` to `FEATURE_IDS` / `FEATURES` (`libs/shared/types/src/lib/portal.ts`) and `FeatureOverridesDto` (`apps/api/src/access/access.module.ts`)
 - [x] T002 [P] Contracts in `libs/shared/types/src/lib/training-posts.ts`; extend `FoodPost`
 - [x] T003 [P] Domain in `libs/shared/domain/src/lib/training-posts.ts` with unit tests: `validTrainingSelection`, `canonicalTrainingPublication`, `planWorkoutFromPublished`, `trainingPublicationLabel`
-- [ ] T004 Schema fields: `food_posts.training/trainingHash/allowCopy` (done); `training_plans.postImportKey/attribution`; `exercises.postImportKey/attribution`; indexes
+- [x] T004 Schema fields: `food_posts.training/trainingHash/allowCopy` (done); `training_plans.postImportKey/attribution`; `exercises.postImportKey/attribution`; indexes
 
 ## Phase 2: Share (US1, US2, US4)
 
@@ -17,9 +17,9 @@ Order follows the plan's phases. `[P]` can run in parallel with its neighbours.
 
 ## Phase 3: Copy (US3, US4)
 
-- [ ] T008 `TrainingPublicationService.copyPreview()` and `copy()`: plan → new plan; single workout → existing plan or new; exercise → own exercise; own exercises once per viewer and source; all-or-nothing; unit tests
-- [ ] T009 `GET/POST /posts/:id/training-copy` with read check, `allowCopy`, feature checks; unit tests
-- [ ] T010 Attribution on `PlanDetail`, `PlanListItem` and `Exercise`
+- [x] T008 `TrainingPublicationService.copyPreview()` and `copy()`: plan → new plan; single workout → existing plan or new; exercise → own exercise; own exercises once per viewer and source; all-or-nothing; unit tests
+- [x] T009 `GET/POST /posts/:id/training-copy` with read check, `allowCopy`, feature checks; unit tests
+- [x] T010 Attribution on `PlanDetail`, `PlanListItem` and `Exercise`
 
 ## Phase 4: After publishing (US5)
 

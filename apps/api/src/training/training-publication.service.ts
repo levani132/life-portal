@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import type {
   Muscle,
@@ -6,10 +6,19 @@ import type {
   PublishedSet,
   SetType,
   TrainingAttachment,
+  TrainingCopyInput,
+  TrainingCopyPreview,
+  TrainingCopyResult,
   TrainingPostSelection,
   TrainingPublication,
 } from '@life-portal/shared-types';
-import { canonicalTrainingPublication, recapRecords, validTrainingSelection } from '@life-portal/shared-domain';
+import {
+  canonicalTrainingPublication,
+  copyNeedsPlanChoice,
+  publishedPlanWorkouts,
+  recapRecords,
+  validTrainingSelection,
+} from '@life-portal/shared-domain';
 import { MediaService } from '../media/media.service';
 import { CatalogueService, type ExerciseRow } from './catalogue.service';
 import { PlansService, toTarget } from './plans.service';
@@ -96,6 +105,99 @@ export class TrainingPublicationService {
   /** Removes a deleted post's own photo copies. Never throws. */
   async removePhotos(publication: TrainingPublication | undefined): Promise<void> {
     await Promise.all((publication?.exercises ?? []).map((exercise) => this.media.deleteKey(exercise.image?.key).catch(() => undefined)));
+  }
+
+  // ---------------------------------------------------------------- copying
+
+  /** The copy this member already has of a post, if any. */
+  private async existingCopy(userId: string, postId: string, authorId: string, publication: TrainingPublication): Promise<TrainingCopyResult | undefined> {
+    if (publication.kind === 'exercise') {
+      const source = publication.exercises.find((exercise) => exercise.key === publication.exercise?.key);
+      const [mine] = source?.sourceId ? await this.catalogue.importedFrom(userId, [importKey(authorId, source.sourceId)]) : [];
+      return mine ? { kind: 'exercise', exerciseId: mine.id, reused: true } : undefined;
+    }
+    const copy = await this.plans.copyOfPost(userId, postId);
+    return copy ? { kind: publication.kind, ...copy, reused: true } : undefined;
+  }
+
+  /** What copying a post would do for this member, before doing it. Changes nothing. */
+  async copyPreview(userId: string, postId: string, authorId: string, publication: TrainingPublication): Promise<TrainingCopyPreview> {
+    const existing = await this.existingCopy(userId, postId, authorId, publication);
+    const own = publication.exercises.filter((exercise) => exercise.own && exercise.sourceId);
+    const have = new Set((await this.catalogue.importedFrom(userId, own.map((exercise) => importKey(authorId, exercise.sourceId as string)))).map((row) => row.key));
+    return {
+      kind: publication.kind,
+      ...(existing ? { existing } : {}),
+      needsPlanChoice: copyNeedsPlanChoice(publication),
+      newExercises: existing ? [] : own.filter((exercise) => !have.has(importKey(authorId, exercise.sourceId as string))).map((exercise) => exercise.name),
+    };
+  }
+
+  /**
+   * Copies a post's attachment into the member's own training data: a plan, a workout inside a
+   * plan, or an exercise, each marked with where it came from. The caller (posts) has already
+   * checked that this member can read the post now and that copying is allowed.
+   *
+   * It never starts a workout or logs a set, and never touches the member's existing plans or
+   * exercises, except to add a workout to the plan they chose. All or nothing: if the plan
+   * cannot be made, the exercises created for it are removed again.
+   */
+  async copy(
+    userId: string,
+    post: { id: string; authorId: string; authorName: string },
+    publication: TrainingPublication,
+    input: TrainingCopyInput,
+  ): Promise<TrainingCopyResult> {
+    const existing = await this.existingCopy(userId, post.id, post.authorId, publication);
+    if (existing) return existing;
+    const sharedBy = { label: `Shared by ${post.authorName}`, postId: post.id, authorId: post.authorId };
+    const single = copyNeedsPlanChoice(publication);
+    if (publication.kind !== 'exercise' && single && !!input.planId === !!input.planName?.trim()) {
+      throw new BadRequestException('Choose one of your plans or name a new one.');
+    }
+    if (publication.kind !== 'exercise' && !single && (input.planId || input.planName)) {
+      throw new BadRequestException('A whole plan is copied as a new plan.');
+    }
+
+    // The member's exercise for each published one: the shared catalogue's, or their own copy.
+    const created: string[] = [];
+    const mine = new Map<string, string>();
+    try {
+      const catalogueIds = publication.exercises.flatMap((exercise) => (exercise.exerciseId ? [exercise.exerciseId] : []));
+      const visible = new Set((await this.catalogue.publishable(userId, catalogueIds)).map((row) => String(row._id)));
+      for (const exercise of publication.exercises) {
+        if (exercise.exerciseId) {
+          if (!visible.has(exercise.exerciseId)) throw new ConflictException(`${exercise.name} is no longer in the exercise list.`);
+          mine.set(exercise.key, exercise.exerciseId);
+          continue;
+        }
+        if (!exercise.sourceId) throw new ConflictException(`${exercise.name} can no longer be copied.`);
+        const copy = await this.catalogue.importFromPost(userId, importKey(post.authorId, exercise.sourceId), exercise, sharedBy);
+        if (copy.created) created.push(copy.id);
+        mine.set(exercise.key, copy.id);
+      }
+
+      if (publication.kind === 'exercise') {
+        return { kind: 'exercise', exerciseId: mine.get(publication.exercise?.key as string) as string, reused: false };
+      }
+      const workouts = publishedPlanWorkouts(publication, (key) => mine.get(key) as string);
+      const source = { postId: post.id, sharedBy };
+      if (single && input.planId) {
+        const [day] = workouts;
+        await this.plans.importDayFromPost(userId, input.planId, { name: day.name, exercises: day.exercises }, source);
+        return { kind: publication.kind, planId: input.planId, planWorkoutId: post.id, reused: false };
+      }
+      const name = (single ? (input.planName as string).trim() : (publication.plan?.name ?? publication.label)).slice(0, 80);
+      const planId = await this.plans.importFromPost(
+        userId,
+        { requestId: input.requestId, name, ...(publication.plan?.description && !single ? { description: publication.plan.description } : {}), workouts },
+        source,
+      );
+      return { kind: publication.kind, planId, reused: false };
+    } catch (error) {
+      await this.catalogue.discardImported(userId, created).catch(() => undefined);
+      throw error;
+    }
   }
 
   // ---------------------------------------------------------------- building
@@ -222,6 +324,9 @@ export class TrainingPublicationService {
     return { kind: 'exercise', label: row.name, exercises, exercise: { key: keyOf(exerciseId) } };
   }
 }
+
+/** One copy of an author's exercise per member, however many of their posts carry it. */
+const importKey = (authorId: string, sourceId: string) => `${authorId}:${sourceId}`;
 
 /** A logged set as shared: its own numbers. Never the effective load, which holds the body weight. */
 function loggedSet(set: { type: string; reps?: number; weightGrams?: number; assistGrams?: number; durationSeconds?: number; distanceMeters?: number }): PublishedSet {

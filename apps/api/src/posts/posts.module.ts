@@ -35,6 +35,7 @@ import {
   FeedPreferencesDto,
   ForYouDto,
   ImportPostDto,
+  TrainingCopyDto,
   PostListDto,
   PreviewPostDto,
   ReportPostDto,
@@ -237,6 +238,20 @@ class PostsController {
     @Body() dto: ImportPostDto,
   ) {
     return this.posts.import(userId, id, dto);
+  }
+  /** Spec 036: what copying this post's Training attachment would do, and doing it. */
+  @Get(':id/training-copy') trainingCopyPreview(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.posts.trainingCopyPreview(userId, id);
+  }
+  @Post(':id/training-copy') trainingCopy(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Body() dto: TrainingCopyDto,
+  ) {
+    return this.posts.trainingCopy(userId, id, dto);
   }
   /** For You feedback (issue #3, task A). Undo is the matching DELETE. */
   @Put(':id/not-interested') notInterested(

@@ -180,6 +180,12 @@ export class PostListDto {
     | 'friend'
     | 'stranger' = 'normal';
 }
+/** Spec 036: copy a post's Training attachment. A single workout names a plan of the copier's, or a new one. */
+export class TrainingCopyDto {
+  @IsUUID() requestId!: string;
+  @ValidateIf((_, v: unknown) => v !== undefined) @IsMongoId() planId?: string;
+  @ValidateIf((_, v: unknown) => v !== undefined) @IsString() @MaxLength(80) planName?: string;
+}
 export class ImportPostDto {
   @IsArray()
   @ArrayMinSize(1)

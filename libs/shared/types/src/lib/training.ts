@@ -130,6 +130,8 @@ export interface Exercise extends ExerciseListItem {
   archived: boolean;
   /** Set on shared rows taken from a dataset. */
   attribution?: { label: string; url: string };
+  /** Spec 036: an own exercise copied from someone's post, and from whom. */
+  sharedBy?: { label: string; postId?: string; authorId?: string };
   image?: TrainingImage;
 }
 
@@ -490,6 +492,8 @@ export interface PlanWorkoutDetail {
   lastDoneDay?: string;
   isNext: boolean;
   exercises: PlanExerciseDetail[];
+  /** Spec 036: this workout was copied into the plan from someone's post. */
+  sharedBy?: { label: string; postId?: string; authorId?: string };
 }
 
 export interface PlanDetail {
@@ -499,6 +503,8 @@ export interface PlanDetail {
   isOwn: boolean;
   archived: boolean;
   copiedFrom?: { planId: string; name: string };
+  /** Spec 036: the whole plan was copied from someone's post. */
+  sharedBy?: { label: string; postId?: string; authorId?: string };
   workouts: PlanWorkoutDetail[];
 }
 

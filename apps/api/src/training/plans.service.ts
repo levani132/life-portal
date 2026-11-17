@@ -139,10 +139,12 @@ export class PlansService {
       isOwn: Boolean(row.userId),
       archived: row.archived,
       ...(row.copiedFrom ? { copiedFrom: { planId: row.copiedFrom.planId, name: row.copiedFrom.name } } : {}),
+      ...(row.sharedBy ? { sharedBy: sharedBy(row.sharedBy) } : {}),
       workouts: row.workouts.map((workout) => ({
         id: workout.id,
         revision: workout.revision ?? 0,
         name: workout.name,
+        ...(workout.sharedBy ? { sharedBy: sharedBy(workout.sharedBy) } : {}),
         ...(progress.lastDoneDay[workout.id] ? { lastDoneDay: progress.lastDoneDay[workout.id] } : {}),
         isNext: workout.id === progress.nextWorkoutId,
         exercises: workout.exercises.map((exercise) => {
@@ -326,6 +328,49 @@ export class PlansService {
     return this.detail(userId, String(created._id));
   }
 
+  // ---------------------------------------------------------------- copies from posts (spec 036)
+
+  /** Where a member's copy of a post is: a whole plan, or one workout inside a plan of theirs. */
+  async copyOfPost(userId: string, postId: string): Promise<{ planId: string; planWorkoutId?: string } | undefined> {
+    const whole = await this.plans.findOne({ userId, postImportKey: postId }).lean<PlanRow>();
+    if (whole) return { planId: String(whole._id) };
+    const holding = await this.plans.findOne({ userId, 'workouts.id': postId }).lean<PlanRow>();
+    return holding ? { planId: String(holding._id), planWorkoutId: postId } : undefined;
+  }
+
+  /**
+   * A post's workouts as a new own plan, marked with where it came from. Validated like any plan,
+   * so the copier's own limits and exercise visibility apply. A retried `requestId` returns the
+   * plan it made.
+   */
+  async importFromPost(
+    userId: string,
+    input: PlanInput & { requestId: string },
+    source: { postId: string; sharedBy: { label: string; postId?: string; authorId?: string } },
+  ): Promise<string> {
+    const plan = await this.create(userId, input);
+    await this.plans.updateOne({ _id: plan.id, userId }, { $set: { postImportKey: source.postId, sharedBy: source.sharedBy } });
+    return plan.id;
+  }
+
+  /**
+   * A post's single workout as a new day of an own plan. The day's id is the post's, which is
+   * what makes a repeat find it again (`copyOfPost`) and `addDay` refuse to add it twice.
+   */
+  async importDayFromPost(
+    userId: string,
+    planId: string,
+    day: { name: string; exercises: PlanInput['workouts'][number]['exercises'] },
+    source: { postId: string; sharedBy: { label: string; postId?: string; authorId?: string } },
+  ): Promise<void> {
+    await this.addDay(userId, planId, { id: source.postId, ...day });
+    await this.plans.updateOne(
+      { _id: planId, userId },
+      { $set: { 'workouts.$[day].sharedBy': source.sharedBy } },
+      { arrayFilters: [{ 'day.id': source.postId }] },
+    );
+  }
+
   /** Own plans only. Sessions started from it keep their frozen names and suggestions. */
   async remove(userId: string, id: string): Promise<{ id: string; deleted: true }> {
     const row = await this.own(userId, id);
@@ -419,6 +464,12 @@ export class PlansService {
 }
 
 const newId = () => new Types.ObjectId().toHexString();
+
+const sharedBy = (value: { label: string; postId?: string; authorId?: string }) => ({
+  label: value.label,
+  ...(value.postId ? { postId: value.postId } : {}),
+  ...(value.authorId ? { authorId: value.authorId } : {}),
+});
 
 type StoredExercise = TrainingPlan['workouts'][number]['exercises'][number];
 

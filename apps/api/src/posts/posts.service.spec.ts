@@ -706,6 +706,8 @@ describe('training attachments (spec 036)', () => {
         exercises: publication.exercises.map(({ image, ...rest }) => ({ ...rest, image: { url: `signed:${image.key}`, width: image.width, height: image.height } })),
       })),
       removePhotos: jest.fn(),
+      copyPreview: jest.fn().mockResolvedValue({ kind: 'exercise', needsPlanChoice: false, newExercises: [] }),
+      copy: jest.fn().mockResolvedValue({ kind: 'exercise', exerciseId: 'mine', reused: false }),
     };
     const service = new PostsService(
       f.posts as never,
@@ -804,6 +806,38 @@ describe('training attachments (spec 036)', () => {
     const post = await f.service.detail('friend', String(f.row._id));
     expect(post.training).toBeUndefined();
     expect(post.canCopy).toBeUndefined();
+  });
+
+  it('copies for a friend who can read it now, passing the author for the attribution', async () => {
+    const f = setup();
+    f.graph.between.mockResolvedValue({ state: 'accepted', blockedBy: [] });
+    f.posts.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(stored(f)) });
+    const id = String(f.row._id);
+    await expect(f.service.trainingCopy('friend', id, { requestId: 'r1' })).resolves.toMatchObject({ exerciseId: 'mine' });
+    expect(f.training.copy).toHaveBeenCalledWith('friend', { id, authorId: 'owner', authorName: 'Owner' }, expect.objectContaining({ kind: 'exercise' }), { requestId: 'r1' });
+    for (const flag of ['training', 'trainingPosts']) expect(f.access.require).toHaveBeenCalledWith('friend', flag);
+  });
+
+  it('refuses to copy your own post, one with copying off, one you cannot read, and without Training', async () => {
+    const f = setup();
+    const id = String(f.row._id);
+    f.posts.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(stored(f)) });
+    await expect(f.service.trainingCopy('owner', id, { requestId: 'r1' })).rejects.toThrow('already yours');
+
+    // A stranger cannot read a friends-only post: the same answer as a missing one.
+    await expect(f.service.trainingCopy('stranger', id, { requestId: 'r1' })).rejects.toThrow(NotFoundException);
+
+    f.graph.between.mockResolvedValue({ state: 'accepted', blockedBy: [] });
+    f.posts.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(stored(f, { allowCopy: false })) });
+    await expect(f.service.trainingCopy('friend', id, { requestId: 'r1' })).rejects.toThrow('turned copying off');
+    await expect(f.service.trainingCopyPreview('friend', id)).rejects.toThrow('turned copying off');
+
+    f.posts.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(stored(f)) });
+    f.access.require.mockImplementation(async (userId: string, flag: string) => {
+      if (userId === 'friend' && flag === 'training') throw new Error('no training');
+    });
+    await expect(f.service.trainingCopy('friend', id, { requestId: 'r1' })).rejects.toThrow('no training');
+    expect(f.training.copy).not.toHaveBeenCalled();
   });
 
   it('removes the post\'s photo copies with the post', async () => {

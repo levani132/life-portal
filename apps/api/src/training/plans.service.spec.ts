@@ -375,3 +375,40 @@ describe('PlansService: day revisions (issue #15)', () => {
     await expect(f.service.replaceDay(ME, f.shared, 'fb:a', 0, [])).rejects.toBeInstanceOf(NotFoundException);
   });
 });
+
+describe('copies from posts (spec 036)', () => {
+  const source = { postId: 'a'.repeat(24), sharedBy: { label: 'Shared by Ana', postId: 'a'.repeat(24), authorId: OTHER } };
+
+  it('makes a new own plan marked with where it came from, and finds it again', async () => {
+    const f = fixture();
+    const id = await f.service.importFromPost(ME, { ...f.input(), requestId: randomUUID() }, source);
+    const detail = await f.service.detail(ME, id);
+    expect(detail).toMatchObject({ name: 'My plan', isOwn: true, sharedBy: source.sharedBy });
+    expect(await f.service.copyOfPost(ME, source.postId)).toEqual({ planId: id });
+    // It is the copier's only: another member has no copy of that post.
+    expect(await f.service.copyOfPost(OTHER, source.postId)).toBeUndefined();
+    // Deleting the copy frees the post to be copied again.
+    await f.service.remove(ME, id);
+    expect(await f.service.copyOfPost(ME, source.postId)).toBeUndefined();
+  });
+
+  it('adds a single workout to an own plan once, marked on that workout only', async () => {
+    const f = fixture();
+    const plan = await f.service.create(ME, { ...f.input(), requestId: randomUUID() });
+    const day = { name: 'From Ana', exercises: [{ exerciseId: f.bench, targets: [{ type: 'working' as const, reps: 10 }] }] };
+    await f.service.importDayFromPost(ME, plan.id, day, source);
+    await f.service.importDayFromPost(ME, plan.id, day, source);
+    const detail = await f.service.detail(ME, plan.id);
+    expect(detail.workouts.map((workout) => workout.name)).toEqual(['Day 1', 'Day 2', 'From Ana']);
+    expect(detail.workouts[2]).toMatchObject({ id: source.postId, sharedBy: source.sharedBy });
+    expect(detail.workouts[0].sharedBy).toBeUndefined();
+    expect(detail.sharedBy).toBeUndefined();
+    expect(await f.service.copyOfPost(ME, source.postId)).toEqual({ planId: plan.id, planWorkoutId: source.postId });
+  });
+
+  it('refuses to add a workout to a ready-made or someone else\'s plan', async () => {
+    const f = fixture();
+    const day = { name: 'X', exercises: [{ exerciseId: f.bench, targets: [{ type: 'working' as const, reps: 10 }] }] };
+    await expect(f.service.importDayFromPost(ME, f.shared, day, source)).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
