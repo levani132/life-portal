@@ -31,8 +31,8 @@
 
 ## Notes
 
-- No clarification markers: the open choices were settled with defaults and recorded under
-  Assumptions for the owner to confirm before planning. The ones that change scope or privacy:
-  copying on by default; a partial plan says it is partial; workout posts hide weights and reps
-  by default and never show body weight, records or ranks; viewers need Training to copy but not
-  to look; online only.
+- No clarification markers. The owner answered the open choices on 2026-11-17; they are recorded
+  under Assumptions ("Confirmed by the owner"). Changes from the first draft: records can be shown
+  by an explicit switch; copying a single workout asks for an existing plan or a new one; sharing
+  works offline as a draft; exercise photos are shared; a later feature will combine a plan and
+  meals in one post, so the training attachment must be self-contained (FR-030).

@@ -12,7 +12,7 @@
 
 ### User Story 1 - Post a finished workout (Priority: P1)
 
-After finishing a workout, a member shares it as a post: its name, when it was done, how long it took, and the exercises with how many sets each had. They preview exactly what others will see, choose the audience, and publish. The weights and reps they lifted stay private unless they switch on "Include weights and reps" for that post.
+After finishing a workout, a member shares it as a post: its name, when it was done, how long it took, and the exercises with how many sets each had. They preview exactly what others will see, choose the audience, and publish. The weights and reps they lifted stay private unless they switch on "Include weights and reps" for that post. If the workout set personal records, they can also switch on "Show records" to celebrate them on the post.
 
 **Why this priority**: It is the most frequent reason to share anything from Training, it needs no import, and it proves the whole path: choose, preview, publish, read.
 
@@ -25,6 +25,8 @@ After finishing a workout, a member shares it as a post: its name, when it was d
 3. **Given** "Include weights and reps" on, **When** the post is published, **Then** viewers also see each logged set's weight and reps as they were at publishing, and still no body weight.
 4. **Given** a published workout post, **When** the member later edits or deletes that workout, **Then** the post still shows what was published.
 5. **Given** an open (unfinished) workout, **When** the member looks for Share, **Then** it is not offered.
+6. **Given** a workout that set personal records, **When** the member switches on "Show records" and publishes, **Then** viewers see which exercises set a record and the record itself (for example "Bench press, 100 kg × 5"), even when "Include weights and reps" is off for the other sets; with "Show records" off, no record is mentioned.
+7. **Given** no connection, **When** the member shares a finished workout, **Then** the post is kept as a draft on the device with the preview they saw, and is published when the connection returns.
 
 ---
 
@@ -61,13 +63,14 @@ A viewer who can see a plan post with copying allowed taps Copy. The shared work
 3. **Given** the shared plan includes an exercise that was the sharer's own, **When** the viewer copies it, **Then** that exercise is created once as the viewer's own exercise and the copied plan uses it.
 4. **Given** copying is off, or the viewer can no longer see the post (audience changed, unfriended, blocked, post deleted), **When** they try to copy, **Then** it is refused and nothing is created.
 5. **Given** a copy was made, **When** the sharer deletes the post or the original plan, **Then** the viewer's copy stays, and its attribution still names the person.
-6. **Given** a workout post with copying allowed, **When** the viewer taps Copy, **Then** they get a new one-workout plan with that workout's exercises and number of sets, and never the sharer's weights or reps.
+6. **Given** a workout post with copying allowed, **When** the viewer taps Copy, **Then** they are asked where it goes, as when saving their own workout to a plan: into one of their existing own plans as a new workout, or into a new plan they name. It carries that workout's exercises and number of sets, and never the sharer's weights or reps.
+7. **Given** a single shared plan workout (a plan post with one workout), **When** the viewer taps Copy, **Then** they get the same choice: an existing own plan or a new one.
 
 ---
 
 ### User Story 4 - Share one of my own exercises (Priority: P2)
 
-A member shares an exercise they created: its name, muscles, equipment, how it is measured and its instructions. A viewer with copying allowed can add it to their own exercises.
+A member shares an exercise they created: its name, muscles, equipment, how it is measured, its instructions and its photo, if it has one. A viewer with copying allowed can add it to their own exercises.
 
 **Why this priority**: Smaller audience than plans, and plans already carry own exercises with them, but it completes the set the owner listed.
 
@@ -75,9 +78,10 @@ A member shares an exercise they created: its name, muscles, equipment, how it i
 
 **Acceptance Scenarios**:
 
-1. **Given** an own exercise, **When** the member shares it, **Then** the post shows its name, muscles, equipment, measure and instructions, and none of the member's history, records or ranks on it.
+1. **Given** an own exercise, **When** the member shares it, **Then** the post shows its name, muscles, equipment, measure, instructions and photo, and none of the member's history, records or ranks on it.
 2. **Given** a catalogue exercise (not the member's own), **When** the member looks for Share on it, **Then** it is not offered, because everyone already has it.
-3. **Given** a visible exercise post with copying allowed, **When** the viewer copies it, **Then** it becomes one of their own exercises, attributed, and copying again returns the same one.
+3. **Given** a visible exercise post with copying allowed, **When** the viewer copies it, **Then** it becomes one of their own exercises, attributed, with its own copy of the photo, and copying again returns the same one.
+4. **Given** the author later changes or removes the exercise's photo, **When** anyone opens the post or an existing copy, **Then** both still show the photo as it was published.
 
 ---
 
@@ -102,7 +106,9 @@ The author can change a training post's audience, caption and copy permission, o
 - The workout chosen for sharing is deleted, or the plan changes, between preview and publish: publishing is refused and the member is shown a fresh preview, as with food posts.
 - A plan is shared with zero workouts selected: publishing is not possible.
 - A plan references a catalogue exercise that has since been archived or renamed: the post shows it as it was named at publishing; a copy uses the same catalogue exercise.
-- The viewer does not have Training turned on: they can see the post's summary but have no Copy action.
+- The viewer does not have Training turned on: they can see the whole post but have no Copy action.
+- A draft written offline whose workout, plan or exercise was changed or deleted before the connection returned: it is held for review with a fresh preview, never published as it was.
+- An exercise photo cannot be copied at publish or at copy time (storage unavailable): the publish or the copy fails as a whole and can be retried; nothing is published or copied without its photo silently.
 - Copying a large plan partially fails: nothing is left half-created; the viewer either has the whole copy or none.
 - The sharer blocks the viewer after the viewer copied: the copy stays (it is the viewer's own data), the post is no longer reachable from its attribution.
 - A repost of a training post: copying follows the original post's permission and visibility, never the reposter's.
@@ -117,11 +123,11 @@ The author can change a training post's audience, caption and copy permission, o
 **What can be shared**
 
 - **FR-001**: Members MUST be able to attach exactly one Training item to a post: a finished workout, an own plan (all or chosen workouts), or an own exercise. A post carries at most one attachment in total (Food or Training, never both).
-- **FR-002**: A workout post MUST contain the workout's name, the day it was done, its duration, and each exercise's name, muscle group and number of sets. It MUST NOT contain weights or reps unless the author switched on "Include weights and reps" for that post, and MUST NEVER contain body weight, records, ranks, level or XP.
+- **FR-002**: A workout post MUST contain the workout's name, the day it was done, its duration, and each exercise's name, muscle group and number of sets. It MUST NOT contain weights or reps unless the author switched on "Include weights and reps" for that post, MUST NOT mention a personal record unless the author switched on "Show records" (which then shows each record set in that workout and its value), and MUST NEVER contain body weight, ranks, level or XP.
 - **FR-003**: A plan post MUST contain the plan's name, the chosen workouts in plan order, and each workout's exercises with their planned sets. When not every workout is included it MUST state how many of how many are included, without naming or describing the others.
-- **FR-004**: An exercise post MUST contain the exercise's name, muscles, equipment, measure and instructions, and nothing from the author's use of it.
+- **FR-004**: An exercise post MUST contain the exercise's name, muscles, equipment, measure, instructions and photo (when it has one), and nothing from the author's use of it. The photo MUST be the post's own copy, unaffected by later changes to the exercise, readable only through the same audience check as the post, and never by a permanent or public address.
 - **FR-005**: Only the author's own plans and own exercises can be shared; ready-made plans and catalogue exercises MUST NOT be offered for sharing. Only finished workouts can be shared.
-- **FR-006**: When shared content uses an exercise that is the author's own, the post MUST carry that exercise's name, muscles, equipment and measure, so it is readable and copyable without access to the author's private exercises.
+- **FR-006**: When shared content uses an exercise that is the author's own, the post MUST carry that exercise's name, muscles, equipment, measure and photo, so it is readable and copyable without access to the author's private exercises.
 
 **Publishing**
 
@@ -141,10 +147,10 @@ The author can change a training post's audience, caption and copy permission, o
 **Copying**
 
 - **FR-016**: A viewer who can currently read a post whose copy permission is on, and who has Training, MUST be able to copy it into their own training data. Otherwise copying MUST be refused and create nothing.
-- **FR-017**: Copying a plan post MUST create one new own plan containing exactly the shared workouts. Copying a workout post MUST create one new own plan with one workout made from that workout's exercises and number of sets, never from the author's weights or reps. Copying an exercise post MUST create one new own exercise.
+- **FR-017**: Copying a plan post MUST create one new own plan containing exactly the shared workouts. Copying a workout post, or a plan post that holds a single workout, MUST let the viewer choose between adding it as a new workout to one of their existing own plans and creating a new plan they name, as saving one's own workout to a plan does. A copied workout is made from its exercises and number of sets, never from the author's weights, reps or records. Copying an exercise post MUST create one new own exercise, with its own copy of the photo.
 - **FR-018**: Copying MUST never start a workout, log a set, or change any existing plan, exercise or history of the viewer.
 - **FR-019**: A copy MUST record where it came from (the post and its author) and show it to its owner. The attribution MUST survive the post's deletion; it then names the author without linking to the post.
-- **FR-020**: Copying the same post again MUST return the existing copy while it exists. If the viewer deleted their copy, copying again MUST create a new one.
+- **FR-020**: Copying the same post again MUST return the existing copy while it exists (the plan it went into, when it was added to an existing plan). If the viewer deleted their copy, copying again MUST create a new one.
 - **FR-021**: An exercise that was the author's own MUST be created as the viewer's own exercise when copied, once per viewer and source, and reused by later copies from the same source.
 - **FR-022**: A copy is the viewer's own from the moment it is made: later changes to, or deletion of, the post, the original, the friendship or the copy permission MUST NOT change or remove it.
 - **FR-023**: Copying MUST be all-or-nothing: a failure MUST NOT leave part of a plan or stray exercises behind.
@@ -158,15 +164,17 @@ The author can change a training post's audience, caption and copy permission, o
 **Access and rollout**
 
 - **FR-027**: Training sharing MUST be behind its own feature switch, off for production until reviewed, and MUST additionally require Social, Training and posts to be on for the member.
-- **FR-028**: Publishing, copying and changing a training post MUST require a connection; none of them is queued for later.
+- **FR-028**: Sharing MUST work without a connection: a training post written offline is kept on the device as a draft, with the preview the author saw, and published when the connection returns, under the same rules as other offline post drafts (never dropped silently, never published twice, never sent under another account). If what would be published has changed by then (FR-009), the draft is held for the author to review, not published. Copying, and changing or deleting a published post, require a connection.
+- **FR-029**: Viewing a training post MUST need only Social and posts for the viewer; Training is needed to share and to copy. A viewer without Training sees the post and no Copy action.
+- **FR-030**: Nothing in a training attachment may assume it is the post's only attachment: what it stores and what it shows MUST stand on its own, so a later feature can let one post carry a training plan and meals together.
 
 ### Key Entities *(include if feature involves data)*
 
-- **Training attachment**: what a post carries from Training: its kind (workout, plan or exercise), the snapshot shown to viewers, the copy permission, and for a plan how many workouts were included of how many.
-- **Workout snapshot**: name, day, duration, exercises with their number of sets, and optionally each set's weight and reps.
+- **Training attachment**: what a post carries from Training: its kind (workout, plan or exercise), the snapshot shown to viewers, the copy permission, and for a plan how many workouts were included of how many. It is self-contained, so a post could later carry it beside a Food attachment.
+- **Workout snapshot**: name, day, duration, exercises with their number of sets, optionally each set's weight and reps, and optionally the personal records the workout set.
 - **Plan snapshot**: name and the included workouts, each with its exercises and planned sets.
-- **Exercise snapshot**: name, muscles, equipment, measure and instructions; also carried inside a workout or plan snapshot for each exercise that was the author's own.
-- **Copy record**: which viewer copied which post, what it became (a plan or an exercise of theirs), and the author's name at the time, kept for attribution and to make repeat copies return the same thing.
+- **Exercise snapshot**: name, muscles, equipment, measure, instructions and the post's own copy of the photo; also carried inside a workout or plan snapshot for each exercise that was the author's own.
+- **Copy record**: which viewer copied which post, what it became (a plan, a workout inside a plan, or an exercise of theirs), and the author's name at the time, kept for attribution and to make repeat copies return the same thing.
 
 ## Success Criteria *(mandatory)*
 
@@ -181,14 +189,23 @@ The author can change a training post's audience, caption and copy permission, o
 
 ## Assumptions
 
-- **Copying is on by default.** The owner asked for the option to forbid copying, not for it to be the norm; someone who shares a plan usually wants it used. It is one switch on the share form and can be turned off later.
-- **A partial plan says it is partial** ("2 of 5 workouts") but reveals nothing about the rest. This keeps a viewer from mistaking a sample for the whole plan, which matters more once plans can be sold.
-- **Workout posts hide weights and reps by default** and never show body weight, records or ranks. Showing a personal record on a post is a possible later addition, not part of this feature.
-- **One attachment per post.** A post has Food or Training, not both, as today a post has at most one food.
-- **Viewers need Training to copy, not to look.** A member without Training can read a training post's summary.
-- **Selling is out of scope.** No prices, payments, purchases or paid access here. Copy permission and partial sharing are the only parts built now for that future.
-- **Online only for now.** Offline post drafts (spec 032) do not carry training attachments in this feature.
-- **Own exercise photos are not shared** in this feature; the exercise's text details are.
+Confirmed by the owner on 2026-11-17:
+
+- **Copying is on by default.** It is one switch on the share form and can be turned off later.
+- **Workout posts hide weights and reps by default.** Body weight, ranks, level and XP are never shown.
+- **Records can be shown**, by a separate "Show records" switch on a workout post, off by default.
+- **Copying a workout asks where it goes**: an existing own plan or a new one, the same choice as saving one's own workout to a plan.
+- **Everyone in the audience can look; only members with Training can copy.**
+- **Its own feature switch**, off for production until reviewed.
+- **Sharing works offline** as a draft; **exercise photos are shared**.
+- **Selling is out of scope.** No prices, payments, purchases or paid access here. Copy permission and partial sharing are the parts built now for that future.
+- **One attachment per post for now.** A later work item will let one post carry a whole plan that works for someone, workouts and meals together; FR-030 keeps this feature from standing in its way.
+
+Defaults chosen here:
+
+- **A partial plan says it is partial** ("2 of 5 workouts") but reveals nothing about the rest, so a viewer does not mistake a sample for the whole plan.
+- **A shown record is the record's own value** (for example "100 kg × 5"), which is a weight: switching "Show records" on is the author's explicit choice to show that one figure, even with "Include weights and reps" off.
+- **A whole plan (two or more workouts) always copies as a new plan**; only a single workout offers "add to an existing plan".
 - **Discovery is unchanged.** Training posts appear wherever posts already appear (Wall, profiles, For You where that is on, messages), under the existing rules. No training-specific topics or ranking.
 - **Existing "Copy" on ready-made plans is unchanged**; this feature adds copying from posts.
-- Reuses the post, audience, graph, report, repost, comment and like behaviour of spec 007 and its follow-ups without changing them.
+- Reuses the post, audience, graph, report, repost, comment, like and offline-draft behaviour of spec 007 and its follow-ups without changing them.
