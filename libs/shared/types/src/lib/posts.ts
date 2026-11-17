@@ -1,5 +1,6 @@
 import type { Audience } from './portal';
 import type { FoodUnit, MealSlot, NutritionFacts } from './nutrition';
+import type { TrainingAttachment } from './training-posts';
 export const POST_KINDS = [
   'entry',
   'meal',
@@ -123,6 +124,12 @@ export interface FoodPost {
   /** For You with personalised ranking only: up to two reasons this post is here. */
   reasons?: ForYouReason[];
   isOwner: boolean;
+  /** Spec 036: the post's Training attachment, when it has one. Independent of the food fields. */
+  training?: TrainingAttachment;
+  /** Spec 036: the author's choice, shown to them on their own post. */
+  allowCopy?: boolean;
+  /** Spec 036: whether this viewer may copy the Training attachment into their own data. */
+  canCopy?: boolean;
   /**
    * Set when this card is someone's repost: the post itself is always the original (its id,
    * author and content), so likes, comments and shares go to the original.

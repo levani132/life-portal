@@ -4,9 +4,9 @@ Order follows the plan's phases. `[P]` can run in parallel with its neighbours.
 
 ## Phase 1: Foundation
 
-- [ ] T001 Add `trainingPosts` to `FEATURE_IDS` / `FEATURES` (`libs/shared/types/src/lib/portal.ts`) and `FeatureOverridesDto` (`apps/api/src/access/access.module.ts`)
-- [ ] T002 [P] Contracts in `libs/shared/types/src/lib/training-posts.ts`; extend `FoodPost`
-- [ ] T003 [P] Domain in `libs/shared/domain/src/lib/training-posts.ts` with unit tests: `validTrainingSelection`, `canonicalTrainingPublication`, `planWorkoutFromPublished`, `trainingPublicationLabel`
+- [x] T001 Add `trainingPosts` to `FEATURE_IDS` / `FEATURES` (`libs/shared/types/src/lib/portal.ts`) and `FeatureOverridesDto` (`apps/api/src/access/access.module.ts`)
+- [x] T002 [P] Contracts in `libs/shared/types/src/lib/training-posts.ts`; extend `FoodPost`
+- [x] T003 [P] Domain in `libs/shared/domain/src/lib/training-posts.ts` with unit tests: `validTrainingSelection`, `canonicalTrainingPublication`, `planWorkoutFromPublished`, `trainingPublicationLabel`
 - [ ] T004 Schema fields: `food_posts.training/trainingHash/allowCopy`; `training_plans.postImportKey/attribution`; `exercises.postImportKey/attribution`; indexes
 
 ## Phase 2: Share (US1, US2, US4)

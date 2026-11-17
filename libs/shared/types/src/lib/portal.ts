@@ -26,6 +26,7 @@ export const FEATURE_IDS = [
   'forYouMetrics',
   'trainingRanks',
   'tournaments',
+  'trainingPosts',
 ] as const;
 export type FeatureId = (typeof FEATURE_IDS)[number];
 export type FeatureAccess = Record<FeatureId, boolean>;
@@ -165,4 +166,5 @@ export const FEATURES: { id: FeatureId; name: string }[] = [
   { id: 'forYouMetrics', name: 'For You measurement' },
   { id: 'trainingRanks', name: 'Strength ranks' },
   { id: 'tournaments', name: 'Strength tournaments' },
+  { id: 'trainingPosts', name: 'Training posts and copying' },
 ];
