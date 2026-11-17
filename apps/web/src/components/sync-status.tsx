@@ -50,8 +50,8 @@ export function SyncStatus() {
               : 'Other account';
   const tone =
     notices.lost || auth || attention
-      ? 'border-rose-500/50 text-rose-300'
-      : 'border-amber-500/50 text-amber-300';
+      ? 'border-danger-solid/50 text-danger'
+      : 'border-warning-solid/50 text-warning';
 
   return (
     <>
@@ -97,7 +97,7 @@ export function SyncStatus() {
               </div>
             )}
             {notices.lost > 0 && (
-              <div className="mb-2 space-y-2 rounded-md bg-rose-500/10 p-2 text-sm">
+              <div className="mb-2 space-y-2 rounded-md bg-danger-solid/10 p-2 text-sm">
                 <p>
                   {notices.lost === 1 ? '1 change' : `${notices.lost} changes`} saved on this device{' '}
                   {notices.lost === 1 ? 'is' : 'are'} gone. Your browser cleared this site’s storage before{' '}
@@ -113,7 +113,7 @@ export function SyncStatus() {
               </div>
             )}
             {notices.otherAccounts > 0 && (
-              <p className="mb-2 rounded-md bg-amber-500/10 p-2 text-sm">
+              <p className="mb-2 rounded-md bg-warning-solid/10 p-2 text-sm">
                 This device also has {notices.otherAccounts === 1 ? '1 unsent change' : `${notices.otherAccounts} unsent changes`}{' '}
                 from another account. {notices.otherAccounts === 1 ? 'It is' : 'They are'} sent only when that account signs
                 in here.
@@ -192,7 +192,7 @@ function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: st
           <p
             className={clsx(
               'text-xs',
-              stuck ? 'text-rose-300' : 'text-ink-faint',
+              stuck ? 'text-danger' : 'text-ink-faint',
             )}
           >
             {STATE_TEXT[item.state]}
@@ -214,7 +214,7 @@ function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: st
           )}
           <button
             type="button"
-            className="btn-ghost px-2 py-1 text-xs text-rose-300"
+            className="btn-ghost px-2 py-1 text-xs text-danger"
             onClick={() => setConfirm(true)}
           >
             Discard
@@ -223,7 +223,7 @@ function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: st
       </div>
       {/* Spec 028: two open workouts are never merged; the person picks which one stays open. */}
       {workoutConflict && (
-        <div className="mt-2 space-y-2 rounded-md bg-amber-500/10 p-2 text-xs">
+        <div className="mt-2 space-y-2 rounded-md bg-warning-solid/10 p-2 text-xs">
           <p>
             Another workout is open, probably on another device. Finish that one (at its last set) and send this one,
             or discard this one and keep the other.
@@ -233,21 +233,21 @@ function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: st
               {resolving ? 'Finishing…' : 'Finish the other, send this'}
             </button>
           </div>
-          {problem && <p className="text-rose-300">{problem}</p>}
+          {problem && <p className="text-danger">{problem}</p>}
         </div>
       )}
       {clash && <ClashChoice item={item} clash={clash} onUndo={onUndo} />}
       {tooOld && <TooOldChoice item={item} recordedAt={tooOld.recordedAt} />}
       {/* Spec 034: saved by another version of the app; kept exactly as stored, never sent. */}
       {item.state === 'incompatible' && (
-        <p className="mt-2 rounded-md bg-amber-500/10 p-2 text-xs">
+        <p className="mt-2 rounded-md bg-warning-solid/10 p-2 text-xs">
           This change was saved by a different version of the app, and this version can’t read it, so it won’t be
           sent. It stays on this device unchanged, in case an update can send it.
         </p>
       )}
       {/* Spec 034: queued more than 30 days ago; sent only if the person still wants it. */}
       {item.state === 'held' && (
-        <div className="mt-2 space-y-2 rounded-md bg-amber-500/10 p-2 text-xs">
+        <div className="mt-2 space-y-2 rounded-md bg-warning-solid/10 p-2 text-xs">
           <p>
             Saved on this device on <strong>{when(new Date(item.createdAt).toISOString())}</strong>, more than 30 days
             ago, and not sent yet. Send it now, or discard it.
@@ -261,13 +261,13 @@ function SyncRow({ item, onUndo }: { item: OutboxItem; onUndo: (undo: { text: st
       )}
       {/* Spec 031: a comment on a post that is gone keeps its text here, to copy before discarding. */}
       {comment && (
-        <div className="mt-2 space-y-1 rounded-md bg-amber-500/10 p-2 text-xs">
+        <div className="mt-2 space-y-1 rounded-md bg-warning-solid/10 p-2 text-xs">
           <p>{item.lastErrorCode === 'POST_GONE' ? 'This post is no longer available, so your comment was not posted.' : 'Your comment:'}</p>
           <p className="select-text whitespace-pre-wrap break-words rounded border border-border bg-surface p-2 text-sm">{comment}</p>
         </div>
       )}
       {confirm && (
-        <div className="mt-2 flex flex-wrap items-center justify-end gap-2 rounded-md bg-rose-500/10 p-2 text-xs">
+        <div className="mt-2 flex flex-wrap items-center justify-end gap-2 rounded-md bg-danger-solid/10 p-2 text-xs">
           <span className="mr-auto">
             {item.state === 'incompatible'
               ? 'Delete this change for good? It cannot be recovered afterwards, and changes that depend on it go too.'
@@ -319,7 +319,7 @@ function TooOldChoice({ item, recordedAt }: { item: OutboxItem; recordedAt: stri
     }
   };
   return (
-    <div className="mt-2 space-y-2 rounded-md bg-amber-500/10 p-2 text-xs">
+    <div className="mt-2 space-y-2 rounded-md bg-warning-solid/10 p-2 text-xs">
       <p>
         This workout was recorded on <strong>{when(recordedAt)}</strong>, more than 14 days ago, so it can’t be saved
         with that date. You can save it with today’s date instead, or discard it.
@@ -346,7 +346,7 @@ function TooOldChoice({ item, recordedAt }: { item: OutboxItem; recordedAt: stri
           </button>
         </div>
       )}
-      {problem && <p className="text-rose-300">{problem}</p>}
+      {problem && <p className="text-danger">{problem}</p>}
     </div>
   );
 }
@@ -382,7 +382,7 @@ function ClashChoice({
 
   if (clash.type === 'deleted') {
     return (
-      <div className="mt-2 space-y-2 rounded-md bg-amber-500/10 p-2 text-xs">
+      <div className="mt-2 space-y-2 rounded-md bg-warning-solid/10 p-2 text-xs">
         <p>This was deleted on another device after you changed it here.</p>
         <div className="flex flex-wrap justify-end gap-2">
           <button type="button" className="btn-ghost px-2 py-1 text-xs" disabled={busy} onClick={() => void act(() => outbox.discard(item.id))}>
@@ -394,7 +394,7 @@ function ClashChoice({
             </button>
           )}
         </div>
-        {problem && <p className="text-rose-300">{problem}</p>}
+        {problem && <p className="text-danger">{problem}</p>}
       </div>
     );
   }
@@ -412,7 +412,7 @@ function ClashChoice({
     });
 
   return (
-    <div className="mt-2 space-y-2 rounded-md bg-amber-500/10 p-2 text-xs">
+    <div className="mt-2 space-y-2 rounded-md bg-warning-solid/10 p-2 text-xs">
       <p>{weighIn ? 'Another device recorded a weigh-in for this day too. Which one is right?' : 'This was changed on another device too. Which version should stay?'}</p>
       <table className="w-full table-fixed text-left">
         <thead className="text-ink-faint">
@@ -470,7 +470,7 @@ function ClashChoice({
           </button>
         </div>
       )}
-      {problem && <p className="text-rose-300">{problem}</p>}
+      {problem && <p className="text-danger">{problem}</p>}
     </div>
   );
 }

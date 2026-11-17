@@ -333,7 +333,7 @@ function PlanRow({
           {plan.status !== 'done' && (
             <button
               type="button"
-              className="text-[11px] text-emerald-400 hover:underline"
+              className="text-[11px] text-success hover:underline"
               disabled={pending}
               onClick={() =>
                 void run(() =>
@@ -353,7 +353,7 @@ function PlanRow({
           </button>
           <button
             type="button"
-            className="text-[11px] text-ink-faint hover:text-rose-400"
+            className="text-[11px] text-ink-faint hover:text-danger"
             disabled={pending}
             onClick={() => void run(() => api.delete(`/personal/${plan.id}`))}
           >

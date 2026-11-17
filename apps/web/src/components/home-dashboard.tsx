@@ -120,7 +120,7 @@ export function Dashboard() {
         <LoadProblem error={error} onRetry={() => void reload()}>
           {offline && (
             <>
-              <p className="mt-2 text-rose-200/80">Home needs a connection: its figures aren’t kept on this device.</p>
+              <p className="mt-2 text-danger/80">Home needs a connection: its figures aren’t kept on this device.</p>
               {(portal.data?.access.training || portal.data?.access.nutrition) && (
                 <p className="mt-2 flex flex-wrap gap-3">
                   {portal.data?.access.training && (
@@ -291,7 +291,7 @@ export function Dashboard() {
               Add widgets
             </Link>
             <button
-              className="btn-ghost justify-start text-rose-400"
+              className="btn-ghost justify-start text-danger"
               disabled={removing}
               onClick={() => void removeWidget(menuCard)}
             >

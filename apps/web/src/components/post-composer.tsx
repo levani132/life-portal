@@ -533,7 +533,7 @@ export function PostComposer({
             </div>
           )}
           {keepForLater && !error && (
-            <p className="px-4 pt-3 text-xs text-amber-300">
+            <p className="px-4 pt-3 text-xs text-warning">
               {newFood
                 ? 'A new food needs a connection to save. Pick one from Food to post it later.'
                 : (keepProblem ??
@@ -593,7 +593,7 @@ export function PostComposer({
               </button>
             )}
             {draft.caption.length > 1000 && (
-              <p role="alert" className="text-xs text-rose-400">
+              <p role="alert" className="text-xs text-danger">
                 Keep the text within 1,000 characters.
               </p>
             )}

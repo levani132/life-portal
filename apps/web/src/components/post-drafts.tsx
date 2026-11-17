@@ -29,7 +29,7 @@ export function PostDrafts() {
           className="flex items-center gap-3 rounded-xl border border-border bg-surface-raised px-3 py-2 text-sm"
         >
           <p className="flex-1 truncate">
-            <span className="font-medium text-emerald-300">Posted</span>
+            <span className="font-medium text-success">Posted</span>
             <span className="text-ink-muted"> · {summary(item.meta)}</span>
           </p>
           <Link href={`/posts/${item.postId}`} className="btn-ghost px-2 py-1 text-xs" onClick={() => dismissPosted(item.draftId)}>
@@ -94,7 +94,7 @@ function DraftRow({ item }: { item: OutboxItem<PostDraftMeta> }) {
       ) : null}
       <div className="flex-1">
         <p className="truncate">{summary(item.meta)}</p>
-        <p className={refused ? 'text-xs text-rose-300' : 'text-xs text-amber-300'}>{status}</p>
+        <p className={refused ? 'text-xs text-danger' : 'text-xs text-warning'}>{status}</p>
       </div>
       {refused && (
         <button type="button" className="btn-ghost px-2 py-1 text-xs" onClick={() => void outbox.retry(item.id)}>
@@ -105,13 +105,13 @@ function DraftRow({ item }: { item: OutboxItem<PostDraftMeta> }) {
         (confirm ? (
           <button
             type="button"
-            className="btn-ghost px-2 py-1 text-xs text-rose-300"
+            className="btn-ghost px-2 py-1 text-xs text-danger"
             onClick={() => void outbox.discard(item.id)}
           >
             Delete draft
           </button>
         ) : (
-          <button type="button" className="btn-ghost px-2 py-1 text-xs text-rose-300" onClick={() => setConfirm(true)}>
+          <button type="button" className="btn-ghost px-2 py-1 text-xs text-danger" onClick={() => setConfirm(true)}>
             Discard
           </button>
         ))}

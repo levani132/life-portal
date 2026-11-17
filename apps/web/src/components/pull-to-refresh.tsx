@@ -216,7 +216,7 @@ function RefreshRing({
         cy="12"
         r="9"
         fill="none"
-        stroke="rgb(40 45 58)"
+        stroke="rgb(var(--border))"
         strokeWidth="2.5"
       />
       <circle
@@ -224,7 +224,7 @@ function RefreshRing({
         cy="12"
         r="9"
         fill="none"
-        stroke="rgb(56 189 248)"
+        stroke="rgb(var(--info))"
         strokeWidth="2.5"
         strokeLinecap="round"
         strokeDasharray={`${RING_CIRCUMFERENCE}`}

@@ -42,7 +42,7 @@ export function PublishedNutritionSummary({
           return (
             <div
               key={key}
-              className="flex items-center gap-2 rounded-lg bg-violet-500/5 p-2"
+              className="flex items-center gap-2 rounded-lg bg-special-solid/5 p-2"
             >
               {diary && (
                 <svg

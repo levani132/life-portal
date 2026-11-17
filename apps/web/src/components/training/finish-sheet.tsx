@@ -120,7 +120,7 @@ export function FinishSheet({
           </div>
           {field.today ? (
             planned?.replaces !== undefined && (
-              <p className="text-xs font-medium text-amber-600 dark:text-amber-400" role="status">
+              <p className="text-xs font-medium text-warning" role="status">
                 Replaces today's measurement of {formatWeight(planned.replaces, unit)}.
               </p>
             )

@@ -47,9 +47,12 @@ export function ThemeSync() {
             : 'light'
           : preference;
       document.documentElement.dataset.theme = theme;
+      // The status bar takes the page's surface, whatever theme set it (spec 037).
+      const surface = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim();
+      const fallback = theme === 'dark' ? '#0c0e14' : '#f5f7fa';
       document
         .querySelector('meta[name="theme-color"]')
-        ?.setAttribute('content', theme === 'dark' ? '#0c0e14' : '#f5f7fa');
+        ?.setAttribute('content', /^\d{1,3} \d{1,3} \d{1,3}$/.test(surface) ? `rgb(${surface.split(' ').join(', ')})` : fallback);
     }
     apply();
     media.addEventListener('change', apply);

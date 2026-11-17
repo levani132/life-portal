@@ -2,13 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Shared palette tokens; nutrition and status hues keep their existing meanings. */
+/*
+ * Colour roles (spec 037). Every colour in the app's own interface is one of these variables,
+ * an `r g b` triplet used as `rgb(var(--role) / alpha)`. The values here are **v0**, the built-in
+ * theme: the fallback that never needs loading. The role list and these values come from
+ * `THEME_ROLES` in `libs/shared/types/src/lib/theme.ts`, and a test fails if the two differ.
+ *
+ * The active theme (set by the admin) overrides these from a `<style id="lp-theme">` element
+ * that `lib/theme-runtime.ts` writes, in the same three places: light, explicit dark, and a dark
+ * system without an explicit light choice.
+ */
 :root {
   color-scheme: light;
-  --text-emerald: #047857;
-  --text-amber: #92400e;
-  --text-rose: #be123c;
-  --text-lime: #4d7c0f;
   --surface: 245 247 250;
   --surface-raised: 255 255 255;
   --border: 210 217 228;
@@ -20,7 +25,26 @@
   --accent-solid: 3 105 161;
   --accent-solid-hover: 7 89 133;
   --on-accent: 255 255 255;
-  /* Training (spec 024): muscle-group hues for text and tints, and solid fills for white text. */
+  --success: 4 120 87;
+  --success-solid: 16 185 129;
+  --warning: 146 64 14;
+  --warning-solid: 245 158 11;
+  --danger: 190 18 60;
+  --danger-solid: 244 63 94;
+  --info: 56 189 248;
+  --info-solid: 14 165 233;
+  --special: 167 139 250;
+  --special-solid: 139 92 246;
+  --fresh: 77 124 15;
+  --fresh-solid: 132 204 22;
+  --macro-kcal: 52 211 153;
+  --macro-protein: 167 139 250;
+  --macro-carbs: 56 189 248;
+  --macro-fat: 251 191 36;
+  --macro-kcal-text: 4 120 87;
+  --macro-protein-text: 167 139 250;
+  --macro-carbs-text: 56 189 248;
+  --macro-fat-text: 146 64 14;
   --train-push: 194 65 12;
   --train-pull: 29 78 216;
   --train-legs: 4 120 87;
@@ -37,22 +61,6 @@
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --text-emerald-100: #d1fae5;
-  --text-emerald-200: #a7f3d0;
-  --text-emerald-300: #6ee7b7;
-  --text-emerald-400: #34d399;
-  --text-amber-100: #fef3c7;
-  --text-amber-200: #fde68a;
-  --text-amber-300: #fcd34d;
-  --text-amber-400: #fbbf24;
-  --text-rose-100: #ffe4e6;
-  --text-rose-200: #fecdd3;
-  --text-rose-300: #fda4af;
-  --text-rose-400: #fb7185;
-  --text-lime-100: #ecfccb;
-  --text-lime-200: #d9f99d;
-  --text-lime-300: #bef264;
-  --text-lime-400: #a3e635;
   --surface: 12 14 20;
   --surface-raised: 22 25 34;
   --border: 40 45 58;
@@ -64,34 +72,44 @@
   --accent-solid: 14 165 233;
   --accent-solid-hover: 56 189 248;
   --on-accent: 12 14 20;
+  --success: 52 211 153;
+  --success-solid: 16 185 129;
+  --warning: 251 191 36;
+  --warning-solid: 245 158 11;
+  --danger: 251 113 133;
+  --danger-solid: 244 63 94;
+  --info: 56 189 248;
+  --info-solid: 14 165 233;
+  --special: 167 139 250;
+  --special-solid: 139 92 246;
+  --fresh: 217 249 157;
+  --fresh-solid: 132 204 22;
+  --macro-kcal: 52 211 153;
+  --macro-protein: 167 139 250;
+  --macro-carbs: 56 189 248;
+  --macro-fat: 251 191 36;
+  --macro-kcal-text: 52 211 153;
+  --macro-protein-text: 167 139 250;
+  --macro-carbs-text: 56 189 248;
+  --macro-fat-text: 251 191 36;
   --train-push: 251 146 60;
   --train-pull: 96 165 250;
   --train-legs: 52 211 153;
   --train-core: 251 191 36;
   --train-arms: 167 139 250;
   --train-cardio: 244 114 182;
+  --train-push-solid: 194 65 12;
+  --train-pull-solid: 37 99 235;
+  --train-legs-solid: 4 120 87;
+  --train-core-solid: 180 83 9;
+  --train-arms-solid: 124 58 237;
+  --train-cardio-solid: 219 39 119;
 }
 
 /* Follow the OS even before JavaScript runs. Explicit preferences take priority. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --text-emerald-100: #d1fae5;
-    --text-emerald-200: #a7f3d0;
-    --text-emerald-300: #6ee7b7;
-    --text-emerald-400: #34d399;
-    --text-amber-100: #fef3c7;
-    --text-amber-200: #fde68a;
-    --text-amber-300: #fcd34d;
-    --text-amber-400: #fbbf24;
-    --text-rose-100: #ffe4e6;
-    --text-rose-200: #fecdd3;
-    --text-rose-300: #fda4af;
-    --text-rose-400: #fb7185;
-    --text-lime-100: #ecfccb;
-    --text-lime-200: #d9f99d;
-    --text-lime-300: #bef264;
-    --text-lime-400: #a3e635;
     --surface: 12 14 20;
     --surface-raised: 22 25 34;
     --border: 40 45 58;
@@ -103,12 +121,38 @@
     --accent-solid: 14 165 233;
     --accent-solid-hover: 56 189 248;
     --on-accent: 12 14 20;
+    --success: 52 211 153;
+    --success-solid: 16 185 129;
+    --warning: 251 191 36;
+    --warning-solid: 245 158 11;
+    --danger: 251 113 133;
+    --danger-solid: 244 63 94;
+    --info: 56 189 248;
+    --info-solid: 14 165 233;
+    --special: 167 139 250;
+    --special-solid: 139 92 246;
+    --fresh: 217 249 157;
+    --fresh-solid: 132 204 22;
+    --macro-kcal: 52 211 153;
+    --macro-protein: 167 139 250;
+    --macro-carbs: 56 189 248;
+    --macro-fat: 251 191 36;
+    --macro-kcal-text: 52 211 153;
+    --macro-protein-text: 167 139 250;
+    --macro-carbs-text: 56 189 248;
+    --macro-fat-text: 251 191 36;
     --train-push: 251 146 60;
     --train-pull: 96 165 250;
     --train-legs: 52 211 153;
     --train-core: 251 191 36;
     --train-arms: 167 139 250;
     --train-cardio: 244 114 182;
+    --train-push-solid: 194 65 12;
+    --train-pull-solid: 37 99 235;
+    --train-legs-solid: 4 120 87;
+    --train-core-solid: 180 83 9;
+    --train-arms-solid: 124 58 237;
+    --train-cardio-solid: 219 39 119;
   }
 }
 
@@ -202,7 +246,7 @@
   }
 
   .btn-danger {
-    @apply btn border border-rose-500/40 text-rose-300 hover:bg-rose-500/10;
+    @apply btn border border-danger-solid/40 text-danger hover:bg-danger-solid/10;
   }
 
   .field {

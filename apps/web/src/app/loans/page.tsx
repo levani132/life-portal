@@ -215,8 +215,8 @@ function LoanBlock({ detail, today }: { detail: LoanDetail; today: string }) {
           understate a real debt — but the gap is shown rather than left to be discovered.
         */}
         {detail.unrecordedScheduledCents > 0 && (
-          <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
-            <p className="text-xs leading-relaxed text-amber-100">
+          <div className="mt-4 rounded-lg border border-warning-solid/40 bg-warning-solid/10 px-3 py-2.5">
+            <p className="text-xs leading-relaxed text-warning">
               {detail.unrecordedScheduledCount === 1
                 ? 'One scheduled repayment has fallen due'
                 : `${detail.unrecordedScheduledCount} scheduled repayments have fallen due`}
@@ -313,7 +313,7 @@ function LoanBlock({ detail, today }: { detail: LoanDetail; today: string }) {
                         )}
                         <button
                           type="button"
-                          className="mt-1 text-[11px] text-ink-faint hover:text-rose-400"
+                          className="mt-1 text-[11px] text-ink-faint hover:text-danger"
                           disabled={pending}
                           onClick={() =>
                             void run(() =>
@@ -370,7 +370,7 @@ function LoanBlock({ detail, today }: { detail: LoanDetail; today: string }) {
                       />
                       <button
                         type="button"
-                        className="text-[11px] text-ink-faint hover:text-rose-400"
+                        className="text-[11px] text-ink-faint hover:text-danger"
                         disabled={pending}
                         onClick={() =>
                           void run(() =>
@@ -426,8 +426,8 @@ function Stat({
       <p
         className={clsx(
           'tabular text-lg font-semibold',
-          tone === 'good' && 'text-emerald-400',
-          tone === 'warn' && 'text-amber-400',
+          tone === 'good' && 'text-success',
+          tone === 'warn' && 'text-warning',
         )}
       >
         {value}
@@ -492,7 +492,7 @@ function Scenarios({
                         </span>
                       </>
                     ) : (
-                      <span className="text-rose-400">
+                      <span className="text-danger">
                         never, on these assumptions
                       </span>
                     )}

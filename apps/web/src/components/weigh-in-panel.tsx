@@ -87,7 +87,7 @@ export function WeighInPanel({
       </div>
 
       {error && (
-        <p className="mt-3 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+        <p className="mt-3 rounded-lg border border-danger-solid/40 bg-danger-solid/10 px-3 py-2 text-xs text-danger">
           {error}
         </p>
       )}
@@ -110,7 +110,7 @@ export function WeighInPanel({
                 </span>
                 <button
                   type="button"
-                  className="p-1 text-xs text-ink-faint hover:text-rose-300"
+                  className="p-1 text-xs text-ink-faint hover:text-danger"
                   onClick={() => remove(row)}
                   aria-label={`Remove the weigh-in from ${formatDay(row.day)}`}
                   disabled={pending}

@@ -132,7 +132,7 @@ export function ExerciseDetail({
                   ))}
                 </ol>
               )}
-              {exercise.archived && <p className="text-xs text-amber-400">Archived: kept for past workouts, hidden from search.</p>}
+              {exercise.archived && <p className="text-xs text-warning">Archived: kept for past workouts, hidden from search.</p>}
               {exercise.attribution && (
                 <p className="text-[11px] text-ink-faint">
                   <a href={exercise.attribution.url} target="_blank" rel="noreferrer" className="underline">

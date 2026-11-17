@@ -222,7 +222,7 @@ function Portal({ children }: { children: ReactNode }) {
             <TabLink key={tab.href} tab={tab} pathname={pathname}>
                 {tab.label === 'Messages' && unreadMessages > 0 && (
                   <span
-                    className="absolute left-1/2 top-1 ml-1.5 rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] leading-none text-white"
+                    className="absolute left-1/2 top-1 ml-1.5 rounded-full bg-info-solid px-1.5 py-0.5 text-[10px] leading-none text-white"
                     aria-label={`${unreadMessages} unread conversations`}
                   >
                     {unreadMessages > 99 ? '99+' : unreadMessages}
@@ -230,7 +230,7 @@ function Portal({ children }: { children: ReactNode }) {
                 )}
                 {tab.href === LAST_TAB_HREF.profile && !!requests.data?.count && (
                   <span
-                    className="absolute left-1/2 top-1 ml-1.5 rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] leading-none text-white"
+                    className="absolute left-1/2 top-1 ml-1.5 rounded-full bg-info-solid px-1.5 py-0.5 text-[10px] leading-none text-white"
                     aria-label={`${requests.data.count} pending friend requests`}
                   >
                     {requests.data.count}

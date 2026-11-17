@@ -75,7 +75,7 @@ export function ChangePasswordPanel({ onChanged }: { onChanged?: () => void }) {
         </Field>
         {error && <ErrorNote message={error} />}
         {done && (
-          <p role="status" className="text-sm text-emerald-400">
+          <p role="status" className="text-sm text-success">
             Password changed. Your other devices were signed out.
           </p>
         )}
@@ -292,7 +292,7 @@ export function EmailPanel() {
           <p className="flex flex-wrap items-center gap-2 text-sm">
             <span className="min-w-0 break-all">{me.data.email}</span>
             {me.data.emailVerifiedAt ? (
-              <span className="text-xs text-emerald-400">Confirmed</span>
+              <span className="text-xs text-success">Confirmed</span>
             ) : (
               <span className="text-xs text-ink-faint">Not confirmed yet</span>
             )}

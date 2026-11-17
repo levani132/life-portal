@@ -201,7 +201,7 @@ export function CameraView({
       />
       {top}
       {recording && (
-        <span className="absolute left-1/2 top-10 -translate-x-1/2 rounded-full bg-rose-500 px-3 py-1 text-xs font-semibold tabular-nums">
+        <span className="absolute left-1/2 top-10 -translate-x-1/2 rounded-full bg-danger-solid px-3 py-1 text-xs font-semibold tabular-nums">
           0:{String(Math.floor(elapsed / 1000)).padStart(2, '0')}
         </span>
       )}
@@ -274,7 +274,7 @@ export function CameraView({
             )}
           </svg>
           <span
-            className={`block rounded-full transition-all duration-200 ${recording ? 'h-7 w-7 rounded-lg bg-rose-500' : 'h-[60px] w-[60px] bg-white'}`}
+            className={`block rounded-full transition-all duration-200 ${recording ? 'h-7 w-7 rounded-lg bg-danger-solid' : 'h-[60px] w-[60px] bg-white'}`}
           />
         </button>
         <button

@@ -68,7 +68,7 @@ export function NutritionRing({ metric }: { metric: NutritionMetric }) {
             cy="40"
             r="35"
             fill="none"
-            stroke={over ? 'rgb(244 63 94)' : metric.color}
+            stroke={over ? 'rgb(var(--danger-solid))' : metric.color}
             strokeWidth="5"
             strokeLinecap="round"
             pathLength="100"
@@ -89,7 +89,7 @@ export function NutritionRing({ metric }: { metric: NutritionMetric }) {
       <p
         className={clsx(
           'text-[10px] leading-tight sm:text-[11px]',
-          over ? 'text-rose-400' : 'text-ink-muted',
+          over ? 'text-danger' : 'text-ink-muted',
         )}
       >
         {remainingText(metric)}

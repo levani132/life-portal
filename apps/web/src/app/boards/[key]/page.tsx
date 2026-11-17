@@ -193,7 +193,7 @@ function Board({ boardKey }: { boardKey: string }) {
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
-                        <p className="tabular text-sm text-emerald-400">+{contribution.points}</p>
+                        <p className="tabular text-sm text-success">+{contribution.points}</p>
                         <DeleteButton path={`/boards/contributions/${contribution.id}`} />
                       </div>
                     </li>
@@ -301,9 +301,9 @@ function Counter({
       <p
         className={clsx(
           'tabular text-lg font-semibold',
-          tone === 'good' && 'text-emerald-400',
-          tone === 'warn' && 'text-amber-400',
-          tone === 'bad' && 'text-rose-400',
+          tone === 'good' && 'text-success',
+          tone === 'warn' && 'text-warning',
+          tone === 'bad' && 'text-danger',
         )}
       >
         {value}
@@ -318,7 +318,7 @@ function DeleteButton({ path }: { path: string }) {
   return (
     <button
       type="button"
-      className="shrink-0 text-[11px] text-ink-faint hover:text-rose-400"
+      className="shrink-0 text-[11px] text-ink-faint hover:text-danger"
       disabled={pending}
       onClick={() => void run(() => api.delete(path))}
     >
@@ -358,7 +358,7 @@ function TaskRow({ task }: { task: BoardTask }) {
           </div>
           {task.notes && <p className="mt-0.5 text-xs text-ink-faint">{task.notes}</p>}
           {task.dueDate && (
-            <p className={clsx('mt-0.5 text-xs', overdue ? 'text-rose-400' : 'text-ink-faint')}>
+            <p className={clsx('mt-0.5 text-xs', overdue ? 'text-danger' : 'text-ink-faint')}>
               due {formatDay(task.dueDate)}
             </p>
           )}
@@ -404,7 +404,7 @@ function PersonRow({ person }: { person: Person & { oneOnOneOverdue: boolean } }
             {[person.role, person.level, person.project].filter(Boolean).join(' · ') || 'no details'}
           </p>
           {person.attentionReason && (
-            <p className="mt-1 text-xs text-amber-300">{person.attentionReason}</p>
+            <p className="mt-1 text-xs text-warning">{person.attentionReason}</p>
           )}
           <p className="mt-1 text-xs text-ink-faint">
             {person.lastOneOnOne ? `last 1:1 ${formatDay(person.lastOneOnOne)}` : 'no 1:1 recorded'}

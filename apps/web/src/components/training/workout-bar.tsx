@@ -100,7 +100,7 @@ function Bar({ session }: { session: SessionDetail }) {
       >
         <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/20">
           <Dumbbell className="h-4 w-4" aria-hidden />
-          <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-train-legs-solid motion-safe:animate-pulse" />
+          <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-success-solid ring-2 ring-train-legs-solid motion-safe:animate-pulse" />
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold">

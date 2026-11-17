@@ -106,7 +106,7 @@ export function RankJourney({
             <p className="mt-2 text-sm text-ink-muted">Not ranked yet. Log a working set to get a rank.</p>
           )}
           {benchmark.provisional && (
-            <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">Provisional standard: a rough guide.</p>
+            <p className="mt-2 text-[11px] text-warning">Provisional standard: a rough guide.</p>
           )}
         </section>
       )}

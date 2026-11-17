@@ -33,7 +33,7 @@ function Projects() {
           <Link
             key={board.id}
             href={`/boards/${board.key}`}
-            className="card p-5 hover:border-violet-400/40"
+            className="card p-5 hover:border-special-solid/40"
           >
             <h2 className="font-medium">{board.name}</h2>
             <p className="mt-2 text-sm text-ink-muted">

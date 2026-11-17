@@ -35,7 +35,7 @@ export function HealthShortcutAdminSetting() {
         )
       )}
       {saved && (
-        <p role="status" className="mt-2 text-sm text-emerald-400">
+        <p role="status" className="mt-2 text-sm text-success">
           Shortcut link updated.
         </p>
       )}

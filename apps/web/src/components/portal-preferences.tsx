@@ -187,7 +187,7 @@ function PreferencesEditor({
             {visibleSteps.map(({ id, index }) => (
               <span
                 key={id}
-                className={`h-1 flex-1 rounded-full ${index <= step ? 'bg-sky-400' : 'bg-surface-raised'}`}
+                className={`h-1 flex-1 rounded-full ${index <= step ? 'bg-info-solid' : 'bg-surface-raised'}`}
               />
             ))}
           </div>
@@ -222,11 +222,11 @@ function PreferencesEditor({
           available.map((module) => (
             <label
               key={module.id}
-              className={`card flex cursor-pointer items-center gap-4 p-5 ${selected.includes(module.id) ? 'border-sky-500/50 bg-sky-500/5' : ''}`}
+              className={`card flex cursor-pointer items-center gap-4 p-5 ${selected.includes(module.id) ? 'border-info-solid/50 bg-info-solid/5' : ''}`}
             >
               <input
                 type="checkbox"
-                className="h-5 w-5 shrink-0 accent-sky-400"
+                className="h-5 w-5 shrink-0 accent-info-solid"
                 checked={selected.includes(module.id)}
                 onChange={(event) => {
                   setSelected((current) =>
@@ -247,8 +247,8 @@ function PreferencesEditor({
           ))}
         {active === 1 && (
           <>
-            <div className="mb-4 flex items-start gap-3 rounded-xl bg-emerald-500/5 p-4 text-sm text-ink-muted">
-              <ShieldCheck size={22} className="shrink-0 text-emerald-400" />
+            <div className="mb-4 flex items-start gap-3 rounded-xl bg-success-solid/5 p-4 text-sm text-ink-muted">
+              <ShieldCheck size={22} className="shrink-0 text-success" />
               <p>
                 These choices control the live widgets on your shared profile.
                 Sharing a food or posting a meal is a separate action. Food’s
@@ -344,7 +344,7 @@ function PreferencesEditor({
         {active === INTERESTS_STEP && hasForYou(initial) && <InterestPicker />}
         {active === READY_STEP && (
           <div className="card p-6">
-            <Check className="mb-4 text-emerald-400" size={28} />
+            <Check className="mb-4 text-success" size={28} />
             <p className="font-medium">
               A little more organised, one day at a time.
             </p>
@@ -400,7 +400,7 @@ function PreferencesEditor({
             </button>
           )}
           {!isSetup && saved && (
-            <span className="text-sm text-emerald-400" role="status">
+            <span className="text-sm text-success" role="status">
               Saved
             </span>
           )}

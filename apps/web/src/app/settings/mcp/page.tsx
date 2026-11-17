@@ -121,7 +121,7 @@ function McpSetup() {
                   Expires: {expiresAt ? new Date(expiresAt).toLocaleDateString() : ''}
                 </span>
               </div>
-              <p className="text-xs text-amber-400">
+              <p className="text-xs text-warning">
                 ⚠️ Keep this token secret. Anyone with it can read and modify your nutrition data.
               </p>
             </div>

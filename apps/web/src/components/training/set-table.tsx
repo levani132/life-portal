@@ -393,7 +393,7 @@ function LoggedRow({
       badge={
         records.length > 0 ? (
           <span
-            className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400"
+            className="rounded-full bg-warning-solid/15 px-1.5 py-0.5 text-[10px] font-semibold text-warning"
             title={`Personal record: ${records.map((kind) => RECORD_LABELS[kind]).join(', ')}`}
             aria-label={`Personal record: ${records.map((kind) => RECORD_LABELS[kind]).join(', ')}`}
           >
@@ -442,7 +442,7 @@ function Row({
       onBlur={onBlur}
       className={clsx(
         'rounded-xl p-1 transition-colors',
-        ticked && 'bg-emerald-500/10',
+        ticked && 'bg-success-solid/10',
         state === 'next' && 'bg-accent/[0.07]',
         state === 'saving' && 'opacity-60',
       )}
@@ -484,8 +484,8 @@ function Row({
           className={clsx(
             'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 transition-colors',
             ticked
-              ? 'border-emerald-500 bg-emerald-500 text-white'
-              : 'border-border text-ink-faint hover:border-emerald-500 hover:text-emerald-400',
+              ? 'border-success-solid bg-success-solid text-white'
+              : 'border-border text-ink-faint hover:border-success-solid hover:text-success',
             state === 'saving' && 'animate-pulse',
           )}
         >
@@ -495,7 +495,7 @@ function Row({
       {(caption || badge || problem) && (
         <p className="mt-0.5 flex items-center gap-1.5 pl-11 pr-12 text-[11px] text-ink-faint">
           {badge}
-          {problem ? <span className="text-rose-400">{problem}</span> : <span className="truncate">{caption}</span>}
+          {problem ? <span className="text-danger">{problem}</span> : <span className="truncate">{caption}</span>}
         </p>
       )}
     </li>

@@ -58,11 +58,11 @@ export function RestTimer({ since, seconds, next }: { since?: string; seconds: n
       className={
         left > 0
           ? 'rounded-xl border border-train-pull/30 bg-train-pull/10 px-3 py-2 text-sm'
-          : 'rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm'
+          : 'rounded-xl border border-success-solid/30 bg-success-solid/10 px-3 py-2 text-sm'
       }
     >
       <div className="flex items-center justify-between gap-2">
-        <span className={left <= 0 ? 'min-w-0 truncate font-semibold text-emerald-400' : 'min-w-0 truncate font-semibold text-train-pull'}>
+        <span className={left <= 0 ? 'min-w-0 truncate font-semibold text-success' : 'min-w-0 truncate font-semibold text-train-pull'}>
           {left > 0 ? `Rest ${formatDuration(left)}` : 'Rest over'}
           {next && <span className="font-normal text-ink-muted"> · next {next}</span>}
         </span>

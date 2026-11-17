@@ -62,13 +62,13 @@ export function FoodPicker({
                 className={clsx(
                   'flex w-full items-baseline justify-between gap-3 px-3 py-2 text-left text-sm transition',
                   food.id === selectedId
-                    ? 'bg-lime-500/10 text-ink'
+                    ? 'bg-fresh-solid/10 text-ink'
                     : 'text-ink-muted hover:bg-surface hover:text-ink',
                 )}
               >
                 <span className="min-w-0">
                   <span className="block truncate">
-                    {food.favourite && <span className="mr-1 text-amber-400">★</span>}
+                    {food.favourite && <span className="mr-1 text-warning">★</span>}
                     {food.name}
                   </span>
                   {food.brand && <span className="block truncate text-xs text-ink-faint">{food.brand}</span>}

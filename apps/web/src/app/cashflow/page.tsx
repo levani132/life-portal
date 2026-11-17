@@ -476,9 +476,9 @@ function BigStat({
       <p
         className={clsx(
           'tabular mt-1 text-xl font-semibold',
-          tone === 'good' && 'text-emerald-400',
-          tone === 'warn' && 'text-amber-400',
-          tone === 'bad' && 'text-rose-400',
+          tone === 'good' && 'text-success',
+          tone === 'warn' && 'text-warning',
+          tone === 'bad' && 'text-danger',
         )}
       >
         {value}
@@ -506,9 +506,9 @@ function SnapshotStat({
       <p
         className={clsx(
           'tabular mt-1 text-lg font-semibold',
-          tone === 'good' && 'text-emerald-400',
-          tone === 'warn' && 'text-amber-400',
-          tone === 'bad' && 'text-rose-400',
+          tone === 'good' && 'text-success',
+          tone === 'warn' && 'text-warning',
+          tone === 'bad' && 'text-danger',
         )}
       >
         {formatCents(cents, currency)}
@@ -568,7 +568,7 @@ function ChartPanel({
               className={clsx(
                 'rounded-full border px-2 py-0.5 text-[11px] transition',
                 option.months === months
-                  ? 'border-sky-500/50 bg-sky-500/10 text-accent'
+                  ? 'border-info-solid/50 bg-info-solid/10 text-accent'
                   : 'border-border text-ink-muted hover:border-ink-faint hover:text-ink',
               )}
               onClick={() => setMonths(option.months)}
@@ -588,12 +588,12 @@ function ChartPanel({
               <AreaChart data={points} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="actualFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="rgb(56 189 248)" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="rgb(56 189 248)" stopOpacity={0} />
+                    <stop offset="0%" stopColor="rgb(var(--info))" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="rgb(var(--info))" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="plannedFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="rgb(56 189 248)" stopOpacity={0.15} />
-                    <stop offset="100%" stopColor="rgb(56 189 248)" stopOpacity={0} />
+                    <stop offset="0%" stopColor="rgb(var(--info))" stopOpacity={0.15} />
+                    <stop offset="100%" stopColor="rgb(var(--info))" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke="rgb(var(--border))" vertical={false} />
@@ -611,7 +611,7 @@ function ChartPanel({
                   width={44}
                 />
                 {/* Zero line matters more than any gridline: crossing it is the failure case. */}
-                <ReferenceLine y={0} stroke="rgb(244 63 94)" strokeDasharray="3 3" />
+                <ReferenceLine y={0} stroke="rgb(var(--danger-solid))" strokeDasharray="3 3" />
                 {/* Today: where recorded days end and the plan begins. */}
                 <ReferenceLine
                   x={today}
@@ -642,14 +642,14 @@ function ChartPanel({
                 <Area
                   type="monotone"
                   dataKey="actual"
-                  stroke="rgb(56 189 248)"
+                  stroke="rgb(var(--info))"
                   strokeWidth={2}
                   fill="url(#actualFill)"
                 />
                 <Area
                   type="monotone"
                   dataKey="planned"
-                  stroke="rgb(56 189 248)"
+                  stroke="rgb(var(--info))"
                   strokeWidth={2}
                   strokeDasharray="5 4"
                   strokeOpacity={0.8}
@@ -660,12 +660,12 @@ function ChartPanel({
           </div>
           <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-ink-faint">
             <span className="flex items-center gap-1.5">
-              <span className="inline-block h-0.5 w-5 shrink-0 rounded bg-sky-400" aria-hidden />
+              <span className="inline-block h-0.5 w-5 shrink-0 rounded bg-info-solid" aria-hidden />
               actual — captured spending and settled lines
             </span>
             <span className="flex items-center gap-1.5">
               <span
-                className="inline-block w-5 shrink-0 border-t-2 border-dashed border-sky-400/80"
+                className="inline-block w-5 shrink-0 border-t-2 border-dashed border-info-solid/80"
                 aria-hidden
               />
               planned — from your budgets
@@ -1017,7 +1017,7 @@ function DatePanel({
                       <span
                         className={clsx(
                           'mr-0.5 text-xs',
-                          payment.direction === 'in' ? 'text-emerald-400' : 'text-ink-faint',
+                          payment.direction === 'in' ? 'text-success' : 'text-ink-faint',
                         )}
                       >
                         {payment.direction === 'in' ? '+' : '−'}
@@ -1068,7 +1068,7 @@ function DatePanel({
                     <span
                       className={clsx(
                         'mr-0.5 text-xs',
-                        event.direction === 'in' ? 'text-emerald-400' : 'text-ink-faint',
+                        event.direction === 'in' ? 'text-success' : 'text-ink-faint',
                       )}
                     >
                       {event.direction === 'in' ? '+' : '−'}
@@ -1131,9 +1131,9 @@ function DayFigure({
       <p
         className={clsx(
           'tabular mt-0.5 text-sm font-semibold',
-          tone === 'good' && 'text-emerald-400',
-          tone === 'warn' && 'text-amber-400',
-          tone === 'bad' && 'text-rose-400',
+          tone === 'good' && 'text-success',
+          tone === 'warn' && 'text-warning',
+          tone === 'bad' && 'text-danger',
         )}
       >
         {cents == null ? '—' : formatCents(cents, currency)}
@@ -1272,13 +1272,13 @@ function CategoryRow({
       </div>
       <div className="h-1 overflow-hidden rounded-full bg-border">
         <div
-          className="h-full rounded-full bg-sky-500/70"
+          className="h-full rounded-full bg-info-solid/70"
           style={{ width: `${Math.round(plannedShare * 100)}%` }}
         />
       </div>
       <div className="mt-0.5 h-0.5 overflow-hidden rounded-full bg-border/60">
         <div
-          className="h-full rounded-full bg-amber-400/80"
+          className="h-full rounded-full bg-warning-solid/80"
           style={{ width: `${Math.round(actualShare * 100)}%` }}
         />
       </div>
@@ -1539,7 +1539,7 @@ function RecurringSpending({
                           {PERIOD_WORD[tier.cadence]}
                           {' · '}
                           <span
-                            className={tier.savingCents >= 0 ? 'text-emerald-400' : 'text-rose-400'}
+                            className={tier.savingCents >= 0 ? 'text-success' : 'text-danger'}
                           >
                             {tier.savingCents >= 0
                               ? `${formatCents(tier.savingCents, displayCurrency)} saved`
@@ -1661,7 +1661,7 @@ function ExpenseRow({
           </button>
           <button
             type="button"
-            className="text-[11px] text-ink-faint hover:text-rose-400"
+            className="text-[11px] text-ink-faint hover:text-danger"
             disabled={pending}
             onClick={() => void run(() => api.delete(`/cashflow/expenses/${expense.id}`))}
           >
@@ -1718,7 +1718,7 @@ function SuggestionStrip({
     });
 
   return (
-    <div className="mt-1.5 rounded-lg border border-sky-500/30 bg-sky-500/5 px-2.5 py-1.5">
+    <div className="mt-1.5 rounded-lg border border-info-solid/30 bg-info-solid/5 px-2.5 py-1.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-accent">
           Suggest {formatCents(suggestion.suggestedCents, displayCurrency)} (was{' '}
@@ -1744,7 +1744,7 @@ function SuggestionStrip({
           </button>
         </div>
       </div>
-      {error && <p className="mt-1 text-[11px] text-rose-400">{error}</p>}
+      {error && <p className="mt-1 text-[11px] text-danger">{error}</p>}
     </div>
   );
 }
@@ -1880,7 +1880,7 @@ function OneOffSpending({
               className={clsx(
                 'rounded-full border px-2 py-0.5 text-[11px] transition',
                 key === month
-                  ? 'border-sky-500/50 bg-sky-500/10 text-accent'
+                  ? 'border-info-solid/50 bg-info-solid/10 text-accent'
                   : 'border-border text-ink-muted hover:border-ink-faint hover:text-ink',
               )}
               onClick={() => setMonth(key)}
@@ -1917,13 +1917,13 @@ function UnplannedBlock({
   if (extraCents == null && payments.length === 0 && proposals.length === 0) return null;
 
   return (
-    <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+    <div className="mb-4 rounded-lg border border-warning-solid/30 bg-warning-solid/5 p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
         <p className="text-sm font-medium text-ink">Unplanned this month</p>
         <p
           className={clsx(
             'tabular shrink-0 text-sm font-medium',
-            (extraCents ?? 0) > 0 ? 'text-amber-400' : 'text-ink-faint',
+            (extraCents ?? 0) > 0 ? 'text-warning' : 'text-ink-faint',
           )}
         >
           {extraCents == null ? '—' : formatCents(extraCents, displayCurrency)}
@@ -1995,7 +1995,7 @@ function NewLineProposalRow({
   const { run, pending, error } = useAction();
 
   return (
-    <div className="mt-2 rounded-lg border border-sky-500/30 bg-sky-500/5 px-2.5 py-1.5">
+    <div className="mt-2 rounded-lg border border-info-solid/30 bg-info-solid/5 px-2.5 py-1.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-accent">
           You keep paying for &ldquo;{proposal.label}&rdquo; — budget{' '}
@@ -2018,7 +2018,7 @@ function NewLineProposalRow({
           Budget it
         </button>
       </div>
-      {error && <p className="mt-1 text-[11px] text-rose-400">{error}</p>}
+      {error && <p className="mt-1 text-[11px] text-danger">{error}</p>}
     </div>
   );
 }
@@ -2086,7 +2086,7 @@ function ExpenseList({
               </button>
               <button
                 type="button"
-                className="text-[11px] text-ink-faint hover:text-rose-400"
+                className="text-[11px] text-ink-faint hover:text-danger"
                 disabled={pending}
                 onClick={() => void run(() => api.delete(`/cashflow/expenses/${expense.id}`))}
               >
@@ -2143,11 +2143,11 @@ function IncomeRow({
         {/* The income's own currency — the salary is genuinely paid in dollars. */}
         <Money cents={income.amountCents} currency={income.currency} tone="good" />
         {income.amountCents === 0 && (
-          <p className="text-[11px] text-amber-400">set the real amount</p>
+          <p className="text-[11px] text-warning">set the real amount</p>
         )}
         <button
           type="button"
-          className="mt-0.5 block w-full text-[11px] text-ink-faint hover:text-rose-400"
+          className="mt-0.5 block w-full text-[11px] text-ink-faint hover:text-danger"
           disabled={pending}
           onClick={() => void run(() => api.delete(`/cashflow/incomes/${income.id}`))}
         >
@@ -2212,7 +2212,7 @@ function ArrivalModal({
         recalculate around the real date. It never adds a second payment.
       </p>
       {candidates.length === 0 ? (
-        <p className="text-xs text-amber-400">
+        <p className="text-xs text-warning">
           This income has no occurrences around today to move.
         </p>
       ) : (
@@ -2249,7 +2249,7 @@ function ArrivalModal({
                 </span>
                 <button
                   type="button"
-                  className="text-[11px] text-ink-faint hover:text-rose-400"
+                  className="text-[11px] text-ink-faint hover:text-danger"
                   disabled={pending}
                   onClick={() =>
                     void save(
@@ -2314,7 +2314,7 @@ function EditExpenseModal({
       }}
     >
       {expense.linkedLoanId && (
-        <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+        <p className="rounded-lg border border-warning-solid/40 bg-warning-solid/10 px-3 py-2 text-xs text-warning">
           This funds a debt repayment. Changing the amount here also changes the payoff dates on the
           Debts screen — it is the same figure, stored once.
         </p>

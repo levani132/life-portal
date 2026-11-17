@@ -340,32 +340,32 @@ export function PostCard({
     entry: {
       label: 'Logged food',
       icon: Utensils,
-      tint: 'bg-orange-500/10 text-amber-400',
+      tint: 'bg-warning-solid/10 text-warning',
     },
     food: {
       label: 'Food',
       icon: Apple,
-      tint: 'bg-emerald-500/10 text-emerald-400',
+      tint: 'bg-success-solid/10 text-success',
     },
     meal: {
       label: 'Meal',
       icon: CookingPot,
-      tint: 'bg-orange-500/10 text-amber-400',
+      tint: 'bg-warning-solid/10 text-warning',
     },
     day: {
       label: 'Food diary',
       icon: CalendarDays,
-      tint: 'bg-sky-500/10 text-accent',
+      tint: 'bg-info-solid/10 text-accent',
     },
     combination: {
       label: 'Saved meal',
       icon: Layers,
-      tint: 'bg-violet-500/10 text-accent',
+      tint: 'bg-special-solid/10 text-accent',
     },
     database: {
       label: 'Food database',
       icon: Library,
-      tint: 'bg-emerald-500/10 text-emerald-400',
+      tint: 'bg-success-solid/10 text-success',
     },
   }[post.kind ?? 'food'];
   const hasFood = !!post.kind;
@@ -760,7 +760,7 @@ function ImportPost({
         <Spinner />
       ) : result ? (
         <div className="space-y-4">
-          <p className="font-medium text-emerald-400">
+          <p className="font-medium text-success">
             {result.createdCount} foods imported privately.
           </p>
           <p className="text-sm text-ink-muted">

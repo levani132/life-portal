@@ -1,6 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
+import { withAlpha } from '../lib/macro-colors';
 import {
   ChevronLeft,
   ChevronRight,
@@ -41,11 +42,12 @@ import { Input, Modal } from './ui';
  * both themes.
  */
 const SLOTS: Record<MealSlot, { label: string; icon: LucideIcon; color: string }> = {
-  breakfast: { label: 'Breakfast', icon: Sunrise, color: '#f97316' },
-  lunch: { label: 'Lunch', icon: Sun, color: '#eab308' },
-  dinner: { label: 'Dinner', icon: Moon, color: '#6366f1' },
-  snack: { label: 'Snack', icon: Cookie, color: '#ec4899' },
-  uncategorized: { label: 'Other', icon: Utensils, color: '#64748b' },
+  // The same colour per meal as the Food page (`SLOT_STYLES`), as roles.
+  breakfast: { label: 'Breakfast', icon: Sunrise, color: 'rgb(var(--train-core-solid))' },
+  lunch: { label: 'Lunch', icon: Sun, color: 'rgb(var(--train-legs-solid))' },
+  dinner: { label: 'Dinner', icon: Moon, color: 'rgb(var(--train-arms-solid))' },
+  snack: { label: 'Snack', icon: Cookie, color: 'rgb(var(--train-cardio-solid))' },
+  uncategorized: { label: 'Other', icon: Utensils, color: 'rgb(var(--train-pull-solid))' },
 };
 
 /**
@@ -290,7 +292,7 @@ export function LogFoodModal({
                 1 serving = {servingSize} {unit} · type either, the other follows
               </p>
               {amount > 3000 && (
-                <p className="mt-1 text-xs text-amber-400">
+                <p className="mt-1 text-xs text-warning">
                   {Math.round(amount)} {unit} is a lot — worth a second look in
                   case a digit slipped.
                 </p>
@@ -344,7 +346,7 @@ function MealChooser({
             )}
             style={
               selected
-                ? { borderColor: color, backgroundColor: `${color}1f` }
+                ? { borderColor: color, backgroundColor: withAlpha(color, 0.12) }
                 : undefined
             }
           >
@@ -352,7 +354,7 @@ function MealChooser({
               className="flex h-8 w-8 items-center justify-center rounded-full transition"
               style={{
                 color: selected ? '#fff' : color,
-                backgroundColor: selected ? color : `${color}1f`,
+                backgroundColor: selected ? color : withAlpha(color, 0.12),
               }}
             >
               <Icon size={16} strokeWidth={2.2} />
@@ -396,7 +398,7 @@ function DayPicker({
         <ChevronLeft size={15} />
       </button>
       <label className="relative flex h-full cursor-pointer items-center px-1 font-medium">
-        <span className={clsx(!isToday && 'text-amber-400')}>{label}</span>
+        <span className={clsx(!isToday && 'text-warning')}>{label}</span>
         <input
           ref={picker}
           type="date"

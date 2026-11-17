@@ -92,7 +92,7 @@ function Stocks() {
       />
 
       {!data.provider.live && data.provider.unavailableReason && (
-        <div className="mb-5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+        <div className="mb-5 rounded-lg border border-warning-solid/40 bg-warning-solid/10 px-4 py-3 text-sm text-warning">
           {data.provider.unavailableReason} Everything still works — use “set price” on each
           holding.
         </div>
@@ -184,8 +184,8 @@ function Tile({
       <p
         className={clsx(
           'tabular mt-1 text-xl font-semibold',
-          tone === 'good' && 'text-emerald-400',
-          tone === 'bad' && 'text-rose-400',
+          tone === 'good' && 'text-success',
+          tone === 'bad' && 'text-danger',
         )}
       >
         {value}
@@ -299,7 +299,7 @@ function PositionPanel({
                 <span
                   className={clsx(
                     'ml-2 text-xs',
-                    position.suggestedTarget.upsidePct >= 0 ? 'text-emerald-400' : 'text-rose-400',
+                    position.suggestedTarget.upsidePct >= 0 ? 'text-success' : 'text-danger',
                   )}
                 >
                   {formatPct(position.suggestedTarget.upsidePct)} from here
@@ -353,7 +353,7 @@ function PositionPanel({
                   )}
                   <button
                     type="button"
-                    className="text-[11px] text-ink-faint hover:text-rose-400"
+                    className="text-[11px] text-ink-faint hover:text-danger"
                     disabled={pending}
                     onClick={() => void run(() => api.delete(`/stocks/lots/${lot.id}`))}
                   >
@@ -566,8 +566,8 @@ function Metric({
       <p
         className={clsx(
           'tabular mt-0.5 text-base font-semibold',
-          tone === 'good' && 'text-emerald-400',
-          tone === 'bad' && 'text-rose-400',
+          tone === 'good' && 'text-success',
+          tone === 'bad' && 'text-danger',
         )}
       >
         {value}
@@ -659,7 +659,7 @@ function EsppPanel({ projections, plans }: { projections: EsppProjection[]; plan
                         {grant.estimatedShares.toFixed(3)} shares @{' '}
                         {formatCents(grant.purchasePriceCents, plan?.currency ?? 'USD')}
                       </p>
-                      <p className="text-[11px] text-emerald-400">
+                      <p className="text-[11px] text-success">
                         +{formatCents(grant.discountValueCents, plan?.currency ?? 'USD')} from the
                         discount
                       </p>

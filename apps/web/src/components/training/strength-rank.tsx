@@ -96,7 +96,7 @@ function Ranked({ view, unit, onChangeStandards }: { view: ExerciseRankView; uni
             <p className="font-semibold">
               {rankLabel(current)}
               {benchmark.provisional && (
-                <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                <span className="ml-2 rounded bg-warning-solid/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-warning">
                   Provisional
                 </span>
               )}
@@ -139,7 +139,7 @@ function Ranked({ view, unit, onChangeStandards }: { view: ExerciseRankView; uni
             </p>
           )}
           {benchmark.provisional && (
-            <p className="text-amber-600 dark:text-amber-400">
+            <p className="text-warning">
               Provisional standard: estimated from the main lifts by typical ratios, not from published tables for this exercise, so
               treat the rank as a rough guide.
             </p>
@@ -151,7 +151,7 @@ function Ranked({ view, unit, onChangeStandards }: { view: ExerciseRankView; uni
             Tiers start at {benchmark.tierStarts.slice(1).map((start) => formatRankScore(start, benchmark).replace(' body weight', '')).join(', ')}.
           </p>
           <p>{benchmark.basis}</p>
-          {benchmark.draft && <p className="text-amber-600 dark:text-amber-400">Draft standards ({benchmark.version}): they may still change before they are fixed.</p>}
+          {benchmark.draft && <p className="text-warning">Draft standards ({benchmark.version}): they may still change before they are fixed.</p>}
           {!benchmark.draft && (
             <p>
               Standards {benchmark.version} are fixed. A later change comes as a new version, and never takes away a rank

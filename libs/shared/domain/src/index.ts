@@ -31,6 +31,7 @@ export * from './lib/training-plans';
 export * from './lib/workout-recap';
 export * from './lib/training-plan-update';
 export * from './lib/training-posts';
+export * from './lib/theme';
 export * from './lib/training-workout';
 export * from './lib/post-topics';
 export * from './lib/training-levels';

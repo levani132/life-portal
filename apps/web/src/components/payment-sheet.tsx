@@ -283,7 +283,7 @@ export function PaymentSheet({
       </header>
 
       {orphaned.length > 0 && (
-        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-200">
+        <div className="rounded-lg border border-warning-solid/40 bg-warning-solid/5 px-3 py-2 text-xs text-warning">
           You confirmed this against a budget line that no longer exists, so it is counting as
           unplanned spending until you decide again. Pick a line below, or give it a purpose of its
           own.
@@ -619,7 +619,7 @@ function ConfirmForm({
             <div className="mt-2 flex justify-end">
               <button
                 type="button"
-                className="text-[11px] text-ink-faint hover:text-rose-400"
+                className="text-[11px] text-ink-faint hover:text-danger"
                 onClick={() => setRows(rows.filter((other) => other.key !== row.key))}
               >
                 remove
@@ -637,7 +637,7 @@ function ConfirmForm({
         Split across another allowance
       </button>
 
-      <p className={clsx('text-xs', leftoverCents < 0 ? 'text-rose-400' : 'text-ink-faint')}>
+      <p className={clsx('text-xs', leftoverCents < 0 ? 'text-danger' : 'text-ink-faint')}>
         {leftoverCents < 0 ? (
           <>
             That is {formatCents(Math.abs(leftoverCents), payment.currency)} more than the payment.

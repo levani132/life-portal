@@ -46,7 +46,7 @@ function Reports() {
                 {new Date(report.createdAt).toLocaleDateString()}
               </p>
               <button
-                className="btn-ghost mt-3 text-rose-300"
+                className="btn-ghost mt-3 text-danger"
                 disabled={action.pending}
                 onClick={() =>
                   void action.run(

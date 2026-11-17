@@ -18,16 +18,16 @@ import { formatCents } from '@life-portal/shared-domain';
 /** Tone → colour, in one place so "warn" looks the same on every screen. */
 export const TONE_TEXT: Record<WidgetTone, string> = {
   neutral: 'text-ink',
-  good: 'text-emerald-400',
-  warn: 'text-amber-400',
-  bad: 'text-rose-400',
+  good: 'text-success',
+  warn: 'text-warning',
+  bad: 'text-danger',
 };
 
 export const TONE_CHIP: Record<WidgetTone, string> = {
   neutral: 'border-border text-ink-muted',
-  good: 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10',
-  warn: 'border-amber-500/40 text-amber-300 bg-amber-500/10',
-  bad: 'border-rose-500/40 text-rose-300 bg-rose-500/10',
+  good: 'border-success-solid/40 text-success bg-success-solid/10',
+  warn: 'border-warning-solid/40 text-warning bg-warning-solid/10',
+  bad: 'border-danger-solid/40 text-danger bg-danger-solid/10',
 };
 
 export function Panel({
@@ -79,7 +79,7 @@ export function Field({
       <span className="label">{label}</span>
       {children}
       {hint && !error && <span className="mt-1 block text-xs text-ink-faint">{hint}</span>}
-      {error && <span className="mt-1 block text-xs text-rose-400">{error}</span>}
+      {error && <span className="mt-1 block text-xs text-danger">{error}</span>}
     </label>
   );
 }
@@ -242,9 +242,9 @@ export function ProgressBar({ ratio, tone = 'good' }: { ratio: number; tone?: Wi
   const pct = Math.round(Math.min(1, Math.max(0, ratio)) * 100);
   const fill = {
     neutral: 'bg-ink-faint',
-    good: 'bg-emerald-500',
-    warn: 'bg-amber-500',
-    bad: 'bg-rose-500',
+    good: 'bg-success-solid',
+    warn: 'bg-warning-solid',
+    bad: 'bg-danger-solid',
   }[tone];
   return (
     <div
@@ -341,7 +341,7 @@ export function Modal({
           >
             <div className="space-y-3">{children}</div>
             {error && (
-              <p className="mt-3 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+              <p className="mt-3 rounded-lg border border-danger-solid/40 bg-danger-solid/10 px-3 py-2 text-xs text-danger">
                 {error}
               </p>
             )}
@@ -358,7 +358,7 @@ export function Modal({
           <div>
             <div className="space-y-3">{children}</div>
             {error && (
-              <p className="mt-3 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+              <p className="mt-3 rounded-lg border border-danger-solid/40 bg-danger-solid/10 px-3 py-2 text-xs text-danger">
                 {error}
               </p>
             )}
@@ -381,7 +381,7 @@ export function EmptyState({ message, action }: { message: string; action?: Reac
 export function Spinner({ label = 'Loading…' }: { label?: string }) {
   return (
     <div className="flex items-center justify-center gap-2 py-12 text-sm text-ink-faint">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-sky-500" />
+      <span className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-info-solid" />
       {label}
     </div>
   );
@@ -389,7 +389,7 @@ export function Spinner({ label = 'Loading…' }: { label?: string }) {
 
 export function ErrorNote({ message }: { message: string }) {
   return (
-    <div role="alert" className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+    <div role="alert" className="rounded-lg border border-danger-solid/40 bg-danger-solid/10 px-4 py-3 text-sm text-danger">
       {message}
     </div>
   );

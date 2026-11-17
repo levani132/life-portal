@@ -210,7 +210,7 @@ function HistoryRow({ session, onOpen }: { session: SessionListItem; onOpen: () 
             {session.plan ? session.plan.workoutName : 'Workout'}
           </span>
           {session.status === 'open' && (
-            <span className="shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+            <span className="shrink-0 rounded-full bg-success-solid/15 px-2 py-0.5 text-[10px] font-semibold text-success">
               in progress
             </span>
           )}

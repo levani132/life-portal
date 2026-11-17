@@ -92,9 +92,9 @@ export function WeightTrend({ weighIns }: { weighIns: WeighIn[] }) {
             <Line
               type="monotone"
               dataKey="kg"
-              stroke="rgb(163 230 53)"
+              stroke="rgb(var(--fresh-solid))"
               strokeWidth={2}
-              dot={{ r: 2, fill: 'rgb(163 230 53)' }}
+              dot={{ r: 2, fill: 'rgb(var(--fresh-solid))' }}
             />
           </LineChart>
         </ResponsiveContainer>

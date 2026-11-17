@@ -101,7 +101,7 @@ function PublicFoodsModal({
         />
 
         {error && (
-          <p className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+          <p className="rounded-lg border border-danger-solid/40 bg-danger-solid/10 px-3 py-2 text-xs text-danger">
             {error}
           </p>
         )}

@@ -382,7 +382,7 @@ function SheetAction({
       className="flex w-16 flex-col items-center gap-1.5 disabled:opacity-50"
     >
       <span
-        className={`flex h-14 w-14 items-center justify-center rounded-full ${pressed ? 'bg-emerald-500/15 text-emerald-400' : 'bg-ink/5 text-ink'}`}
+        className={`flex h-14 w-14 items-center justify-center rounded-full ${pressed ? 'bg-success-solid/15 text-success' : 'bg-ink/5 text-ink'}`}
       >
         {children}
       </span>

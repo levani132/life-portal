@@ -56,7 +56,7 @@ export function FoodSharingControls() {
         ))}
       </fieldset>
       {portal.data.moduleVisibility.nutrition === 'private' && (
-        <p className="text-xs text-amber-300">
+        <p className="text-xs text-warning">
           Your Food audience is Only me. Save Friends or Everyone above to make
           enabled details visible to that audience.
         </p>

@@ -61,7 +61,7 @@ function ChangeRow({ change }: { change: PlanDayChange }) {
   let text: ReactNode;
   switch (change.kind) {
     case 'added':
-      icon = <Plus className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />;
+      icon = <Plus className="h-4 w-4 text-success" />;
       text = (
         <>
           Add <b>{change.name}</b>, {change.sets} planned {change.sets === 1 ? 'set' : 'sets'}
@@ -69,7 +69,7 @@ function ChangeRow({ change }: { change: PlanDayChange }) {
       );
       break;
     case 'removed':
-      icon = <X className="h-4 w-4 text-rose-600 dark:text-rose-400" />;
+      icon = <X className="h-4 w-4 text-danger" />;
       text = (
         <>
           Remove <b>{change.name}</b>
@@ -77,7 +77,7 @@ function ChangeRow({ change }: { change: PlanDayChange }) {
       );
       break;
     case 'replaced':
-      icon = <ArrowRightLeft className="h-4 w-4 text-sky-600 dark:text-sky-400" />;
+      icon = <ArrowRightLeft className="h-4 w-4 text-info" />;
       text = (
         <>
           Replace <b>{change.fromName}</b> with <b>{change.toName}</b>
@@ -153,7 +153,7 @@ export function DayLines({ lines }: { lines: PlanDayLine[] }) {
             <span
               className={clsx(
                 'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                line.change === 'added' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-accent/15 text-ink',
+                line.change === 'added' ? 'bg-success-solid/15 text-success' : 'bg-accent/15 text-ink',
               )}
             >
               {LINE_BADGE[line.change]}
@@ -181,7 +181,7 @@ export function PlanDayUpdate({ sessionId }: { sessionId: string }) {
     const refused = queued.state === 'error' || queued.state === 'conflict';
     return (
       <div className="flex flex-wrap items-center gap-2 px-1 text-xs">
-        <p className={clsx('min-w-0 flex-1', refused ? 'text-rose-600 dark:text-rose-300' : 'text-ink-muted')}>
+        <p className={clsx('min-w-0 flex-1', refused ? 'text-danger' : 'text-ink-muted')}>
           {refused
             ? `The plan update was not saved: ${queued.lastError ?? 'it was refused.'}`
             : 'The plan update is kept on this device and is sent when there is a connection.'}
@@ -205,7 +205,7 @@ export function PlanDayUpdate({ sessionId }: { sessionId: string }) {
   if (data.status === 'applied' && data.applied) {
     return (
       <p className="flex items-center gap-1.5 px-1 text-xs text-ink-muted">
-        <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+        <Check className="h-3.5 w-3.5 text-success" aria-hidden />
         {data.applied.copied
           ? `Saved ${data.workoutName} to your copy of ${data.planName}.`
           : `${data.workoutName} in ${data.planName} was updated from this workout.`}
@@ -324,7 +324,7 @@ function PlanDayReview({
         </p>
       )}
       {preview.editedSince && (
-        <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+        <p className="rounded-xl border border-warning-solid/40 bg-warning-solid/10 px-3 py-2 text-xs text-warning">
           {preview.workoutName} was edited after this workout started. The changes are shown against how it is now, and
           anything this workout did not touch stays as it is.
         </p>

@@ -27,7 +27,7 @@ export function SaveWorkoutToPlan({ sessionId }: { sessionId: string }) {
   if (data.status === 'applied') {
     return (
       <p className="flex items-center gap-1.5 px-1 text-xs text-ink-muted">
-        <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+        <Check className="h-3.5 w-3.5 shrink-0 text-success" aria-hidden />
         {data.planName && data.workoutName
           ? `Saved as ${data.workoutName} in ${data.planName}.`
           : 'This workout was saved to a plan.'}

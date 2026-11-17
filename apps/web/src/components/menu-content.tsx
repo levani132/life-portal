@@ -87,7 +87,7 @@ export function MenuContent() {
             <span className="flex-1">{label}</span>
             {badge && (
               <span
-                className="rounded-full bg-sky-500 px-2 py-0.5 text-[11px] font-semibold text-white"
+                className="rounded-full bg-info-solid px-2 py-0.5 text-[11px] font-semibold text-white"
                 aria-label={`${badge} pending friend requests`}
               >
                 {badge}
@@ -105,7 +105,7 @@ export function MenuContent() {
           <Link
             key={m.id}
             href={m.href}
-            className="card p-4 hover:border-sky-500/40"
+            className="card p-4 hover:border-info-solid/40"
           >
             {m.name}
             <p className="mt-1 text-xs text-ink-muted">{m.description}</p>

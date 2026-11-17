@@ -16,39 +16,20 @@ module.exports = {
   ],
   theme: {
     extend: {
-      // Text-only adaptations keep status/progress fills at their original colors.
-      textColor: Object.fromEntries(
-        ['emerald', 'amber', 'rose', 'lime'].map((hue) => [
-          hue,
-          Object.fromEntries(
-            [100, 200, 300, 400].map((shade) => [
-              shade,
-              `var(--text-${hue}-${shade}, var(--text-${hue}))`,
-            ]),
-          ),
-        ]),
+      // Spec 037: every colour is a role (`THEME_ROLES` in libs/shared/types/src/lib/theme.ts),
+      // an `r g b` variable the active theme sets. Keep this list in step with it: a test fails
+      // if a role is missing here.
+      colors: Object.fromEntries(
+        [
+          'surface', 'surface-raised', 'border', 'ink', 'ink-muted', 'ink-faint',
+          'accent', 'accent-hover', 'accent-solid', 'accent-solid-hover', 'on-accent',
+          'success', 'success-solid', 'warning', 'warning-solid', 'danger', 'danger-solid',
+          'info', 'info-solid', 'special', 'special-solid', 'fresh', 'fresh-solid',
+          'macro-kcal', 'macro-protein', 'macro-carbs', 'macro-fat',
+          'macro-kcal-text', 'macro-protein-text', 'macro-carbs-text', 'macro-fat-text',
+          ...['push', 'pull', 'legs', 'core', 'arms', 'cardio'].flatMap((hue) => [`train-${hue}`, `train-${hue}-solid`]),
+        ].map((role) => [role, `rgb(var(--${role}) / <alpha-value>)`]),
       ),
-      colors: {
-        // Semantic tokens, so a card's colour is chosen by meaning rather than by hue.
-        accent: 'rgb(var(--accent) / <alpha-value>)',
-        'accent-hover': 'rgb(var(--accent-hover) / <alpha-value>)',
-        'accent-solid': 'rgb(var(--accent-solid) / <alpha-value>)',
-        'accent-solid-hover': 'rgb(var(--accent-solid-hover) / <alpha-value>)',
-        'on-accent': 'rgb(var(--on-accent) / <alpha-value>)',
-        surface: 'rgb(var(--surface) / <alpha-value>)',
-        'surface-raised': 'rgb(var(--surface-raised) / <alpha-value>)',
-        border: 'rgb(var(--border) / <alpha-value>)',
-        ink: 'rgb(var(--ink) / <alpha-value>)',
-        'ink-muted': 'rgb(var(--ink-muted) / <alpha-value>)',
-        'ink-faint': 'rgb(var(--ink-faint) / <alpha-value>)',
-        // Training (spec 024): `train-<hue>` for text and tints, `-solid` for fills with white text.
-        ...Object.fromEntries(
-          ['push', 'pull', 'legs', 'core', 'arms', 'cardio'].flatMap((hue) => [
-            [`train-${hue}`, `rgb(var(--train-${hue}) / <alpha-value>)`],
-            [`train-${hue}-solid`, `rgb(var(--train-${hue}-solid) / <alpha-value>)`],
-          ]),
-        ),
-      },
     },
   },
   plugins: [],

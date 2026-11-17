@@ -168,7 +168,7 @@ export function SwipeRow({
               <span
                 className={clsx(
                   'flex h-8 items-center justify-center rounded-full text-white shadow-sm',
-                  action.danger ? 'bg-rose-500' : action.tone === 'accent' ? 'bg-accent-solid' : 'bg-ink-faint',
+                  action.danger ? 'bg-danger-solid' : action.tone === 'accent' ? 'bg-accent-solid' : 'bg-ink-faint',
                 )}
                 // The last button grows into a pill with the swipe; the others stay round.
                 style={{ width: last ? 32 + stretch : 32 }}

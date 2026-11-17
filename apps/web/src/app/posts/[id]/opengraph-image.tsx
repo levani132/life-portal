@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { MACRO_COLORS } from '../../../lib/macro-colors';
+import { MACRO_HEX } from '../../../lib/macro-colors';
 import { macroShares, ringArcs } from '@life-portal/shared-domain';
 import type { PublicPostPreview } from '@life-portal/shared-types';
 import { fetchPublicPreview } from '../../../lib/public-preview';
@@ -12,7 +12,7 @@ const BG = '#0C0E14';
 const INK = '#F4F5F8';
 const MUTED = '#9AA3B2';
 const ACCENT = '#38BDF8';
-const COLORS = MACRO_COLORS;
+const COLORS = MACRO_HEX;
 
 /**
  * A font that covers the text, subset by Google Fonts to just those characters. Titles are often

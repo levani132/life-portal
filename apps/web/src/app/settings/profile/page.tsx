@@ -106,7 +106,7 @@ function ProfileEditor({ profile }: { profile: SocialProfile }) {
           <label className="flex items-start gap-3 rounded-xl border border-border p-4">
             <input
               type="checkbox"
-              className="mt-1 h-5 w-5 shrink-0 accent-sky-400"
+              className="mt-1 h-5 w-5 shrink-0 accent-info-solid"
               checked={form.discoverable}
               onChange={(event) => {
                 setForm({ ...form, discoverable: event.target.checked });
@@ -127,7 +127,7 @@ function ProfileEditor({ profile }: { profile: SocialProfile }) {
               {action.pending ? 'Saving…' : 'Save profile'}
             </button>
             {saved && (
-              <span className="text-sm text-emerald-400" role="status">
+              <span className="text-sm text-success" role="status">
                 Saved
               </span>
             )}

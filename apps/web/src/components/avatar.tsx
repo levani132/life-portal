@@ -24,7 +24,7 @@ export function Avatar({
     <span
       aria-hidden
       className={clsx(
-        'flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-sky-500/15 font-semibold text-sky-300',
+        'flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-info-solid/15 font-semibold text-info',
         className,
       )}
       style={{ width: size, height: size, fontSize: size * 0.4 }}

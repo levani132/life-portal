@@ -353,7 +353,7 @@ function IOSHealthSyncButton() {
   return (
     <button
       type="button"
-      className={`flex h-10 items-center gap-1 rounded-lg px-2 text-xs font-medium hover:bg-violet-500/10 ${due ? 'text-amber-400' : 'text-violet-400'}`}
+      className={`flex h-10 items-center gap-1 rounded-lg px-2 text-xs font-medium hover:bg-special-solid/10 ${due ? 'text-warning' : 'text-special'}`}
       aria-label={
         due
           ? 'Renew automatic Apple Health sync — run manually every 20 days'
@@ -522,10 +522,10 @@ function IOSAppleHealthPanel({
             size={22}
             className={
               installState === 'installed'
-                ? 'text-emerald-400'
+                ? 'text-success'
                 : installState === 'update'
-                  ? 'text-amber-400'
-                  : 'text-rose-400'
+                  ? 'text-warning'
+                  : 'text-danger'
             }
           />
           <span className="flex-1">
@@ -562,7 +562,7 @@ function IOSAppleHealthPanel({
                 ['Steps', activity.steps.toLocaleString()],
                 ['Adjustment', `+${activity.adjustmentKcal} kcal`],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-xl bg-violet-500/10 p-3">
+                <div key={label} className="rounded-xl bg-special-solid/10 p-3">
                   <dt className="text-[11px] text-ink-muted">{label}</dt>
                   <dd className="mt-1 font-semibold tabular-nums">{value}</dd>
                 </div>
@@ -604,7 +604,7 @@ function IOSAppleHealthPanel({
               status.data.tokenExpiresAt,
               Date.now(),
             ) !== 'active' && (
-              <p role="status" className="text-amber-400">
+              <p role="status" className="text-warning">
                 Tap Sync now to renew automatic syncing.
               </p>
             )}
@@ -643,7 +643,7 @@ function IOSAppleHealthPanel({
             {status.data?.paired && (
               <button
                 type="button"
-                className="text-rose-400 underline"
+                className="text-danger underline"
                 disabled={busy}
                 onClick={async () => {
                   setBusy(true);

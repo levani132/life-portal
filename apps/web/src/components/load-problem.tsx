@@ -18,9 +18,9 @@ const HINT: Partial<Record<LoadErrorKind, string>> = {
 export function LoadProblem({ error, onRetry, children }: { error: unknown; onRetry: () => void; children?: ReactNode }) {
   const kind = loadErrorKind(error);
   return (
-    <div role="alert" className="mx-auto max-w-lg rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-4 text-sm">
-      <p className="font-medium text-rose-200">{loadErrorMessage(kind, error)}</p>
-      {HINT[kind] && <p className="mt-1 text-rose-200/80">{HINT[kind]}</p>}
+    <div role="alert" className="mx-auto max-w-lg rounded-lg border border-danger-solid/40 bg-danger-solid/10 px-4 py-4 text-sm">
+      <p className="font-medium text-danger">{loadErrorMessage(kind, error)}</p>
+      {HINT[kind] && <p className="mt-1 text-danger/80">{HINT[kind]}</p>}
       {children}
       <button type="button" className="btn mt-3" onClick={onRetry}>
         Try again
@@ -32,7 +32,7 @@ export function LoadProblem({ error, onRetry, children }: { error: unknown; onRe
 export function LoadProblemBar({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   const kind = loadErrorKind(error);
   return (
-    <div role="status" className="mb-3 flex items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+    <div role="status" className="mb-3 flex items-center gap-3 rounded-lg border border-warning-solid/40 bg-warning-solid/10 px-3 py-2 text-sm text-warning">
       <span className="flex-1">{loadErrorMessage(kind, error)} Showing what was last loaded.</span>
       <button type="button" className="shrink-0 underline" onClick={onRetry}>
         Try again

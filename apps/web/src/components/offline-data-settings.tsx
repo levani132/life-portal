@@ -100,7 +100,7 @@ export function OfflineDataSettings() {
         </button>
       </div>
       {asking === 'confirm' && (
-        <div className="mt-3 flex flex-wrap items-center justify-end gap-2 rounded-lg border border-rose-500/40 bg-rose-500/10 p-3 text-sm">
+        <div className="mt-3 flex flex-wrap items-center justify-end gap-2 rounded-lg border border-danger-solid/40 bg-danger-solid/10 p-3 text-sm">
           <span className="mr-auto">Delete everything this app keeps on this device for your account?</span>
           <button type="button" className="btn-ghost" onClick={() => setAsking(null)}>
             Cancel

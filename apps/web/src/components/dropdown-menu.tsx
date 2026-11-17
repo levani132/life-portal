@@ -82,7 +82,7 @@ export function DropdownMenu({
               disabled={item.disabled}
               className={clsx(
                 'flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-surface disabled:opacity-50',
-                item.danger ? 'text-rose-300' : 'text-ink',
+                item.danger ? 'text-danger' : 'text-ink',
               )}
               onClick={() => {
                 setOpen(false);

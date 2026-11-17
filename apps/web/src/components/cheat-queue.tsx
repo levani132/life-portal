@@ -184,7 +184,7 @@ export function CheatQueue({
             )}
             <button
               type="button"
-              className="text-xs text-ink-faint hover:text-rose-300"
+              className="text-xs text-ink-faint hover:text-danger"
               onClick={() => remove(row.id)}
               disabled={pending}
               aria-label={`Remove ${row.name ?? 'item'}`}

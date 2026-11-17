@@ -42,12 +42,12 @@ export function PortalMark({ size = 88 }: { size?: number }) {
         cy="256"
         r="150"
         fill="none"
-        className="portal-sweep stroke-sky-400"
+        className="portal-sweep stroke-info"
         strokeWidth="34"
         strokeLinecap="round"
       />
       {/* The three rising bars, breathing in sequence behind the ring. */}
-      <g className="fill-emerald-400">
+      <g className="fill-success">
         <rect x="188" y="286" width="34" height="62" rx="14" className="portal-bar" />
         <rect x="239" y="248" width="34" height="100" rx="14" className="portal-bar [animation-delay:160ms]" />
         <rect x="290" y="200" width="34" height="148" rx="14" className="portal-bar [animation-delay:320ms]" />

@@ -5,7 +5,7 @@ import type { EntryTotals, NutritionTargets } from '@life-portal/shared-types';
 import { figureValue } from '@life-portal/shared-domain';
 import { MACRO_COLORS, MACRO_TEXT } from '../lib/macro-colors';
 
-const OVER = 'rgb(244 63 94)';
+const OVER = 'rgb(var(--danger-solid))';
 
 interface Metric {
   key: keyof typeof MACRO_COLORS;
@@ -71,7 +71,7 @@ export function MealImpact({
   ];
 
   return (
-    <div className="rounded-xl border border-border bg-gradient-to-br from-violet-500/10 to-sky-500/5 p-3">
+    <div className="rounded-xl border border-border bg-gradient-to-br from-special-solid/10 to-info-solid/5 p-3">
       <div className="mb-3 flex items-baseline justify-between gap-2">
         <p className="label">{added ? 'Your day after this' : 'Your day so far'}</p>
         <p className="flex shrink-0 items-center gap-2 text-[10px] text-ink-faint">
@@ -174,7 +174,7 @@ function ImpactRing({ metric }: { metric: Metric }) {
       <p
         className={clsx(
           'truncate text-[10px] leading-tight sm:text-[11px]',
-          over ? 'text-rose-400' : 'text-ink-muted',
+          over ? 'text-danger' : 'text-ink-muted',
         )}
       >
         {remaining === undefined

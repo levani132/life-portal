@@ -131,7 +131,7 @@ export function Inbox() {
                 </span>
                 {entry.unread > 0 && (
                   <span
-                    className="min-w-[22px] rounded-full bg-sky-500 px-1.5 text-center text-xs font-semibold leading-[22px] text-white"
+                    className="min-w-[22px] rounded-full bg-info-solid px-1.5 text-center text-xs font-semibold leading-[22px] text-white"
                     aria-label={`${entry.unread} unread`}
                   >
                     {entry.unread >= 99 ? '99+' : entry.unread}
@@ -543,8 +543,8 @@ export function Conversation({ id }: { id: string }) {
               className={clsx(
                 'max-w-[78%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md px-3.5 py-2 text-left text-[15px]',
                 item.status === 'failed'
-                  ? 'border border-rose-500/50 bg-rose-500/10 text-rose-200'
-                  : 'bg-sky-500/60 text-white',
+                  ? 'border border-danger-solid/50 bg-danger-solid/10 text-danger'
+                  : 'bg-info-solid/60 text-white',
               )}
             >
               {'text' in item.body ? item.body.text : 'Sharing a post…'}
@@ -630,7 +630,7 @@ function PostCard({ post, mine }: { post: SharedPostCard; mine: boolean }) {
       className={clsx(
         'block w-64 max-w-full overflow-hidden rounded-2xl border',
         mine
-          ? 'border-sky-500/40 bg-sky-500/10'
+          ? 'border-info-solid/40 bg-info-solid/10'
           : 'border-border bg-surface-raised',
       )}
     >
@@ -687,7 +687,7 @@ function Bubble({
           {menu && (
             <button
               type="button"
-              className="absolute right-0 top-7 z-10 whitespace-nowrap rounded-lg border border-border bg-surface px-3 py-2 text-sm text-rose-300 shadow-lg"
+              className="absolute right-0 top-7 z-10 whitespace-nowrap rounded-lg border border-border bg-surface px-3 py-2 text-sm text-danger shadow-lg"
               onClick={() => {
                 setMenu(false);
                 onUnsend();
@@ -709,7 +709,7 @@ function Bubble({
           className={clsx(
             'max-w-[78%] whitespace-pre-wrap break-words px-3.5 py-2 text-[15px]',
             mine
-              ? 'rounded-2xl rounded-br-md bg-sky-500 text-white'
+              ? 'rounded-2xl rounded-br-md bg-info-solid text-white'
               : 'rounded-2xl rounded-bl-md bg-surface-raised text-ink',
           )}
           title={new Date(message.createdAt).toLocaleString()}

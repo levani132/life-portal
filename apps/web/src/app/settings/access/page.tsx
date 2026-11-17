@@ -190,7 +190,7 @@ function AccessEditor({
             {action.pending ? 'Saving…' : 'Save access'}
           </button>
           {saved && (
-            <span role="status" className="text-sm text-emerald-400">
+            <span role="status" className="text-sm text-success">
               Saved
             </span>
           )}

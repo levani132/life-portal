@@ -83,7 +83,7 @@ export function PostEngagement({
             {value.likeCount
               ? `${value.likeCount.toLocaleString()} ${value.likeCount === 1 ? 'like' : 'likes'}`
               : ''}
-            {value.unsent && <span className="ml-2 text-amber-300">Not sent yet</span>}
+            {value.unsent && <span className="ml-2 text-warning">Not sent yet</span>}
           </span>
           {value.commentCount > 0 && (
             <button
@@ -105,7 +105,7 @@ export function PostEngagement({
           aria-pressed={value?.liked ?? false}
           disabled={busy || !value}
           onClick={() => void like()}
-          className={`flex min-h-11 items-center justify-center gap-2 rounded-lg text-sm transition hover:bg-violet-500/10 active:scale-95 disabled:opacity-50 ${value?.liked ? 'text-rose-400' : 'text-ink-muted'}`}
+          className={`flex min-h-11 items-center justify-center gap-2 rounded-lg text-sm transition hover:bg-special-solid/10 active:scale-95 disabled:opacity-50 ${value?.liked ? 'text-danger' : 'text-ink-muted'}`}
         >
           <Heart size={18} className={value?.liked ? 'fill-current' : ''} />
           Like
@@ -115,7 +115,7 @@ export function PostEngagement({
           aria-expanded={commentsOpen}
           aria-controls={`post-comments-${post.id}`}
           onClick={() => setCommentsOpen((open) => !open)}
-          className="flex min-h-11 items-center justify-center gap-2 rounded-lg text-sm text-ink-muted transition hover:bg-violet-500/10 active:scale-95"
+          className="flex min-h-11 items-center justify-center gap-2 rounded-lg text-sm text-ink-muted transition hover:bg-special-solid/10 active:scale-95"
         >
           <MessageCircle size={18} />
           Comment
@@ -124,14 +124,14 @@ export function PostEngagement({
           type="button"
           aria-haspopup="dialog"
           onClick={() => setShareOpen(true)}
-          className="flex min-h-11 items-center justify-center gap-2 rounded-lg text-sm text-ink-muted transition hover:bg-violet-500/10 active:scale-95"
+          className="flex min-h-11 items-center justify-center gap-2 rounded-lg text-sm text-ink-muted transition hover:bg-special-solid/10 active:scale-95"
         >
           <Send size={18} className="-rotate-12" />
           Share
         </button>
       </div>
       {value?.unsent && !(value.likeCount || value.commentCount) && (
-        <p className="mb-1 text-xs text-amber-300">Not sent yet</p>
+        <p className="mb-1 text-xs text-warning">Not sent yet</p>
       )}
       {(error || statsFailed) && (
         <ErrorNote message={error || (stats.error as Error).message} />
@@ -283,7 +283,7 @@ function PostComments({
               size={28}
               className="mt-1"
             />
-            <div className="min-w-0 flex-1 rounded-xl bg-violet-500/5 px-3 py-2">
+            <div className="min-w-0 flex-1 rounded-xl bg-special-solid/5 px-3 py-2">
               {comment.author.userId ? (
                 <Link
                   href={`/people/${comment.author.userId}`}
@@ -301,7 +301,7 @@ function PostComments({
               </p>
               <span className="mt-1 block text-[10px] text-ink-faint">
                 {comment.unsent ? (
-                  <span className="text-amber-300">Not sent yet</span>
+                  <span className="text-warning">Not sent yet</span>
                 ) : (
                   <PostRelativeTime date={comment.createdAt} />
                 )}
@@ -312,7 +312,7 @@ function PostComments({
                 type="button"
                 aria-label="Delete comment"
                 disabled={deleting === comment.id}
-                className="rounded p-2 text-ink-faint hover:bg-rose-500/10 hover:text-rose-400"
+                className="rounded p-2 text-ink-faint hover:bg-danger-solid/10 hover:text-danger"
                 onClick={async () => {
                   setDeleting(comment.id);
                   setError('');

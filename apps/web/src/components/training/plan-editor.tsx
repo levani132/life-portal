@@ -510,7 +510,7 @@ export function PlanEditor({
 
       <Panel>
         {tried && problems.length > 0 && (
-          <ul className="mb-3 space-y-1 text-sm text-rose-300">
+          <ul className="mb-3 space-y-1 text-sm text-danger">
             {problems.slice(0, 8).map((problem) => (
               <li key={problem.path}>
                 <span className="text-ink-muted">{where(draft, problem.path)}:</span> {problem.message}
@@ -587,7 +587,7 @@ function TargetRows({
             type="button"
             className={clsx(
               'mb-1 w-8 shrink-0 rounded-md border px-1 py-1 text-center text-xs tabular-nums',
-              target.type === 'warmup' ? 'border-amber-500/50 text-amber-300' : 'border-border text-ink-faint',
+              target.type === 'warmup' ? 'border-warning-solid/50 text-warning' : 'border-border text-ink-faint',
             )}
             onClick={() => set(index, { type: target.type === 'warmup' ? 'working' : 'warmup' })}
             aria-label={target.type === 'warmup' ? `Set ${index + 1} is a warm-up; make it a working set` : `Set ${index + 1} is a working set; make it a warm-up`}

@@ -1,7 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
-import { MACRO_COLORS } from '../../lib/macro-colors';
+import { MACRO_COLORS, withAlpha } from '../../lib/macro-colors';
 import { useIsIOS } from '../../lib/ios-device';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -396,8 +396,8 @@ function MacroTiles({
             key={tile.label}
             className="card glass macro-tile rounded-2xl px-1 py-2.5 sm:p-4"
             style={{
-              backgroundImage: `radial-gradient(130% 80% at 50% 0%, ${colors[i]}33, transparent 62%)`,
-              borderColor: `${colors[i]}4d`,
+              backgroundImage: `radial-gradient(130% 80% at 50% 0%, ${withAlpha(colors[i], 0.2)}, transparent 62%)`,
+              borderColor: withAlpha(colors[i], 0.3),
             }}
           >
             <NutritionRing
@@ -467,7 +467,7 @@ function MissingInputs({
     (input) => MISSING_INPUT_LABELS[input] ?? input,
   );
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning-solid/40 bg-warning-solid/10 px-4 py-3 text-sm text-warning">
       <p>
         No targets yet — they need {missing.join(', ')}. Logging still works; it
         just cannot tell you what is left.
@@ -614,7 +614,7 @@ function SlotSection({
                   <MacroLine totals={entry.totals} />
                 </p>
                 {isUnsaved(entry) && (
-                  <p className="text-[11px] font-medium text-amber-700 dark:text-amber-400">Not saved yet · on this device</p>
+                  <p className="text-[11px] font-medium text-warning">Not saved yet · on this device</p>
                 )}
                 {updatedAfterSync.has(entry.id) && updatedAfterSync.get(entry.id) !== entry.totals.energyKcal && (
                   <p className="text-[11px] text-ink-faint">
@@ -645,7 +645,7 @@ function SlotSection({
                 </button>
                 <button
                   type="button"
-                  className={clsx(rowAction, 'hover:text-rose-400')}
+                  className={clsx(rowAction, 'hover:text-danger')}
                   onClick={() => remove(entry)}
                   disabled={pending}
                   aria-label={`Remove ${entry.facts.name}`}
@@ -770,7 +770,7 @@ function SlotSuggestions({
           </button>
         ))}
       </div>
-      {error && <p className="mt-2 text-xs text-rose-400">{error}</p>}
+      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
     </div>
   );
 }
@@ -868,7 +868,7 @@ function CheatSection({
       )}
 
       {profile.cheatDays.length === 0 && cheat.queue.length > 0 && (
-        <p className="mt-3 text-xs text-amber-400">
+        <p className="mt-3 text-xs text-warning">
           Set a cheat day under &ldquo;You&rdquo; and this list gets a date.
         </p>
       )}
@@ -1138,7 +1138,7 @@ function FoodsTab({
             )}
           </div>
           {!overview.foodLookup.available && (
-            <p className="text-xs text-amber-400">
+            <p className="text-xs text-warning">
               Open Food Facts is unavailable — manual entry works as normal
             </p>
           )}
@@ -1264,7 +1264,7 @@ function SavedMealsPanel({
                   )}
                   <button
                     type="button"
-                    className="p-1 text-xs text-ink-faint hover:text-rose-300"
+                    className="p-1 text-xs text-ink-faint hover:text-danger"
                     onClick={() => remove(meal.id)}
                     disabled={pending}
                     aria-label={`Delete ${meal.name}`}
@@ -1283,7 +1283,7 @@ function SavedMealsPanel({
                   .join(' + ')}
               </p>
               {!meal.loggable && (
-                <p className="mt-1 text-xs text-amber-400">
+                <p className="mt-1 text-xs text-warning">
                   One of its foods is gone, so this cannot be logged until it is
                   fixed.
                 </p>
@@ -1382,10 +1382,10 @@ function TargetsPanel({ targets }: { targets: NutritionTargets }) {
           <p
             className={clsx(
               targets.rateVerdict === 'fast'
-                ? 'text-amber-400'
+                ? 'text-warning'
                 : targets.rateVerdict === 'slow'
                   ? 'text-ink-faint'
-                  : 'text-emerald-400',
+                  : 'text-success',
             )}
           >
             At this target you would change about{' '}
@@ -1403,13 +1403,13 @@ function TargetsPanel({ targets }: { targets: NutritionTargets }) {
         )}
 
         {targets.floorApplied && (
-          <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-200">
+          <p className="rounded-lg border border-warning-solid/40 bg-warning-solid/10 px-3 py-2 text-warning">
             {targets.floorApplied.reason}
           </p>
         )}
 
         {targets.macroAdjustment && (
-          <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-200">
+          <p className="rounded-lg border border-warning-solid/40 bg-warning-solid/10 px-3 py-2 text-warning">
             {targets.macroAdjustment.reason}
           </p>
         )}
@@ -1435,7 +1435,7 @@ function FoodSyncNotes({ overview }: { overview: NutritionOverview }) {
   return (
     <div className="space-y-2">
       {(offline || unsaved > 0) && (
-        <p className="text-xs text-amber-700 dark:text-amber-400">
+        <p className="text-xs text-warning">
           {offline ? 'No connection. ' : ''}
           {unsaved > 0
             ? `These totals include ${unsaved} meal${unsaved === 1 ? '' : 's'} not saved yet; they are kept on this device and sent when there is a connection.`
@@ -1445,7 +1445,7 @@ function FoodSyncNotes({ overview }: { overview: NutritionOverview }) {
       {refused.map((item) => (
         <div
           key={item.id}
-          className="flex flex-wrap items-center gap-2 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs"
+          className="flex flex-wrap items-center gap-2 rounded-lg border border-danger-solid/40 bg-danger-solid/10 px-3 py-2 text-xs"
         >
           <p className="min-w-0 flex-1">
             <span className="font-medium">{item.label ?? 'A change'} was not saved.</span>{' '}

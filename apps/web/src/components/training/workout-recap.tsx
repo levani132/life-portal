@@ -67,7 +67,7 @@ export function WorkoutRecapView({
         <div className="flex items-center gap-3">
           <span
             className={clsx(
-              'flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30',
+              'flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-success-solid text-white shadow-lg shadow-success-solid/30',
               celebrate && 'recap-pop',
             )}
             aria-hidden
@@ -92,18 +92,18 @@ export function WorkoutRecapView({
 
         {pending && !sync.offline ? (
           <p className="flex items-center gap-2 text-xs text-ink-faint" role="status">
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-sky-500 motion-reduce:animate-none" aria-hidden />
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-info-solid motion-reduce:animate-none" aria-hidden />
             Saving to your account…
           </p>
         ) : pending ? (
-          <p className="flex items-start gap-2 rounded-xl bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300" role="status">
+          <p className="flex items-start gap-2 rounded-xl bg-warning-solid/10 p-3 text-xs text-warning" role="status">
             <CloudOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             Saved on this device and waiting to sync. Records, ranks and your level appear here and in History once it reaches
             the server.
           </p>
         ) : isLoading ? (
           <p className="flex items-center gap-2 text-xs text-ink-faint" role="status">
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-sky-500 motion-reduce:animate-none" aria-hidden />
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-info-solid motion-reduce:animate-none" aria-hidden />
             Loading records and ranks…
           </p>
         ) : error || !recap ? (
@@ -215,7 +215,7 @@ function Achievements({
 
       {recap.records.length > 0 && (
         <Highlight {...enter()} tone="record">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-500" aria-hidden>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-warning-solid/15 text-warning" aria-hidden>
             <Trophy className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
@@ -263,7 +263,7 @@ function Highlight({
         'flex items-center gap-3 rounded-xl border p-3',
         tone === 'rank' && 'border-train-pull/40 bg-train-pull/10',
         tone === 'level' && 'border-accent/40 bg-accent/10',
-        tone === 'record' && 'border-amber-500/40 bg-amber-500/10',
+        tone === 'record' && 'border-warning-solid/40 bg-warning-solid/10',
         tone === 'quiet' && 'border-border',
         className,
       )}

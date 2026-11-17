@@ -387,7 +387,7 @@ export function NutritionSettings({
                 aria-pressed={cheatDays.includes(weekday.value)}
                 className={
                   cheatDays.includes(weekday.value)
-                    ? 'chip border-lime-500/50 bg-lime-500/15 text-lime-200'
+                    ? 'chip border-fresh-solid/50 bg-fresh-solid/15 text-fresh'
                     : 'chip border-border text-ink-muted hover:text-ink'
                 }
               >
@@ -532,7 +532,7 @@ export function NutritionSettings({
         </details>
 
         {error && (
-          <p className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+          <p className="rounded-lg border border-danger-solid/40 bg-danger-solid/10 px-3 py-2 text-xs text-danger">
             {error}
           </p>
         )}

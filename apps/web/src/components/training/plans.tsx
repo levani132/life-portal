@@ -308,7 +308,7 @@ function PlanView({
           </section>
           {actionError && <ErrorNote message={actionError} />}
           {inProgress && (
-            <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-ink">
+            <div className="space-y-2 rounded-lg border border-warning-solid/40 bg-warning-solid/10 p-3 text-sm text-ink">
               <p>{inProgress} is still in progress. Finish or discard it before starting another.</p>
               <button type="button" className="btn-ghost" onClick={onStarted}>
                 Open it

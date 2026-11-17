@@ -91,7 +91,7 @@ export function FoodCard({
         className={clsx(
           'absolute left-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full backdrop-blur transition active:scale-90',
           food.favourite
-            ? 'bg-amber-400 text-white shadow'
+            ? 'bg-warning-solid text-white shadow'
             : 'bg-black/35 text-white hover:bg-black/50',
         )}
       >
@@ -214,7 +214,7 @@ function IconButton({
       title={title ?? label}
       className={clsx(
         'relative z-10 flex h-8 w-8 items-center justify-center rounded-lg text-ink-faint transition hover:bg-surface',
-        danger ? 'hover:text-rose-400' : 'hover:text-ink',
+        danger ? 'hover:text-danger' : 'hover:text-ink',
       )}
     >
       {children}

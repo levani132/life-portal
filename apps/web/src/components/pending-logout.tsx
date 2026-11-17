@@ -57,7 +57,7 @@ export function PendingLogout({
         this device.
       </p>
       {confirming ? (
-        <div className="space-y-3 rounded-lg border border-rose-500/40 bg-rose-500/10 p-3">
+        <div className="space-y-3 rounded-lg border border-danger-solid/40 bg-danger-solid/10 p-3">
           <p className="text-sm">
             Discarding deletes {waiting === 1 ? 'this change' : `these ${waiting} changes`} for good. This cannot be
             undone.

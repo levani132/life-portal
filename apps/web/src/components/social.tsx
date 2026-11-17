@@ -223,7 +223,7 @@ export function ConnectionActions({
                 Message
               </button>
             )}
-            <span className="flex items-center px-1 text-sm text-emerald-400">
+            <span className="flex items-center px-1 text-sm text-success">
               Friends
             </span>
             <button
@@ -247,7 +247,7 @@ export function ConnectionActions({
         {!compact && relationship !== 'self' && relationship !== 'blocked' && (
           <button
             type="button"
-            className="btn-ghost text-rose-300"
+            className="btn-ghost text-danger"
             title="Blocking removes this friendship and hides sharing in both directions"
             disabled={action.pending}
             onClick={() => void act('block')}
@@ -421,7 +421,7 @@ export function ProfileView({ userId }: { userId?: string }) {
       <section className="card relative">
         <div
           aria-hidden
-          className="h-24 rounded-t-xl bg-gradient-to-br from-accent/30 via-violet-500/15 to-emerald-400/10"
+          className="h-24 rounded-t-xl bg-gradient-to-br from-accent/30 via-special-solid/15 to-success-solid/10"
         />
         <div className="absolute right-3 top-3 flex items-center gap-1.5">
           {own ? (
@@ -562,7 +562,7 @@ function RelationshipChip({ person }: { person: SocialPerson }) {
     <span
       className={
         person.relationship === 'friends'
-          ? 'rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-400'
+          ? 'rounded-full bg-success-solid/10 px-2 py-0.5 text-[11px] font-medium text-success'
           : 'rounded-full bg-surface px-2 py-0.5 text-[11px] font-medium text-ink-muted'
       }
     >
@@ -627,7 +627,7 @@ function OwnHeaderActions({
         title={copied ? 'Link copied' : 'Share profile'}
         onClick={() => void share()}
       >
-        {copied ? <Check size={18} className="text-emerald-400" /> : <Share2 size={18} />}
+        {copied ? <Check size={18} className="text-success" /> : <Share2 size={18} />}
       </button>
       <Link
         href="/settings/profile"
@@ -641,7 +641,7 @@ function OwnHeaderActions({
         <Menu size={18} />
         {!!requests.data?.count && (
           <span
-            className="absolute right-1 top-1 h-2 w-2 rounded-full bg-sky-500"
+            className="absolute right-1 top-1 h-2 w-2 rounded-full bg-info-solid"
             aria-label="Friend requests waiting"
           />
         )}
@@ -766,7 +766,7 @@ function OwnStats({ person }: { person: SocialProfile }) {
         <span className="text-ink-muted">{count === 1 ? 'friend' : 'friends'}</span>
         {!!requests.data?.count && (
           <span
-            className="ml-1 rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] font-semibold text-white"
+            className="ml-1 rounded-full bg-info-solid px-1.5 py-0.5 text-[10px] font-semibold text-white"
             aria-label={`${requests.data.count} pending friend requests`}
           >
             {requests.data.count}
@@ -876,7 +876,7 @@ function AvatarEditor({ person }: { person: SocialProfile }) {
           {picture}
         </button>
       )}
-      {error && <p className="mt-2 text-xs text-rose-400">{error}</p>}
+      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
       <input
         ref={input}
         type="file"

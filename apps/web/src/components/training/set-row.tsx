@@ -173,7 +173,7 @@ function SignedInput({
         type="button"
         className={clsx(
           'absolute inset-y-1 left-1 flex w-8 items-center justify-center rounded-md text-base font-bold leading-none transition-colors disabled:opacity-50',
-          negative ? 'bg-amber-500/15 text-amber-400' : 'bg-border/40 text-ink-muted hover:text-ink',
+          negative ? 'bg-warning-solid/15 text-warning' : 'bg-border/40 text-ink-muted hover:text-ink',
         )}
         disabled={disabled}
         onClick={() => onChange(negative ? magnitude : `-${magnitude}`)}
@@ -332,7 +332,7 @@ export function SetForm({
           {submitLabel}
         </button>
       </div>
-      {problem && <p className="text-xs text-rose-400">{problem}</p>}
+      {problem && <p className="text-xs text-danger">{problem}</p>}
     </div>
   );
 }
@@ -342,7 +342,7 @@ export const SET_TYPE_CHIPS: Record<SetType, string> = {
   warmup: 'bg-train-core/15 text-train-core',
   working: 'bg-accent/15 text-accent',
   drop: 'bg-train-arms/15 text-train-arms',
-  failure: 'bg-rose-500/15 text-rose-400',
+  failure: 'bg-danger-solid/15 text-danger',
 };
 
 /** One logged set as a line: number, type mark, the values, and RPE. */
@@ -404,7 +404,7 @@ export function SetLine({
       </span>
       {records.length > 0 && (
         <span
-          className="shrink-0 rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400"
+          className="shrink-0 rounded-full bg-warning-solid/15 px-1.5 py-0.5 text-[10px] font-semibold text-warning"
           title={`Personal record: ${records.map((kind) => RECORD_LABELS[kind]).join(', ')}`}
           aria-label={`Personal record: ${records.map((kind) => RECORD_LABELS[kind]).join(', ')}`}
         >

@@ -177,7 +177,7 @@ function EnableButton({ onDone }: { onDone: () => void }) {
 
 function BlockedHelp() {
   return (
-    <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+    <p className="rounded-lg border border-warning-solid/40 bg-warning-solid/10 px-3 py-2 text-xs text-warning">
       Notifications are blocked for Life Portal on this device. Allow them in your device’s
       settings (on iPhone: Settings › Notifications › Life Portal), then come back here.
     </p>
@@ -203,7 +203,7 @@ export function ActivityBell({ access }: { access: PortalState['access'] }) {
     >
       <Bell size={20} aria-hidden />
       {count > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-sky-500 px-1 text-center text-[10px] font-semibold leading-[18px] text-white">
+        <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-info-solid px-1 text-center text-[10px] font-semibold leading-[18px] text-white">
           {count > 99 ? '99+' : count}
         </span>
       )}
@@ -264,7 +264,7 @@ function Toggle({
     <label className="flex items-start gap-3 rounded-xl border border-border p-4">
       <input
         type="checkbox"
-        className="mt-1 h-5 w-5 shrink-0 accent-sky-400"
+        className="mt-1 h-5 w-5 shrink-0 accent-info-solid"
         checked={checked}
         disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
@@ -497,7 +497,7 @@ export function ActivityList() {
               <span
                 className={
                   item.unseen
-                    ? 'mt-2 h-2 w-2 shrink-0 rounded-full bg-sky-500'
+                    ? 'mt-2 h-2 w-2 shrink-0 rounded-full bg-info-solid'
                     : 'mt-2 h-2 w-2 shrink-0'
                 }
                 aria-label={item.unseen ? 'New' : undefined}

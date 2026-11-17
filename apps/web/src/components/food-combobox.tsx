@@ -206,7 +206,7 @@ export function FoodCombobox({
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm text-ink">
-                    {food.favourite && <span className="mr-1 text-amber-400">★</span>}
+                    {food.favourite && <span className="mr-1 text-warning">★</span>}
                     {food.name}
                   </span>
                   <span className="block truncate text-xs text-ink-faint">

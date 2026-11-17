@@ -88,7 +88,7 @@ export function FoodPhotoField({
         {preview && progress === null && (
           <button
             type="button"
-            className="mt-1 inline-flex items-center gap-1 text-xs text-rose-400"
+            className="mt-1 inline-flex items-center gap-1 text-xs text-danger"
             onClick={() => {
               abort.current?.abort();
               setPreview(undefined);
@@ -98,7 +98,7 @@ export function FoodPhotoField({
             <Trash2 size={12} /> Remove
           </button>
         )}
-        {error && <p className="mt-1 text-xs text-rose-400">{error}</p>}
+        {error && <p className="mt-1 text-xs text-danger">{error}</p>}
       </div>
       <input
         ref={input}

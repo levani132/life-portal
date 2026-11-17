@@ -25,7 +25,7 @@ export function HealthActivityChart({
           Recorded activity
         </h3>
         <div
-          className="flex rounded-lg bg-violet-500/10 p-1"
+          className="flex rounded-lg bg-special-solid/10 p-1"
           role="group"
           aria-label="Activity chart metric"
         >
@@ -35,7 +35,7 @@ export function HealthActivityChart({
               type="button"
               aria-pressed={metric === value}
               onClick={() => setMetric(value)}
-              className={`rounded-md px-2 py-1 text-xs ${metric === value ? 'bg-violet-500/20 text-ink' : 'text-ink-muted'}`}
+              className={`rounded-md px-2 py-1 text-xs ${metric === value ? 'bg-special-solid/20 text-ink' : 'text-ink-muted'}`}
             >
               {value === 'steps' ? 'Steps' : 'Active kcal'}
             </button>
@@ -64,7 +64,7 @@ export function HealthActivityChart({
                   rx={3}
                   className={
                     present(row)
-                      ? 'fill-violet-400'
+                      ? 'fill-special'
                       : 'fill-current text-ink-muted opacity-20'
                   }
                 />

@@ -121,8 +121,8 @@ function IngestTokens() {
  */
 function Revealed({ created, onDismiss }: { created: IngestTokenCreated; onDismiss: () => void }) {
   return (
-    <section className="card border-emerald-500/50 bg-emerald-500/5 p-5">
-      <h2 className="text-sm font-semibold text-emerald-300">
+    <section className="card border-success-solid/50 bg-success-solid/5 p-5">
+      <h2 className="text-sm font-semibold text-success">
         Copy this now — it will never be shown again
       </h2>
       <p className="mt-1 text-xs text-ink-muted">
@@ -175,12 +175,12 @@ function TokenRow({
          * the phone is still firing, and it is stamped only when a message actually lands.
          */}
         {token.lastUsedAt ? (
-          <p className="mt-0.5 text-xs text-emerald-400">
+          <p className="mt-0.5 text-xs text-success">
             Last message {formatDay(token.lastUsedAt.slice(0, 10))}
             {today && ` · ${relativeDays(today, token.lastUsedAt.slice(0, 10))}`}
           </p>
         ) : (
-          <p className="mt-0.5 text-xs text-amber-400">
+          <p className="mt-0.5 text-xs text-warning">
             Not used yet — capture is not working. Nothing has ever sent a message with this token.
           </p>
         )}
@@ -190,7 +190,7 @@ function TokenRow({
             ? `Revoked ${formatDay(token.revokedAt as string)}`
             : `${expired ? 'Expired' : 'Expires'} ${formatDay(token.expiresAt)}`}
         </p>
-        {error && <p className="mt-1 text-xs text-rose-400">{error}</p>}
+        {error && <p className="mt-1 text-xs text-danger">{error}</p>}
       </div>
 
       {!revoked && (

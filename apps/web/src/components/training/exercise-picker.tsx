@@ -181,7 +181,7 @@ export function ExerciseSearch({
         ))}
       </Select>
       {offline && saved.data && (
-        <p className="text-xs text-amber-700 dark:text-amber-400">
+        <p className="text-xs text-warning">
           No connection: showing the exercises saved on this device (yours, recent and in your plans). Others are
           unavailable offline.
         </p>

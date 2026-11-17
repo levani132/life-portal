@@ -334,7 +334,7 @@ function FxRates({
           </p>
         </>
       ) : (
-        <p className="mt-2 text-xs text-amber-400">
+        <p className="mt-2 text-xs text-warning">
           No rate for today yet, so amounts are shown in the currency they were
           recorded in.
         </p>

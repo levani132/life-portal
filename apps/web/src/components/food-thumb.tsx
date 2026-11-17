@@ -36,7 +36,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { macroShares } from '@life-portal/shared-domain';
-import { MACRO_COLORS } from '../lib/macro-colors';
+import { MACRO_COLORS, withAlpha } from '../lib/macro-colors';
 
 /** First match wins, so the more specific words come first ("egg" before "bread" in "egg bread"). */
 const ICONS: [RegExp, LucideIcon][] = [
@@ -124,7 +124,7 @@ export function FoodThumb({
   return (
     <span
       aria-hidden
-      style={{ ...style, color, backgroundColor: `${color}26` }}
+      style={{ ...style, color, backgroundColor: withAlpha(color, 0.15) }}
       className={clsx('flex shrink-0 items-center justify-center rounded-lg', className)}
     >
       <Icon size={Math.round(size * 0.5)} strokeWidth={2} />
@@ -166,7 +166,7 @@ export function FoodArt({
       className={clsx('flex h-full w-full items-center justify-center', className)}
       style={{
         color,
-        backgroundImage: `radial-gradient(circle at 30% 25%, ${color}40, ${color}14 70%)`,
+        backgroundImage: `radial-gradient(circle at 30% 25%, ${withAlpha(color, 0.25)}, ${withAlpha(color, 0.08)} 70%)`,
       }}
     >
       <Icon className="h-2/5 w-2/5" strokeWidth={1.6} />

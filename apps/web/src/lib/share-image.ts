@@ -1,6 +1,6 @@
 'use client';
 import { macroShares, ringArcs } from '@life-portal/shared-domain';
-import { MACRO_COLORS } from './macro-colors';
+import { MACRO_HEX } from './macro-colors';
 import type { FoodPost } from '@life-portal/shared-types';
 
 /**
@@ -14,7 +14,7 @@ const SURFACE = '#151924';
 const INK = '#F4F5F8';
 const MUTED = '#9AA3B2';
 const ACCENT = '#38BDF8';
-const COLORS = MACRO_COLORS;
+const COLORS = MACRO_HEX;
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Georgian", "Noto Sans", sans-serif';
 
 /**

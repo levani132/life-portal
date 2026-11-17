@@ -362,7 +362,7 @@ export function FoodForm({
           </label>
 
           {mismatch && (
-            <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            <p className="rounded-lg border border-warning-solid/40 bg-warning-solid/10 px-3 py-2 text-xs text-warning">
               Those macros work out to about {mismatch.impliedKcal} kcal per 100 {unit}, not{' '}
               {factsFromInput(payload, entryMode, payload.servingSize).energyKcalPer100}. Worth
               checking whether the calories and the macros are stated the same way — it will save
@@ -444,7 +444,7 @@ function LookupTab({
   return (
     <div className="space-y-3">
       {!available && reason && (
-        <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+        <p className="rounded-lg border border-warning-solid/40 bg-warning-solid/10 px-3 py-2 text-xs text-warning">
           {reason}
         </p>
       )}
@@ -479,7 +479,7 @@ function LookupTab({
       </div>
 
       {error && (
-        <p className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+        <p className="rounded-lg border border-danger-solid/40 bg-danger-solid/10 px-3 py-2 text-xs text-danger">
           {error}
         </p>
       )}

@@ -81,7 +81,7 @@ function ExerciseLine({ exercise, detail, record }: { exercise: Published; detai
         <span className="block truncate text-xs text-ink-faint">{detail}</span>
       </span>
       {record && (
-        <span className="flex shrink-0 items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+        <span className="flex shrink-0 items-center gap-1 rounded-full bg-warning-solid/15 px-2 py-0.5 text-[11px] font-semibold text-warning">
           <Trophy className="h-3 w-3" aria-hidden /> {record}
         </span>
       )}
@@ -151,7 +151,7 @@ function CompactAttachment({ training }: { training: TrainingAttachment }) {
             {workout.exercises.length} exercise{workout.exercises.length === 1 ? '' : 's'} · {sets} sets
           </span>
           {!!workout.records?.length && (
-            <span className="flex items-center gap-1 font-semibold text-amber-600 dark:text-amber-400">
+            <span className="flex items-center gap-1 font-semibold text-warning">
               <Trophy className="h-3.5 w-3.5" aria-hidden /> {workout.records.length} record{workout.records.length === 1 ? '' : 's'}
             </span>
           )}

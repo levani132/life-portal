@@ -134,7 +134,7 @@ export function PaymentsPanel({
                   <span
                     className={clsx(
                       'tabular shrink-0 text-sm font-medium',
-                      payment.direction === 'in' ? 'text-emerald-400' : 'text-ink',
+                      payment.direction === 'in' ? 'text-success' : 'text-ink',
                     )}
                   >
                     {payment.direction === 'in' ? '+' : ''}
@@ -310,7 +310,7 @@ function PaymentRow({
         <p
           className={clsx(
             'tabular text-sm font-medium',
-            incoming ? 'text-emerald-400' : 'text-ink',
+            incoming ? 'text-success' : 'text-ink',
           )}
         >
           {incoming ? '+' : ''}
@@ -343,7 +343,7 @@ function PaymentRow({
           </button>
           <button
             type="button"
-            className="text-[11px] text-ink-faint hover:text-rose-400"
+            className="text-[11px] text-ink-faint hover:text-danger"
             disabled={pending}
             onClick={() =>
               void run(async () => {
@@ -403,8 +403,8 @@ export function MissingPanel({
       ) : (
         <div className="space-y-2">
           {queueCount > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2">
-              <p className="text-xs text-amber-200">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning-solid/40 bg-warning-solid/5 px-3 py-2">
+              <p className="text-xs text-warning">
                 {queueCount} message{queueCount === 1 ? '' : 's'} the app could not read. They count
                 towards no figure until you fill them in.
               </p>
@@ -417,7 +417,7 @@ export function MissingPanel({
           {foundGaps.map((gap, index) => (
             <p
               key={`${gap.cardLast4}-${gap.from}-${gap.to}-${index}`}
-              className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-200"
+              className="rounded-lg border border-warning-solid/40 bg-warning-solid/5 px-3 py-2 text-xs text-warning"
             >
               {gap.missingCents > 0 ? (
                 <>
@@ -442,9 +442,9 @@ export function MissingPanel({
           {foundOrphans.map((orphan, index) => (
             <div
               key={`${orphan.paymentId}-${orphan.forDay}-${index}`}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning-solid/40 bg-warning-solid/5 px-3 py-2"
             >
-              <p className="text-xs text-amber-200">
+              <p className="text-xs text-warning">
                 A confirmation lost its budget line —{' '}
                 <span className="tabular">{formatCents(orphan.amountCents, displayCurrency)}</span>{' '}
                 on {formatDay(orphan.forDay)} counts as unplanned until you decide again.

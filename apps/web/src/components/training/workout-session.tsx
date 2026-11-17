@@ -352,7 +352,7 @@ export function WorkoutSession({
         </div>
         <div className="space-y-3 p-4">
           {session.isStale && (
-            <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
+            <div className="space-y-2 rounded-lg border border-warning-solid/40 bg-warning-solid/10 p-3 text-sm text-warning">
               <p>This workout has been open for over 12 hours.</p>
               <div className="flex flex-wrap gap-2">
                 <button type="button" className="btn-ghost" disabled={busy || !session.lastSetAt} onClick={() => void finish('lastSet')}>
@@ -365,7 +365,7 @@ export function WorkoutSession({
             </div>
           )}
           {sync.offline && (
-            <p className="text-xs text-amber-700 dark:text-amber-400">
+            <p className="text-xs text-warning">
               No connection: this workout is kept on this device and sent when it is back.
             </p>
           )}
@@ -566,7 +566,7 @@ function ExerciseBlock({
     <section
       className={clsx(
         'card border-l-4 p-4 transition-[color,background-color,border-color,box-shadow,padding] duration-200 motion-reduce:transition-none',
-        isDone ? 'border-l-emerald-500 bg-emerald-500/[0.06]' : style.edge,
+        isDone ? 'border-l-success-solid bg-success-solid/[0.06]' : style.edge,
         state === 'current' && 'ring-2 ring-train-pull/60',
         exercise.skipped && 'opacity-70',
         collapsed && 'py-3',
@@ -582,7 +582,7 @@ function ExerciseBlock({
           className={clsx(
             'flex shrink-0 items-center justify-center rounded-xl shadow-sm',
             collapsed ? 'h-9 w-9' : 'h-11 w-11',
-            isDone ? 'bg-emerald-500 text-white' : style.solid,
+            isDone ? 'bg-success-solid text-white' : style.solid,
           )}
           aria-hidden
         >
@@ -633,7 +633,7 @@ function ExerciseBlock({
           <span
             className={clsx(
               'flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums',
-              complete ? 'bg-emerald-500/15 text-emerald-400' : clsx(style.tint, style.text),
+              complete ? 'bg-success-solid/15 text-success' : clsx(style.tint, style.text),
             )}
             aria-label={`${Math.min(done, targetCount)} of ${targetCount} planned sets done`}
           >
@@ -675,7 +675,7 @@ function ExerciseBlock({
           {fromPlan && session.status === 'open' && (
             <button
               type="button"
-              className={clsx(iconButton, exercise.skipped && 'text-amber-400')}
+              className={clsx(iconButton, exercise.skipped && 'text-warning')}
               disabled={busy}
               onClick={() => onSkip(!exercise.skipped)}
               aria-label={exercise.skipped ? `Do ${exercise.snapshot.name} after all` : `Skip ${exercise.snapshot.name}`}
@@ -693,7 +693,7 @@ function ExerciseBlock({
           <button type="button" className={iconButton} disabled={!canMoveDown || busy} onClick={() => onMove(1)} aria-label="Move down">
             <ArrowDown className="h-4 w-4" />
           </button>
-          <button type="button" className={clsx(iconButton, 'hover:text-rose-400')} disabled={busy} onClick={onRemove} aria-label="Remove exercise">
+          <button type="button" className={clsx(iconButton, 'hover:text-danger')} disabled={busy} onClick={onRemove} aria-label="Remove exercise">
             <Trash2 className="h-4 w-4" />
           </button>
         </div>

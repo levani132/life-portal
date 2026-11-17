@@ -230,7 +230,7 @@ function ItemRow({
             {item.soldAt && ` · sold ${formatDay(item.soldAt)}`}
           </p>
           {item.interests.length > 0 && (
-            <p className="mt-1 text-xs text-emerald-400">
+            <p className="mt-1 text-xs text-success">
               {item.interests.length} interested:{' '}
               {item.interests.map((interest) => interest.name).join(', ')}
             </p>
@@ -255,7 +255,7 @@ function ItemRow({
             {onSell && (
               <button
                 type="button"
-                className="text-[11px] text-emerald-400 hover:underline"
+                className="text-[11px] text-success hover:underline"
                 onClick={onSell}
               >
                 mark sold
@@ -270,7 +270,7 @@ function ItemRow({
             </button>
             <button
               type="button"
-              className="text-[11px] text-ink-faint hover:text-rose-400"
+              className="text-[11px] text-ink-faint hover:text-danger"
               disabled={pending}
               onClick={() => void run(() => api.delete(`/items/${item.id}`))}
             >
