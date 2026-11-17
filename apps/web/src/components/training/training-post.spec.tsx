@@ -63,6 +63,32 @@ describe('TrainingAttachmentView (spec 036)', () => {
   });
 });
 
+describe('the feed summary', () => {
+  const day = (name: string) => ({ name, exercises: [{ key: '0', targets: [{ type: 'working' as const, reps: 8 }] }] });
+  const five: TrainingAttachment = { ...plan, plan: { name: 'PPL', includedWorkouts: 5, totalWorkouts: 5, workouts: ['Push', 'Pull', 'Legs', 'Arms', 'Core'].map(day) } };
+
+  it('lists a plan\'s days by name without their sets, and says how many more are in the post', () => {
+    render(<TrainingAttachmentView training={five} compact />);
+    expect(screen.getByText('Push')).toBeTruthy();
+    expect(screen.getByText('2 more in the post')).toBeTruthy();
+    // The fifth day is not on the card at all, and no planned set is spelled out.
+    expect(screen.queryByText('Core')).toBeNull();
+    expect(screen.queryByText('8 reps')).toBeNull();
+  });
+
+  it('shows no fade or count when the whole plan fits', () => {
+    render(<TrainingAttachmentView training={plan} compact />);
+    expect(screen.queryByText(/more in the post/)).toBeNull();
+  });
+
+  it('sums a workout up in a line, with its exercise names and no weights', () => {
+    render(<TrainingAttachmentView training={workout(true, true)} compact />);
+    expect(screen.getByText(/1 exercise · 2 sets/)).toBeTruthy();
+    expect(screen.getByText('1 record')).toBeTruthy();
+    expect(screen.queryByText(/100 kg/)).toBeNull();
+  });
+});
+
 describe('CopyTrainingSheet (spec 036)', () => {
   it('asks which plan a single workout goes into, and sends that choice once', async () => {
     responses['/posts/p1/training-copy'] = { kind: 'workout', needsPlanChoice: true, newExercises: [] };

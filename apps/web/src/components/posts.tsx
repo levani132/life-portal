@@ -570,10 +570,13 @@ export function PostCard({
       {post.training && (
         // Spec 036: the Training attachment, exactly as published. A feed card shows the start of it.
         <div className="mt-4 rounded-xl border border-border/60 bg-surface p-3 sm:p-4">
-          <TrainingAttachmentView training={post.training} limit={detail ? undefined : 4} />
-          {!detail && (
-            <Link href={`/posts/${post.id}`} className="mt-3 inline-block text-sm text-accent">
-              Open post →
+          {detail ? (
+            <TrainingAttachmentView training={post.training} />
+          ) : (
+            // On a feed card: a summary, and the whole of it opens the post.
+            <Link href={`/posts/${post.id}`} className="block" aria-label={`Open post: ${post.training.label}`}>
+              <TrainingAttachmentView training={post.training} compact />
+              <span className="mt-3 inline-block text-sm text-accent">Open post →</span>
             </Link>
           )}
           {post.canCopy && <CopyTrainingButton postId={post.id} training={post.training} />}

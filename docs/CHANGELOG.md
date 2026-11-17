@@ -14,6 +14,9 @@ Off until it is turned on for your account ("Training posts and copying").
 - **Share an exercise you created**, with its photo and instructions.
 - **You see exactly what others will see** before posting, and choose who sees it.
 - **"Allow copying"** on each post, which you can turn off later. Copies already made stay.
+- **On the wall, a training post is a summary**: a plan shows its days by name with the muscles
+  each works, and fades out when there are more than three; a workout shows its figures and
+  muscles. Tap it to open the whole post.
 - **Copy from a post.** A plan becomes one of your plans; a single workout goes into a plan you
   pick or a new one; an exercise joins your own. Each says who it came from. Nothing is started
   or logged, and a workout is copied without the other person's weights.

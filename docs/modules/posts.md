@@ -289,7 +289,11 @@ nothing stored or read assumes that, so a later feature can carry a plan and mea
 - **Access.** Sharing and copying need `training` and the `trainingPosts` flag (off for
   production) on top of the post gate.
 - **Web.** `components/training/training-post.tsx`: `TrainingAttachmentView` (used by the post
-  card and by the composer's preview, so they cannot differ) and `CopyTrainingSheet`.
+  card and by the composer's preview, so they cannot differ) and `CopyTrainingSheet`. On a feed
+  card it is `compact`: a workout is one line of figures, the muscles worked as small icons and
+  its exercise names; a plan is its days by name, each with its muscle icons, showing three days
+  and fading out over a fourth when there are more. The whole summary opens the post, where
+  everything is shown. The summary never shows a weight, reps or a planned set.
   `components/training/share-training.tsx` is the Share link on a workout's summary, a plan, a
   plan workout and an own exercise; it opens `/new?training=<selection>`.
 

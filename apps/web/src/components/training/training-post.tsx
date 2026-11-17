@@ -89,12 +89,122 @@ function ExerciseLine({ exercise, detail, record }: { exercise: Published; detai
   );
 }
 
+/** The muscles a list of exercises works, one small figure each, in the order first met. */
+function MuscleIcons({ exercises, max = 6 }: { exercises: readonly Published[]; max?: number }) {
+  const seen = new Set<string>();
+  const unique = exercises.filter((exercise) => {
+    const key = exercise.measure === 'distance_duration' ? 'cardio' : (exercise.primaryMuscles[0] ?? 'other');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return (
+    <span className="flex shrink-0 items-center gap-1" aria-hidden>
+      {unique.slice(0, max).map((exercise) => {
+        const style = GROUP_STYLES[exerciseGroup(exercise.primaryMuscles, exercise.measure)];
+        const Icon = style.icon;
+        return (
+          <span key={exercise.key} className={clsx('flex h-7 w-7 items-center justify-center rounded-lg', style.tint, style.text)}>
+            {exercise.measure !== 'distance_duration' && hasMuscleFigure(exercise.primaryMuscles) ? (
+              <MuscleFigure
+                muscles={exercise.primaryMuscles}
+                lit="currentColor"
+                dim="color-mix(in srgb, currentColor 30%, rgb(var(--surface-raised)))"
+                gap="rgb(var(--surface-raised))"
+                className="h-[23px] w-[23px]"
+              />
+            ) : (
+              <Icon className="h-3.5 w-3.5" />
+            )}
+          </span>
+        );
+      })}
+      {unique.length > max && <span className="text-[11px] text-ink-faint">+{unique.length - max}</span>}
+    </span>
+  );
+}
+
+/** How many plan days a feed card shows before it fades out. */
+const FEED_DAYS = 3;
+
+/**
+ * The attachment on a feed card: a summary, not the whole thing. A plan is its days by name, each
+ * with the muscles it works; past a few days the list fades out, which says there is more behind
+ * "Open post". A workout is its figures and the muscles worked. Nothing here is not also in the
+ * full view.
+ */
+function CompactAttachment({ training }: { training: TrainingAttachment }) {
+  const byKey = new Map(training.exercises.map((exercise) => [exercise.key, exercise]));
+  const of = (keys: readonly string[]) => keys.flatMap((key) => byKey.get(key) ?? []);
+  const { workout, plan } = training;
+  if (workout) {
+    const sets = workout.exercises.reduce((sum, row) => sum + row.setTypes.length, 0);
+    const names = of(workout.exercises.map((row) => row.key)).map((exercise) => exercise.name);
+    return (
+      <div className="space-y-2">
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
+          <span>{formatDay(workout.day)}</span>
+          <span className="flex items-center gap-1">
+            <Clock className="h-3.5 w-3.5" aria-hidden /> {formatDuration(workout.durationSeconds)}
+          </span>
+          <span>
+            {workout.exercises.length} exercise{workout.exercises.length === 1 ? '' : 's'} · {sets} sets
+          </span>
+          {!!workout.records?.length && (
+            <span className="flex items-center gap-1 font-semibold text-amber-600 dark:text-amber-400">
+              <Trophy className="h-3.5 w-3.5" aria-hidden /> {workout.records.length} record{workout.records.length === 1 ? '' : 's'}
+            </span>
+          )}
+        </p>
+        <MuscleIcons exercises={of(workout.exercises.map((row) => row.key))} max={8} />
+        <p className="line-clamp-2 text-xs text-ink-faint">{names.join(' · ')}</p>
+      </div>
+    );
+  }
+  if (plan) {
+    const more = plan.workouts.length > FEED_DAYS;
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-ink-muted">
+          {plan.includedWorkouts < plan.totalWorkouts
+            ? `${plan.includedWorkouts} of ${plan.totalWorkouts} workouts`
+            : `${plan.workouts.length} workout${plan.workouts.length === 1 ? '' : 's'}`}
+        </p>
+        <div className="relative">
+          <ul className="space-y-1.5">
+            {/* One more than the limit, half hidden under the fade: the list visibly continues. */}
+            {plan.workouts.slice(0, FEED_DAYS + 1).map((day, index) => (
+              <li key={index} className="flex items-center gap-2.5 rounded-xl bg-surface-raised px-2.5 py-2">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{day.name}</span>
+                  <span className="block text-xs text-ink-faint">
+                    {day.exercises.length} exercise{day.exercises.length === 1 ? '' : 's'}
+                  </span>
+                </span>
+                <MuscleIcons exercises={of(day.exercises.map((row) => row.key))} max={4} />
+              </li>
+            ))}
+          </ul>
+          {more && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-surface via-surface/80 to-transparent"
+            />
+          )}
+        </div>
+        {more && <p className="text-xs text-ink-faint">{plan.workouts.length - FEED_DAYS} more in the post</p>}
+      </div>
+    );
+  }
+  return null;
+}
+
 /**
  * A post's Training attachment (spec 036), as its viewers see it: exactly the published snapshot,
  * nothing read from anyone's training data. Used by the post card and by the composer's preview,
- * so what the author previews is what is shown.
+ * so what the author previews is what is shown. `compact` is the feed's summary of the same thing.
  */
-export function TrainingAttachmentView({ training, limit }: { training: TrainingAttachment; limit?: number }) {
+export function TrainingAttachmentView({ training, compact = false }: { training: TrainingAttachment; compact?: boolean }) {
   const unit = useViewerUnit();
   const byKey = new Map(training.exercises.map((exercise) => [exercise.key, exercise]));
   const { workout, plan } = training;
@@ -113,7 +223,9 @@ export function TrainingAttachmentView({ training, limit }: { training: Training
         </div>
       </div>
 
-      {workout && (
+      {compact && !single && <CompactAttachment training={training} />}
+
+      {workout && !compact && (
         <>
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
             <span>{formatDay(workout.day)}</span>
@@ -126,7 +238,7 @@ export function TrainingAttachmentView({ training, limit }: { training: Training
             </span>
           </p>
           <ul className="space-y-1.5">
-            {workout.exercises.slice(0, limit).map((row, index) => {
+            {workout.exercises.map((row, index) => {
               const exercise = byKey.get(row.key);
               if (!exercise) return null;
               const record = workout.records?.find((item) => item.key === row.key);
@@ -140,13 +252,10 @@ export function TrainingAttachmentView({ training, limit }: { training: Training
               );
             })}
           </ul>
-          {limit !== undefined && workout.exercises.length > limit && (
-            <p className="text-xs text-ink-faint">and {workout.exercises.length - limit} more</p>
-          )}
         </>
       )}
 
-      {plan && (
+      {plan && !compact && (
         <>
           {plan.description && <p className="whitespace-pre-wrap text-xs text-ink-muted">{plan.description}</p>}
           {plan.includedWorkouts < plan.totalWorkouts && (
@@ -154,7 +263,7 @@ export function TrainingAttachmentView({ training, limit }: { training: Training
               {plan.includedWorkouts} of {plan.totalWorkouts} workouts. This is part of a larger plan.
             </p>
           )}
-          {plan.workouts.slice(0, limit).map((day, index) => (
+          {plan.workouts.map((day, index) => (
             <section key={index} aria-label={day.name}>
               <h4 className="mb-1.5 text-xs font-bold">{day.name}</h4>
               <ul className="space-y-1.5">
@@ -167,9 +276,6 @@ export function TrainingAttachmentView({ training, limit }: { training: Training
               </ul>
             </section>
           ))}
-          {limit !== undefined && plan.workouts.length > limit && (
-            <p className="text-xs text-ink-faint">and {plan.workouts.length - limit} more workout{plan.workouts.length - limit === 1 ? '' : 's'}</p>
-          )}
         </>
       )}
 
@@ -190,7 +296,7 @@ export function TrainingAttachmentView({ training, limit }: { training: Training
               detail={[...single.primaryMuscles, ...(single.secondaryMuscles ?? [])].map((muscle) => muscle.replace(/_/g, ' ')).join(', ')}
             />
           </ul>
-          {!!single.instructions?.length && (
+          {!compact && !!single.instructions?.length && (
             <ol className="list-decimal space-y-1 pl-5 text-sm text-ink-muted">
               {single.instructions.map((step, index) => (
                 <li key={index}>{step}</li>
