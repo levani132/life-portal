@@ -21,6 +21,7 @@ import {
 import { trainingWrites, useCurrentSession } from '../../lib/training-offline';
 import { PlanEditor } from './plan-editor';
 import { lastDoneLabel } from './plan-suggestions';
+import { ShareTrainingLink } from './share-training';
 
 type View = { kind: 'list' } | { kind: 'plan'; id: string } | { kind: 'edit'; id?: string };
 
@@ -260,6 +261,7 @@ function PlanView({
                   <p className="mt-0.5 text-xs text-white/80">
                     {data.workouts.length} {data.workouts.length === 1 ? 'workout' : 'workouts'}
                     {data.copiedFrom ? ` · based on ${data.copiedFrom.name}` : ''}
+                    {data.sharedBy ? ` · ${data.sharedBy.label}` : ''}
                   </p>
                 </div>
               </div>
@@ -275,6 +277,12 @@ function PlanView({
                 </button>
                 {data.isOwn && (
                   <>
+                    {data.workouts.length > 0 && (
+                      <ShareTrainingLink
+                        selection={{ kind: 'plan', planId: id }}
+                        className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-white/20 px-3 text-sm font-medium hover:bg-white/30"
+                      />
+                    )}
                     <button
                       type="button"
                       className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-white/20 px-3 text-sm font-medium hover:bg-white/30 disabled:opacity-60"
@@ -342,8 +350,17 @@ function PlanView({
                     </div>
                     <p className="text-xs text-ink-faint">
                       {workout.exercises.length} exercises · {lastDoneLabel(workout.lastDoneDay, workoutDay())}
+                      {workout.sharedBy ? ` · ${workout.sharedBy.label}` : ''}
                     </p>
                   </div>
+                  {data.isOwn && workout.exercises.length > 0 && (
+                    <ShareTrainingLink
+                      selection={{ kind: 'plan', planId: id, workoutIds: [workout.id] }}
+                      label={`Share ${workout.name}`}
+                      iconOnly
+                      className="flex h-10 w-9 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-surface hover:text-ink"
+                    />
+                  )}
                   <button
                     type="button"
                     className="btn-primary shrink-0"

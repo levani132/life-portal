@@ -27,10 +27,10 @@ Order follows the plan's phases. `[P]` can run in parallel with its neighbours.
 
 ## Phase 5: Web
 
-- [ ] T012 `newPostHref` + composer: `PickedTrainingCard`, switches, publish
-- [ ] T013 `TrainingAttachmentView` in `PostCard`; Copy action and `CopyTrainingSheet`
-- [ ] T014 Share entry points: recap, History workout, plan header, plan workout, own exercise
-- [ ] T015 Attribution lines on a copied plan and exercise
+- [x] T012 `newPostHref` + composer: `PickedTrainingCard`, switches, publish
+- [x] T013 `TrainingAttachmentView` in `PostCard`; Copy action and `CopyTrainingSheet`
+- [x] T014 Share entry points: recap, History workout, plan header, plan workout, own exercise
+- [x] T015 Attribution lines on a copied plan and exercise
 
 ## Phase 6: Offline, docs, verification
 

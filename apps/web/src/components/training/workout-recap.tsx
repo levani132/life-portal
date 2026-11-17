@@ -11,6 +11,7 @@ import { RECORD_LABELS, formatDuration, formatRecordValue, formatWeight, useTrai
 import { hasUnsyncedWrites, useTrainingSync, useTrainingWrites } from '../../lib/training-offline';
 import { PlanDayUpdate } from './plan-day-update';
 import { SaveWorkoutToPlan } from './save-to-plan';
+import { ShareTrainingLink } from './share-training';
 import { RankEmblem } from './rank-emblem';
 
 export const recapKey = (sessionId: string) => `/training/sessions/${sessionId}/recap`;
@@ -143,6 +144,10 @@ export function WorkoutRecapView({
         {/* Not started from a plan: it can become a plan workout instead. */}
         {celebrate && !session.plan && !pending && <SaveWorkoutToPlan sessionId={session.id} />}
 
+        {/* Spec 036: a finished workout that has reached the server can be posted. */}
+        {session.status === 'finished' && !pending && (
+          <ShareTrainingLink selection={{ kind: 'workout', sessionId: session.id }} label="Share this workout" className="btn-ghost w-full justify-center" />
+        )}
         <button type="button" className="btn-primary w-full justify-center" onClick={onClose}>
           Done
         </button>

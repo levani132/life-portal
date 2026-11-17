@@ -24,6 +24,9 @@ import {
   type NutritionProfile,
   type PostPreview,
   type PostSelection,
+  type PlanDetail,
+  type TrainingPostPreview,
+  type TrainingPostSelection,
 } from '@life-portal/shared-types';
 import { clampAspect, postHasContent, publicationMacros } from '@life-portal/shared-domain';
 import { api, NetworkError } from '../lib/api';
@@ -44,6 +47,7 @@ import {
   type NewFoodDraft,
 } from './new-food-card';
 import { MacroRings } from './macro-rings';
+import { TrainingAttachmentView } from './training/training-post';
 import { PublishedFoodMacros, PublishedNutritionSummary } from './published-nutrition';
 import { ErrorNote, Spinner } from './ui';
 import { requestNotificationOffer } from './notifications';
@@ -87,14 +91,21 @@ export function PostComposer({
   onClose,
   onDone,
   initialSource,
+  initialTraining,
   defaultAudience,
 }: {
   onClose: () => void;
   /** Where to go once something was saved or posted. */
   onDone?: (path: string) => void;
   initialSource?: PostSelection;
+  /** Spec 036: something from Training to share. A post carries food or training, not both yet. */
+  initialTraining?: TrainingPostSelection;
   defaultAudience?: Audience;
 }) {
+  const [training, setTraining] = useState<TrainingPostSelection | null>(initialTraining ?? null);
+  const [trainingPreview, setTrainingPreview] = useState<TrainingPostPreview | null>(null);
+  const [trainingError, setTrainingError] = useState<string | null>(null);
+  const [allowCopy, setAllowCopy] = useState(true);
   const [food, setFood] = useState<PickedFood | null>(
     initialSource ? { source: initialSource, label: '' } : null,
   );
@@ -111,7 +122,7 @@ export function PostComposer({
   const audienceTouched = useRef(!!defaultAudience);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [picking, setPicking] = useState(false);
-  const [camera, setCamera] = useState<CameraState>(initialSource ? 'hidden' : 'half');
+  const [camera, setCamera] = useState<CameraState>(initialSource || initialTraining ? 'hidden' : 'half');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [requestId] = useState(() => crypto.randomUUID());
@@ -155,6 +166,28 @@ export function PostComposer({
       active = false;
     };
   }, [source, retry]);
+
+  // Spec 036: what the Training selection would publish. Re-read whenever a switch changes.
+  const trainingKey = training ? JSON.stringify(training) : null;
+  useEffect(() => {
+    setTrainingPreview(null);
+    setTrainingError(null);
+    if (!trainingKey) return;
+    let active = true;
+    void api
+      .post<TrainingPostPreview>('/posts/preview', { training: JSON.parse(trainingKey) })
+      .then((result) => {
+        if (active) setTrainingPreview(result);
+      })
+      .catch((e: unknown) => {
+        if (!active) return;
+        if (e instanceof NetworkError) setTrainingError('No connection. Sharing from Training needs one for now.');
+        else setTrainingError(e instanceof Error ? e.message : 'Could not prepare this.');
+      });
+    return () => {
+      active = false;
+    };
+  }, [trainingKey, retry]);
 
   const attachmentsRef = useRef(attachments);
   attachmentsRef.current = attachments;
@@ -253,17 +286,22 @@ export function PostComposer({
     title: draft.title,
     caption: draft.caption,
     mediaCount: attachments.length,
-    hasFood: !!food,
+    hasFood: !!food || !!training,
   });
   const ready =
-    hasContent && uploadsSettled && (!food || !!preview) && draft.caption.length <= 1000 && !pending;
+    hasContent &&
+    uploadsSettled &&
+    (!food || !!preview) &&
+    (!training || !!trainingPreview) &&
+    draft.caption.length <= 1000 &&
+    !pending;
   const mediaIds = () => attachments.map((item) => item.id!).filter(Boolean);
 
   // Spec 032: with no connection the post is kept on this device and published later.
   const keepForLater = deviceOffline || noConnection || attachments.some((item) => item.status === 'waiting');
   const keepProblem = draftProblem(attachments.map((item) => ({ kind: item.media.kind, bytes: item.media.blob.size })));
   const canKeep =
-    hasContent && !newFood && !keepProblem && draft.caption.length <= 1000 && !pending && !uploading;
+    hasContent && !newFood && !training && !keepProblem && draft.caption.length <= 1000 && !pending && !uploading;
 
   async function keepDraft() {
     if (!canKeep) return;
@@ -293,6 +331,8 @@ export function PostComposer({
       previewHash = (await api.post<PostPreview>('/posts/preview', { source: postSource })).previewHash;
     const post = await api.post<{ id: string }>('/posts', {
       ...(postSource ? { source: postSource, previewHash } : {}),
+      // Spec 036: the selection and the hash of the preview on screen; the server builds the rest.
+      ...(training && trainingPreview ? { training, trainingHash: trainingPreview.trainingHash, allowCopy } : {}),
       ...(attachments.length ? { mediaIds: mediaIds() } : {}),
       title: draft.title.trim(),
       caption: draft.caption.trim(),
@@ -607,6 +647,19 @@ export function PostComposer({
             />
           )}
 
+          {training && (
+            <PickedTrainingCard
+              selection={training}
+              preview={trainingPreview}
+              error={trainingError}
+              allowCopy={allowCopy}
+              onAllowCopy={setAllowCopy}
+              onChange={setTraining}
+              onRemove={() => setTraining(null)}
+              onRetry={() => setRetry((value) => value + 1)}
+            />
+          )}
+
           {food && (
             <PickedFoodCard
               food={food}
@@ -628,6 +681,7 @@ export function PostComposer({
             pressed={!!newFood}
             onClick={() => {
               setFood(null);
+              setTraining(null);
               setNewFood((current) => current ?? EMPTY_FOOD);
             }}
           >
@@ -740,6 +794,7 @@ export function PostComposer({
         <PostFoodPicker
           onPick={(picked) => {
             setNewFood(null);
+            setTraining(null);
             setFood(picked);
             setRetry(0);
           }}
@@ -751,6 +806,126 @@ export function PostComposer({
 }
 
 /** A food picked from Food, joined to the post's only photo when there is exactly one. */
+/** A labelled switch row, for the choices on a Training attachment. */
+function Toggle({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <label className="flex min-h-11 cursor-pointer items-center gap-3 py-1">
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm">{label}</span>
+        {hint && <span className="block text-xs text-ink-faint">{hint}</span>}
+      </span>
+      <input type="checkbox" className="h-5 w-5 shrink-0 accent-[rgb(var(--accent-solid))]" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+    </label>
+  );
+}
+
+/**
+ * Spec 036: what is being shared from Training, as viewers will see it, with the author's
+ * choices. The preview below the switches is the server's: exactly what will be published.
+ */
+function PickedTrainingCard({
+  selection,
+  preview,
+  error,
+  allowCopy,
+  onAllowCopy,
+  onChange,
+  onRemove,
+  onRetry,
+}: {
+  selection: TrainingPostSelection;
+  preview: TrainingPostPreview | null;
+  error: string | null;
+  allowCopy: boolean;
+  onAllowCopy: (value: boolean) => void;
+  onChange: (next: TrainingPostSelection) => void;
+  onRemove: () => void;
+  onRetry: () => void;
+}) {
+  // A plan's workouts, to choose which ones to share. The author's own plan, read as they see it.
+  const plan = useApi<PlanDetail>(selection.kind === 'plan' ? `/training/plans/${selection.planId}` : null);
+  const chosen = selection.kind === 'plan' ? new Set(selection.workoutIds ?? plan.data?.workouts.map((workout) => workout.id) ?? []) : undefined;
+  return (
+    <div className="relative mx-4 mb-4 mt-3 overflow-hidden rounded-2xl border border-border bg-surface-raised p-3">
+      <button
+        type="button"
+        aria-label="Remove from the post"
+        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full text-ink-muted hover:bg-ink/5"
+        onClick={onRemove}
+      >
+        <X size={16} />
+      </button>
+      {error ? (
+        <div className="pr-8 text-sm text-ink-muted">
+          <p>{error}</p>
+          <button type="button" className="mt-2 text-accent" onClick={onRetry}>
+            Try again
+          </button>
+        </div>
+      ) : !preview ? (
+        <p className="pr-8 text-sm text-ink-muted">Preparing the preview…</p>
+      ) : (
+        <div className="pr-6">
+          <TrainingAttachmentView training={preview.training} />
+        </div>
+      )}
+      <div className="mt-3 divide-y divide-border border-t border-border pt-1">
+        {selection.kind === 'workout' && (
+          <>
+            <Toggle
+              label="Include weights and reps"
+              hint="Off: others see the exercises and how many sets."
+              checked={!!selection.includeSets}
+              onChange={(includeSets) => onChange({ ...selection, includeSets })}
+            />
+            <Toggle
+              label="Show records"
+              hint="Shows each record this workout set, with its value."
+              checked={!!selection.showRecords}
+              onChange={(showRecords) => onChange({ ...selection, showRecords })}
+            />
+          </>
+        )}
+        {selection.kind === 'plan' && plan.data && plan.data.workouts.length > 1 && (
+          <fieldset className="py-2">
+            <legend className="text-sm">Workouts to share</legend>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {plan.data.workouts.map((workout) => {
+                const on = chosen?.has(workout.id) ?? true;
+                return (
+                  <button
+                    key={workout.id}
+                    type="button"
+                    aria-pressed={on}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium ${on ? 'border-transparent bg-accent-solid text-on-accent' : 'border-border text-ink-muted'}`}
+                    onClick={() => {
+                      const next = new Set(chosen);
+                      if (on) next.delete(workout.id);
+                      else next.add(workout.id);
+                      // At least one stays; all of them means "the whole plan".
+                      if (!next.size) return;
+                      const ids = plan.data!.workouts.map((item) => item.id).filter((id) => next.has(id));
+                      onChange({ kind: 'plan', planId: selection.planId, ...(ids.length === plan.data!.workouts.length ? {} : { workoutIds: ids }) });
+                    }}
+                  >
+                    {workout.name}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+        )}
+        <Toggle
+          label="Allow copying"
+          hint={selection.kind === 'exercise' ? 'Others can add it to their own exercises.' : 'Others can copy it into their own plans.'}
+          checked={allowCopy}
+          onChange={onAllowCopy}
+        />
+      </div>
+    </div>
+  );
+}
+
 function PickedFoodCard({
   food,
   preview,

@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AppShell } from '../../components/app-shell';
 import { PostComposer } from '../../components/post-composer';
-import { parseNewPostSource } from '../../lib/new-post';
+import { parseNewPostSource, parseNewPostTraining } from '../../lib/new-post';
 
 /**
  * The new post page. It sits outside the swiping tabs: the shell hides its header and tab bar
@@ -13,14 +13,16 @@ function NewPost() {
   const router = useRouter();
   const params = useSearchParams();
   const source = parseNewPostSource(params.get('source'));
+  const training = parseNewPostTraining(params.get('training'));
   const close = () => {
     if (window.history.length > 1) router.back();
     else router.replace('/');
   };
   return (
     <PostComposer
-      key={params.get('source') ?? 'empty'}
+      key={params.get('source') ?? params.get('training') ?? 'empty'}
       initialSource={source}
+      initialTraining={training}
       onClose={close}
       onDone={(path) => router.replace(path)}
     />

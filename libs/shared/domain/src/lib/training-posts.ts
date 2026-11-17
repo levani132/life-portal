@@ -179,7 +179,7 @@ export function publishedPlanWorkouts(publication: TrainingPublication, exercise
 }
 
 /** A single workout (a workout post, or a plan post holding one) goes into a plan the copier picks. */
-export function copyNeedsPlanChoice(publication: TrainingPublication): boolean {
+export function copyNeedsPlanChoice(publication: Pick<TrainingPublication, 'workout' | 'plan'>): boolean {
   return !!publication.workout || publication.plan?.workouts.length === 1;
 }
 

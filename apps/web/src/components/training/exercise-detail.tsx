@@ -10,6 +10,7 @@ import { useApi } from '../../lib/hooks';
 import { MEASURE_LABELS, humanise, revalidateTraining } from '../../lib/training';
 import { ExerciseForm } from './exercise-form';
 import { ExerciseHistory } from './exercise-history';
+import { ShareTrainingLink } from './share-training';
 
 export type ExerciseDetailTab = 'about' | 'progress' | 'rank' | 'history';
 
@@ -139,9 +140,11 @@ export function ExerciseDetail({
                   </a>
                 </p>
               )}
+              {exercise.sharedBy && <p className="text-[11px] text-ink-faint">{exercise.sharedBy.label}</p>}
               {actionError && <ErrorNote message={actionError} />}
               {exercise.isOwn && !exercise.archived && (
                 <div className="flex flex-wrap gap-2 pt-1">
+                  <ShareTrainingLink selection={{ kind: 'exercise', exerciseId: exercise.id }} className="btn-ghost" />
                   <button type="button" className="btn-ghost" disabled={busy} onClick={() => setEditing(true)}>
                     <Pencil className="h-4 w-4" /> Edit
                   </button>

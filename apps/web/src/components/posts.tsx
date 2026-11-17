@@ -38,6 +38,7 @@ import { PostEngagement } from './post-engagement';
 import { PostMediaCarousel } from './post-media';
 import { METRICS_KEY } from './for-you-preferences';
 import { MacroRings } from './macro-rings';
+import { CopyTrainingButton, TrainingAttachmentView } from './training/training-post';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { SOCIAL_REFRESH } from '../lib/social-hooks';
 import {
@@ -566,6 +567,21 @@ export function PostCard({
         </div>
       </div>
       )}
+      {post.training && (
+        // Spec 036: the Training attachment, exactly as published. A feed card shows the start of it.
+        <div className="mt-4 rounded-xl border border-border/60 bg-surface p-3 sm:p-4">
+          <TrainingAttachmentView training={post.training} limit={detail ? undefined : 4} />
+          {!detail && (
+            <Link href={`/posts/${post.id}`} className="mt-3 inline-block text-sm text-accent">
+              Open post →
+            </Link>
+          )}
+          {post.canCopy && <CopyTrainingButton postId={post.id} training={post.training} />}
+          {post.isOwner && post.allowCopy === false && (
+            <p className="mt-3 text-xs text-ink-faint">Copying is off: others can look, not copy.</p>
+          )}
+        </div>
+      )}
       <PostEngagement
         post={post}
         onSaveFoods={hasFood && !post.isOwner ? () => setImporting(true) : undefined}
@@ -590,6 +606,7 @@ function EditPost({ post, onClose }: { post: FoodPost; onClose: () => void }) {
   const [title, setTitle] = useState(post.title);
   const [caption, setCaption] = useState(post.caption);
   const [audience, setAudience] = useState<Audience>(post.audience);
+  const [allowCopy, setAllowCopy] = useState(post.allowCopy !== false);
   const action = useAction();
   return (
     <Modal
@@ -607,6 +624,7 @@ function EditPost({ post, onClose }: { post: FoodPost; onClose: () => void }) {
               title,
               caption,
               audience,
+              ...(post.training ? { allowCopy } : {}),
             });
             await revalidate('/posts');
             onClose();
@@ -639,8 +657,22 @@ function EditPost({ post, onClose }: { post: FoodPost; onClose: () => void }) {
           <option value="public">Everyone in Life Portal</option>
         </Select>
       </Field>
+      {post.training && (
+        <label className="flex min-h-11 cursor-pointer items-center gap-3">
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm">Allow copying</span>
+            <span className="block text-xs text-ink-faint">Off: others can look, not copy. Copies already made stay.</span>
+          </span>
+          <input
+            type="checkbox"
+            className="h-5 w-5 shrink-0 accent-[rgb(var(--accent-solid))]"
+            checked={allowCopy}
+            onChange={(event) => setAllowCopy(event.target.checked)}
+          />
+        </label>
+      )}
       <p className="text-xs text-ink-muted">
-        Food facts stay as posted. Previously imported copies won’t change.
+        {post.training ? 'What was shared stays as posted.' : 'Food facts stay as posted.'} Previously imported copies won’t change.
       </p>
     </Modal>
   );
