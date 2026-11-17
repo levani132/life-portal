@@ -114,3 +114,25 @@ describe('post drafts (spec 032)', () => {
     expect(mealWritesBefore(undefined, items)).toEqual([]);
   });
 });
+
+describe('post drafts with a Training attachment (spec 036)', () => {
+  const training = { kind: 'workout' as const, sessionId: 'a'.repeat(24), includeSets: true };
+
+  it('publishes it as previewed: the selection, the hash the author saw and their copy choice', async () => {
+    const d = deps({ previewTraining: async () => 'seen' });
+    await publishDraft(draft({ photos: [], training, trainingHash: 'seen', allowCopy: false }), async () => undefined, d.value);
+    expect(d.created).toEqual([
+      { training, trainingHash: 'seen', allowCopy: false, title: 'Lunch', caption: 'Good', audience: 'friends', requestId: 'req-1' },
+    ]);
+  });
+
+  it('holds the draft, unpublished, when what would be shared is no longer what was previewed', async () => {
+    const d = deps({ previewTraining: async () => 'different-now' });
+    const attempt = publishDraft(draft({ photos: [], training, trainingHash: 'seen' }), async () => undefined, d.value);
+    await expect(attempt).rejects.toMatchObject({ status: 409, code: 'TRAINING_CHANGED' });
+    // A refusal, not "offline": it is never retried into a post the author did not see.
+    await expect(attempt).rejects.toBeInstanceOf(ApiError);
+    await expect(attempt).rejects.not.toBeInstanceOf(NetworkError);
+    expect(d.created).toEqual([]);
+  });
+});

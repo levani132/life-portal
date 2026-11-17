@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useSyncExternalStore } from 'react';
-import type { Audience, PostSelection } from '@life-portal/shared-types';
+import type { Audience, PostSelection, TrainingPostSelection } from '@life-portal/shared-types';
 import { revalidate } from './hooks';
 import type { PreparedMedia } from './media';
 import {
@@ -26,6 +26,10 @@ export interface DraftInput {
   caption: string;
   audience: Audience;
   source?: PostSelection;
+  /** Spec 036: a Training selection, the hash of the preview the author saw, and their copy choice. */
+  training?: TrainingPostSelection;
+  trainingHash?: string;
+  allowCopy?: boolean;
   /** `mediaId` for a photo already uploaded before the connection went. */
   photos: (PreparedMedia & { mediaId?: string })[];
 }
@@ -42,6 +46,9 @@ export async function keepPostDraft(input: DraftInput): Promise<void> {
     caption: input.caption,
     audience: input.audience,
     ...(input.source ? { source: input.source } : {}),
+    ...(input.training && input.trainingHash
+      ? { training: input.training, trainingHash: input.trainingHash, allowCopy: input.allowCopy !== false }
+      : {}),
     photos: input.photos.map(({ blob, width, height, mediaId }) => ({ blob, width, height, ...(mediaId ? { mediaId } : {}) })),
   };
   const meta: PostDraftMeta = {
@@ -51,9 +58,10 @@ export async function keepPostDraft(input: DraftInput): Promise<void> {
     audience: input.audience,
     photoCount: input.photos.length,
     hasFood: !!input.source,
+    ...(input.training ? { hasTraining: true } : {}),
   };
   const dependsOn = mealWritesBefore(input.source, outboxItems());
-  const text = meta.title || meta.caption || (meta.photoCount ? 'photo' : 'food');
+  const text = meta.title || meta.caption || (meta.photoCount ? 'photo' : input.training ? 'training' : 'food');
   await enqueueWrite({
     id: crypto.randomUUID(),
     kind: POST_DRAFT_KIND,

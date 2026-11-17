@@ -1,7 +1,7 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import type { PostPreview } from '@life-portal/shared-types';
+import type { PostPreview, TrainingPostPreview } from '@life-portal/shared-types';
 import { request } from '../api';
 import { uploadMedia } from '../media';
 import { publishDraft, type PostDraftBody } from './post-drafts';
@@ -36,6 +36,8 @@ export function sendPostDraft(item: OutboxItem, save: (body: unknown) => Promise
       ),
     preview: async (source) =>
       (await request<PostPreview>('/posts/preview', { method: 'POST', body: { source } })).previewHash,
+    previewTraining: async (training) =>
+      (await request<TrainingPostPreview>('/posts/preview', { method: 'POST', body: { training } })).trainingHash,
     // No Idempotency-Key: the draft's `requestId` already makes a repeat return the same post.
     create: (body) => request<{ id: string }>('/posts', { method: 'POST', body }),
     onProgress: (fraction) => set({ id: item.id, fraction }),

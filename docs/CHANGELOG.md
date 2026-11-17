@@ -2,6 +2,22 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-17: Share your training, and copy someone else's (behind a switch)
+
+Off until it is turned on for your account ("Training posts and copying").
+
+- **Share a finished workout** from its summary: its exercises, how many sets and how long it
+  took. Your weights and reps stay private unless you switch on "Include weights and reps", and
+  records unless you switch on "Show records". Your body weight is never shown.
+- **Share a plan, or part of one.** Pick which workouts to include; a partial plan says "2 of 5
+  workouts" and nothing about the rest. One workout of a plan can be shared on its own.
+- **Share an exercise you created**, with its photo and instructions.
+- **You see exactly what others will see** before posting, and choose who sees it.
+- **"Allow copying"** on each post, which you can turn off later. Copies already made stay.
+- **Copy from a post.** A plan becomes one of your plans; a single workout goes into a plan you
+  pick or a new one; an exercise joins your own. Each says who it came from. Nothing is started
+  or logged, and a workout is copied without the other person's weights.
+
 ## 2026-11-17: Home no longer goes blank on a bad connection
 
 - **A failed refresh keeps your Home cards** and shows "Showing what was last loaded" with

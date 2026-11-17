@@ -164,7 +164,7 @@ The author can change a training post's audience, caption and copy permission, o
 **Access and rollout**
 
 - **FR-027**: Training sharing MUST be behind its own feature switch, off for production until reviewed, and MUST additionally require Social, Training and posts to be on for the member.
-- **FR-028**: Sharing MUST work without a connection: a training post written offline is kept on the device as a draft, with the preview the author saw, and published when the connection returns, under the same rules as other offline post drafts (never dropped silently, never published twice, never sent under another account). If what would be published has changed by then (FR-009), the draft is held for the author to review, not published. Copying, and changing or deleting a published post, require a connection.
+- **FR-028**: A training post whose preview the author has seen MUST survive a lost connection: it is kept on the device as a draft and published when the connection returns, under the same rules as other offline post drafts (never dropped silently, never published twice, never sent under another account). If what would be published has changed by then (FR-009), the draft is held for the author to review, not published. The preview itself is made by the service, so starting to share with no connection at all is not possible in this version (see Assumptions). Copying, and changing or deleting a published post, require a connection.
 - **FR-029**: Viewing a training post MUST need only Social and posts for the viewer; Training is needed to share and to copy. A viewer without Training sees the post and no Copy action.
 - **FR-030**: Nothing in a training attachment may assume it is the post's only attachment: what it stores and what it shows MUST stand on its own, so a later feature can let one post carry a training plan and meals together.
 
@@ -203,6 +203,9 @@ Confirmed by the owner on 2026-11-17:
 
 Defaults chosen here:
 
+- **No preview without a connection.** The owner asked for offline sharing. The preview is the service's snapshot, so a post can be kept as an offline draft only after its preview has loaded; with no connection from the start, sharing waits. Building the preview on the device is a later step.
+- **A copied workout whose reps were hidden gets placeholder reps** (10 reps, 60 seconds or 1 km), because a planned set must say how many; the copier edits them.
+- **Viewing still needs Food turned on**, like every post today; that gate was not changed here.
 - **A partial plan says it is partial** ("2 of 5 workouts") but reveals nothing about the rest, so a viewer does not mistake a sample for the whole plan.
 - **A shown record is the record's own value** (for example "100 kg × 5"), which is a weight: switching "Show records" on is the author's explicit choice to show that one figure, even with "Include weights and reps" off.
 - **A whole plan (two or more workouts) always copies as a new plan**; only a single workout offers "add to an existing plan".

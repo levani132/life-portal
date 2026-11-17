@@ -181,7 +181,7 @@ export function PostComposer({
       })
       .catch((e: unknown) => {
         if (!active) return;
-        if (e instanceof NetworkError) setTrainingError('No connection. Sharing from Training needs one for now.');
+        if (e instanceof NetworkError) setTrainingError('No connection. The preview of what you share is made by the server, so this needs one.');
         else setTrainingError(e instanceof Error ? e.message : 'Could not prepare this.');
       });
     return () => {
@@ -301,7 +301,7 @@ export function PostComposer({
   const keepForLater = deviceOffline || noConnection || attachments.some((item) => item.status === 'waiting');
   const keepProblem = draftProblem(attachments.map((item) => ({ kind: item.media.kind, bytes: item.media.blob.size })));
   const canKeep =
-    hasContent && !newFood && !training && !keepProblem && draft.caption.length <= 1000 && !pending && !uploading;
+    hasContent && !newFood && (!training || !!trainingPreview) && !keepProblem && draft.caption.length <= 1000 && !pending && !uploading;
 
   async function keepDraft() {
     if (!canKeep) return;
@@ -314,6 +314,8 @@ export function PostComposer({
         caption: draft.caption,
         audience,
         ...(food ? { source: food.source } : {}),
+        // Spec 036: only what the author previewed; it is checked again before it is published.
+        ...(training && trainingPreview ? { training, trainingHash: trainingPreview.trainingHash, allowCopy } : {}),
         // Photos already uploaded keep their ids, so a post that did reach the server is not doubled.
         photos: attachments.map((item) => ({ ...item.media, ...(item.status === 'done' && item.id ? { mediaId: item.id } : {}) })),
       });

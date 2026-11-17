@@ -445,6 +445,7 @@ All under `/api/training`. Full contract: `specs/020-training-logging/contracts/
 | `POST` | `/sessions/:id/plan-update` `{requestId, revision}` | Issue #15: applies to that day only → `{planId, planWorkoutId, copied}`. 409 `PLAN_CHANGED` (day moved on) or `NOTHING_TO_APPLY`; once applied, returns the first result. |
 | `PUT` | `/sessions/:id/rest-alarm` `{at: ISO \| null}` | Spec 025: 204. Sets, moves or cancels the person's rest-over push (in memory). |
 | `GET` | `/exercises/:id/rank?today=` | Issue #5b, needs `trainingRanks` (403 otherwise): `ExerciseRankView`, current and highest-ever strength rank. See Strength ranks. |
+| `POST` | `/posts/preview`, `/posts`, `/posts/:id/training-copy` (posts module) | Spec 036: sharing and copying, behind `trainingPosts`. See Sharing and copying. |
 | `GET` | `/ranks?today=` | Issue #5b, needs `trainingRanks` (403 otherwise): `ExerciseRankBadge[]` (`{exerciseId, status, tier, division}`), one per exercise the caller holds (`ranked`, current) or has held (`inactive`, highest ever) a rank on. For marking rows in the exercise list. Empty until standards are chosen. |
 | `GET` | `/summary?today=` | The Home card's figures (`TrainingSummary`, with `weightUnit`, read without creating a profile); also in `GET /api/dashboard`. |
 | `GET` | `/sessions/:id/recap` | Issue #25: `WorkoutRecap`, recomputed on every read as of that workout. See Finishing a workout. |
@@ -950,6 +951,61 @@ So the workout list sets `overflow-anchor: none` and anchors itself with `useScr
   shortfall (`shortfall`).
 
 The maths (`pickAnchor`, `correction`, `floorHeight`, `shortfall`) is pure and unit-tested.
+
+## Sharing and copying (spec 036)
+
+Behind `trainingPosts` (off for production), with `training`. Posts stores a Training attachment;
+this module is the only place it is built from, and copied back into, training data
+(`training-publication.service.ts`). See `docs/modules/posts.md` for the post side.
+
+**The snapshot rule, a fourth instance.** `TrainingPublicationService.snapshot(userId, selection)`
+reads the caller's own finished workout, own plan or own exercise and returns a
+`TrainingPublication`. It is never accepted from a request and never refreshed: editing or
+deleting the original changes no post. A ready-made plan, a catalogue exercise, an open workout,
+and anyone else's rows are refused.
+
+**What a snapshot may hold.**
+
+| Part | Always | Only when asked | Never |
+|---|---|---|---|
+| Workout | name, day, duration, each exercise's name and muscles, how many sets and whether each was a warm-up, rest, superset | weights and reps (`includeSets`); records and their values (`showRecords`) | body weight, a bodyweight set's effective load, a record that depends on a weigh-in, rank, level, XP |
+| Plan | name, description, the chosen workouts in plan order with their targets (the author's plan weights included: they wrote them), "N of M workouts" | | the workouts left out, even their names |
+| Exercise | name, muscles, equipment, measure, instructions, photo | | history, records, ranks |
+
+An exercise from the shared catalogue is referenced by id (`exerciseId`); one that was the author's
+own carries its details (`own`, `sourceId`), so the post is readable and copyable without access
+to their private exercises. Names in a workout are the workout's own frozen snapshot.
+
+**Photos.** At publish, each own exercise's photo is copied to `posts/<author>/training/…`
+(`withOwnPhotos`, all or nothing), so a later change to the exercise does not change the post;
+the hash is computed before the copy, from the author's own key. Reads sign the post's copy.
+Deleting the post deletes the copies.
+
+**Copying** (`copy()`), for a viewer the post service has already checked:
+
+- A whole plan (two or more workouts) becomes a new own plan: `PlansService.importFromPost`,
+  marked `postImportKey = <post id>` and `sharedBy`.
+- A single workout (a workout post, or a plan post holding one) goes into an own plan the copier
+  names (`planId`) or a new one (`planName`), exactly one: `importDayFromPost` adds a day whose id
+  is the post's id, which is what makes a repeat find it and `addDay` refuse to add it twice.
+- An exercise post becomes an own exercise.
+- Each of the author's own exercises is created once per copier and source
+  (`exercises.postImportKey = <author id>:<their exercise id>`), with its own photo copy, and
+  reused by later copies from the same author.
+- A copied **workout** takes its number and type of sets, never a weight. If the author shared
+  their sets, the reps, time or distance are theirs; if not, a placeholder (`COPY_PLACEHOLDER`: 10
+  reps, 60 s, 1 km), because a planned set must say how many. The copier edits it.
+- `copyOfPost` / `importedFrom` find an existing copy, which is returned (`reused: true`) instead
+  of making a second. Deleting the copy frees the post to be copied again.
+- All or nothing: if the plan cannot be made, the exercises created for it are removed.
+- It never starts a workout or logs a set.
+
+`sharedBy {label, postId?, authorId?}` is on a copied plan, plan workout and exercise, and shown
+there. `label` is the author's name as it was, so it survives the post's deletion.
+
+Pure parts are in `libs/shared/domain/src/lib/training-posts.ts`: `validTrainingSelection`,
+`canonicalTrainingPublication` (the hashed form), `copiedTargets`, `publishedPlanWorkouts`,
+`copyNeedsPlanChoice`, `canCopyTrainingPost`.
 
 ## Deletion
 

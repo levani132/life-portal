@@ -2462,3 +2462,42 @@ selected tab's box (measured, written straight to its style, no state). The pill
 positioned from the cell count, so New post in the middle is a cell it passes over and never
 rests on. Hiding the bar on scroll moves it 140% of its height, enough to clear the inset.
 
+## 2026-11-17 · Training sharing: a fourth snapshot, and copies that say where they came from (spec 036)
+
+**A post's Training attachment is a snapshot built by Training, stored by Posts.** The same split
+as food: `TrainingPublicationService` reads the author's rows and builds the publication; posts
+stores it beside the food publication and never reads a training collection. It is hashed for the
+preview-then-publish check, never accepted from a request and never refreshed. This is the fourth
+deliberate copy in the codebase (after `meal_entries.facts`, the workout snapshots and food
+publications), for the same reason: correcting the original must not rewrite what was published.
+
+**Privacy defaults are the owner's.** Weights and reps are off unless "Include weights and reps"
+is on; records are off unless "Show records" is on; body weight, ranks, level and XP are never
+in a snapshot. A record that depends on a weigh-in is left out even with records on, because its
+value is the body weight. Copying is on by default and is the author's switch, before and after
+publishing. A partial plan says "N of M workouts" and nothing about the rest. Selling is out of
+scope; partial sharing and the copy switch are the parts built now for it.
+
+**One attachment per post for now, but nothing depends on it.** The owner wants a later feature
+where one post carries a whole plan that works for someone, workouts and meals. So the training
+fields sit beside the food ones and are read independently; only `POST /posts` refuses both.
+
+**A copy records its source on itself.** No import ledger: a copied plan has `postImportKey` and
+`sharedBy`, a copied workout is a plan day whose id is the post's id, a copied exercise has
+`postImportKey = <author>:<their exercise id>`. That is how a repeat returns the same copy, and
+why deleting the copy frees the post to be copied again. The indexes are not unique: a deleted
+(archived) exercise keeps its key.
+
+**A copied workout whose reps were hidden gets placeholder reps.** A planned set must say how
+many reps (or how long, or how far). Using the author's hidden reps would leak them through the
+copy, so the copy gets 10 reps (60 s, 1 km) for the copier to edit. If the author shared their
+sets, the copy uses their reps, never their weights.
+
+**No preview without a connection.** The spec asked for sharing to work offline. The preview is
+the server's snapshot, and showing a client-built one would mean a second implementation of the
+privacy rules. So an offline draft exists only once the preview has loaded, and is re-checked by
+hash when sent. Building the preview on the device is a possible later step, not done here.
+
+**Viewing still needs Food.** Every post route requires `nutrition`. The spec says viewing needs
+only Social and posts; the existing gate was left alone, because changing it changes all posts.
+

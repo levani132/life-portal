@@ -34,6 +34,6 @@ Order follows the plan's phases. `[P]` can run in parallel with its neighbours.
 
 ## Phase 6: Offline, docs, verification
 
-- [ ] T016 Offline draft carries the training selection and previewed hash; held when it differs
-- [ ] T017 Docs: `docs/modules/posts.md`, `training.md`, `offline.md`, `DECISIONS.md`, `CHANGELOG.md`, `ROADMAP.md`; CLAUDE.md trap note for the new snapshot
+- [x] T016 Offline draft carries the training selection and previewed hash; held when it differs
+- [x] T017 Docs: `docs/modules/posts.md`, `training.md`, `offline.md`, `DECISIONS.md`, `CHANGELOG.md`, `ROADMAP.md`; CLAUDE.md trap note for the new snapshot
 - [ ] T018 Integration test: publish, read as friend and stranger, copy, repeat copy, copy off

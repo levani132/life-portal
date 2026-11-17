@@ -1,4 +1,4 @@
-import type { Audience, PostSelection } from '@life-portal/shared-types';
+import type { Audience, PostSelection, TrainingPostSelection } from '@life-portal/shared-types';
 import { ApiError } from '../api';
 
 /**
@@ -30,6 +30,13 @@ export interface PostDraftBody {
   caption: string;
   audience: Audience;
   source?: PostSelection;
+  /**
+   * Spec 036: something from Training, with the hash of the preview the author saw and their
+   * copy choice. Only the selection is stored; the snapshot is the server's, built at publish.
+   */
+  training?: TrainingPostSelection;
+  trainingHash?: string;
+  allowCopy?: boolean;
   photos: DraftPhoto[];
 }
 
@@ -41,7 +48,11 @@ export interface PostDraftMeta {
   audience: Audience;
   photoCount: number;
   hasFood: boolean;
+  hasTraining?: boolean;
 }
+
+/** A draft's Training attachment is no longer what its author previewed: held, never published as is. */
+export const TRAINING_CHANGED = 'TRAINING_CHANGED';
 
 /** Why these attachments cannot be kept for later, if they cannot. */
 export function draftProblem(media: readonly { kind: string; bytes: number }[]): string | undefined {
@@ -56,6 +67,9 @@ export function draftProblem(media: readonly { kind: string; bytes: number }[]):
 export interface CreatePostBody {
   source?: PostSelection;
   previewHash?: string;
+  training?: TrainingPostSelection;
+  trainingHash?: string;
+  allowCopy?: boolean;
   mediaIds?: string[];
   title: string;
   caption: string;
@@ -68,6 +82,8 @@ export interface PublishDeps {
   upload(photo: DraftPhoto, onProgress: (fraction: number) => void): Promise<string>;
   /** The food's preview as it is now: its hash freezes the numbers the post shows. */
   preview(source: PostSelection): Promise<string>;
+  /** Spec 036: the hash of what the Training selection would publish now. */
+  previewTraining?(training: TrainingPostSelection): Promise<string>;
   create(body: CreatePostBody): Promise<{ id: string }>;
   onProgress?(fraction: number): void;
 }
@@ -103,8 +119,19 @@ export async function publishDraft(
     }
     deps.onProgress?.(1);
     const previewHash = current.source ? await deps.preview(current.source) : undefined;
+    // Spec 036: a Training attachment is published only as the author previewed it. If the
+    // workout, plan or exercise changed since, the draft is held for them to look at again.
+    if (current.training) {
+      const now = await deps.previewTraining?.(current.training);
+      if (now !== current.trainingHash) {
+        throw new ApiError('What you shared from Training changed since you previewed it. Open it again to review and post.', 409, undefined, TRAINING_CHANGED);
+      }
+    }
     return deps.create({
       ...(current.source ? { source: current.source, previewHash } : {}),
+      ...(current.training
+        ? { training: current.training, trainingHash: current.trainingHash, allowCopy: current.allowCopy !== false }
+        : {}),
       ...(current.photos.length ? { mediaIds: current.photos.map((photo) => photo.mediaId as string) } : {}),
       title: current.title.trim(),
       caption: current.caption.trim(),

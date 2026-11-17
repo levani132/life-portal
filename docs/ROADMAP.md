@@ -86,7 +86,10 @@ search, connection actions and money widget sharing have their own tests.
    training content in For You, with relevance and quality staying primary, no suppression of
    beginners, imported ("verified") workouts weighted over self-reported ones, and resistance to
    gamed logs.
-   5 workout posts and friend leaderboards, then programs, with paid programs last.
+   **Sharing built** (spec 036, `trainingPosts` flag, off for production): workout, plan and
+   exercise posts with a copy switch and partial plans, and copying into your own plans and
+   exercises. Still to come: friend leaderboards, a post carrying a plan and meals together, then
+   programs, with paid programs last.
 6. **Video through a service.** 014 records 30-second clips in the app and stores them as-is.
    Next: transcoding through Mux or Cloudflare Stream so every clip plays everywhere, library
    videos and 60 seconds. No reels scroller until people make video on their own.

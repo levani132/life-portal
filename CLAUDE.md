@@ -210,6 +210,14 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   way. A start with an `id` while one is open is `SESSION_CONFLICT`, never a resume. Client times
   are clamped (`clientTime`). The workout on screen is the cached copy plus the outbox's writes
   (`training-overlay.ts`): keep every op idempotent, and never compute records or ranks there.
+- **A post's Training attachment is a snapshot built by Training, never by posts and never from a
+  request** (spec 036). `TrainingPublicationService` alone builds it, hashes it and copies it into
+  a viewer's plans and exercises; posts stores `training`, `trainingHash` and `allowCopy` beside
+  the food fields and reads them independently (a later post will carry both). Weights and reps
+  only with `includeSets`, records only with `showRecords`, never body weight, a weigh-in-based
+  record, rank or level. A copy never starts or logs anything and never takes a weight from a
+  workout. Don't add a field to the snapshot without the test that proves it is not private. See
+  `docs/modules/training.md` ("Sharing and copying").
 - **Food logged offline still never sends facts** (spec 029). `POST /nutrition/entries` takes a
   device `id` and `meal/:id/log` takes `ids`; the server snapshots at sync. The Food day
   (`/nutrition?today=&day=`) is the one cached read with a query string (14 days, 2,000 foods).

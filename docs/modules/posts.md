@@ -257,6 +257,42 @@ Home shows the feed under the widgets. With the `forYou` flag (019) it is two ta
 
 **Link previews.** `app/posts/[id]/layout.tsx` sets the page's Open Graph and Twitter metadata, and `opengraph-image.tsx` renders a 1200×630 card with `next/og`, both from the public preview route (`lib/public-preview.ts`, cached 5 minutes, `API_INTERNAL_URL` or an absolute `NEXT_PUBLIC_API_URL`). A post that is not public gets a generic "A post on Life Portal" title and image, so a link never reveals more than the audience allows; opening it still needs sign-in and the audience check. The OG card loads Noto Sans and Noto Sans Georgian from Google Fonts, subset to the text, because the built-in font has no Georgian glyphs.
 
+## Training attachments (spec 036)
+
+A post can carry a **Training attachment**: a finished workout, an own plan (all or chosen
+workouts) or an own exercise. It sits beside the Food attachment and is independent of it:
+`food_posts.training`, `trainingHash` and `allowCopy` (absent means yes) next to `publication` and
+`previewHash`. For now a post carries one or the other (`POST /posts` answers 400 for both), but
+nothing stored or read assumes that, so a later feature can carry a plan and meals together.
+
+- **Posts stores it and never builds or reads into it.** `TrainingPublicationService`
+  (`apps/api/src/training`, see `docs/modules/training.md`) builds the snapshot from the author's
+  own rows, hashes it, signs its photos and copies it into a viewer's data. Posts calls it, as it
+  calls `NutritionPublicationService` for food.
+- **Preview then publish, by hash.** `POST /posts/preview {training}` returns
+  `{training, trainingHash}`; `POST /posts` takes `training`, `trainingHash` and `allowCopy`,
+  rebuilds the snapshot and answers 409 "Your selection changed" when the hash differs. The
+  snapshot is never accepted from the request and never refreshed. `sameRequest` compares
+  `trainingHash` and the copy choice, so a retry with a different one is a different request.
+- **Reading.** Every read path builds `FoodPost.training` (the attachment with signed photo
+  links, never a storage key), `allowCopy` (the owner only) and `canCopy` (this viewer, now) after
+  the usual `readable()` check. The attachment is left out when its author no longer has
+  `training` and `trainingPosts`. Viewing needs no Training; it does still need the post gate
+  (`social`, `nutrition`, `foodPosts`), which this feature did not change.
+- **Copying.** `GET /posts/:id/training-copy` (what it would do, and any copy already made) and
+  `POST /posts/:id/training-copy {requestId, planId? | planName?}`. Both run `copyable()`: the
+  viewer can read the post now, it is not their own, it still has a shareable attachment,
+  `allowCopy` is not false (403 `COPY_OFF`), and the viewer has `training` and `trainingPosts`.
+- **After publishing.** `PATCH /posts/:id` accepts `allowCopy`; the shared content is immutable.
+  Delete and moderation unset `training`, `trainingHash` and `allowCopy` and remove the post's own
+  photo copies.
+- **Access.** Sharing and copying need `training` and the `trainingPosts` flag (off for
+  production) on top of the post gate.
+- **Web.** `components/training/training-post.tsx`: `TrainingAttachmentView` (used by the post
+  card and by the composer's preview, so they cannot differ) and `CopyTrainingSheet`.
+  `components/training/share-training.tsx` is the Share link on a workout's summary, a plan, a
+  plan workout and an own exercise; it opens `/new?training=<selection>`.
+
 ## Verification and boundaries
 
 Domain tests cover source selection, canonicalisation, duplicates, calorie calculation and the audience matrix. API tests cover owned allowlists, historical snapshots, invalid combinations and private/import retry behavior. Isolated API/browser checks exercise the complete publication/import flow with separate accounts. Engagement tests cover idempotent likes and comments, delete rights, blocked commenters and notifying only on new rows. Reactions beyond a like, comment replies, image moderation before public launch, library video, financial posts, automatic posting, a public web page for a post (previews exist, the page itself still needs sign-in), a native Instagram Stories sticker (needs the native app) and collection updates are future work.

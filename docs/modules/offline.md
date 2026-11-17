@@ -174,6 +174,16 @@ Module-level request ids (training's `requestId`) remain; the header is the gene
   being posted (with progress), not accepted (Retry, Discard), or posted (with a link). A draft
   is the person's own content, which is the only thing S3's interim rule allows on the device.
 
+### A draft with a Training attachment (spec 036)
+
+A draft may carry `training` (the selection), `trainingHash` (the hash of the preview the author
+saw) and `allowCopy`. The snapshot is the server's, so **there is no preview without a
+connection**: a Training post can be kept as a draft only after its preview has loaded, for
+example when the connection drops between previewing and posting. When the draft is sent, the
+selection is previewed again; if its hash is not the one stored, the send fails with 409
+`TRAINING_CHANGED` (an `ApiError`, so a refusal, never "offline") and the draft is held for the
+author to open and review. It is never published as something they did not see.
+
 ## Your own posts, readable offline (spec 033, issue #20 S3)
 
 - **Owner's choice (a) on #20:** only the signed-in person's own posts are kept for reading, and
