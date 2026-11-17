@@ -15,6 +15,7 @@ import {
   useRestControls,
   useWorkoutOnScreen,
 } from '../../lib/training-workout';
+import { useDraftsVersion } from '../../lib/training-drafts';
 
 /**
  * Spec 025: a slim bar under the app header while a workout is open, on every page: how long it
@@ -47,6 +48,7 @@ export function WorkoutBar({ enabled, push = false }: { enabled: boolean; push?:
  */
 function RestAlarmSync({ session }: { session: SessionDetail }) {
   const profile = useTrainingProfile();
+  useDraftsVersion();
   const focus = sessionFocus(session, [], profile.defaultRestSeconds);
   const controls = useRestControls(session.lastSetAt);
   const total = focus.restSeconds + controls.addSeconds;
@@ -76,6 +78,7 @@ function Bar({ session }: { session: SessionDetail }) {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+  useDraftsVersion();
   const focus = sessionFocus(session, [], profile.defaultRestSeconds);
   const controls = useRestControls(session.lastSetAt);
   const left = restLeft(session.lastSetAt, focus.restSeconds, controls, now);

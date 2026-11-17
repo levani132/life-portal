@@ -164,8 +164,12 @@ the `{userId, 'plan.planId', day}` index.
   position, so a warm-up stays a warm-up. The plan's targets (`prefillFor`) are used only when
   there is no history; neither gives one empty row. Rows beyond those carry the row above down.
   The plan caption ("Plan: 3 × 12 @ 80 kg") still shows, so a plan that differs from last time is
-  visible. A planned exercise is done once it has as many sets as it started with
-  (`setGoal` in `lib/training-workout.ts`); `openTargets` and the header's "of N planned sets"
+  visible. A planned exercise is done once it has as many sets as it started with, **plus the
+  rows the person added to it in this workout, minus the ones they removed** (`setGoal` in
+  `lib/training-workout.ts`, which reads the kept draft's `extra`). Adding a fourth set to a
+  three-set exercise makes it a four-set exercise: it stays current, and its chip reads 3/4,
+  until the fourth is ticked. Whatever shows this re-reads when a draft changes
+  (`useDraftsVersion`); `openTargets` and the header's "of N planned sets"
   still count the plan's targets.
 - **Open rows are kept on the device until the workout ends (issue #32)**,
   `lib/training-drafts.ts`: per workout (`training:draft:<sessionId>` in the training cache, plus

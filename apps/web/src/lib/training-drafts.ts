@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react';
 import { offlineCache, waitForOfflineCache } from './offline/runtime';
 
 /**
@@ -17,6 +18,32 @@ export interface SetDraft<F = unknown> {
 type WorkoutDrafts = Record<string, SetDraft>;
 
 const memory = new Map<string, WorkoutDrafts>();
+
+// What depends on the rows a person added or removed (which exercise is done, the n/m chip)
+// re-reads when a draft changes.
+let version = 0;
+const listeners = new Set<() => void>();
+const changed = () => {
+  version += 1;
+  listeners.forEach((listener) => listener());
+};
+
+/** Re-renders the caller whenever any kept draft changes. */
+export function useDraftsVersion(): number {
+  return useSyncExternalStore(
+    (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    () => version,
+    () => 0,
+  );
+}
+
+/** Rows added (+) or removed (−) to an exercise in this workout, beyond what it started with. */
+export function extraRows(sessionId: string, exerciseId: string): number {
+  return memory.get(sessionId)?.[exerciseId]?.extra ?? 0;
+}
 const keyOf = (sessionId: string) => `training:draft:${sessionId}`;
 
 /** What is already in memory, for a synchronous first render. */
@@ -33,6 +60,7 @@ export async function loadDraft<F>(sessionId: string, exerciseId: string): Promi
   if (!stored) return undefined;
   // Another exercise may have saved into memory meanwhile: what is in memory is newer.
   memory.set(sessionId, { ...stored, ...memory.get(sessionId) });
+  changed();
   return draftNow<F>(sessionId, exerciseId);
 }
 
@@ -43,6 +71,7 @@ export function saveDraft<F>(sessionId: string, exerciseId: string, draft: SetDr
   if (empty(draft)) delete drafts[exerciseId];
   else drafts[exerciseId] = draft;
   memory.set(sessionId, drafts);
+  changed();
   const cache = offlineCache();
   if (!cache) return;
   void (Object.keys(drafts).length ? cache.put(keyOf(sessionId), drafts) : cache.remove(keyOf(sessionId))).catch(() => undefined);
@@ -51,10 +80,12 @@ export function saveDraft<F>(sessionId: string, exerciseId: string, draft: SetDr
 /** The workout is over (finished or deleted): nothing typed in it is needed any more. */
 export function clearDrafts(sessionId: string): void {
   memory.delete(sessionId);
+  changed();
   void offlineCache()?.remove(keyOf(sessionId)).catch(() => undefined);
 }
 
 /** Sign-out (the device copy goes with the account's store), and tests. */
 export function forgetDraftsInMemory(): void {
   memory.clear();
+  changed();
 }

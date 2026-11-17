@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-17: An added set counts
+
+- **Adding a set to an exercise now makes it part of the exercise.** If you add a fourth set to a
+  three-set exercise, it is no longer marked done after three: it stays the current exercise, and
+  shows 3/4, until you tick the fourth. Removing a set lowers the count the same way.
+
 ## 2026-11-17: Share your training, and copy someone else's (behind a switch)
 
 Off until it is turned on for your account ("Training posts and copying").

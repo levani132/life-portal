@@ -1,5 +1,6 @@
 'use client';
 
+import { extraRows } from './training-drafts';
 import { useSyncExternalStore } from 'react';
 import { restAfter, startingRowCount, supersetRuns, workoutFocus, type FocusExercise, type SupersetPlace } from '@life-portal/shared-domain';
 import type { PlanDetail, PlanInput, SessionDetail, SessionExercise } from '@life-portal/shared-types';
@@ -23,11 +24,18 @@ export interface SessionFocus {
 
 /**
  * How many sets make a planned exercise done (issue #32): as many as it started with, which is
- * last time's count when there is history, else the plan's. 0 for one added by hand (it is done
- * once the person moves on).
+ * last time's count when there is history, else the plan's, plus the rows the person added to it
+ * in this workout (or minus the ones they removed). Adding a fourth set to a three-set exercise
+ * makes it a four-set exercise: it is not done at three. 0 for one added by hand (it is done once
+ * the person moves on).
+ *
+ * The added rows are the set table's draft (`training-drafts.ts`). A caller that shows this must
+ * re-render when drafts change: `useDraftsVersion()`.
  */
 export const setGoal = (exercise: SessionExercise): number =>
-  exercise.planned ? startingRowCount(exercise.previous?.sets, exercise.planned.targets) : 0;
+  exercise.planned
+    ? Math.max(0, startingRowCount(exercise.previous?.sets, exercise.planned.targets) + extraRows(exercise.sessionId, exercise.id))
+    : 0;
 
 /** The rest an exercise asks for: chosen in this workout, else the plan's. Absent: the default. */
 export const exerciseRest = (exercise: SessionExercise): number | undefined =>

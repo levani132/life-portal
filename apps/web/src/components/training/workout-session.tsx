@@ -65,6 +65,7 @@ import { GROUP_STYLES, exerciseGroup, usePlanStyle } from '../../lib/training-co
 import { RestTimer } from './rest-timer';
 import { RestEditor } from './rest-editor';
 import { exerciseRest, sessionFocus, setGoal } from '../../lib/training-workout';
+import { useDraftsVersion } from '../../lib/training-drafts';
 import { SetForm, type SetFormValue } from './set-row';
 import { SetTable } from './set-table';
 import { PlanDayUpdate } from './plan-day-update';
@@ -249,6 +250,8 @@ export function WorkoutSession({
 
   // Spec 025: which exercise is done and which is current, and the rest after the last set (the
   // exercise's own rest, 0 mid-way through a superset round). Derived on every render.
+  // Adding or removing a set row changes how many sets make an exercise done.
+  useDraftsVersion();
   const focus = sessionFocus(session, [], profile.defaultRestSeconds);
   const upNext = focus.current && focus.current.id !== focus.lastId ? focus.current.snapshot.name : undefined;
 
