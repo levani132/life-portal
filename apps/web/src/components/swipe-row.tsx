@@ -122,7 +122,9 @@ export function SwipeRow({
 
   return (
     <div ref={row} className={clsx('relative overflow-hidden', className)} data-no-tab-swipe>
-      <div className="absolute inset-y-0 right-0 flex" aria-hidden={!open}>
+      {/* Not painted while the row is closed: the row has rounded corners, and the actions
+          behind it would show through them. */}
+      <div className={clsx('absolute inset-y-0 right-0 flex', !open && 'invisible')} aria-hidden={!open}>
         {actions.map((action, index) => {
           const Icon = action.icon;
           return (
