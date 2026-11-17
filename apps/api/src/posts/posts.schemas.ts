@@ -7,6 +7,7 @@ import {
   type FoodPublication,
   type MediaKind,
   type ReportReason,
+  type TrainingPublication,
 } from '@life-portal/shared-types';
 import { baseSchemaOptions } from '../common/mongoose';
 export interface AttachedMedia {
@@ -26,6 +27,14 @@ export class FoodPostRecord {
   /** Present exactly when the post carries food. Text and media posts have neither. */
   @Prop() previewHash?: string;
   @Prop({ type: Object }) publication?: FoodPublication;
+  /**
+   * Spec 036: the Training attachment, a snapshot built by `TrainingPublicationService` at
+   * publishing time. Independent of `publication`: nothing assumes a post has only one of them.
+   */
+  @Prop({ type: Object }) training?: TrainingPublication;
+  @Prop() trainingHash?: string;
+  /** Spec 036: whether viewers may copy the Training attachment. Absent means yes. */
+  @Prop() allowCopy?: boolean;
   /** A copy of each attached file's facts, so a read needs no join. The files never change. */
   @Prop({ type: [Object], default: undefined }) media?: AttachedMedia[];
   @Prop({ default: '', maxlength: 120 }) title!: string;

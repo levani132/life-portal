@@ -266,6 +266,17 @@ export class MediaService {
     };
   }
 
+  /**
+   * Spec 036: a second, independent copy of a stored image under `prefix`, for something that
+   * must keep it when the original changes (a post's copy of an exercise photo, and a member's
+   * copy of that). Returns the new key. The caller has already decided the reader may have it.
+   */
+  async copyStored(fromKey: string, prefix: string): Promise<string> {
+    const key = `${prefix}${new Types.ObjectId().toHexString()}.jpg`;
+    await this.storage.copy(fromKey, key);
+    return key;
+  }
+
   /** Signs one stored image the caller is already allowed to see. */
   async signKey(key: string): Promise<string | undefined> {
     return this.storage.configured ? this.storage.presignGet(key) : undefined;

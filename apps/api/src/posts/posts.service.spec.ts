@@ -190,7 +190,7 @@ describe('post read authorization and publish retries', () => {
       { _id: String(f.row._id) },
       {
         $set: { deleted: true, title: 'Removed post', caption: '' },
-        $unset: { publication: '', media: '' },
+        $unset: { publication: '', media: '', training: '', trainingHash: '', allowCopy: '' },
       },
     );
     expect(f.media.removeForPost).toHaveBeenCalledWith(String(f.row._id));
@@ -674,5 +674,144 @@ describe('For You feedback (issue #3, task A)', () => {
     });
     f.feedback.updateOne.mockRejectedValue({ code: 11000 });
     await expect(f.service.feedFeedback('viewer', id, 'post', true)).resolves.toEqual({ success: true });
+  });
+});
+
+describe('training attachments (spec 036)', () => {
+  const HASH = 'a'.repeat(64);
+  const selection = { kind: 'exercise' as const, exerciseId: 'b'.repeat(24) };
+  const snapshot = {
+    kind: 'exercise',
+    label: 'My fly',
+    exercises: [{ key: '0', name: 'My fly', primaryMuscles: ['chest'], equipmentType: 'cable', measure: 'weight_reps', own: true, sourceId: selection.exerciseId, image: { key: 'training/owner/fly.jpg', width: 8, height: 6 } }],
+    exercise: { key: '0' },
+  };
+  const dto = { training: selection, trainingHash: HASH, requestId: 'r1', title: '', caption: '', audience: 'friends' as const };
+
+  function setup(options: { trainingOn?: (userId: string) => boolean } = {}) {
+    const f = fixture();
+    const on = options.trainingOn ?? (() => true);
+    f.access.forUser.mockImplementation(async (userId: string) => ({
+      access: { social: true, nutrition: true, foodPosts: true, training: on(userId), trainingPosts: on(userId) },
+    }));
+    const training = {
+      snapshot: jest.fn().mockResolvedValue(snapshot),
+      hash: jest.fn().mockReturnValue(HASH),
+      withOwnPhotos: jest.fn(async (_userId: string, publication: typeof snapshot) => ({
+        ...publication,
+        exercises: publication.exercises.map((exercise) => ({ ...exercise, image: { ...exercise.image, key: 'posts/owner/training/1.jpg' } })),
+      })),
+      attachment: jest.fn(async (publication: typeof snapshot) => ({
+        ...publication,
+        exercises: publication.exercises.map(({ image, ...rest }) => ({ ...rest, image: { url: `signed:${image.key}`, width: image.width, height: image.height } })),
+      })),
+      removePhotos: jest.fn(),
+    };
+    const service = new PostsService(
+      f.posts as never,
+      f.reports as never,
+      f.access as never,
+      f.nutrition as never,
+      { ...f.social, own: jest.fn() } as never,
+      f.graph as never,
+      f.media as never,
+      { jwtSecret: 'isolated-test-key' } as never,
+      {} as never,
+      training as never,
+    );
+    return { ...f, training, service };
+  }
+  const stored = (f: ReturnType<typeof setup>, extra: Record<string, unknown> = {}) => ({
+    ...f.row,
+    requestId: 'r1',
+    previewHash: undefined,
+    publication: undefined,
+    title: '',
+    audience: 'friends',
+    trainingHash: HASH,
+    training: { ...snapshot, exercises: [{ ...snapshot.exercises[0], image: { key: 'posts/owner/training/1.jpg', width: 8, height: 6 } }] },
+    ...extra,
+  });
+
+  it('previews what would be published, with signed photos and the hash to publish against', async () => {
+    const f = setup();
+    const preview = await f.service.previewTraining('owner', selection);
+    expect(preview.trainingHash).toBe(HASH);
+    expect(preview.training.exercises[0].image).toEqual({ url: 'signed:training/owner/fly.jpg', width: 8, height: 6 });
+    for (const flag of ['training', 'trainingPosts']) expect(f.access.require).toHaveBeenCalledWith('owner', flag);
+  });
+
+  it('publishes the server-built snapshot with the post\'s own photo copies, copying allowed by default', async () => {
+    const f = setup();
+    f.posts.findOne
+      .mockReturnValueOnce({ lean: jest.fn().mockResolvedValue(null) })
+      .mockReturnValue({ lean: jest.fn().mockResolvedValue(stored(f)) });
+    const post = await f.service.create('owner', dto as never);
+    const inserted = f.posts.updateOne.mock.calls[0][1].$setOnInsert;
+    expect(inserted).toMatchObject({ trainingHash: HASH, allowCopy: true });
+    expect(inserted.training.exercises[0].image.key).toBe('posts/owner/training/1.jpg');
+    expect(inserted.publication).toBeUndefined();
+    expect(f.nutrition.snapshot).not.toHaveBeenCalled();
+    // The author sees their own choice, and is never offered a copy of their own post.
+    expect(post).toMatchObject({ allowCopy: true, canCopy: false, training: { kind: 'exercise' } });
+    expect(JSON.stringify(post)).not.toContain('"key":"posts/');
+  });
+
+  it('refuses when what would be published is not what was previewed, and copies no photo', async () => {
+    const f = setup();
+    f.posts.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+    f.training.hash.mockReturnValue('c'.repeat(64));
+    await expect(f.service.create('owner', dto as never)).rejects.toThrow('Your selection changed');
+    expect(f.training.withOwnPhotos).not.toHaveBeenCalled();
+    expect(f.posts.updateOne).not.toHaveBeenCalled();
+  });
+
+  it('refuses food and training together for now, and sharing without the feature', async () => {
+    const f = setup();
+    f.posts.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+    await expect(f.service.create('owner', { ...dto, source: { kind: 'food', foodId: 'f' }, previewHash: 'hash' } as never)).rejects.toThrow('not both');
+    f.access.require.mockImplementation(async (_userId: string, flag: string) => {
+      if (flag === 'trainingPosts') throw new Error('not available');
+    });
+    await expect(f.service.create('owner', dto as never)).rejects.toThrow('not available');
+    expect(f.training.snapshot).not.toHaveBeenCalled();
+  });
+
+  it('offers a friend the copy only while it is allowed and they have Training', async () => {
+    const f = setup();
+    f.graph.between.mockResolvedValue({ state: 'accepted', blockedBy: [] });
+    f.posts.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(stored(f)) });
+    const allowed = await f.service.detail('friend', String(f.row._id));
+    expect(allowed).toMatchObject({ canCopy: true, training: { kind: 'exercise' } });
+    expect(allowed.allowCopy).toBeUndefined();
+
+    f.posts.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(stored(f, { allowCopy: false })) });
+    expect((await f.service.detail('friend', String(f.row._id))).canCopy).toBe(false);
+
+    const noTraining = setup({ trainingOn: (userId) => userId === 'owner' });
+    noTraining.graph.between.mockResolvedValue({ state: 'accepted', blockedBy: [] });
+    noTraining.posts.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(stored(noTraining)) });
+    const seen = await noTraining.service.detail('friend', String(noTraining.row._id));
+    // Everyone in the audience can look; only Training lets them copy.
+    expect(seen.training).toBeDefined();
+    expect(seen.canCopy).toBe(false);
+  });
+
+  it('leaves the attachment out when its author no longer has Training sharing', async () => {
+    const f = setup({ trainingOn: (userId) => userId !== 'owner' });
+    f.graph.between.mockResolvedValue({ state: 'accepted', blockedBy: [] });
+    f.posts.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(stored(f)) });
+    const post = await f.service.detail('friend', String(f.row._id));
+    expect(post.training).toBeUndefined();
+    expect(post.canCopy).toBeUndefined();
+  });
+
+  it('removes the post\'s photo copies with the post', async () => {
+    const f = setup();
+    f.posts.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(stored(f)) });
+    f.posts.updateOne.mockResolvedValue({ matchedCount: 1 });
+    await f.service.remove('owner', String(f.row._id));
+    expect(f.posts.updateOne.mock.calls[0][1].$unset).toMatchObject({ training: '', trainingHash: '', allowCopy: '' });
+    expect(f.training.removePhotos).toHaveBeenCalledWith(expect.objectContaining({ kind: 'exercise' }));
   });
 });

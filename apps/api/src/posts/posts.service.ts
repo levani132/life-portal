@@ -5,6 +5,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -22,8 +23,12 @@ import type {
   PostPage,
   PostPreview,
   PostReport,
+  TrainingPostPreview,
+  TrainingPostSelection,
+  TrainingPublication,
 } from '@life-portal/shared-types';
 import {
+  canCopyTrainingPost,
   canReadFoodPost,
   canRepost,
   canonicalPublication,
@@ -37,6 +42,7 @@ import { NutritionPublicationService } from '../nutrition/nutrition-publication.
 import { SocialService } from '../social/social.module';
 import { SocialGraphService } from '../social-graph/social-graph.module';
 import { MediaService } from '../media/media.service';
+import { TrainingPublicationService } from '../training/training-publication.service';
 import {
   FeedFeedbackRecord,
   FoodPostRecord,
@@ -86,7 +92,35 @@ export class PostsService {
     @Inject(CONFIG) private readonly config: AppConfig,
     @InjectModel(FeedFeedbackRecord.name)
     private readonly feedback: Model<FeedFeedbackRecord>,
+    @Optional() private readonly trainingPublications?: TrainingPublicationService,
   ) {}
+
+  /** Spec 036: Training builds and reads its own snapshots; posts only stores them. */
+  private get training(): TrainingPublicationService {
+    if (!this.trainingPublications) throw new BadRequestException('Training sharing is not available.');
+    return this.trainingPublications;
+  }
+  /** Sharing and copying need Training and its sharing switch, on top of the post gate. */
+  private async requireTrainingPosts(userId: string) {
+    await this.requireEnabled(userId);
+    await this.access.require(userId, 'training');
+    await this.access.require(userId, 'trainingPosts');
+  }
+  private async trainingOn(userId: string): Promise<boolean> {
+    try {
+      const { access } = await this.access.forUser(userId);
+      return !!access.training && !!access.trainingPosts;
+    } catch (error) {
+      if (error instanceof UnauthorizedException) return false;
+      throw error;
+    }
+  }
+  /** Spec 036: what a Training selection would publish, with the hash that publishing must match. */
+  async previewTraining(userId: string, selection: TrainingPostSelection): Promise<TrainingPostPreview> {
+    await this.requireTrainingPosts(userId);
+    const publication = await this.training.snapshot(userId, selection);
+    return { training: await this.training.attachment(publication), trainingHash: this.training.hash(publication) };
+  }
 
   /**
    * The (UTC) creation day of each original, live post, for profile badges (spec 022). Reposts and
@@ -151,6 +185,7 @@ export class PostsService {
       // From the whole publication, never the feed teaser, and from published content only.
       topics: postTopics({ caption: row.caption, publication: p }),
       isOwner: row.userId === viewerId,
+      ...(await this.trainingPart(row, viewerId)),
     };
     // A post without food: text and/or photos only.
     if (!p) return { ...base, itemCount: 0, items: [] };
@@ -167,6 +202,21 @@ export class PostsService {
       ...(p.kind === 'day' && p.targets ? { targets: p.targets } : {}),
     };
   }
+  /**
+   * Spec 036: the Training attachment as this viewer gets it. Left out when its author no longer
+   * has Training sharing; `canCopy` is this viewer's, decided now.
+   */
+  private async trainingPart(row: FoodPostRecord, viewerId: string): Promise<Pick<FoodPost, 'training' | 'allowCopy' | 'canCopy'>> {
+    if (!row.training || !this.trainingPublications) return {};
+    const own = row.userId === viewerId;
+    if (!(await this.trainingOn(row.userId))) return {};
+    const allowCopy = row.allowCopy !== false;
+    return {
+      training: await this.training.attachment(row.training),
+      ...(own ? { allowCopy } : {}),
+      canCopy: canCopyTrainingPost({ own, allowCopy, viewerHasTraining: own || (await this.trainingOn(viewerId)), hasTraining: true }),
+    };
+  }
   /** Whether a stored post is what this create request asked for (an idempotent retry). */
   private sameRequest(
     row: FoodPostRecord,
@@ -175,6 +225,8 @@ export class PostsService {
     return (
       !row.deleted &&
       row.previewHash === dto.previewHash &&
+      row.trainingHash === dto.trainingHash &&
+      (!row.training || (row.allowCopy !== false) === (dto.allowCopy !== false)) &&
       row.title === dto.title.trim() &&
       row.caption === dto.caption.trim() &&
       row.audience === dto.audience &&
@@ -189,12 +241,18 @@ export class PostsService {
         title: dto.title,
         caption: dto.caption,
         mediaCount: mediaIds.length,
-        hasFood: !!dto.source,
+        hasFood: !!dto.source || !!dto.training,
       })
     )
       throw new BadRequestException('Write something, or add a photo or food.');
     if (!dto.source && dto.previewHash)
       throw new BadRequestException('A preview needs the food it previews.');
+    if (!dto.training && dto.trainingHash)
+      throw new BadRequestException('A preview needs the training it previews.');
+    // One attachment for now. Nothing below depends on it: each is stored and read on its own.
+    if (dto.source && dto.training)
+      throw new BadRequestException('A post carries food or training, not both yet.');
+    if (dto.training) await this.requireTrainingPosts(userId);
     const existing = await this.posts
       .findOne({ userId, requestId: dto.requestId })
       .lean();
@@ -216,6 +274,16 @@ export class PostsService {
           'Your selection changed. Preview it again before posting.',
         );
     }
+    let training: TrainingPublication | undefined;
+    if (dto.training) {
+      const snapshot = await this.training.snapshot(userId, dto.training as TrainingPostSelection);
+      if (this.training.hash(snapshot) !== dto.trainingHash)
+        throw new ConflictException(
+          'Your selection changed. Preview it again before posting.',
+        );
+      // The post's own copies of any exercise photos: all of them, or the publish fails.
+      training = await this.training.withOwnPhotos(userId, snapshot);
+    }
     const media = await this.media.reserve(userId, dto.requestId, mediaIds);
     await this.social.own(userId);
     try {
@@ -227,6 +295,9 @@ export class PostsService {
             requestId: dto.requestId,
             ...(preview
               ? { previewHash: preview.previewHash, publication: preview.publication }
+              : {}),
+            ...(training
+              ? { training, trainingHash: dto.trainingHash, allowCopy: dto.allowCopy !== false }
               : {}),
             ...(media.length ? { media } : {}),
             title: dto.title.trim(),
@@ -243,6 +314,9 @@ export class PostsService {
     const row = (await this.posts
       .findOne({ userId, requestId: dto.requestId })
       .lean())!;
+    // A concurrent retry won the insert: the photo copies made here belong to no post.
+    if (training && row.training?.exercises.find((e) => e.image)?.image?.key !== training.exercises.find((e) => e.image)?.image?.key)
+      void this.training.removePhotos(training);
     if (!this.sameRequest(row, dto))
       throw new ConflictException('This publish request was already used.');
     if (media.length)
@@ -715,9 +789,9 @@ export class PostsService {
     if (!dto.title.trim() && !dto.caption.trim()) {
       const row = await this.posts
         .findOne({ _id: id, userId, deleted: { $ne: true }, ...ORIGINAL })
-        .select('publication media')
+        .select('publication media training')
         .lean();
-      if (row && !row.publication && !row.media?.length)
+      if (row && !row.publication && !row.media?.length && !row.training)
         throw new BadRequestException('A post without food or photos needs some text.');
     }
     const changed = await this.posts.updateOne(
@@ -727,6 +801,8 @@ export class PostsService {
           title: dto.title.trim(),
           caption: dto.caption.trim(),
           audience: dto.audience,
+          // Spec 036: the copy permission. Copies already made are the copiers' own and stay.
+          ...(dto.allowCopy !== undefined ? { allowCopy: dto.allowCopy } : {}),
         },
       },
     );
@@ -736,19 +812,21 @@ export class PostsService {
   async remove(userId: string, id: string) {
     await this.requireEnabled(userId);
     this.id(id);
+    const before = await this.posts.findOne({ _id: id, userId, ...ORIGINAL }).lean();
     if (
       !(
         await this.posts.updateOne(
           { _id: id, userId, ...ORIGINAL },
           {
             $set: { deleted: true, title: 'Removed post', caption: '' },
-            $unset: { publication: '', media: '' },
+            $unset: { publication: '', media: '', training: '', trainingHash: '', allowCopy: '' },
           },
         )
       ).matchedCount
     )
       throw new NotFoundException('Post not found.');
     void this.media.removeForPost(id);
+    if (before?.training) void this.trainingPublications?.removePhotos(before.training);
     return { success: true };
   }
   async importPreview(userId: string, id: string) {
@@ -857,14 +935,16 @@ export class PostsService {
     this.id(reportId);
     const report = await this.reports.findById(reportId).lean();
     if (!report) throw new NotFoundException('Report not found.');
+    const before = await this.posts.findOne({ _id: report.postId }).lean();
     await this.posts.updateOne(
       { _id: report.postId },
       {
         $set: { deleted: true, title: 'Removed post', caption: '' },
-        $unset: { publication: '', media: '' },
+        $unset: { publication: '', media: '', training: '', trainingHash: '', allowCopy: '' },
       },
     );
     void this.media.removeForPost(report.postId);
+    if (before?.training) void this.trainingPublications?.removePhotos(before.training);
     await this.reports.updateMany(
       { postId: report.postId },
       { $set: { resolvedAt: new Date() } },

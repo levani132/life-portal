@@ -19,7 +19,7 @@ import { normaliseSearch, rankLoadNote } from '@life-portal/shared-domain';
 import { MediaService } from '../media/media.service';
 import { Exercise, TrainingPlan, WorkoutExercise, WorkoutSet } from './training.schemas';
 
-type ExerciseRow = Exercise & { _id: unknown };
+export type ExerciseRow = Exercise & { _id: unknown };
 
 export interface CatalogueQuery {
   q?: string;
@@ -201,6 +201,13 @@ export class CatalogueService {
       .lean<ExerciseRow>();
     if (!row) throw new NotFoundException(`Exercise ${id} not found`);
     return row;
+  }
+
+  /** Spec 036: the caller-visible rows among `ids`, whole, archived ones included, for a publication. */
+  async publishable(userId: string, ids: readonly string[]): Promise<ExerciseRow[]> {
+    const valid = [...new Set(ids)].filter((id) => isValidObjectId(id));
+    if (!valid.length) return [];
+    return this.exercises.find(this.visible(userId, { _id: { $in: valid } })).lean<ExerciseRow[]>();
   }
 
   /** The caller-visible rows among `ids`, archived ones included: what a rank needs of each. */

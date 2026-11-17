@@ -7,13 +7,13 @@ Order follows the plan's phases. `[P]` can run in parallel with its neighbours.
 - [x] T001 Add `trainingPosts` to `FEATURE_IDS` / `FEATURES` (`libs/shared/types/src/lib/portal.ts`) and `FeatureOverridesDto` (`apps/api/src/access/access.module.ts`)
 - [x] T002 [P] Contracts in `libs/shared/types/src/lib/training-posts.ts`; extend `FoodPost`
 - [x] T003 [P] Domain in `libs/shared/domain/src/lib/training-posts.ts` with unit tests: `validTrainingSelection`, `canonicalTrainingPublication`, `planWorkoutFromPublished`, `trainingPublicationLabel`
-- [ ] T004 Schema fields: `food_posts.training/trainingHash/allowCopy`; `training_plans.postImportKey/attribution`; `exercises.postImportKey/attribution`; indexes
+- [ ] T004 Schema fields: `food_posts.training/trainingHash/allowCopy` (done); `training_plans.postImportKey/attribution`; `exercises.postImportKey/attribution`; indexes
 
 ## Phase 2: Share (US1, US2, US4)
 
-- [ ] T005 `TrainingPublicationService.snapshot()` for workout, plan (with chosen workouts) and exercise; unit tests incl. "no weights without includeSets", "records only with showRecords", own-exercise details
-- [ ] T006 `PostsService.preview/create/dto/sameRequest` carry the training attachment; DTOs; unit tests
-- [ ] T007 Exercise photos: copy at publish, sign on read, delete with the post
+- [x] T005 `TrainingPublicationService.snapshot()` for workout, plan (with chosen workouts) and exercise; unit tests incl. "no weights without includeSets", "records only with showRecords", own-exercise details
+- [x] T006 `PostsService.preview/create/dto/sameRequest` carry the training attachment; DTOs; unit tests
+- [x] T007 Exercise photos: copy at publish, sign on read, delete with the post
 
 ## Phase 3: Copy (US3, US4)
 
@@ -23,7 +23,7 @@ Order follows the plan's phases. `[P]` can run in parallel with its neighbours.
 
 ## Phase 4: After publishing (US5)
 
-- [ ] T011 `PATCH /posts/:id` accepts `allowCopy`; delete and moderation remove the attachment and its photos
+- [x] T011 `PATCH /posts/:id` accepts `allowCopy`; delete and moderation remove the attachment and its photos
 
 ## Phase 5: Web
 

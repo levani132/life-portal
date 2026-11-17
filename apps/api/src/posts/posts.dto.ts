@@ -28,6 +28,8 @@ import {
   MEAL_SLOTS,
   POST_KINDS,
   REPORT_REASONS,
+  TRAINING_POST_KINDS,
+  type TrainingPostKind,
   type Audience,
   type FeedMetricEvent,
   type FoodPostKind,
@@ -60,8 +62,36 @@ export class PostSelectionDto implements PostSelection {
   @Type(() => ComponentDto)
   components?: ComponentDto[];
 }
+/**
+ * Spec 036: what to share from Training. Only the shape is checked here; which fields belong to
+ * which kind, and that the ids are the caller's own, is `TrainingPublicationService`'s job.
+ */
+export class TrainingSelectionDto {
+  @IsIn(TRAINING_POST_KINDS) kind!: TrainingPostKind;
+  @ValidateIf((_, v: unknown) => v !== undefined) @IsMongoId() sessionId?: string;
+  @ValidateIf((_, v: unknown) => v !== undefined) @IsBoolean() includeSets?: boolean;
+  @ValidateIf((_, v: unknown) => v !== undefined) @IsBoolean() showRecords?: boolean;
+  @ValidateIf((_, v: unknown) => v !== undefined) @IsMongoId() planId?: string;
+  @ValidateIf((_, v: unknown) => v !== undefined)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(14)
+  @ArrayUnique()
+  @IsString({ each: true })
+  @MaxLength(64, { each: true })
+  workoutIds?: string[];
+  @ValidateIf((_, v: unknown) => v !== undefined) @IsMongoId() exerciseId?: string;
+}
 export class PreviewPostDto {
-  @ValidateNested() @Type(() => PostSelectionDto) source!: PostSelectionDto;
+  @ValidateIf((_, v: unknown) => v !== undefined)
+  @ValidateNested()
+  @Type(() => PostSelectionDto)
+  source?: PostSelectionDto;
+  /** Spec 036: preview a Training attachment instead. */
+  @ValidateIf((_, v: unknown) => v !== undefined)
+  @ValidateNested()
+  @Type(() => TrainingSelectionDto)
+  training?: TrainingSelectionDto;
 }
 export class CreatePostDto {
   /** Absent for a post without food. */
@@ -82,11 +112,23 @@ export class CreatePostDto {
   @IsString() @MaxLength(120) title!: string;
   @IsString() @MaxLength(1000) caption!: string;
   @IsIn(AUDIENCES) audience!: Audience;
+  /** Spec 036: a Training attachment, with the hash of the preview the author saw. */
+  @ValidateIf((_, v: unknown) => v !== undefined)
+  @ValidateNested()
+  @Type(() => TrainingSelectionDto)
+  training?: TrainingSelectionDto;
+  @ValidateIf((o: CreatePostDto) => o.training !== undefined)
+  @Matches(/^[a-f0-9]{64}$/)
+  trainingHash?: string;
+  /** Spec 036: whether viewers may copy the Training attachment. Absent means yes. */
+  @ValidateIf((_, v: unknown) => v !== undefined) @IsBoolean() allowCopy?: boolean;
 }
 export class UpdatePostDto {
   @IsString() @MaxLength(120) title!: string;
   @IsString() @MaxLength(1000) caption!: string;
   @IsIn(AUDIENCES) audience!: Audience;
+  /** Spec 036: change the copy permission of a post with a Training attachment. */
+  @ValidateIf((_, v: unknown) => v !== undefined) @IsBoolean() allowCopy?: boolean;
 }
 /** `PUT /posts/for-you/preferences` (#10). Ids are checked against the catalogue in the service. */
 export class FeedPreferencesDto {

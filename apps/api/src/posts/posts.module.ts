@@ -1,3 +1,5 @@
+import type { TrainingPostSelection } from '@life-portal/shared-types';
+import { TrainingModule } from '../training/training.module';
 import {
   PostEngagementService,
   PostLikeRecord,
@@ -73,6 +75,8 @@ class PostsController {
     @CurrentUser('userId') userId: string,
     @Body() dto: PreviewPostDto,
   ) {
+    // Spec 036: a Training attachment has its own preview and its own hash.
+    if (dto.training) return this.posts.previewTraining(userId, dto.training as TrainingPostSelection);
     return this.posts.preview(userId, dto);
   }
   @Post() create(
@@ -284,6 +288,7 @@ class PublicPostsController {
 @Module({
   imports: [
     NutritionModule,
+    TrainingModule,
     SocialModule,
     MongooseModule.forFeature([
       { name: FoodPostRecord.name, schema: FoodPostSchema },
