@@ -25,6 +25,9 @@ User-visible changes. Newest first.
 - **Each meal has its own colour and icon**: breakfast, lunch, dinner, snacks and anything else.
   Its calories and macros sit in the header, and each food is a row with icon buttons to share,
   edit and remove.
+- **Swipe a logged food left for its actions.** On a phone, Share, Edit and Remove are behind
+  the row: swipe left to show them, or swipe most of the way to remove it. With a mouse the three
+  buttons stay visible.
 - **The bottom bar is a floating glass capsule.** The page scrolls underneath it, and a pill
   slides to the tab you open, with a small bounce, the way an iPhone app's tab bar does. Icons dip
   under your finger.

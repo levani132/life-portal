@@ -571,6 +571,17 @@
   }
 }
 
+/* Shown only with a mouse or trackpad: the visible twin of actions a touch screen reaches by
+   swiping a row (`components/swipe-row.tsx`). */
+.pointer-fine-flex {
+  display: none;
+}
+@media (pointer: fine) {
+  .pointer-fine-flex {
+    display: flex;
+  }
+}
+
 /* A sideways strip that scrolls by touch or trackpad without showing a scrollbar. */
 .no-scrollbar {
   scrollbar-width: none;

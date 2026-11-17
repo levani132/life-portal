@@ -34,6 +34,7 @@ import { AppShell } from '../../components/app-shell';
 import { CheatQueue } from '../../components/cheat-queue';
 import { FoodCard } from '../../components/food-card';
 import { FoodHero, MacroLine, SLOT_STYLES } from '../../components/food-day';
+import { SwipeRow, type SwipeAction } from '../../components/swipe-row';
 import { FoodForm } from '../../components/food-form';
 import { FoodPicker } from '../../components/food-picker';
 import { LogFoodModal } from '../../components/log-food-modal';
@@ -585,8 +586,19 @@ function SlotSection({
 
       {slot.entries.length > 0 && (
         <ul className="space-y-1.5 px-3 pb-3 sm:px-4">
-          {slot.entries.map((entry) => (
-            <li key={entry.id} className="flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-sm">
+          {slot.entries.map((entry) => {
+            // On a phone the row's actions are behind it: swipe left, or all the way to remove.
+            const actions: SwipeAction[] = [
+              ...(onShare && !isUnsaved(entry)
+                ? [{ label: `Share ${entry.facts.name}`, icon: Share2, onClick: () => onShare({ kind: 'entry' as const, entryId: entry.id }) }]
+                : []),
+              { label: `Edit ${entry.facts.name}`, icon: Pencil, onClick: () => onEdit(entry) },
+              { label: `Remove ${entry.facts.name}`, icon: X, onClick: () => remove(entry), danger: true, disabled: pending },
+            ];
+            return (
+            <li key={entry.id}>
+              <SwipeRow actions={actions} className="rounded-xl">
+              <div className="flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-sm">
               <span className={clsx('h-8 w-1 shrink-0 rounded-full', style.dot)} aria-hidden />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">
@@ -613,7 +625,8 @@ function SlotSection({
                 <span className="tabular block font-bold">{entry.totals.energyKcal}</span>
                 <span className="block text-[10px] text-ink-faint">kcal</span>
               </span>
-              <div className="flex shrink-0 items-center">
+              {/* With a mouse or trackpad the same three actions stay visible. */}
+              <div className="pointer-fine-flex shrink-0 items-center">
                 {onShare && !isUnsaved(entry) && (
                   <button
                     type="button"
@@ -639,8 +652,11 @@ function SlotSection({
                   <X size={16} aria-hidden="true" />
                 </button>
               </div>
+              </div>
+              </SwipeRow>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 
