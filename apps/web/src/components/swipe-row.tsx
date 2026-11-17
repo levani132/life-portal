@@ -6,10 +6,14 @@ import type { LucideIcon } from 'lucide-react';
 
 export interface SwipeAction {
   label: string;
+  /** One word under the button, e.g. "Edit". */
+  short: string;
   icon: LucideIcon;
   onClick: () => void;
   /** The destructive action: red, last, and the one a full swipe runs. */
   danger?: boolean;
+  /** The button's colour; a destructive one is always red. */
+  tone?: 'accent' | 'neutral';
   disabled?: boolean;
 }
 
@@ -25,9 +29,16 @@ export function settle(offset: number, actionsWidth: number, rowWidth: number, c
   return -offset >= actionsWidth / 2 ? 'open' : 'closed';
 }
 
+/** How much of button `fromRight` (0 is the rightmost) is uncovered when the row has moved `reveal` px. */
+export function shown(reveal: number, fromRight: number): number {
+  return Math.max(0, Math.min(1, (reveal - fromRight * ACTION_WIDTH) / ACTION_WIDTH));
+}
+
 /**
- * A row whose actions sit behind it, as in iOS lists: swipe left to reveal them, swipe most of
- * the way to run the destructive one. Touch only. Pointer devices keep visible buttons (the
+ * A row whose actions sit behind it: swipe left to reveal them, swipe most of the way to run the
+ * destructive one. The actions are round buttons with a word underneath, in the manner of
+ * Telegram's: each pops in as the row uncovers its place, right to left, and on a long swipe the
+ * last one stretches into a pill while the others dim, showing what releasing will do. Touch only. Pointer devices keep visible buttons (the
  * caller renders them with `.pointer-fine-flex`), so nothing is reachable by swiping alone.
  *
  * The same rules as the app's other gestures: the non-passive `touchmove` listener is attached
@@ -54,6 +65,9 @@ export function SwipeRow({
   // Past the actions' own width the last one stretches with the finger, so no gap opens.
   const stretch = Math.max(0, -offset - actionsWidth);
   const open = offset < 0;
+  const reveal = -offset;
+  const canFull = actions.some((action) => action.danger && !action.disabled);
+  const full = canFull && !!row.current && reveal >= row.current.offsetWidth * FULL_SHARE;
   const settleBack = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(settleBack.current), []);
 
@@ -127,6 +141,8 @@ export function SwipeRow({
       <div className={clsx('absolute inset-y-0 right-0 flex', !open && 'invisible')} aria-hidden={!open}>
         {actions.map((action, index) => {
           const Icon = action.icon;
+          const last = index === actions.length - 1;
+          const amount = shown(reveal, actions.length - 1 - index);
           return (
             <button
               key={action.label}
@@ -139,13 +155,27 @@ export function SwipeRow({
                 setOffset(0);
                 action.onClick();
               }}
-              style={{ width: ACTION_WIDTH + (index === actions.length - 1 ? stretch : 0) }}
+              style={{
+                width: ACTION_WIDTH + (last ? stretch : 0),
+                opacity: full && !last ? 0.35 : amount,
+                transform: `scale(${0.4 + 0.6 * amount})`,
+              }}
               className={clsx(
-                'flex shrink-0 items-center justify-center text-white disabled:opacity-50',
-                action.danger ? 'bg-rose-600' : 'bg-ink-faint/60',
+                'flex shrink-0 flex-col items-center justify-center gap-0.5 disabled:opacity-50',
+                !dragging && 'transition-[transform,opacity] duration-200 ease-out motion-reduce:transition-none',
               )}
             >
-              <Icon size={18} aria-hidden />
+              <span
+                className={clsx(
+                  'flex h-8 items-center justify-center rounded-full text-white shadow-sm',
+                  action.danger ? 'bg-rose-500' : action.tone === 'accent' ? 'bg-accent-solid' : 'bg-ink-faint',
+                )}
+                // The last button grows into a pill with the swipe; the others stay round.
+                style={{ width: last ? 32 + stretch : 32 }}
+              >
+                <Icon size={16} aria-hidden />
+              </span>
+              <span className="text-[9px] font-medium leading-none text-ink-muted">{action.short}</span>
             </button>
           );
         })}

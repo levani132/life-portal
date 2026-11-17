@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { Pencil, X } from 'lucide-react';
-import { SwipeRow, settle } from './swipe-row';
+import { SwipeRow, settle, shown } from './swipe-row';
 
 describe('settle', () => {
   it('closes a short swipe, opens past half the actions, and goes all the way past most of the row', () => {
@@ -12,6 +12,17 @@ describe('settle', () => {
   });
 });
 
+describe('shown', () => {
+  it('uncovers the buttons one at a time, the rightmost first', () => {
+    expect(shown(0, 0)).toBe(0);
+    expect(shown(28, 0)).toBe(0.5);
+    expect(shown(56, 0)).toBe(1);
+    // The next one in starts only once the first is fully out.
+    expect(shown(56, 1)).toBe(0);
+    expect(shown(112, 1)).toBe(1);
+  });
+});
+
 describe('SwipeRow', () => {
   const edit = jest.fn();
   const remove = jest.fn();
@@ -19,8 +30,8 @@ describe('SwipeRow', () => {
     render(
       <SwipeRow
         actions={[
-          { label: 'Edit oats', icon: Pencil, onClick: edit },
-          { label: 'Remove oats', icon: X, onClick: remove, danger: true },
+          { label: 'Edit oats', short: 'Edit', icon: Pencil, onClick: edit },
+          { label: 'Remove oats', short: 'Remove', icon: X, onClick: remove, danger: true },
         ]}
       >
         <p>Oats</p>

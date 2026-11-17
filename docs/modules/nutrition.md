@@ -385,7 +385,9 @@ here is stored or changes a figure.
   `MacroLine` (P, C, F in the one macro palette, `lib/macro-colors.ts`); each entry is a row with
   icon buttons for share, edit and remove. Suggestions take the meal's tint.
 - **A logged food's actions are behind its row on touch screens** (`components/swipe-row.tsx`):
-  swipe left for Share, Edit and Remove; a swipe past 60% of the row removes it. It is touch only;
+  swipe left for Share, Edit and Remove; a swipe past 60% of the row removes it. The actions are
+  round buttons with a word underneath, as in Telegram: each pops in as the row uncovers its
+  place, and on a long swipe Remove stretches into a pill while the others dim. It is touch only;
   with a fine pointer the same three buttons stay visible (`.pointer-fine-flex`), so no action is
   reachable by swiping alone. The row is `data-no-tab-swipe`, its `touchmove` listener is
   non-passive and attached at mount, and a mostly vertical move is left to scrolling.

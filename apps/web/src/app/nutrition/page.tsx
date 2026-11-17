@@ -5,7 +5,7 @@ import { MACRO_COLORS } from '../../lib/macro-colors';
 import { useIsIOS } from '../../lib/ios-device';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Apple, BookmarkPlus, Bot, Info, Pencil, Plus, Search, Share2, Sparkles, UserRound, Utensils, X, Zap, type LucideIcon } from 'lucide-react';
+import { Apple, BookmarkPlus, Bot, Info, Pencil, Plus, Search, Share2, Sparkles, Trash2, UserRound, Utensils, X, Zap, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type {
   PortalState,
@@ -592,10 +592,10 @@ function SlotSection({
             // On a phone the row's actions are behind it: swipe left, or all the way to remove.
             const actions: SwipeAction[] = [
               ...(onShare && !isUnsaved(entry)
-                ? [{ label: `Share ${entry.facts.name}`, icon: Share2, onClick: () => onShare({ kind: 'entry' as const, entryId: entry.id }) }]
+                ? [{ label: `Share ${entry.facts.name}`, short: 'Share', tone: 'accent' as const, icon: Share2, onClick: () => onShare({ kind: 'entry' as const, entryId: entry.id }) }]
                 : []),
-              { label: `Edit ${entry.facts.name}`, icon: Pencil, onClick: () => onEdit(entry) },
-              { label: `Remove ${entry.facts.name}`, icon: X, onClick: () => remove(entry), danger: true, disabled: pending },
+              { label: `Edit ${entry.facts.name}`, short: 'Edit', icon: Pencil, onClick: () => onEdit(entry) },
+              { label: `Remove ${entry.facts.name}`, short: 'Remove', icon: Trash2, onClick: () => remove(entry), danger: true, disabled: pending },
             ];
             return (
             <li key={entry.id}>
