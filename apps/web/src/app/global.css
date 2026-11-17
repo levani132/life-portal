@@ -524,30 +524,56 @@
     0 12px 32px -10px rgb(0 0 0 / 0.55);
 }
 /*
- * `--n` cells, the pill under cell `--i`. During a tab swipe the tab host sets `--tab-swipe` on
- * the root (0 to 1 towards the next tab, 0 to -1 towards the previous) and the pill leans that
- * way under the finger: it moves part of the distance (`--follow`) and stretches, then finishes
- * the trip with the usual bounce when the tab changes. `--next` / `--prev` are how many cells
- * away those tabs are (New post in the middle makes it two).
+ * `--n` cells, the pill under cell `--i`. It is meant to feel like a drop of water being moved,
+ * the way iOS's does.
+ *
+ * During a tab swipe the tab host sets `--tab-swipe` on the root (0 to 1 towards the next tab,
+ * 0 to -1 towards the previous) and the drop travels with the finger, the whole way: `--next` /
+ * `--prev` are how many cells away those tabs are (New post in the middle makes it two). While
+ * it is between two tabs it is slightly longer and slightly flatter, most at the halfway point
+ * (`--bump`, 0 at either end and 1 in the middle), and it is its normal shape again on arrival.
  */
 .glass-bar-pill {
-  --follow: 0.45;
   --cell: calc((100% - 0.75rem) / var(--n));
-  --lean: calc(
-    (max(var(--tab-swipe, 0), 0) * var(--next) + min(var(--tab-swipe, 0), 0) * var(--prev)) * var(--follow)
-  );
+  --p: var(--tab-swipe, 0);
+  --travel: calc(max(var(--p), 0) * var(--next) + min(var(--p), 0) * var(--prev));
+  --a: max(var(--p), -1 * var(--p));
+  --bump: calc(4 * var(--a) * (1 - var(--a)));
+  /* At the halfway point: 12% longer, 3px flatter top and bottom. */
+  --long: calc(var(--cell) * 0.12 * var(--bump));
   position: absolute;
-  top: 0.375rem;
-  bottom: 0.375rem;
-  left: calc(0.375rem + var(--cell) * (var(--i) + min(var(--lean), 0)));
-  width: calc(var(--cell) * (1 + max(var(--lean), -1 * var(--lean))));
+  top: calc(0.375rem + 3px * var(--bump));
+  bottom: calc(0.375rem + 3px * var(--bump));
+  left: calc(0.375rem + var(--cell) * (var(--i) + var(--travel)) - var(--long) / 2);
+  width: calc(var(--cell) + var(--long));
+  transition:
+    left 420ms cubic-bezier(0.3, 1.3, 0.5, 1),
+    width 420ms cubic-bezier(0.3, 1.3, 0.5, 1),
+    top 300ms ease,
+    bottom 300ms ease,
+    opacity 200ms ease;
+}
+.glass-bar-drop {
+  position: absolute;
+  inset: 0;
   border-radius: 9999px;
   background-color: rgb(var(--ink) / 0.12);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18);
-  transition:
-    left 420ms cubic-bezier(0.3, 1.35, 0.5, 1),
-    width 420ms cubic-bezier(0.3, 1.35, 0.5, 1),
-    opacity 200ms ease;
+}
+/* A tap moves the drop in one go: it flattens and lengthens as it leaves, then settles. */
+.glass-bar-drop-move {
+  animation: glass-drop 420ms cubic-bezier(0.3, 1.2, 0.5, 1);
+}
+@keyframes glass-drop {
+  0% {
+    transform: scale(1.1, 0.86);
+  }
+  60% {
+    transform: scale(0.98, 1.03);
+  }
+  100% {
+    transform: scale(1, 1);
+  }
 }
 /* Under the finger it follows exactly; easing would make it trail. */
 [data-tab-swiping] .glass-bar-pill {
@@ -556,6 +582,9 @@
 @media (prefers-reduced-motion: reduce) {
   .glass-bar-pill {
     transition: none;
+  }
+  .glass-bar-drop-move {
+    animation: none;
   }
 }
 

@@ -194,18 +194,11 @@ function Portal({ children }: { children: ReactNode }) {
         )}
       >
         <div className="glass-bar pointer-events-auto relative mx-auto flex max-w-md rounded-full border p-1.5">
-          <span
-            aria-hidden
-            className="glass-bar-pill"
-            style={
-              {
-                '--n': bar.length,
-                '--i': Math.max(0, barIndex),
-                '--next': swipeCells(bar, barIndex, 1),
-                '--prev': swipeCells(bar, barIndex, -1),
-                opacity: barIndex < 0 ? 0 : 1,
-              } as CSSProperties
-            }
+          <BarPill
+            cells={bar.length}
+            index={barIndex}
+            next={swipeCells(bar, barIndex, 1)}
+            prev={swipeCells(bar, barIndex, -1)}
           />
           {bar.map((tab) =>
             tab === NEW_POST ? (
@@ -363,6 +356,25 @@ const LAST_TAB_HREF = { profile: '/profile', menu: '/menu' } as const;
 
 function OwnProfile() {
   return <ProfileView />;
+}
+
+/**
+ * The drop of glass behind the open tab. The outer element is where it is (CSS, from these
+ * variables and the swipe's progress); the inner one is what it looks like, and is remounted when
+ * the tab changes so its squash-and-settle plays once per move, never on the first render.
+ */
+function BarPill({ cells, index, next, prev }: { cells: number; index: number; next: number; prev: number }) {
+  const first = useRef(index);
+  if (index !== first.current) first.current = -2;
+  return (
+    <span
+      aria-hidden
+      className="glass-bar-pill"
+      style={{ '--n': cells, '--i': Math.max(0, index), '--next': next, '--prev': prev, opacity: index < 0 ? 0 : 1 } as CSSProperties}
+    >
+      <span key={index} className={clsx('glass-bar-drop', first.current === -2 && 'glass-bar-drop-move')} />
+    </span>
+  );
 }
 
 /**

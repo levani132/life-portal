@@ -2452,8 +2452,10 @@ the page scrolls under it, so its blur is stronger than in-page glass. The band 
 slides to the next one with a small overshoot (`transform` only, one element, no layout), and an
 icon scales down while pressed; both are off under `prefers-reduced-motion`. **During a tab swipe
 the pill follows the finger**: `TabHost` writes the swipe's progress to the root as `--tab-swipe`
-(and `data-tab-swiping` while a finger drives it), and the pill's CSS leans 45% of the way and
-stretches, as Instagram's does, then completes with the bounce when the route changes. The
+(and `data-tab-swiping` while a finger drives it), and the pill travels with the finger the whole way, like a drop of water being
+moved: between two tabs it is at most 12% longer and a few pixels flatter, most at the halfway
+point, and its normal shape on arrival. (A first version leaned only 45% of the way and stretched
+much more; the owner found it unnatural.) A tap plays one squash-and-settle on the drop itself. The
 property is cleared in the same layout effect that switches the tab, so the pill never jumps back.
 **In-page glass tabs slide too**: `GlassPill` is one absolutely positioned pane that takes the
 selected tab's box (measured, written straight to its style, no state). The pill is
