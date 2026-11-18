@@ -79,7 +79,9 @@ function Portal({ children }: { children: ReactNode }) {
     if (!loading && !user) router.replace('/login');
     else if (needsSetup && pathname !== '/setup') router.replace('/setup');
   }, [loading, user, needsSetup, pathname, router]);
-  const [chromeHidden, revealChrome] = useScrollHidden(pathname === '/');
+  const [scrolledDown, revealChrome] = useScrolledDown(pathname);
+  // Only the feed's header gets out of the way; the tab bar shrinks on every page instead.
+  const chromeHidden = scrolledDown && pathname === '/';
   // iOS can leave the screen shifted after the keyboard: the bar and header follow it.
   useViewportDrift();
   const unreadMessages = useUnreadMessages(portal.data?.access ?? NO_ACCESS);
@@ -192,10 +194,10 @@ function Portal({ children }: { children: ReactNode }) {
         aria-label="Main navigation"
         onFocusCapture={revealChrome}
         className={clsx(
-          'portal-tabbar pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] transition-transform duration-300',
-          chromeHidden && 'translate-y-[140%]',
+          'portal-tabbar pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]',
         )}
-        // The `translate` property, so it adds to the hide-on-scroll transform instead of replacing it.
+        // Scrolling down makes the bar smaller (icons only, narrower); it never leaves the screen.
+        data-compact={scrolledDown || undefined}
         style={{ translate: '0 var(--vv-bottom-shift, 0px)' }}
       >
         <div className="glass-bar pointer-events-auto relative mx-auto flex max-w-md rounded-full border p-1.5">
@@ -212,9 +214,9 @@ function Portal({ children }: { children: ReactNode }) {
                 href="/new"
                 scroll={false}
                 aria-label="New post"
-                className="relative z-10 flex min-h-[3.25rem] flex-1 items-center justify-center"
+                className="tab-cell relative z-10 flex min-h-[3.25rem] flex-1 items-center justify-center"
               >
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-ink text-surface shadow-sm transition-transform duration-150 active:scale-90">
+                <span className="tab-new flex h-10 w-10 items-center justify-center rounded-full bg-ink text-surface shadow-sm transition-transform duration-150 active:scale-90">
                   <Plus size={22} strokeWidth={2.5} aria-hidden />
                 </span>
               </Link>
@@ -247,16 +249,15 @@ function Portal({ children }: { children: ReactNode }) {
 }
 
 /**
- * On the feed, the header and the bottom tabs both get out of the way while scrolling down
- * and come back on any scroll up, the way Safari's toolbars do. Elsewhere they stay put.
+ * Whether the person is scrolling down the page (true) or has scrolled up, is near the top or
+ * has reached the end (false). The tab bar shrinks while it is true, on every page; on the feed
+ * the header also gets out of the way, the way Safari's toolbars do. Each tab keeps its own
+ * scroll position, so a change of page starts from "not scrolling down".
  */
-function useScrollHidden(enabled: boolean) {
+function useScrolledDown(pathname: string) {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
-    if (!enabled) {
-      setHidden(false);
-      return;
-    }
+    setHidden(false);
     let anchor = Math.max(0, window.scrollY);
     let frame = 0;
     const update = () => {
@@ -268,7 +269,7 @@ function useScrollHidden(enabled: boolean) {
         setHidden(false);
         anchor = y;
       } else if (bottom) {
-        // Reaching the end brings the tabs back, so there is always a way out of the feed.
+        // Reaching the end brings the header and the full bar back.
         setHidden(false);
         anchor = y;
       } else if (Math.abs(y - anchor) > 8) {
@@ -284,7 +285,7 @@ function useScrollHidden(enabled: boolean) {
       window.removeEventListener('scroll', scroll);
       cancelAnimationFrame(frame);
     };
-  }, [enabled]);
+  }, [pathname]);
   return [hidden, () => setHidden(false)] as const;
 }
 
@@ -421,7 +422,7 @@ function TabLink({
       }}
       aria-current={active ? 'page' : undefined}
       className={clsx(
-        'group relative z-10 flex min-h-[3.25rem] flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors duration-200',
+        'tab-cell group relative z-10 flex min-h-[3.25rem] flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors duration-200',
         active ? 'text-ink' : 'text-ink-muted',
       )}
     >
@@ -432,7 +433,7 @@ function TabLink({
         aria-hidden
         className="transition-transform duration-200 ease-[cubic-bezier(0.3,1.6,0.5,1)] group-active:scale-[0.82]"
       />
-      <span>{label}</span>
+      <span className="tab-label">{label}</span>
       {children}
     </Link>
   );

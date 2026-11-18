@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-18: The tab bar shrinks instead of hiding
+
+- **The bottom tab bar never leaves the screen.** Scrolling down on any page makes it smaller
+  (icons only, a narrower capsule); scrolling up, reaching the top or reaching the end brings
+  the full bar back. On the feed it used to slide away completely. The feed's header still
+  hides while you scroll down.
+
 ## 2026-11-17: Colour themes
 
 - **The app's colours can now be changed as a whole.** The admin has a new Themes page (menu →
