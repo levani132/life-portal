@@ -99,6 +99,26 @@ export function NutritionRing({ metric }: { metric: NutritionMetric }) {
   );
 }
 
+/** One macro as a line: its name, what was eaten, and a slim bar in its colour showing it against the goal. */
+function MacroBar({ metric }: { metric: NutritionMetric }) {
+  const { label, value, target, unit, color } = metric;
+  const ratio = target !== undefined && target > 0 ? Math.min(1, Math.max(0, value / target)) : 0;
+  const over = target !== undefined && value > target;
+  return (
+    <li aria-label={`${label}: ${value} ${unit} consumed. ${remainingText(metric)}.`}>
+      <div className="flex items-baseline justify-between gap-1 text-[11px] leading-tight" aria-hidden>
+        <span className="truncate font-medium">{label}</span>
+        <span className={clsx('shrink-0 tabular', over ? 'text-danger' : 'text-ink-muted')}>
+          {Number.isFinite(value) ? Math.round(value) : '–'} {unit}
+        </span>
+      </div>
+      <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-border" aria-hidden>
+        <div className="h-full rounded-full" style={{ width: `${ratio * 100}%`, backgroundColor: over ? 'rgb(var(--danger-solid))' : color }} />
+      </div>
+    </li>
+  );
+}
+
 const ICONS = {
   nutrition: Utensils,
   stocks: TrendingUp,
@@ -240,13 +260,13 @@ export function HomeWidget({
         >
           <span
             className={clsx(
-              'flex h-8 w-8 shrink-0 items-center justify-center rounded-xl',
+              'widget-icon flex h-8 w-8 shrink-0 items-center justify-center rounded-xl',
               hue.tile,
             )}
           >
             <Icon size={17} aria-hidden />
           </span>
-          <span className="truncate">{card.title}</span>
+          <span className="widget-title truncate">{card.title}</span>
           {card.key === 'nutrition' && (
             <span className="widget-today shrink-0 text-xs font-normal text-ink-faint">
               Today
@@ -261,7 +281,7 @@ export function HomeWidget({
               aria-label={card.quickAction?.label ?? 'Log food'}
               title={card.quickAction?.label ?? 'Log food'}
               className={clsx(
-                'flex h-8 w-8 items-center justify-center rounded-xl',
+                'widget-action flex h-8 w-8 items-center justify-center rounded-xl',
                 hue.tile,
                 hue.hover,
               )}
@@ -278,7 +298,7 @@ export function HomeWidget({
             type="button"
             data-widget-action
             aria-label={`${card.title} widget options`}
-            className="flex h-8 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-surface"
+            className="widget-action widget-menu flex h-8 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-surface"
             onClick={onMenu}
           >
             {state.editing ? (
@@ -298,11 +318,25 @@ export function HomeWidget({
         className="flex min-h-0 flex-1 flex-col overflow-hidden [justify-content:safe_center]"
       >
         {metrics ? (
-          <div className="widget-rings grid grid-cols-4 items-start gap-1 sm:gap-3">
-            {metrics.map((metric) => (
-              <NutritionRing key={metric.label} metric={metric} />
-            ))}
-          </div>
+          <>
+            <div className="widget-rings grid grid-cols-4 items-start gap-1 sm:gap-3">
+              {metrics.map((metric) => (
+                <NutritionRing key={metric.label} metric={metric} />
+              ))}
+            </div>
+            {/* A half-width card (shown by a container query in global.css, in place of the four
+                rings): calories as one ring, the three macros as bars beside it. */}
+            <div className="widget-food-compact items-center gap-2.5">
+              <div className="w-[62px] shrink-0">
+                <NutritionRing metric={metrics[0]} />
+              </div>
+              <ul className="min-w-0 flex-1 space-y-1.5">
+                {metrics.slice(1).map((metric) => (
+                  <MacroBar key={metric.label} metric={metric} />
+                ))}
+              </ul>
+            </div>
+          </>
         ) : (
           <>
             {card.subtitle && (

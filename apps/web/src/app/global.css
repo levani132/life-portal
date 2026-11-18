@@ -521,28 +521,85 @@
 .home-widget .widget-stat-label {
   font-size: clamp(11px, 3.6cqw, 13px);
 }
-/* A half-width card: the four rings sit two by two without their "left" line, and the three
-   figures take two columns. */
+/* The half-width food layout exists in every card and shows only in a narrow one. */
+.widget-food-compact {
+  display: none;
+}
+/*
+ * A half-width card is its own layout, not the wide one shrunk: a smaller header; for food, one
+ * calories ring with the three macros as bars beside it; for the rest, two large figures with
+ * the third as one line under them.
+ */
 @container widget (max-width: 230px) {
-  .home-widget .widget-rings {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    row-gap: 2px;
+  .home-widget {
+    padding-inline: 0.625rem;
   }
-  .home-widget .nutrition-ring {
-    width: 42px;
+  .home-widget .widget-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 0.5rem;
   }
-  .home-widget .ring-label {
-    margin-top: 2px;
+  .home-widget .widget-icon svg {
+    width: 14px;
+    height: 14px;
   }
-  .home-widget .ring-left,
-  .home-widget .nutrition-ring .text-ink-faint {
+  .home-widget .widget-title {
+    font-size: 13px;
+  }
+  .home-widget .widget-action {
+    width: 1.625rem;
+    height: 1.625rem;
+    border-radius: 0.5rem;
+  }
+  .home-widget .widget-action svg {
+    width: 15px;
+    height: 15px;
+  }
+  .home-widget .widget-menu {
+    width: 1.25rem;
+  }
+  .home-widget .widget-today {
     display: none;
+  }
+  .home-widget .widget-rings {
+    display: none;
+  }
+  .home-widget .widget-food-compact {
+    display: flex;
+  }
+  .home-widget .widget-food-compact .nutrition-ring {
+    width: 62px;
+  }
+  .home-widget .ring-label,
+  .home-widget .ring-left {
+    display: none;
+  }
+  .home-widget .widget-subtitle {
+    margin-bottom: 0.375rem;
+    font-size: 11px;
   }
   .home-widget .widget-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 0.5rem;
   }
-  .home-widget .widget-subtitle {
-    margin-bottom: 0.25rem;
+  .home-widget .widget-stat-value {
+    font-size: 0.9375rem;
+  }
+  /* The third figure: one line across the card, value then label. */
+  .home-widget .widget-stats > :nth-child(3) {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    gap: 0.375rem;
+    border-top: 1px solid rgb(var(--border) / 0.7);
+    padding-top: 0.375rem;
+  }
+  .home-widget .widget-stats > :nth-child(3) .widget-stat-value {
+    flex-shrink: 0;
+    font-size: 0.8125rem;
+  }
+  .home-widget .widget-stats > :nth-child(3) .widget-stat-label {
+    margin-top: 0;
   }
 }
 /*

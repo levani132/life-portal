@@ -463,5 +463,7 @@ On the page (`widget-carousel.tsx`): a card's width is a share of the strip minu
 so two halves, or three quarters plus a quarter of the next card, fill it exactly. The first
 card snaps to the left, the last to the right, others to the centre; a half card snaps to the
 left so the whole card beside it shows. A lone card is always full width. The card's content is
-sized from the card's own width (container units in `global.css`), and under 230px the food
-rings sit two by two and the figures take two columns.
+sized from the card's own width (container units in `global.css`). Under 230px a card has its
+own layout: a smaller header; food shows one calories ring with the three macros as bars beside
+it (`widget-food-compact`, rendered in every card and shown by a container query); other cards
+show two figures with the third as one line under them.
