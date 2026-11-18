@@ -5,7 +5,7 @@ import { MACRO_COLORS, withAlpha } from '../../lib/macro-colors';
 import { useIsIOS } from '../../lib/ios-device';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Apple, BookmarkPlus, Bot, Info, Pencil, Plus, Search, Share2, Sparkles, Trash2, UserRound, Utensils, X, Zap, type LucideIcon } from 'lucide-react';
+import { Apple, BookmarkPlus, Bot, ChevronDown, Info, Pencil, Plus, Search, Share2, Sparkles, Trash2, UserRound, Utensils, X, Zap, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type {
   PortalState,
@@ -35,6 +35,8 @@ import { CheatQueue } from '../../components/cheat-queue';
 import { FoodCard } from '../../components/food-card';
 import { GlassPill } from '../../components/glass-pill';
 import { FoodHero, MacroLine, SLOT_STYLES } from '../../components/food-day';
+import { MacroSplit } from '../../components/macro-split';
+import { useCollapsedSlot } from '../../lib/food-collapsed';
 import { SwipeRow, type SwipeAction } from '../../components/swipe-row';
 import { FoodForm } from '../../components/food-form';
 import { FoodPicker } from '../../components/food-picker';
@@ -527,30 +529,52 @@ function SlotSection({
 
   const { icon: SlotIcon, style } = SLOT_STYLES[slot.slot];
   const label = SLOT_LABELS[slot.slot];
+  const [collapsed, setCollapsed] = useCollapsedSlot(slot.slot);
   const action = 'flex h-10 w-9 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface hover:text-ink active:scale-95';
   const rowAction = 'flex h-9 w-8 items-center justify-center rounded-lg text-ink-faint transition hover:bg-surface hover:text-ink';
 
   return (
     <section className={clsx('card overflow-hidden border-l-4', style.edge)} aria-label={label}>
       <header className="flex items-center gap-3 p-3 sm:p-4">
-        <span
-          className={clsx('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow', style.gradient)}
-          aria-hidden
+        {/* The icon and title fold the meal away: its total and macro line stay in the header. */}
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          aria-expanded={!collapsed}
+          aria-label={`${label}: ${collapsed ? 'show' : 'hide'} its foods`}
+          onClick={() => setCollapsed(!collapsed)}
         >
-          <SlotIcon className="h-5 w-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-bold">{label}</h2>
-          {slot.entries.length === 0 ? (
-            <p className="text-xs text-ink-faint">Nothing yet</p>
-          ) : (
-            <p className="truncate text-xs text-ink-faint">
-              <span className={clsx('font-semibold tabular', style.text)}>{slot.totals.energyKcal.toLocaleString()} kcal</span>
-              {' · '}
-              <MacroLine totals={slot.totals} />
-            </p>
-          )}
-        </div>
+          <span
+            className={clsx('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow', style.gradient)}
+            aria-hidden
+          >
+            <SlotIcon className="h-5 w-5" />
+          </span>
+          <span className="block min-w-0 flex-1">
+            <span className="flex items-center gap-1">
+              {/* A heading by role: an <h2> may not sit inside a button. */}
+              <span role="heading" aria-level={2} className="text-sm font-bold">{label}</span>
+              <ChevronDown className={clsx('h-4 w-4 shrink-0 text-ink-faint transition-transform duration-200', collapsed && '-rotate-90')} aria-hidden />
+              {collapsed && slot.entries.length > 0 && (
+                <span className="text-[11px] font-medium text-ink-faint">
+                  {slot.entries.length} item{slot.entries.length === 1 ? '' : 's'}
+                </span>
+              )}
+            </span>
+            {slot.entries.length === 0 ? (
+              <span className="block text-xs text-ink-faint">Nothing yet</span>
+            ) : (
+              <>
+                <span className="block truncate text-xs text-ink-faint">
+                  <span className={clsx('font-semibold tabular', style.text)}>{slot.totals.energyKcal.toLocaleString()} kcal</span>
+                  {' · '}
+                  <MacroLine totals={slot.totals} />
+                </span>
+                <MacroSplit macros={slot.totals} className="mt-1.5 h-1" />
+              </>
+            )}
+          </span>
+        </button>
         <div className="flex shrink-0 items-center">
           {onShare && slot.entries.length > 0 && (
             <button
@@ -578,7 +602,10 @@ function SlotSection({
             type="button"
             className={clsx('ml-1 flex h-10 w-10 items-center justify-center rounded-xl transition active:scale-95', style.tint, style.text)}
             title={`Add to ${label.toLowerCase()}`}
-            onClick={onAdd}
+            onClick={() => {
+              setCollapsed(false);
+              onAdd();
+            }}
             aria-label={`Add to ${label}`}
           >
             <Plus size={20} aria-hidden="true" />
@@ -586,7 +613,7 @@ function SlotSection({
         </div>
       </header>
 
-      {slot.entries.length > 0 && (
+      {!collapsed && slot.entries.length > 0 && (
         <ul className="space-y-1.5 px-3 pb-3 sm:px-4">
           {slot.entries.map((entry) => {
             // On a phone the row's actions are behind it: swipe left, or all the way to remove.
@@ -662,14 +689,16 @@ function SlotSection({
         </ul>
       )}
 
-      <SlotSuggestions
-        suggestions={suggestions}
-        foods={foods}
-        day={day}
-        slot={slot.slot}
-        slotLabel={SLOT_LABELS[slot.slot]}
-        onChanged={onChanged}
-      />
+      {!collapsed && (
+        <SlotSuggestions
+          suggestions={suggestions}
+          foods={foods}
+          day={day}
+          slot={slot.slot}
+          slotLabel={SLOT_LABELS[slot.slot]}
+          onChanged={onChanged}
+        />
+      )}
 
       <Modal
         open={saving}

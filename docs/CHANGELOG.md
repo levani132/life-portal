@@ -2,6 +2,15 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-18: Food: fold meals away, and see where the calories come from
+
+- **Breakfast, lunch and the other meals can be folded.** Tap a meal's icon or name to hide its
+  foods; its calories and macros stay visible, with a count of the items inside. Tap again to
+  open it. Adding a food opens the meal. Which meals are folded is remembered on this device.
+- **A macro line under each meal** shows how its calories split between protein, carbs and fat,
+  in the macro colours: the same line the food cards already had.
+- **The same line in the food chooser**, under each food's macros, when you log a meal.
+
 ## 2026-11-18: Resizable Home widgets
 
 - **Choose how wide each widget is.** Open a widget's menu (the three dots) and pick Half, Three

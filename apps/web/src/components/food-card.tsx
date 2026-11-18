@@ -3,9 +3,10 @@
 import clsx from 'clsx';
 import { Archive, Globe, Pencil, Share2, Star, Trash2 } from 'lucide-react';
 import type { FoodWithUsage } from '@life-portal/shared-types';
-import { macroShares, mgToG } from '@life-portal/shared-domain';
-import { MACRO_COLORS, MACRO_TEXT } from '../lib/macro-colors';
+import { mgToG } from '@life-portal/shared-domain';
+import { MACRO_TEXT } from '../lib/macro-colors';
 import { FoodArt } from './food-thumb';
+import { MacroSplit } from './macro-split';
 
 /**
  * One food in the Foods tab: a large picture, its calories per serving, a bar of where those
@@ -28,7 +29,6 @@ export function FoodCard({
   onShare?: () => void;
 }) {
   const { energyKcal, proteinMg, carbMg, fatMg } = food.perServing;
-  const shares = macroShares({ proteinMg, carbMg, fatMg });
   const serving = food.servingLabel
     ? `${food.servingLabel} · ${food.servingSize} ${food.unit}`
     : `${food.servingSize} ${food.unit}`;
@@ -118,15 +118,7 @@ export function FoodCard({
           <p className="mt-0.5 truncate text-[11px] text-ink-faint">per {serving}</p>
         </div>
 
-        <div
-          className="flex h-1.5 overflow-hidden rounded-full bg-border"
-          role="img"
-          aria-label={`Calories from protein ${pct(shares.protein)}, carbs ${pct(shares.carbs)}, fat ${pct(shares.fat)}`}
-        >
-          <span style={{ width: pct(shares.protein), background: MACRO_COLORS.protein }} />
-          <span style={{ width: pct(shares.carbs), background: MACRO_COLORS.carbs }} />
-          <span style={{ width: pct(shares.fat), background: MACRO_COLORS.fat }} />
-        </div>
+        <MacroSplit macros={food.perServing} />
 
         <dl className="grid grid-cols-3 gap-1 text-center">
           <Macro label="Protein" grams={mgToG(proteinMg)} className={MACRO_TEXT.protein} />
@@ -222,6 +214,3 @@ function IconButton({
   );
 }
 
-function pct(share: number) {
-  return `${Math.round(share * 100)}%`;
-}

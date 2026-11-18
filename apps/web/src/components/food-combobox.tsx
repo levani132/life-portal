@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { FoodWithUsage } from '@life-portal/shared-types';
 import { mgToG } from '@life-portal/shared-domain';
 import { MACRO_TEXT } from '../lib/macro-colors';
+import { MacroSplit } from './macro-split';
 import { FoodThumb } from './food-thumb';
 
 /**
@@ -121,6 +122,7 @@ export function FoodCombobox({
             <span className="ml-0.5 text-[10px] font-normal text-ink-faint">kcal</span>
           </span>
           <MacroLine food={selected} />
+          <MacroSplit macros={selected.perServing} className="mt-1 h-1" />
         </span>
         <ChevronDown size={16} className="shrink-0 text-ink-faint" aria-hidden />
       </button>
@@ -219,6 +221,7 @@ export function FoodCombobox({
                     <span className="ml-0.5 text-[10px] font-normal text-ink-faint">kcal</span>
                   </span>
                   <MacroLine food={food} />
+                  <MacroSplit macros={food.perServing} className="mt-1 h-1" />
                 </span>
               </button>
             </li>
