@@ -31,11 +31,13 @@ export interface NutritionMetric {
   basis?: string;
 }
 
-function remainingText({ value, target, unit }: NutritionMetric) {
+/** `short` drops the unit: under a ring the unit is already inside it, and the line must fit. */
+function remainingText({ value, target, unit }: NutritionMetric, short = false) {
   if (!Number.isFinite(value)) return 'Loading…';
-  if (target === undefined) return 'No goal set';
+  if (target === undefined) return short ? 'No goal' : 'No goal set';
   const remaining = Math.round((target - value) * 10) / 10;
-  return `${Math.abs(remaining)} ${unit} ${remaining < 0 ? 'over' : 'left'}`;
+  const amount = short ? Math.round(Math.abs(remaining)).toLocaleString() : `${Math.abs(remaining)} ${unit}`;
+  return `${amount} ${remaining < 0 ? 'over' : 'left'}`;
 }
 
 export function NutritionRing({ metric }: { metric: NutritionMetric }) {
@@ -92,7 +94,7 @@ export function NutritionRing({ metric }: { metric: NutritionMetric }) {
           over ? 'text-danger' : 'text-ink-muted',
         )}
       >
-        {remainingText(metric)}
+        {remainingText(metric, true)}
         {metric.basis && <EstimateMark basis={metric.basis} />}
       </p>
     </div>

@@ -499,7 +499,8 @@
  * its number is sized to the ring.
  */
 .home-widget .nutrition-ring {
-  width: clamp(34px, 100%, 92px);
+  /* The cap is what fits the card's fixed height with both lines of text under the ring. */
+  width: clamp(34px, 100%, 78px);
   container-type: inline-size;
 }
 .home-widget .nutrition-ring-value {
@@ -510,16 +511,28 @@
 }
 .home-widget .ring-left {
   font-size: clamp(10px, 3.8cqw, 12px);
-  text-wrap: balance;
+  white-space: nowrap;
+}
+/* The estimate mark sits on the line, so it cannot push the text out of the card. */
+.home-widget .ring-left sup,
+.home-widget .ring-left .estimate-mark {
+  line-height: 1;
 }
 .home-widget .widget-subtitle {
   font-size: clamp(12px, 3.8cqw, 14px);
 }
 .home-widget .widget-stat-value {
-  font-size: clamp(1rem, 6.8cqw, 1.75rem);
+  /* One line: a figure like "1 h 43 min" must fit a third of the card, so it never wraps. */
+  font-size: clamp(0.875rem, 5.4cqw, 1.5rem);
+  white-space: nowrap;
 }
 .home-widget .widget-stat-label {
   font-size: clamp(11px, 3.6cqw, 13px);
+  /* Two lines instead of one cut short ("PR · Seated Cable Row"). */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
 }
 /* The half-width food layout exists in every card and shows only in a narrow one. */
 .widget-food-compact {
@@ -583,7 +596,7 @@
     row-gap: 0.5rem;
   }
   .home-widget .widget-stat-value {
-    font-size: 0.9375rem;
+    font-size: 0.875rem;
   }
   /* The third figure: one line across the card, value then label. */
   .home-widget .widget-stats > :nth-child(3) {
@@ -600,6 +613,8 @@
   }
   .home-widget .widget-stats > :nth-child(3) .widget-stat-label {
     margin-top: 0;
+    display: block;
+    white-space: nowrap;
   }
 }
 /*
