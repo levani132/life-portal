@@ -362,6 +362,7 @@ seeded straight into Mongo still gets sane defaults.
 | `capitalGainsTaxRate` | 0 | stock liquidation maths (Georgia: 0% on most personal share sales) |
 | `fxRates` | `{}` | `convertCents()`, keyed `USD_GEL` style |
 | `widgetOrder` | `[]` | the dashboard's card order — see below |
+| `widgetSizes` | absent | card id → `half` or `full`, the width chosen for it on Home. `wide` (three quarters) is the default and is not stored. Written only by `PUT /api/dashboard/size` |
 
 `widgetOrder` is written only by `PUT /api/dashboard/order`, also by setup through `PUT /api/portal`, never by `PUT /api/settings`: the DTO
 there deliberately does not accept it, so currency changes cannot accidentally overwrite arrangement and cannot
@@ -448,3 +449,19 @@ attention, overdue 1:1s, and a personal plan within a week. Each carries a tone 
 `@Today()` decorator (`apps/api/src/common/today.ts`). Projections take it as an argument
 (principle V), which makes "what does this look like on 1 December?" a query parameter and makes
 the API deterministic under test.
+
+### Card sizes on Home
+
+Each card takes half, three quarters (`wide`, the default) or all of the strip's width; the
+person picks it in the card's menu. `PUT /api/dashboard/size { id, size }` stores the choice in
+`settings.widgetSizes`, and `GET /api/dashboard` returns every card with its `size`
+(`sizeWidgets` in `libs/shared/domain/src/lib/widget-order.ts`). Like the order, the map is a
+list of preferences: an id with no card is ignored, an unknown value is `wide`, and it never
+holds more than 64 entries.
+
+On the page (`widget-carousel.tsx`): a card's width is a share of the strip minus half the gap,
+so two halves, or three quarters plus a quarter of the next card, fill it exactly. The first
+card snaps to the left, the last to the right, others to the centre; a half card snaps to the
+left so the whole card beside it shows. A lone card is always full width. The card's content is
+sized from the card's own width (container units in `global.css`), and under 230px the food
+rings sit two by two and the figures take two columns.

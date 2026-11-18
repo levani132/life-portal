@@ -1,14 +1,18 @@
 'use client';
 
 import { PostDrafts } from './post-drafts';
+import clsx from 'clsx';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type {
-  DashboardResponse,
-  MealSlot,
-  WidgetCard,
-  PortalState,
+import {
+  DEFAULT_WIDGET_SIZE,
+  WIDGET_SIZES,
+  type DashboardResponse,
+  type MealSlot,
+  type WidgetCard,
+  type WidgetSize,
+  type PortalState,
 } from '@life-portal/shared-types';
 import {
   arrangeWidgets,
@@ -36,6 +40,9 @@ import { useStartWorkout } from '../lib/training-offline';
 import { useNutritionDay } from '../lib/nutrition-offline';
 
 
+const SIZE_LABEL: Record<WidgetSize, string> = { half: 'Half', wide: 'Three quarters', full: 'Full width' };
+const SIZE_SHARE: Record<WidgetSize, string> = { half: '50%', wide: '75%', full: '100%' };
+
 export function Dashboard() {
   // Issue #34: Home reads again on its own after a failure (resume, reconnect, backoff).
   const { data, error, isLoading, mutate: reload } = useApi<DashboardResponse>('/dashboard', RECOVERS);
@@ -53,13 +60,25 @@ export function Dashboard() {
   const [removing, setRemoving] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<string[] | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const cards = useMemo(
-    () =>
-      pendingOrder
-        ? arrangeWidgets(data?.cards ?? [], pendingOrder)
-        : (data?.cards ?? []),
-    [data?.cards, pendingOrder],
-  );
+  // A size just chosen shows at once; the saved one replaces it when the dashboard is read again.
+  const [pendingSizes, setPendingSizes] = useState<Record<string, WidgetSize>>({});
+  const cards = useMemo(() => {
+    const ordered = pendingOrder ? arrangeWidgets(data?.cards ?? [], pendingOrder) : (data?.cards ?? []);
+    return ordered.map((card) => (pendingSizes[card.id] ? { ...card, size: pendingSizes[card.id] } : card));
+  }, [data?.cards, pendingOrder, pendingSizes]);
+
+  async function resize(card: WidgetCard, size: WidgetSize) {
+    setSaveError(null);
+    setPendingSizes((current) => ({ ...current, [card.id]: size }));
+    try {
+      await api.put('/dashboard/size', { id: card.id, size });
+      await revalidate('/dashboard');
+    } catch {
+      setSaveError('Could not save the new size. It will be back as it was on reload.');
+    } finally {
+      setPendingSizes(({ [card.id]: _done, ...rest }) => rest);
+    }
+  }
 
   const save = useCallback(async (order: string[]) => {
     setSaveError(null);
@@ -277,6 +296,33 @@ export function Dashboard() {
           onClose={() => setMenuCard(null)}
           title={`${menuCard.title} widget`}
         >
+          <div className="mb-3">
+            <p className="mb-1.5 text-xs font-medium text-ink-muted">Size on Home</p>
+            <div className="grid grid-cols-3 gap-2" role="group" aria-label="Size on Home">
+              {WIDGET_SIZES.map((size) => {
+                const current = cards.find((card) => card.id === menuCard.id)?.size ?? DEFAULT_WIDGET_SIZE;
+                return (
+                  <button
+                    key={size}
+                    type="button"
+                    aria-pressed={current === size}
+                    onClick={() => void resize(menuCard, size)}
+                    className={clsx(
+                      'flex flex-col items-center gap-1.5 rounded-xl border px-2 py-2.5 text-xs font-medium transition-colors',
+                      current === size ? 'border-accent bg-accent-solid/10 text-accent' : 'border-border text-ink-muted hover:text-ink',
+                    )}
+                  >
+                    {/* The strip in miniature: this card, and what is left for the next one. */}
+                    <span className="flex h-5 w-full gap-0.5" aria-hidden>
+                      <span className="rounded bg-current" style={{ width: SIZE_SHARE[size] }} />
+                      {size !== 'full' && <span className="flex-1 rounded bg-current opacity-30" />}
+                    </span>
+                    {SIZE_LABEL[size]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div className="grid gap-2">
             <button
               className="btn-ghost justify-start"

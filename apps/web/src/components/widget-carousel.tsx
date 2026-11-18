@@ -2,7 +2,7 @@
 
 import clsx from 'clsx';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import type { WidgetCard } from '@life-portal/shared-types';
+import { DEFAULT_WIDGET_SIZE, type WidgetCard, type WidgetSize } from '@life-portal/shared-types';
 import { SortableGrid, type SortableState } from './sortable-grid';
 
 interface Props {
@@ -15,18 +15,31 @@ interface Props {
 }
 
 /**
- * Where a card snaps: the first to the left edge, the last to the right, the rest centred. On the
- * first card the next one shows its whole icon; on a centred card each neighbour shows a thinner
- * slice, with its icon cut.
+ * Where a card snaps: the first to the left edge, the last to the right, the rest centred, so a
+ * centred card shows a slice of both neighbours. A half-width card snaps to the left instead:
+ * centred, it would show two quarter slices rather than the whole card beside it.
  */
-function snapAlign(index: number, count: number): 'start' | 'center' | 'end' {
-  return index === 0 ? 'start' : index === count - 1 ? 'end' : 'center';
+export function snapAlign(index: number, count: number, size: WidgetSize = DEFAULT_WIDGET_SIZE): 'start' | 'center' | 'end' {
+  if (index === 0) return 'start';
+  if (index === count - 1) return 'end';
+  return size === 'half' ? 'start' : 'center';
+}
+
+/**
+ * A card's width, as a share of the strip (`cqw`: the strip is a size container). The 8px gap
+ * is split between a card and what shows beside it, so two halves, or three quarters and a
+ * quarter of the next card, fill the strip exactly. A lone card always takes all of it.
+ */
+export function slotWidth(size: WidgetSize, count: number): string {
+  if (count === 1 || size === 'full') return '100cqw';
+  return size === 'half' ? 'calc(50cqw - var(--widget-gap) / 2)' : 'calc(75cqw - var(--widget-gap) / 2)';
 }
 
 /**
  * Home's widget strip: a plain pager.
  *
- * Every widget is one fixed-size card that always shows its full content; the browser's own
+ * Every widget is one card of the width its owner chose (half, three quarters or all of the
+ * strip) that always shows its full content; the browser's own
  * scrolling and snapping do all the moving, and the next card shows as a slice of itself. There
  * is deliberately no scroll-driven layout here: an earlier version resized the cards under the
  * finger and swapped their content once the strip came to rest, and that wait after every swipe
@@ -76,7 +89,7 @@ export function WidgetCarousel({
   const restFor = (el: HTMLElement, index: number) => {
     const view = viewport.current;
     if (!view) return 0;
-    const align = snapAlign(index, count);
+    const align = snapAlign(index, count, cards[index]?.size);
     const spare = view.clientWidth - el.offsetWidth;
     return el.offsetLeft - (align === 'start' ? 0 : align === 'end' ? spare : spare / 2);
   };
@@ -176,10 +189,11 @@ export function WidgetCarousel({
           onOrderChange={onOrderChange}
           onCommit={onCommit}
           className="flex h-[184px] w-max items-stretch gap-2 sm:gap-3"
-          // Card widths come from CSS (`.widget-carousel-viewport .widget-slot`).
-          getItemStyle={(_card, index) => ({
+          // Each card takes the width its owner chose for it (`card.size`).
+          getItemStyle={(card, index) => ({
             flexShrink: 0,
-            scrollSnapAlign: snapAlign(index, count),
+            width: slotWidth(card.size ?? DEFAULT_WIDGET_SIZE, count),
+            scrollSnapAlign: snapAlign(index, count, card.size),
           })}
         >
           {(card, state) => children(card, state)}

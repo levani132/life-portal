@@ -1,4 +1,4 @@
-import { arrangeWidgets, moveWidget } from './widget-order';
+import { WIDGET_SIZES_MAX, arrangeWidgets, moveWidget, sizeWidgets, withWidgetSize } from './widget-order';
 
 const cards = [
   { id: 'loans', order: 1 },
@@ -105,5 +105,29 @@ describe('moveWidget', () => {
   it('clamps a target index past either end', () => {
     expect(moveWidget(ids, 0, 99)).toEqual(['b', 'c', 'd', 'a']);
     expect(moveWidget(ids, 3, -5)).toEqual(['d', 'a', 'b', 'c']);
+  });
+});
+
+describe('widget sizes', () => {
+  const cards = [{ id: 'nutrition' }, { id: 'training' }, { id: 'board:epam' }];
+
+  it('gives each card its chosen width, and wide when there is none or it is unknown', () => {
+    const sized = sizeWidgets(cards, { nutrition: 'full', training: 'huge', 'board:gone': 'half' });
+    expect(sized.map((card) => card.size)).toEqual(['full', 'wide', 'wide']);
+    expect(sizeWidgets(cards, undefined).every((card) => card.size === 'wide')).toBe(true);
+  });
+
+  it('stores a choice, drops it again for the default, and forgets values it does not know', () => {
+    expect(withWidgetSize(undefined, 'nutrition', 'half')).toEqual({ nutrition: 'half' });
+    expect(withWidgetSize({ nutrition: 'half', training: 'full' }, 'nutrition', 'wide')).toEqual({ training: 'full' });
+    expect(withWidgetSize({ old: 'huge', training: 'wide' }, 'nutrition', 'full')).toEqual({ nutrition: 'full' });
+  });
+
+  it('never keeps more than the cap', () => {
+    const many = Object.fromEntries(Array.from({ length: WIDGET_SIZES_MAX + 5 }, (_, i) => [`c${i}`, 'half']));
+    const next = withWidgetSize(many, 'new', 'full');
+    expect(Object.keys(next)).toHaveLength(WIDGET_SIZES_MAX);
+    expect(next['new']).toBe('full');
+    expect(next['c0']).toBeUndefined();
   });
 });

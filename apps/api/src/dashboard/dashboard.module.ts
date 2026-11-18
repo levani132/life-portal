@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Module, Put, Req } from '@nestjs/common';
 import type { ProxiedRequest } from '../app/web-proxy';
-import { ArrayMaxSize, IsArray, Matches } from 'class-validator';
-import type { DashboardResponse, UserSettings } from '@life-portal/shared-types';
+import { ArrayMaxSize, IsArray, IsIn, Matches } from 'class-validator';
+import { WIDGET_SIZES, type DashboardResponse, type UserSettings, type WidgetSize } from '@life-portal/shared-types';
 import { CurrentUser, Public } from '../auth/current-user.decorator';
 import { Today } from '../common/today';
 import { BoardsModule } from '../boards/boards.module';
@@ -36,6 +36,14 @@ export class WidgetOrderDto {
   order!: string[];
 }
 
+const CARD_ID = /^[a-z0-9]{1,32}(:[a-z0-9_-]{1,64})?$/i;
+
+/** One card's width on Home. The id is pattern-checked like the order's, for the same reason. */
+export class WidgetSizeDto {
+  @Matches(CARD_ID, { message: 'id must be a dashboard card id' }) id!: string;
+  @IsIn(WIDGET_SIZES) size!: WidgetSize;
+}
+
 @Controller()
 export class DashboardController {
   constructor(
@@ -57,6 +65,16 @@ export class DashboardController {
   ): Promise<{ order: UserSettings['widgetOrder'] }> {
     const settings = await this.settings.setWidgetOrder(userId, dto.order);
     return { order: settings.widgetOrder };
+  }
+
+  /** Persists the width the person chose for one card. */
+  @Put('dashboard/size')
+  async resize(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: WidgetSizeDto,
+  ): Promise<{ sizes: NonNullable<UserSettings['widgetSizes']> }> {
+    const settings = await this.settings.setWidgetSize(userId, dto.id, dto.size);
+    return { sizes: settings.widgetSizes ?? {} };
   }
 
   /**

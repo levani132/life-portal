@@ -139,6 +139,8 @@ export interface UserSettings extends Timestamped {
    * after the ones it does — see `arrangeWidgets` in `libs/shared/domain`.
    */
   widgetOrder: string[];
+  /** Card id → the width chosen for it on Home. A card without an entry is `wide`. */
+  widgetSizes?: Record<string, import('./dashboard').WidgetSize>;
   selectedModules?: ModuleId[];
   moduleVisibility?: Partial<Record<ModuleId, Audience>>;
   completedSetupSteps?: import('./portal').SetupStep[];

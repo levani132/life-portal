@@ -10,6 +10,7 @@ import type {
 } from '@life-portal/shared-types';
 import {
   arrangeWidgets,
+  sizeWidgets,
   diffDays,
   formatCentsCompact,
   formatDay,
@@ -169,7 +170,7 @@ export class DashboardService {
     return {
       generatedAt: new Date().toISOString(),
       today,
-      cards: arrangeWidgets(cards, settings.widgetOrder),
+      cards: sizeWidgets(arrangeWidgets(cards, settings.widgetOrder), settings.widgetSizes),
       netPositionCents,
       displayCurrency: currency,
       summaries: {

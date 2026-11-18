@@ -83,12 +83,12 @@ export function NutritionRing({ metric }: { metric: NutritionMetric }) {
           <span className="text-[10px] text-ink-faint">{unit}</span>
         </span>
       </div>
-      <p className="mt-1 truncate text-[10px] font-medium sm:text-xs">
+      <p className="ring-label mt-1 truncate text-[10px] font-medium sm:text-xs">
         {label}
       </p>
       <p
         className={clsx(
-          'text-[10px] leading-tight sm:text-[11px]',
+          'ring-left text-[10px] leading-tight sm:text-[11px]',
           over ? 'text-danger' : 'text-ink-muted',
         )}
       >
@@ -298,7 +298,7 @@ export function HomeWidget({
         className="flex min-h-0 flex-1 flex-col overflow-hidden [justify-content:safe_center]"
       >
         {metrics ? (
-          <div className="grid grid-cols-4 items-start gap-1 sm:gap-3">
+          <div className="widget-rings grid grid-cols-4 items-start gap-1 sm:gap-3">
             {metrics.map((metric) => (
               <NutritionRing key={metric.label} metric={metric} />
             ))}
@@ -306,16 +306,16 @@ export function HomeWidget({
         ) : (
           <>
             {card.subtitle && (
-              <p className="mb-2 truncate text-xs text-ink-muted">
+              <p className="widget-subtitle mb-2 truncate text-xs text-ink-muted">
                 {card.subtitle}
               </p>
             )}
-            <dl className="grid grid-cols-3 gap-2">
+            <dl className="widget-stats grid grid-cols-3 gap-2">
               {card.stats.map((stat) => (
                 <div key={stat.label}>
                   <dd
                     className={clsx(
-                      'break-words text-base font-bold leading-tight tabular sm:text-lg',
+                      'widget-stat-value break-words text-base font-bold leading-tight tabular sm:text-lg',
                       TONE_TEXT[stat.tone ?? 'neutral'],
                     )}
                   >
@@ -323,7 +323,7 @@ export function HomeWidget({
                     {stat.estimated && <EstimateMark />}
                   </dd>
                   <dt
-                    className="mt-1 truncate text-[11px] leading-tight text-ink-faint sm:text-xs"
+                    className="widget-stat-label mt-1 truncate text-[11px] leading-tight text-ink-faint sm:text-xs"
                     title={stat.label}
                   >
                     {stat.label}

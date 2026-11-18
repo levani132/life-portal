@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-18: Resizable Home widgets
+
+- **Choose how wide each widget is.** Open a widget's menu (the three dots) and pick Half, Three
+  quarters or Full width. Three quarters shows a quarter of the next widget; two halves sit side
+  by side; full width shows one widget alone. The choice is saved to your account.
+- **Widgets fill their space.** The food rings and the training figures are larger and grow with
+  the widget, so a wide widget is no longer half empty.
+
 ## 2026-11-18: The tab bar shrinks instead of hiding
 
 - **The bottom tab bar never leaves the screen.** Scrolling down on any page makes it smaller

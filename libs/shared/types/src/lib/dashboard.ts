@@ -26,6 +26,15 @@ export const WIDGET_KEYS = [
 ] as const;
 export type WidgetKey = (typeof WIDGET_KEYS)[number];
 
+/**
+ * How much of Home's strip a card takes: half, three quarters or all of its width. The person
+ * picks it per card; what is left over shows the next card (a quarter of it beside a `wide`
+ * one, a whole second card beside a `half` one).
+ */
+export const WIDGET_SIZES = ['half', 'wide', 'full'] as const;
+export type WidgetSize = (typeof WIDGET_SIZES)[number];
+export const DEFAULT_WIDGET_SIZE: WidgetSize = 'wide';
+
 /** Severity of the card's headline, used for the accent and the sort. */
 export type WidgetTone = 'neutral' | 'good' | 'warn' | 'bad';
 
@@ -74,6 +83,8 @@ export interface WidgetCard {
   alert?: string;
   /** At most one. Present only where the widget earns it (see `WidgetQuickAction`). */
   quickAction?: WidgetQuickAction;
+  /** The width the person chose for this card on Home (`settings.widgetSizes`); `wide` if none. */
+  size?: WidgetSize;
   /**
    * The rank the widget ships with. It decides where a card the user has never arranged
    * lands, and nothing else: `DashboardResponse.cards` already arrives in display order.

@@ -13,7 +13,8 @@ import {
 } from '@nestjs/mongoose';
 import { IsIn, IsInt, IsNumber, IsOptional, Max, Min } from 'class-validator';
 import { Model } from 'mongoose';
-import type { UserSettings as UserSettingsDto } from '@life-portal/shared-types';
+import type { UserSettings as UserSettingsDto, WidgetSize } from '@life-portal/shared-types';
+import { withWidgetSize } from '@life-portal/shared-domain';
 import { SUPPORTED_CURRENCIES } from '@life-portal/shared-types';
 import { baseSchemaOptions } from '../common/mongoose';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -77,6 +78,14 @@ export class UserSettings {
    */
   @Prop({ type: [String], default: [] })
   widgetOrder!: string[];
+
+  /**
+   * Card id → the width chosen for it on Home (`half`, `full`; `wide` is the default and is not
+   * stored). Preferences like `widgetOrder`: an id with no card is ignored. No default, so an
+   * account that never resized anything has no field.
+   */
+  @Prop({ type: Object })
+  widgetSizes?: Record<string, WidgetSize>;
 
   @Prop({ type: [String], default: undefined }) selectedModules?: ModuleId[];
   @Prop({ type: Object }) moduleVisibility?: Partial<
@@ -174,6 +183,12 @@ export class SettingsService {
     widgetOrder: string[],
   ): Promise<UserSettingsDto> {
     return this.write(userId, { widgetOrder });
+  }
+
+  /** One card's width on Home, written by `PUT /dashboard/size`. The whole map is replaced. */
+  async setWidgetSize(userId: string, id: string, size: WidgetSize): Promise<UserSettingsDto> {
+    const current = await this.get(userId);
+    return this.write(userId, { widgetSizes: withWidgetSize(current.widgetSizes, id, size) });
   }
 
   /**

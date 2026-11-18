@@ -436,23 +436,15 @@
 .widget-carousel-viewport::-webkit-scrollbar {
   display: none;
 }
-/*
- * The slice of the next card is its icon with its padding on both sides: border 1 + padding 12 +
- * icon 32 + padding 12 = 57px, plus the 8px gap (wider padding and gap from `sm`). That is what
- * shows beside the first card; a centred card splits it between its two neighbours, so their
- * icons are cut. Change the
- * card's `px-*` or icon size in `home-widget.tsx` and these with it.
- */
-.widget-carousel-viewport .widget-slot {
-  width: calc(100cqw - 65px);
+/* Card widths are set per card (`slotWidth` in widget-carousel.tsx), from the size its owner
+   chose. The gap is here so the widths and the flex gap cannot drift apart. */
+.widget-carousel-viewport {
+  --widget-gap: 0.5rem;
 }
 @media (min-width: 640px) {
-  .widget-carousel-viewport .widget-slot {
-    width: min(26rem, 100cqw - 77px);
+  .widget-carousel-viewport {
+    --widget-gap: 0.75rem;
   }
-}
-.widget-carousel-viewport .widget-slot:only-child {
-  width: 100cqw;
 }
 .nutrition-ring {
   position: relative;
@@ -472,6 +464,8 @@
  */
 .home-widget {
   container-type: inline-size;
+  /* Named, so a rule inside a ring (a container itself) can still ask about the card. */
+  container-name: widget;
 }
 /* Not while it is being dragged: that state has its own border and shadow. `.glass` is the same
    surface for cards elsewhere (the Food page's macro tiles). */
@@ -498,13 +492,58 @@
     display: none;
   }
 }
-/* On Home the ring sizes its number to itself. */
+/*
+ * Home's cards fill themselves: their content is sized from the card's own width (`cqw`: the card
+ * is a size container), so a full-width card has large rings and figures and a half-width one
+ * small ones, and none of them leaves the card half empty. The ring is its own container, so
+ * its number is sized to the ring.
+ */
 .home-widget .nutrition-ring {
-  width: clamp(34px, 100%, 56px);
+  width: clamp(34px, 100%, 92px);
   container-type: inline-size;
 }
 .home-widget .nutrition-ring-value {
-  font-size: clamp(10px, 22cqi, 13px);
+  font-size: clamp(10px, 20cqi, 19px);
+}
+.home-widget .ring-label {
+  font-size: clamp(10px, 4.2cqw, 13px);
+}
+.home-widget .ring-left {
+  font-size: clamp(10px, 3.8cqw, 12px);
+  text-wrap: balance;
+}
+.home-widget .widget-subtitle {
+  font-size: clamp(12px, 3.8cqw, 14px);
+}
+.home-widget .widget-stat-value {
+  font-size: clamp(1rem, 6.8cqw, 1.75rem);
+}
+.home-widget .widget-stat-label {
+  font-size: clamp(11px, 3.6cqw, 13px);
+}
+/* A half-width card: the four rings sit two by two without their "left" line, and the three
+   figures take two columns. */
+@container widget (max-width: 230px) {
+  .home-widget .widget-rings {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 2px;
+  }
+  .home-widget .nutrition-ring {
+    width: 42px;
+  }
+  .home-widget .ring-label {
+    margin-top: 2px;
+  }
+  .home-widget .ring-left,
+  .home-widget .nutrition-ring .text-ink-faint {
+    display: none;
+  }
+  .home-widget .widget-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .home-widget .widget-subtitle {
+    margin-bottom: 0.25rem;
+  }
 }
 /*
  * Glass tab strips (Training, Food). The strip is the glass surface; the selected tab is a

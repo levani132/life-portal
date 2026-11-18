@@ -70,3 +70,41 @@ export function moveWidget(ids: readonly string[], from: number, to: number): st
   next.splice(Math.min(Math.max(to, 0), next.length), 0, moved);
   return next;
 }
+
+/** The widths a card on Home may take, as fractions of the strip. Same list as `WIDGET_SIZES`. */
+const SIZES = ['half', 'wide', 'full'] as const;
+type Size = (typeof SIZES)[number];
+
+/** The most sizes kept: as many as the arrangement itself (`WidgetOrderDto`). */
+export const WIDGET_SIZES_MAX = 64;
+
+/**
+ * Gives each card the width the person chose for it; a card with no choice, or with a stored
+ * value this version does not know, is `wide`. Like the order, the stored map is a list of
+ * preferences: an id with no card is ignored.
+ */
+export function sizeWidgets<T extends { id: string }>(
+  cards: readonly T[],
+  sizes: Readonly<Record<string, unknown>> | undefined,
+): (T & { size: Size })[] {
+  return cards.map((card) => {
+    const chosen = sizes?.[card.id];
+    return { ...card, size: SIZES.includes(chosen as Size) ? (chosen as Size) : 'wide' };
+  });
+}
+
+/**
+ * The stored map after one card's size is chosen. `wide` is the default, so choosing it removes
+ * the entry; the map never grows past `WIDGET_SIZES_MAX` (the oldest entries go first).
+ */
+export function withWidgetSize(
+  sizes: Readonly<Record<string, unknown>> | undefined,
+  id: string,
+  size: Size,
+): Record<string, Size> {
+  const kept = Object.entries(sizes ?? {}).filter(
+    (entry): entry is [string, Size] => entry[0] !== id && SIZES.includes(entry[1] as Size) && entry[1] !== 'wide',
+  );
+  if (size !== 'wide') kept.push([id, size]);
+  return Object.fromEntries(kept.slice(-WIDGET_SIZES_MAX));
+}
