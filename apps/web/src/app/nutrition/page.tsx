@@ -570,7 +570,7 @@ function SlotSection({
                   {' · '}
                   <MacroLine totals={slot.totals} />
                 </span>
-                <MacroSplit macros={slot.totals} className="mt-1.5 h-1" />
+                <MacroSplit macros={slot.totals} className="mt-1.5" />
               </>
             )}
           </span>

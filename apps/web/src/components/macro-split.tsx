@@ -11,16 +11,19 @@ const pct = (share: number) => `${Math.round(share * 100)}%`;
  */
 export function MacroSplit({
   macros,
+  thin,
   className,
 }: {
   macros: { proteinMg: number; carbMg: number; fatMg: number };
+  /** A finer line, for dense lists such as the food chooser. */
+  thin?: boolean;
   className?: string;
 }) {
   const shares = macroShares(macros);
   if (!(shares.protein + shares.carbs + shares.fat > 0)) return null;
   return (
     <span
-      className={clsx('flex h-1.5 overflow-hidden rounded-full bg-border', className)}
+      className={clsx('flex overflow-hidden rounded-full bg-border', thin ? 'h-[3px]' : 'h-1.5', className)}
       role="img"
       aria-label={`Calories from protein ${pct(shares.protein)}, carbs ${pct(shares.carbs)}, fat ${pct(shares.fat)}`}
     >
