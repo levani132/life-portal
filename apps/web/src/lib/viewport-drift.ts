@@ -15,25 +15,28 @@ import { useEffect } from 'react';
  */
 
 /**
- * How far a bottom-pinned bar must move down (px) to sit at the bottom of what is on screen.
+ * How far a bottom-pinned bar must move down (px) to sit at the bottom of the screen.
  *
- * Never up. The drift this corrects only ever leaves the bar too high. A screen that looks
- * shorter than the layout is the keyboard, or iOS still reporting the keyboard's size just after
- * the app is reopened with no field focused; lifting the bar for that left it stranded in the
- * middle of the screen.
+ * The same distance as the header: how far the screen has slid down the page (`offsetTop`).
+ * A `fixed` bar is laid out against the page's own box, so when the screen slides down by that
+ * much, the bar is left that much above the screen's bottom edge.
+ *
+ * The viewport's reported *height* is deliberately not used. After the app is reopened with the
+ * keyboard having been up, iOS can go on reporting the keyboard's height with no keyboard on
+ * screen, and lets the screen slide by that height as the page scrolls. Trusting the height then
+ * lifted the bar into the middle of the screen, or left it there, depending on the scroll
+ * direction. The whole screen is visible in that state, so only the slide matters.
  */
-export function bottomShift(viewport: { offsetTop: number; height: number }, layoutHeight: number, editing: boolean): number {
-  if (editing) return 0;
-  const shift = Math.round(viewport.offsetTop + viewport.height - layoutHeight);
-  // Sub-pixel differences are rounding, not drift.
-  return shift < 2 ? 0 : shift;
+export function bottomShift(viewport: { offsetTop: number }, editing: boolean): number {
+  return topShift(viewport, editing);
 }
 
 /** How far a top-pinned header must move down (px) to sit at the top of what is on screen. */
 export function topShift(viewport: { offsetTop: number }, editing: boolean): number {
   if (editing) return 0;
   const shift = Math.round(viewport.offsetTop);
-  return Math.abs(shift) < 2 ? 0 : shift;
+  // Sub-pixel differences are rounding, not drift; and the screen never sits above the page.
+  return shift < 2 ? 0 : shift;
 }
 
 const isEditing = () => {
@@ -50,9 +53,7 @@ export function useViewportDrift(): void {
     const apply = () => {
       // A pinch-zoomed page (a desktop trackpad) is panned on purpose: that is not drift.
       const still = isEditing() || Math.abs(viewport.scale - 1) > 0.01;
-      // `innerHeight`, not the document's height: it follows Safari's collapsing toolbars exactly
-      // as the visual viewport does, so they only disagree when the screen has really drifted.
-      root.style.setProperty('--vv-bottom-shift', `${bottomShift(viewport, window.innerHeight, still)}px`);
+      root.style.setProperty('--vv-bottom-shift', `${bottomShift(viewport, still)}px`);
       root.style.setProperty('--vv-top-shift', `${topShift(viewport, still)}px`);
     };
     // Now, again once the keyboard's own animation has finished, and twice more: after the app
@@ -64,6 +65,13 @@ export function useViewportDrift(): void {
       timers.forEach(clearTimeout);
       timers = [400, 1200, 2500].map((delay) => setTimeout(apply, delay));
     };
+    // Leaving the app with a field focused is what puts iOS in the state above: on return it
+    // behaves as if the keyboard were still up. Letting go of the field first avoids it.
+    const release = () => {
+      if (document.visibilityState === 'hidden' && isEditing()) (document.activeElement as HTMLElement | null)?.blur();
+    };
+    document.addEventListener('visibilitychange', release);
+    window.addEventListener('pagehide', release);
     settle();
     viewport.addEventListener('resize', settle);
     viewport.addEventListener('scroll', settle);
@@ -77,6 +85,8 @@ export function useViewportDrift(): void {
     window.addEventListener('touchstart', apply, { passive: true });
     return () => {
       timers.forEach(clearTimeout);
+      document.removeEventListener('visibilitychange', release);
+      window.removeEventListener('pagehide', release);
       window.removeEventListener('focus', settle);
       window.removeEventListener('resize', settle);
       window.removeEventListener('touchstart', apply);

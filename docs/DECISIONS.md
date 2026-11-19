@@ -2602,3 +2602,23 @@ on a tint.
 
 **The admin publishes only their own brands.** Listing other people's brands to pick from would
 show the admin what other people eat; the admin creates or publishes brands of their own.
+
+## 2026-11-19 · The tab bar's drift correction uses the screen's slide, never its reported height
+
+**Seen (twice):** after leaving the installed iPhone app and coming back, the tab bar sat in the
+middle of the screen. The second report added the key detail: scrolling one way put it right,
+scrolling the other way put it back in the middle.
+
+**Likely cause** (from screenshots, not reproduced): the app was left with a field focused. On
+return iOS behaves as if the keyboard were still up: `visualViewport.height` stays the
+keyboard-shortened height with no keyboard on screen, and `offsetTop` moves between 0 and the
+keyboard's height as the page scrolls. The whole screen is visible throughout.
+
+The correction first used `offsetTop + height - innerHeight` for the bottom bar. With a stale
+height that is wrong in both positions: it lifts the bar when the screen has not slid, and
+leaves it lifted when it has. Clamping it to "never up" fixed one position and not the other.
+
+**Now** the bar and the header both move by `offsetTop` only: a `fixed` element is laid out
+against the page's box, so the screen sliding down by `offsetTop` is exactly how far both edges
+are off. The reported height is ignored. A focused field is also blurred when the app is
+hidden, which is what leads to the state in the first place.

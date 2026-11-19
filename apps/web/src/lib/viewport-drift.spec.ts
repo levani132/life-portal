@@ -1,26 +1,32 @@
 import { bottomShift, topShift } from './viewport-drift';
 
 describe('viewport drift', () => {
-  it('is nothing when what is on screen is the layout viewport', () => {
-    expect(bottomShift({ offsetTop: 0, height: 956 }, 956, false)).toBe(0);
+  it('is nothing when the screen sits at the top of the page', () => {
+    expect(bottomShift({ offsetTop: 0 }, false)).toBe(0);
     expect(topShift({ offsetTop: 0 }, false)).toBe(0);
     // Rounding noise is not drift.
-    expect(bottomShift({ offsetTop: 0.4, height: 956.3 }, 956, false)).toBe(0);
+    expect(bottomShift({ offsetTop: 0.4 }, false)).toBe(0);
+    expect(topShift({ offsetTop: 1.4 }, false)).toBe(0);
   });
 
-  it('moves the bar and the header down by how far the screen has drifted', () => {
-    // The visual viewport is stuck 250px down the layout viewport: both edges are 250px off.
-    expect(bottomShift({ offsetTop: 250, height: 956 }, 956, false)).toBe(250);
+  it('moves the bar and the header down by how far the screen has slid down the page', () => {
+    expect(bottomShift({ offsetTop: 250 }, false)).toBe(250);
     expect(topShift({ offsetTop: 250 }, false)).toBe(250);
   });
 
-  it('never lifts the bar: a screen reported shorter than the layout is the keyboard, or its stale size after reopening the app', () => {
-    expect(bottomShift({ offsetTop: 0, height: 700 }, 956, false)).toBe(0);
-    expect(bottomShift({ offsetTop: 0, height: 560 }, 956, false)).toBe(0);
+  it('gives the bar and the header the same shift whatever height iOS reports', () => {
+    // The phantom keyboard after reopening the app: iOS reports a short screen with no keyboard
+    // showing, and the screen slides between 0 and the keyboard's height as the page scrolls.
+    for (const offsetTop of [0, 120, 336]) expect(bottomShift({ offsetTop }, false)).toBe(topShift({ offsetTop }, false));
   });
 
-  it('leaves everything alone while a field has focus: the difference is the keyboard', () => {
-    expect(bottomShift({ offsetTop: 0, height: 620 }, 956, true)).toBe(0);
+  it('never moves anything up', () => {
+    expect(bottomShift({ offsetTop: -40 }, false)).toBe(0);
+    expect(topShift({ offsetTop: -40 }, false)).toBe(0);
+  });
+
+  it('leaves everything alone while a field has focus: the keyboard is really up', () => {
+    expect(bottomShift({ offsetTop: 120 }, true)).toBe(0);
     expect(topShift({ offsetTop: 120 }, true)).toBe(0);
   });
 });
