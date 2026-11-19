@@ -10,6 +10,9 @@ User-visible changes. Newest first.
 - **A macro line under each meal** shows how its calories split between protein, carbs and fat,
   in the macro colours: the same line the food cards already had.
 - **The same line in the food chooser**, under each food's macros, when you log a meal.
+- **Suggestions when you press + on a meal.** Before you search, the log sheet lists what that
+  meal has had on recent days (the same suggestions shown under the meal). Tapping one fills in
+  the food and the amount from last time; change it if you like, then record it.
 
 ## 2026-11-18: Resizable Home widgets
 

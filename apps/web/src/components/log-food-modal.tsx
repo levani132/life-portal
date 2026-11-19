@@ -9,6 +9,7 @@ import {
   Minus,
   Moon,
   Plus,
+  Sparkles,
   Sun,
   Sunrise,
   Utensils,
@@ -20,6 +21,7 @@ import type {
   FoodWithUsage,
   MealEntry,
   MealSlot,
+  MealSuggestion,
 } from '@life-portal/shared-types';
 import { MEAL_SLOTS } from '@life-portal/shared-types';
 import {
@@ -33,6 +35,7 @@ import { FoodCombobox } from './food-combobox';
 import { FoodForm } from './food-form';
 import { FoodThumb } from './food-thumb';
 import { useAction } from '../lib/hooks';
+import { MacroSplit } from './macro-split';
 import { MealImpact } from './meal-impact';
 import { Input, Modal } from './ui';
 
@@ -173,6 +176,25 @@ export function LogFoodModal({
     setAmountText(String(servingsToAmount(keep, picked.servingSize)));
   };
 
+  /** A suggestion fills in its food and the amount eaten last time; the person still records it. */
+  const pickSuggestion = (picked: FoodWithUsage, suggestion: MealSuggestion) => {
+    setFoodId(picked.id);
+    setAmountText(String(suggestion.amount));
+    setServingsText(String(amountToServings(suggestion.amount, picked.servingSize)));
+  };
+  // What this meal has had before (the same list the Food page shows under the meal), for the
+  // meal now chosen. Only foods this device has: the rest cannot be logged from here.
+  const suggested = useMemo(
+    () =>
+      (overview.data?.suggestions ?? [])
+        .filter((suggestion) => suggestion.slot === slot)
+        .flatMap((suggestion) => {
+          const match = foods.find((row) => row.id === suggestion.foodId);
+          return match ? [{ suggestion, food: match }] : [];
+        }),
+    [overview.data?.suggestions, slot, foods],
+  );
+
   const submit = () => {
     if (!facts || !validAmount) return;
     let recorded: MealEntry | undefined;
@@ -240,6 +262,43 @@ export function LogFoodModal({
             onSelect={pickFood}
             onCreate={(name) => setAddingFood({ name })}
           />
+        )}
+
+        {/* Before a food is chosen: what this meal usually is, one tap to fill in. */}
+        {!editing && !food && suggested.length > 0 && (
+          <div>
+            <p className="label flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5" aria-hidden /> {slot === 'uncategorized' ? 'From your recent meals' : `From your recent ${SLOTS[slot].label.toLowerCase()}`}
+            </p>
+            <ul className="space-y-0.5">
+              {suggested.map(({ suggestion, food: item }) => (
+                <li key={suggestion.foodId}>
+                  <button
+                    type="button"
+                    onClick={() => pickSuggestion(item, suggestion)}
+                    aria-label={`Choose ${suggestion.name}, ${suggestion.amount} ${suggestion.unit}`}
+                    className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition hover:bg-surface active:scale-[0.99]"
+                  >
+                    <FoodThumb name={item.name} imageUrl={item.image?.url} macros={item.perServing} size={36} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm text-ink">{suggestion.name}</span>
+                      <span className="tabular block truncate text-xs text-ink-faint">
+                        {suggestion.amount} {suggestion.unit}
+                        {suggestion.dayCount > 1 && ` · ${suggestion.dayCount} days`}
+                      </span>
+                    </span>
+                    <span className="w-16 shrink-0 text-right">
+                      <span className="tabular block text-sm font-medium text-ink">
+                        {suggestion.totals.energyKcal}
+                        <span className="ml-0.5 text-[10px] font-normal text-ink-faint">kcal</span>
+                      </span>
+                      <MacroSplit macros={suggestion.totals} thin className="mt-1" />
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {facts && (
