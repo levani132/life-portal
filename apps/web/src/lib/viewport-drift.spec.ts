@@ -14,8 +14,9 @@ describe('viewport drift', () => {
     expect(topShift({ offsetTop: 250 }, false)).toBe(250);
   });
 
-  it('follows a layout viewport that is taller than the screen', () => {
-    expect(bottomShift({ offsetTop: 0, height: 700 }, 956, false)).toBe(-256);
+  it('never lifts the bar: a screen reported shorter than the layout is the keyboard, or its stale size after reopening the app', () => {
+    expect(bottomShift({ offsetTop: 0, height: 700 }, 956, false)).toBe(0);
+    expect(bottomShift({ offsetTop: 0, height: 560 }, 956, false)).toBe(0);
   });
 
   it('leaves everything alone while a field has focus: the difference is the keyboard', () => {

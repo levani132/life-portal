@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-19: Tab bar stays at the bottom after switching apps
+
+- **The tab bar no longer ends up in the middle of the screen** after you leave the app with the
+  keyboard open and come back. An earlier fix for a different displacement was lifting it by the
+  keyboard's height.
+
 ## 2026-11-19: Food brands
 
 - **Brands with logos.** A food's brand is now a real brand: McDonald's, Wendy's and other
