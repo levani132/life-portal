@@ -2,6 +2,15 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-19: Sharing
+
+- **Share from Food or Training, then send it on.** Sharing a food, a meal, a workout or a plan
+  still makes a post, and the new post now opens with its share sheet, so you can send it to a
+  friend in a message, copy its link or hand it to another app straight away.
+- **The share sheet can be pulled down to close**, and the page behind it no longer scrolls
+  while it is open.
+- **Posts in the feed** have a larger profile picture, with the name and time closer together.
+
 ## 2026-11-18: Food: fold meals away, and see where the calories come from
 
 - **Breakfast, lunch and the other meals can be folded.** Tap a meal's icon or name to hide its

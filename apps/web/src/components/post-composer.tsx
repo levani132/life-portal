@@ -352,7 +352,9 @@ export function PostComposer({
     setError(null);
     try {
       const post = await createPost(food && preview ? food.source : undefined, preview?.previewHash);
-      done(`/posts/${post.id}`);
+      // Shared from Food or Training: the new post opens with its share sheet, to send it to a
+      // friend or outside the app straight away.
+      done(`/posts/${post.id}${initialSource || initialTraining ? '?share=1' : ''}`);
     } catch (e) {
       if (e instanceof NetworkError) {
         setNoConnection(true);
@@ -527,6 +529,11 @@ export function PostComposer({
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {(initialSource || initialTraining) && (
+            <p className="border-b border-border bg-surface px-4 py-2 text-xs text-ink-muted">
+              Sharing makes a post. Once you press Share, you can send it to a friend or to another app.
+            </p>
+          )}
           {error && (
             <div className="px-4 pt-3">
               <ErrorNote message={error} />

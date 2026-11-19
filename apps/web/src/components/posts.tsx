@@ -247,10 +247,13 @@ function DietTopicChips({ topics }: { topics?: FoodPost['topics'] }) {
 export function PostCard({
   post,
   detail = false,
+  openShare = false,
   forYou,
 }: {
   post: FoodPost;
   detail?: boolean;
+  /** Open with the share sheet showing (a post just made by sharing from Food or Training). */
+  openShare?: boolean;
   /** Present on For You cards: enables Not interested / Hide author (issue #3, task A). */
   forYou?: {
     /** Another card on this page hid this post's author. */
@@ -387,22 +390,22 @@ export function PostCard({
           <PostRelativeTime date={post.repost.createdAt} />
         </p>
       )}
-      <div className="flex items-start gap-3">
+      <div className="-ml-1 -mt-1 flex items-center gap-2.5">
         <Link
           href={`/people/${post.author.userId}`}
           aria-label={`View ${post.author.displayName}'s profile`}
           className="shrink-0"
         >
-          <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={40} />
+          <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={48} />
         </Link>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1 leading-tight">
           <Link
             href={`/people/${post.author.userId}`}
-            className="text-sm font-semibold hover:text-accent-hover"
+            className="text-sm font-semibold leading-tight hover:text-accent-hover"
           >
             {post.author.displayName}
           </Link>
-          <div className="mt-0.5 flex items-center gap-1 text-[11px] text-ink-faint">
+          <div className="flex items-center gap-1 text-[11px] leading-tight text-ink-faint">
             <PostDateLink id={post.id} date={post.createdAt} />
             {hasFood && (
               <>
@@ -444,7 +447,7 @@ export function PostCard({
       </div>
       {forYou && <ForYouReasons reasons={post.reasons} />}
       {post.title && post.title !== post.contentLabel && (
-        <h2 className="mt-4 whitespace-pre-wrap break-words text-lg font-semibold">
+        <h2 className="mt-3 whitespace-pre-wrap break-words text-lg font-semibold">
           {post.title}
         </h2>
       )}
@@ -586,6 +589,7 @@ export function PostCard({
         </div>
       )}
       <PostEngagement
+        openShare={openShare}
         post={post}
         onSaveFoods={hasFood && !post.isOwner ? () => setImporting(true) : undefined}
       />

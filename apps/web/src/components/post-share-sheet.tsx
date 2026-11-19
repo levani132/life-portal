@@ -20,6 +20,7 @@ import { canShareImage, shareTargetUrl, type ShareTarget } from '@life-portal/sh
 import { renderShareImage, shareImageFile } from '../lib/share-image';
 import { api } from '../lib/api';
 import { useApi } from '../lib/hooks';
+import { useSheetDrag } from '../lib/sheet-drag';
 import { useSocialApi } from '../lib/social-hooks';
 import { Avatar, errorText, FRIENDS_KEY, openConversation } from './messages';
 import { ErrorNote } from './ui';
@@ -165,17 +166,21 @@ export function PostShareSheet({
     window.open(shareTargetUrl(target, url(), title), '_blank', 'noopener,noreferrer');
   }
 
+  // The sheet takes its own touches: the page behind stays still, and pulling it down closes it.
+  const drag = useSheetDrag(onClose);
   const sentTo = Object.entries(sent);
   const imageState = { disabled: !image, busy: !image && !imageFailed };
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center" data-no-tab-swipe>
+    <div ref={drag.overlay} className="fixed inset-0 z-50 flex items-end justify-center overscroll-contain" data-no-tab-swipe>
       <div className="absolute inset-0 bg-black/60" onClick={onClose} aria-hidden />
       <div
+        ref={drag.sheet}
         role="dialog"
         aria-modal="true"
         aria-label="Share post"
         className="relative w-full max-w-md rounded-t-3xl border border-b-0 border-border bg-surface-raised pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl"
       >
+        {/* The grip: pull the sheet down by it, or by anywhere on the sheet, to close. */}
         <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-ink/20" aria-hidden />
         <div className="flex items-center justify-between px-4 pb-2">
           <h3 className="text-sm font-semibold">Share</h3>

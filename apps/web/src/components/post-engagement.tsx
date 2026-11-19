@@ -26,10 +26,13 @@ import { socialWrites, useOffline, useSocialWrites } from '../lib/social-offline
 export function PostEngagement({
   post,
   onSaveFoods,
+  openShare = false,
 }: {
   post: FoodPost;
   /** Opens the card's import dialog; absent for your own posts and posts without food. */
   onSaveFoods?: () => void;
+  /** Start with the share sheet open. */
+  openShare?: boolean;
 }) {
   const stats = useApi<Engagement>(`/posts/${post.id}/engagement`, {
     refreshInterval: 30000,
@@ -38,7 +41,7 @@ export function PostEngagement({
   const [busy, setBusy] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [error, setError] = useState('');
-  const [shareOpen, setShareOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(openShare);
   const feedStale = useRef(false);
   const portal = useApi<PortalState>('/portal');
   const canSend = messagingAvailable(portal.data?.access);
