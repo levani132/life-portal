@@ -68,6 +68,8 @@ describe('colour roles', () => {
     'components/training/muscle-figure.tsx',
     'components/training/rank-emblem.tsx',
     'lib/macro-colors.ts',
+    // The white square a brand logo is drawn on before upload: a stored picture, not the page.
+    'lib/media.ts',
     'lib/share-image.ts',
   ]);
   const PALETTE =

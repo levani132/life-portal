@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { Globe, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Globe, ImagePlus, Pencil, Plus, Trash2 } from 'lucide-react';
 import { BRAND_NAME_MAX, type FoodBrand, type PortalState } from '@life-portal/shared-types';
 import { api } from '../lib/api';
 import { useBrands } from '../lib/brands';
 import { revalidate, useApi } from '../lib/hooks';
+import { brandKey, cleanBrandName } from '@life-portal/shared-domain';
+import { prepareLogo, uploadMedia } from '../lib/media';
 import { BrandMark } from './brand-mark';
 import { FoodPhotoField, foodPhotoPayload, type FoodPhotoChange } from './food-photo-field';
 import { EmptyState, ErrorNote, Field, Input, Modal } from './ui';
@@ -26,6 +28,42 @@ export function BrandsManager({ open, onClose }: { open: boolean; onClose: () =>
   const [asPublic, setAsPublic] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const files = useRef<HTMLInputElement>(null);
+  const [bulk, setBulk] = useState<string | null>(null);
+
+  /**
+   * Logos for many brands at once: each file is matched to a brand by its file name
+   * ("mcdonalds.png", "Burger King.jpg"), in any spelling. A name with no brand yet becomes a
+   * new one: public when the developer has "Public" ticked, their own otherwise.
+   */
+  async function addLogos(list: FileList) {
+    setError(null);
+    setBusy(true);
+    const editable = brands.filter((brand) => brand.scope === 'own' || developer);
+    const failed: string[] = [];
+    let done = 0;
+    for (const file of Array.from(list)) {
+      const label = cleanBrandName(file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' '));
+      setBulk(`Adding logos: ${done + failed.length + 1} of ${list.length}`);
+      try {
+        const key = brandKey(label);
+        if (!key) throw new Error('no name');
+        const brand =
+          editable.find((item) => item.key === key) ??
+          (await api.post<FoodBrand>('/nutrition/brands', { name: label, ...(developer && asPublic ? { public: true } : {}) }));
+        const imageMediaId = await uploadMedia(await prepareLogo(file), () => undefined, new AbortController().signal);
+        await api.patch(`/nutrition/brands/${brand.id}`, { imageMediaId });
+        done += 1;
+      } catch {
+        failed.push(file.name);
+      }
+    }
+    setBulk(null);
+    setBusy(false);
+    await refresh();
+    if (failed.length) setError(`${done} added. Could not add: ${failed.join(', ')}.`);
+  }
 
   const own = brands.filter((brand) => brand.scope === 'own');
   const shared = developer ? brands.filter((brand) => brand.scope === 'public') : [];
@@ -125,6 +163,27 @@ export function BrandsManager({ open, onClose }: { open: boolean; onClose: () =>
             )}
           </div>
           <div>
+            <span className="label">Logos from files</span>
+            <input
+              ref={files}
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              onChange={(event) => {
+                if (event.target.files?.length) void addLogos(event.target.files);
+                event.target.value = '';
+              }}
+            />
+            <button type="button" className="btn-ghost w-full justify-center" disabled={busy} onClick={() => files.current?.click()}>
+              <ImagePlus size={15} aria-hidden /> {bulk ?? 'Choose logo files'}
+            </button>
+            <p className="mt-1.5 text-xs text-ink-faint">
+              Name each file after its brand (mcdonalds.png, Burger King.jpg). Each logo is trimmed and centred on the same white
+              square, so they all look alike. A name with no brand yet is added as a new brand.
+            </p>
+          </div>
+          <div>
             <span className="label">Your brands</span>
             {!loaded ? (
               <p className="text-sm text-ink-faint">Loading…</p>
@@ -187,7 +246,8 @@ function BrandEditor({
       <FoodPhotoField
         image={brand.logoUrl ? { url: brand.logoUrl, width: 1, height: 1 } : undefined}
         onChange={setLogo}
-        hint="The brand’s logo. Shown beside its foods and on the brand filters."
+        hint="The brand’s logo. It is trimmed and centred on a white square, the same for every brand."
+        prepare={prepareLogo}
       />
       <Field label="Name" hint="Renaming it renames it on the foods that have it.">
         <Input value={name} maxLength={BRAND_NAME_MAX} onChange={(event) => setName(event.target.value)} required />

@@ -466,3 +466,9 @@ the foods already loaded.
 
 **Log from the food list:** each food card has a Log button that opens the log sheet with that
 food chosen at one serving, for the meal the clock suggests.
+
+**Logos are normalised on the device** (`prepareLogo` in `apps/web/src/lib/media.ts`): margins
+that are transparent or near-white are trimmed, and the artwork is centred on a white 512 px
+square with 12% padding, then saved as JPEG. So every logo has the same size and margin whatever
+file it came from. The Brands manager can take many files at once; each is matched to a brand by
+`brandKey` of its file name, and a name with no brand becomes a new one.

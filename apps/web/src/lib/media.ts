@@ -108,6 +108,82 @@ export async function prepareAvatar(file: Blob): Promise<PreparedMedia> {
   return { kind: 'image', blob, width: edge, height: edge, previewUrl: URL.createObjectURL(blob) };
 }
 
+/** Every brand logo is stored as this square, so they all sit the same in lists and chips. */
+export const LOGO_EDGE = 512;
+/** The margin kept around the artwork, as a share of the square's edge. */
+const LOGO_PADDING = 0.12;
+
+/**
+ * The box of an image's artwork: everything that is not transparent and not near-white. Logos
+ * arrive with every kind of margin; trimming it first is what makes them the same size on
+ * screen. A full-bleed image (a logo on its own colour) has no margin, so the box is all of it.
+ */
+function artworkBox(pixels: Uint8ClampedArray, width: number, height: number) {
+  let left = width;
+  let top = height;
+  let right = -1;
+  let bottom = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const blank = pixels[i + 3] < 24 || (pixels[i] > 244 && pixels[i + 1] > 244 && pixels[i + 2] > 244);
+      if (blank) continue;
+      if (x < left) left = x;
+      if (x > right) right = x;
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+    }
+  }
+  if (right < left || bottom < top) return { x: 0, y: 0, width, height };
+  return { x: left, y: top, width: right - left + 1, height: bottom - top + 1 };
+}
+
+/**
+ * Re-encodes a brand logo so every logo is alike: its margins trimmed, the artwork centred on a
+ * white 512 px square with the same padding, whatever shape or size the file was. A transparent
+ * background becomes white (logos are stored as JPEG, like every other picture here).
+ */
+export async function prepareLogo(file: Blob): Promise<PreparedMedia> {
+  const image = await decode(file);
+  const width = 'naturalWidth' in image ? image.naturalWidth : image.width;
+  const height = 'naturalHeight' in image ? image.naturalHeight : image.height;
+  // Read at a bounded size: enough to find the margins, cheap on a phone.
+  const scale = Math.min(1, 1024 / Math.max(width, height, 1));
+  const probe = document.createElement('canvas');
+  probe.width = Math.max(1, Math.round(width * scale));
+  probe.height = Math.max(1, Math.round(height * scale));
+  const probeContext = probe.getContext('2d', { willReadFrequently: true });
+  if (!probeContext) throw new Error('This browser cannot prepare photos.');
+  probeContext.drawImage(image, 0, 0, probe.width, probe.height);
+  const box = artworkBox(probeContext.getImageData(0, 0, probe.width, probe.height).data, probe.width, probe.height);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = LOGO_EDGE;
+  canvas.height = LOGO_EDGE;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('This browser cannot prepare photos.');
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, LOGO_EDGE, LOGO_EDGE);
+  const room = LOGO_EDGE * (1 - LOGO_PADDING * 2);
+  const fit = Math.min(room / box.width, room / box.height);
+  const drawn = { width: box.width * fit, height: box.height * fit };
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(
+    image,
+    box.x / scale,
+    box.y / scale,
+    box.width / scale,
+    box.height / scale,
+    (LOGO_EDGE - drawn.width) / 2,
+    (LOGO_EDGE - drawn.height) / 2,
+    drawn.width,
+    drawn.height,
+  );
+  if ('close' in image) image.close();
+  const blob = await toJpeg(canvas, 0.92);
+  return { kind: 'image', blob, width: LOGO_EDGE, height: LOGO_EDGE, previewUrl: URL.createObjectURL(blob) };
+}
+
 /** A photo taken from the live camera preview. The front camera is mirrored, like a mirror. */
 export async function captureFrame(video: HTMLVideoElement, mirror: boolean) {
   const result = await drawJpeg(

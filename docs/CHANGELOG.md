@@ -13,6 +13,9 @@ User-visible changes. Newest first.
 - **Your own brands and logos.** "Brands" on the Foods tab lists your brands: add one, rename
   it, give it a logo, remove it. The admin can also add public brands, give them logos, and
   make one of their own public.
+- **Logos all look alike, and can be added in bulk.** Any logo you upload is trimmed and centred
+  on the same white square. "Choose logo files" in the Brands manager takes many files at once
+  and matches each to a brand by its file name.
 - **Filter by brand.** The Foods tab and the food chooser show your five most used brands as
   chips with their logos; tap one to see only its foods.
 - **Log from the food list.** Each food card has a Log button that opens the log sheet with that

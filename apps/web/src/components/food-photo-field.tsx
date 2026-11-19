@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ImagePlus, Trash2 } from 'lucide-react';
 import type { FoodImage, MediaConfig } from '@life-portal/shared-types';
 import { useApi } from '../lib/hooks';
-import { prepareImage, uploadMedia } from '../lib/media';
+import { prepareImage, uploadMedia, type PreparedMedia } from '../lib/media';
 
 /** What saving the form should do with the food's photo. */
 export type FoodPhotoChange =
@@ -27,11 +27,14 @@ export function FoodPhotoField({
   image,
   onChange,
   hint = 'Shown with the food in your list and in posts.',
+  prepare = prepareImage,
 }: {
   image?: FoodImage;
   onChange: (change: FoodPhotoChange) => void;
   /** The line under "Photo". The training forms reuse this field for exercises and machines. */
   hint?: string;
+  /** How the chosen file is re-encoded before upload. Brand logos use a fixed square. */
+  prepare?: (file: Blob) => Promise<PreparedMedia>;
 }) {
   const config = useApi<MediaConfig>('/media/config');
   const [preview, setPreview] = useState<string | undefined>(image?.url);
@@ -47,7 +50,7 @@ export function FoodPhotoField({
     abort.current?.abort();
     abort.current = new AbortController();
     try {
-      const media = await prepareImage(file);
+      const media = await prepare(file);
       setPreview(media.previewUrl);
       setProgress(0);
       onChange({ kind: 'uploading' });
