@@ -8,6 +8,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { assertFreeId, withId } from '../common/client-id';
@@ -57,6 +58,7 @@ import {
   weekEnd,
   weekStart,
 } from '@life-portal/shared-domain';
+import { BrandsService } from './brands';
 import { OpenFoodFactsProvider } from './openfoodfacts.provider';
 import {
   CheatMeal,
@@ -129,7 +131,14 @@ export class NutritionService {
     @InjectModel(User.name) private readonly users: Model<User>,
     private readonly lookup: OpenFoodFactsProvider,
     private readonly media: MediaService,
+    // Optional so the many tests that build this service by hand need not supply it.
+    @Optional() private readonly brands?: BrandsService,
   ) {}
+
+  /** A food's brand as it is stored: an existing brand's own name, or a new brand of the person's. */
+  private brandFor(userId: string, text: string | undefined): Promise<string | undefined> {
+    return this.brands ? this.brands.resolve(userId, text) : Promise.resolve(text);
+  }
 
   /** The owner's view of a food: its picture as a signed link. Only for the owner's own foods. */
   private async withImage<T extends FoodDto>(food: T, image?: StoredImage): Promise<T> {
@@ -237,7 +246,7 @@ export class NutritionService {
     const created = await this.foods.create({
       userId,
       name: dto.name,
-      brand: dto.brand,
+      brand: await this.brandFor(userId, dto.brand),
       unit: dto.unit ?? 'g',
       servingSize,
       servingLabel: dto.servingLabel,
@@ -278,7 +287,7 @@ export class NutritionService {
 
     const patch: Record<string, unknown> = {
       ...(dto.name != null ? { name: dto.name } : {}),
-      ...(dto.brand != null ? { brand: dto.brand } : {}),
+      ...(dto.brand != null ? { brand: (await this.brandFor(userId, dto.brand)) ?? '' } : {}),
       ...(dto.unit != null ? { unit: dto.unit } : {}),
       ...(dto.servingLabel != null ? { servingLabel: dto.servingLabel } : {}),
       ...(dto.favourite != null ? { favourite: dto.favourite } : {}),

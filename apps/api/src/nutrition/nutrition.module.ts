@@ -62,6 +62,7 @@ import {
   WeighIn,
   WeighInSchema,
 } from './nutrition.schemas';
+import { BrandsController, BrandsService, FoodBrandRow, FoodBrandSchema } from './brands';
 import { NutritionService } from './nutrition.service';
 import { OpenFoodFactsProvider } from './openfoodfacts.provider';
 
@@ -365,6 +366,7 @@ export class NutritionController {
       { name: HealthConnection.name, schema: HealthConnectionSchema },
       { name: HealthDay.name, schema: HealthDaySchema },
       { name: Food.name, schema: FoodSchema },
+      { name: FoodBrandRow.name, schema: FoodBrandSchema },
       { name: MealEntry.name, schema: MealEntrySchema },
       { name: SavedMeal.name, schema: SavedMealSchema },
       { name: NutritionProfile.name, schema: NutritionProfileSchema },
@@ -374,6 +376,8 @@ export class NutritionController {
     ]),
   ],
   controllers: [
+    // Before the main controller, so `nutrition/brands` is never read as one of its `:id` routes.
+    BrandsController,
     NutritionController,
     HealthController,
     HealthShortcutSettingsController,
@@ -383,6 +387,7 @@ export class NutritionController {
     HealthShortcutSettingsService,
     HealthUploadGuard,
     NutritionService,
+    BrandsService,
     OpenFoodFactsProvider,
     NutritionPublicationService,
   ],

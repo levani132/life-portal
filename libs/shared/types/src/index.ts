@@ -22,3 +22,4 @@ export * from './lib/theme';
 export * from './lib/badges';
 export * from './lib/tournaments';
 export * from './lib/sync-health';
+export * from './lib/brands';

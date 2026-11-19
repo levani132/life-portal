@@ -250,6 +250,13 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   bounded key, count: refusal keys come from `SYNC_REFUSAL_CODES` or `http_<status>`, ages are
   buckets. Never add an account, path, body or value to it. `npm run test:integration` creates and
   drops `lp-int-*` databases: never point `INTEGRATION_MONGODB_URI` at real data.
+- **A food is joined to its brand by name, never by an id.** `foods.brand` is text holding the
+  brand's exact name and `brandKey()` is the join, so foods from barcodes, imports and before
+  brands existed all match. Save a food's brand through `BrandsService.resolve()` (it turns any
+  spelling into the existing brand or creates the person's own); never refuse a food for its
+  brand. Public brands have no `userId`, so every `food_brands` query says public, own or both;
+  a logo's storage key never leaves the API; logos are uploaded by the admin, not shipped. See
+  `docs/modules/nutrition.md` ("Brands").
 - **Never write a palette colour or a literal in the web app** (spec 037). Every colour is a
   role from `THEME_ROLES` (`text-ink`, `bg-danger-solid/10`, `rgb(var(--macro-kcal))`), because
   the active theme is data: `text-emerald-400` would ignore it. A plain role is text; its

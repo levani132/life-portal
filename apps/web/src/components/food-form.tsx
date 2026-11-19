@@ -13,6 +13,7 @@ import { factsFromInput, factsToInput, macroEnergyMismatch, mgToG } from '@life-
 import { api, NetworkError } from '../lib/api';
 import { useAction } from '../lib/hooks';
 import { Field, Input, Modal, Select, Spinner } from './ui';
+import { BrandCombobox } from './brand-combobox';
 import { FoodPhotoField, foodPhotoPayload, type FoodPhotoChange } from './food-photo-field';
 
 /** Long enough that typing "chicken" is one search, not seven. The API allows ten a minute. */
@@ -236,7 +237,7 @@ export function FoodForm({
               <Input value={name} onChange={(event) => setName(event.target.value)} required />
             </Field>
             <Field label="Brand" hint="optional">
-              <Input value={brand} onChange={(event) => setBrand(event.target.value)} />
+              <BrandCombobox value={brand} onChange={setBrand} />
             </Field>
           </div>
 

@@ -6,6 +6,10 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { FoodWithUsage } from '@life-portal/shared-types';
 import { mgToG } from '@life-portal/shared-domain';
 import { MACRO_TEXT } from '../lib/macro-colors';
+import { brandKey } from '@life-portal/shared-domain';
+import { useBrands } from '../lib/brands';
+import { BrandFilter } from './brand-filter';
+import { BrandMark } from './brand-mark';
 import { MacroSplit } from './macro-split';
 import { FoodThumb } from './food-thumb';
 
@@ -31,19 +35,23 @@ export function FoodCombobox({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
+  // One of the person's most used brands, or every brand.
+  const [brand, setBrand] = useState<string | null>(null);
+  const brands = useBrands();
   const root = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLUListElement>(null);
 
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return foods;
-    return foods.filter((food) =>
-      `${food.name} ${food.brand ?? ''}`.toLowerCase().includes(needle),
+    return foods.filter(
+      (food) =>
+        (!brand || brandKey(food.brand) === brand) &&
+        (!needle || `${food.name} ${food.brand ?? ''}`.toLowerCase().includes(needle)),
     );
-  }, [foods, query]);
+  }, [foods, query, brand]);
 
-  useEffect(() => setActive(0), [query]);
+  useEffect(() => setActive(0), [query, brand]);
 
   // A press anywhere outside closes the list. Pointer events rather than blur, because iOS does
   // not focus a tapped button, so a blur would close the list before the tap could choose.
@@ -173,6 +181,8 @@ export function FoodCombobox({
         )}
       </div>
 
+      {open && <BrandFilter foods={foods} value={brand} onChange={setBrand} className="mt-1.5" />}
+
       {open && (
         <ul
           id="food-combobox-list"
@@ -211,8 +221,9 @@ export function FoodCombobox({
                     {food.favourite && <span className="mr-1 text-warning">★</span>}
                     {food.name}
                   </span>
-                  <span className="block truncate text-xs text-ink-faint">
-                    {[food.brand, servingText(food)].filter(Boolean).join(' · ')}
+                  <span className="flex items-center gap-1 text-xs text-ink-faint">
+                    {food.brand && <BrandMark name={food.brand} brand={brands.find(food.brand)} size={14} className="rounded" />}
+                    <span className="truncate">{[food.brand, servingText(food)].filter(Boolean).join(' · ')}</span>
                   </span>
                 </span>
                 <span className="shrink-0 text-right">

@@ -75,6 +75,7 @@ export function LogFoodModal({
   today = day,
   slot: initialSlot,
   entry,
+  food: initialFood,
   onLogged,
 }: {
   open: boolean;
@@ -86,6 +87,8 @@ export function LogFoodModal({
   slot: MealSlot;
   /** Present when correcting an already-logged entry. */
   entry?: MealEntry;
+  /** Start with this food chosen, at one serving (logging straight from the food list). */
+  food?: FoodWithUsage;
   onLogged?: (entry?: MealEntry) => void;
 }) {
   const [addingFood, setAddingFood] = useState<{ name: string } | null>(null);
@@ -93,12 +96,12 @@ export function LogFoodModal({
   const { run, pending, error, clearError } = useAction();
 
   const [slot, setSlot] = useState<MealSlot>(entry?.slot ?? initialSlot);
-  const [foodId, setFoodId] = useState<string | undefined>(entry?.foodId);
+  const [foodId, setFoodId] = useState<string | undefined>(entry?.foodId ?? initialFood?.id);
   const [amountText, setAmountText] = useState(
-    entry ? String(entry.amount) : '',
+    entry ? String(entry.amount) : initialFood ? String(initialFood.servingSize) : '',
   );
   const [servingsText, setServingsText] = useState(
-    entry ? String(entry.servings) : '',
+    entry ? String(entry.servings) : initialFood ? '1' : '',
   );
   const [entryDay, setEntryDay] = useState(entry?.day ?? day);
 
@@ -107,11 +110,12 @@ export function LogFoodModal({
     if (!open) return;
     clearError();
     setSlot(entry?.slot ?? initialSlot);
-    setFoodId(entry?.foodId);
+    setFoodId(entry?.foodId ?? initialFood?.id);
     setEntryDay(entry?.day ?? day);
-    setAmountText(entry ? String(entry.amount) : '');
-    setServingsText(entry ? String(entry.servings) : '');
-  }, [open, entry, initialSlot, day, clearError]);
+    setAmountText(entry ? String(entry.amount) : initialFood ? String(initialFood.servingSize) : '');
+    setServingsText(entry ? String(entry.servings) : initialFood ? '1' : '');
+    // `initialFood` by id: the list re-creates the object on every read.
+  }, [open, entry, initialSlot, day, clearError, initialFood?.id]);
 
   const food = useMemo(
     () => foods.find((row) => row.id === foodId),

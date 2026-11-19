@@ -5,7 +5,7 @@ import { MACRO_COLORS, withAlpha } from '../../lib/macro-colors';
 import { useIsIOS } from '../../lib/ios-device';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Apple, BookmarkPlus, Bot, ChevronDown, Info, Pencil, Plus, Search, Share2, Sparkles, Trash2, UserRound, Utensils, X, Zap, type LucideIcon } from 'lucide-react';
+import { Apple, BookmarkPlus, Bot, ChevronDown, Info, Pencil, Plus, Search, Share2, Sparkles, Tags, Trash2, UserRound, Utensils, X, Zap, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type {
   PortalState,
@@ -29,10 +29,14 @@ import {
   isRecorded,
   mgToG,
   relativeDays,
+  brandKey,
 } from '@life-portal/shared-domain';
 import { AppShell } from '../../components/app-shell';
 import { CheatQueue } from '../../components/cheat-queue';
+import { BrandFilter } from '../../components/brand-filter';
+import { BrandsManager } from '../../components/brands-manager';
 import { FoodCard } from '../../components/food-card';
+import { useBrands } from '../../lib/brands';
 import { GlassPill } from '../../components/glass-pill';
 import { FoodHero, MacroLine, SLOT_STYLES } from '../../components/food-day';
 import { MacroSplit } from '../../components/macro-split';
@@ -126,6 +130,8 @@ function Nutrition() {
   const [logging, setLogging] = useState<{
     slot: MealSlot;
     entry?: MealEntry;
+      /** Logging straight from the food list: this food, already chosen. */
+    food?: FoodWithUsage;
   } | null>(null);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -293,6 +299,7 @@ function Nutrition() {
           overview={data}
           onChanged={refresh}
           onShare={canPost ? setSharing : undefined}
+          onLog={(food) => setLogging({ slot: mealContextNow(dayStartHour).slot, food })}
         />
       )}
 
@@ -328,6 +335,7 @@ function Nutrition() {
           today={today}
           slot={logging.slot}
           entry={logging.entry}
+          food={logging.food}
           onLogged={(entry) => {
             refresh();
             // A meal not yet saved cannot be shared: a post needs the server's row.
@@ -1048,13 +1056,20 @@ function FoodsTab({
   overview,
   onChanged,
   onShare,
+  onLog,
 }: {
   overview: NutritionOverview;
   onChanged: () => void;
   onShare?: (source: PostSelection) => void;
+  /** Opens the log sheet with this food chosen. */
+  onLog: (food: FoodWithUsage) => void;
 }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'favourites' | 'archived'>('all');
+  // One of the person's most used brands, or every brand.
+  const [brand, setBrand] = useState<string | null>(null);
+  const [managingBrands, setManagingBrands] = useState(false);
+  const brands = useBrands();
   const [editing, setEditing] = useState<Food | null>(null);
   const [adding, setAdding] = useState(false);
   const { run, pending } = useAction();
@@ -1064,10 +1079,11 @@ function FoodsTab({
     return overview.foods.filter((food) => {
       if (filter === 'archived' ? !food.archived : food.archived) return false;
       if (filter === 'favourites' && !food.favourite) return false;
+      if (brand && brandKey(food.brand) !== brand) return false;
       if (!needle) return true;
       return `${food.name} ${food.brand ?? ''}`.toLowerCase().includes(needle);
     });
-  }, [overview.foods, query, filter]);
+  }, [overview.foods, query, filter, brand]);
   const counts = useMemo(
     () => ({
       all: overview.foods.filter((food) => !food.archived).length,
@@ -1166,6 +1182,16 @@ function FoodsTab({
               ),
             )}
           </div>
+          <div className="flex items-center gap-1.5">
+            <BrandFilter foods={overview.foods} value={brand} onChange={setBrand} className="min-w-0 flex-1" />
+            <button
+              type="button"
+              onClick={() => setManagingBrands(true)}
+              className="ml-auto flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-border px-3 text-xs font-medium text-ink-muted transition hover:text-ink"
+            >
+              <Tags size={13} aria-hidden /> Brands
+            </button>
+          </div>
           {!overview.foodLookup.available && (
             <p className="text-xs text-warning">
               Open Food Facts is unavailable — manual entry works as normal
@@ -1200,6 +1226,8 @@ function FoodsTab({
                 onEdit={() => setEditing(food)}
                 onFavourite={() => toggleFavourite(food)}
                 onDelete={() => remove(food)}
+                brand={brands.find(food.brand)}
+                onLog={food.archived ? undefined : () => onLog(food)}
                 onShare={
                   onShare
                     ? () => onShare({ kind: 'food', foodId: food.id })
@@ -1210,6 +1238,8 @@ function FoodsTab({
           </ul>
         )}
       </Panel>
+
+      <BrandsManager open={managingBrands} onClose={() => setManagingBrands(false)} />
 
       <SavedMealsPanel
         overview={overview}

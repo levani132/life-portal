@@ -2578,3 +2578,27 @@ route stays for public posts only.
 
 **Not done:** a link-only post written offline is kept as "Only me" (never wider) and has no
 link until it is shared again.
+
+## 2026-11-19 · Brands join foods by name, and logos are not shipped
+
+**Why brands at all:** the owner wants brands with logos, a picker that prevents duplicates,
+filters by brand, and public brands managed by the admin.
+
+**A food keeps its brand as text and finds the brand by a normalised key**, instead of holding a
+brand id. Foods already had a free-text brand; barcode lookups and copies from other people
+arrive with one. With a key (`brandKey`: lower case, no accents, letters and digits only) every
+one of those matches its brand without a migration, and "McDonald's", "mcdonalds" and
+"Mc Donalds" are one brand. The cost is that a rename must update the foods' text, which the
+brand service does.
+
+**A typed brand is never refused on a food.** The request was that a person cannot type a name
+that already exists. Refusing would break barcode imports and offline saves, so the text is
+turned into the existing brand instead; only creating a brand directly in the manager is
+refused, with `BRAND_EXISTS`.
+
+**Starter brands are names without logos.** A logo is the brand's own artwork; it is not ours to
+put in the repository. The admin uploads logos in the app. Until then a brand shows its initial
+on a tint.
+
+**The admin publishes only their own brands.** Listing other people's brands to pick from would
+show the admin what other people eat; the admin creates or publishes brands of their own.

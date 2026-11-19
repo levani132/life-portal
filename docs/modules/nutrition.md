@@ -416,3 +416,53 @@ The snapshot rule is unchanged: a correction never refreshes `facts`.
 A refused meal (`FOOD_GONE`, `MEAL_CHANGED`) stays on
 the day with its reason and Discard. Banked calories, the cheat countdown and suggestions stay the
 server's until it answers.
+
+## Brands
+
+A brand is a name and an optional logo, in `food_brands`:
+
+| Field | Meaning |
+| --- | --- |
+| `userId` | absent for a **public** brand (everyone sees it); the owner's id for their **own** |
+| `name` | as shown, at most 60 characters |
+| `key` | `brandKey(name)`: lower case, accents removed, letters and digits only. Unique per `userId` |
+| `logo` | `{ key, width, height }` in storage under `brands/`; responses carry a signed `logoUrl`, never the key |
+
+Public rows have no `userId`, so this service cannot use `OwnedCrudService` (the same reason as
+Training's catalogue): every query says whether it means public, own, or both.
+
+**A food is joined to its brand by name, not by an id.** `foods.brand` stays text and holds the
+brand's exact name; the join is `brandKey(food.brand) === brand.key`. So foods saved before
+brands existed, foods looked up by barcode and foods copied from someone else find their brand
+(and its logo) with no migration. A meal's `facts.brand` is still the frozen text it always was.
+
+Saving a food runs its brand text through `BrandsService.resolve()`:
+
+| What was typed | What is stored |
+| --- | --- |
+| any spelling of an existing brand, own first, then public | that brand's own name |
+| a new name | the cleaned name, and a new own brand with it |
+| nothing with a letter or digit | no brand |
+
+That is the whole rule that stops one brand being entered twice; the food form applies the same
+rule while typing. At 300 own brands, new names are stored as text without a brand row.
+
+| Route | Who | What |
+| --- | --- | --- |
+| `GET /nutrition/brands` | anyone with Food | public brands and their own (their own wins a shared name), `no-store` |
+| `POST /nutrition/brands` | anyone; `public: true` developer only | 409 `BRAND_EXISTS` with `existing` if the name exists in any spelling |
+| `PATCH /nutrition/brands/:id` | owner; developer for a public brand | name, `imageMediaId`, `removeImage`. A rename renames the brand on foods: the owner's, or everyone's for a public brand |
+| `DELETE /nutrition/brands/:id` | owner; developer for a public brand | foods keep the name as text |
+| `POST /nutrition/brands/:id/publish` | developer | one of the developer's own brands becomes public |
+
+The public list starts with `STARTER_BRANDS` (names only), inserted once per process with
+`$setOnInsert`, never overwriting. Their logos are the brands' own artwork: the admin uploads
+them, they are not in the code.
+
+**Most used brands** (`topBrandKeys`, pure): by how often the person's foods of that brand were
+eaten, then by how many foods, then by name; archived and unbranded foods do not count. The top
+five are the brand chips in the Foods tab and in the food chooser. Computed on the device from
+the foods already loaded.
+
+**Log from the food list:** each food card has a Log button that opens the log sheet with that
+food chosen at one serving, for the meal the clock suggests.

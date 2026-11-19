@@ -221,6 +221,14 @@ export class MediaService {
     return this.copyImage(userId, mediaId, `foods/${userId}/${foodId}-`);
   }
 
+  /**
+   * A brand's logo, copied like a food's picture. Under `brands/`, not under the uploader: a
+   * public brand's logo belongs to no one account.
+   */
+  async copyForBrand(userId: string, mediaId: string, brandId: string): Promise<{ key: string; width: number; height: number }> {
+    return this.copyImage(userId, mediaId, `brands/${brandId}-`, false);
+  }
+
   /** A photo of a private exercise (spec 020), copied like a food's. */
   async copyForTraining(
     userId: string,

@@ -2,6 +2,22 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-19: Food brands
+
+- **Brands with logos.** A food's brand is now a real brand: McDonald's, Wendy's and other
+  well-known ones are there from the start, and foods you already have with those brand names
+  are matched to them on their own.
+- **Pick a brand as you type.** The brand field on a food suggests known brands and your own.
+  Any spelling of an existing brand becomes that brand, so the same one is never entered twice;
+  a new name is saved as your own brand.
+- **Your own brands and logos.** "Brands" on the Foods tab lists your brands: add one, rename
+  it, give it a logo, remove it. The admin can also add public brands, give them logos, and
+  make one of their own public.
+- **Filter by brand.** The Foods tab and the food chooser show your five most used brands as
+  chips with their logos; tap one to see only its foods.
+- **Log from the food list.** Each food card has a Log button that opens the log sheet with that
+  food already chosen.
+
 ## 2026-11-19: Sharing
 
 - **Send something without posting it.** Sharing from Food or Training now asks "Post on my wall"

@@ -43,3 +43,4 @@ export * from './lib/strength-ranks';
 export * from './lib/tournaments';
 export * from './lib/tournament-scoring';
 export * from './lib/sync-health';
+export * from './lib/brands';

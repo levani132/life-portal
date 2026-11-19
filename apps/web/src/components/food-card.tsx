@@ -1,10 +1,11 @@
 'use client';
 
 import clsx from 'clsx';
-import { Archive, Globe, Pencil, Share2, Star, Trash2 } from 'lucide-react';
-import type { FoodWithUsage } from '@life-portal/shared-types';
+import { Archive, Globe, Pencil, Plus, Share2, Star, Trash2 } from 'lucide-react';
+import type { FoodBrand, FoodWithUsage } from '@life-portal/shared-types';
 import { mgToG } from '@life-portal/shared-domain';
 import { MACRO_TEXT } from '../lib/macro-colors';
+import { BrandMark } from './brand-mark';
 import { FoodArt } from './food-thumb';
 import { MacroSplit } from './macro-split';
 
@@ -20,8 +21,14 @@ export function FoodCard({
   onFavourite,
   onDelete,
   onShare,
+  onLog,
+  brand,
 }: {
   food: FoodWithUsage;
+  /** The food's brand, when it is a known one: for its logo. */
+  brand?: Pick<FoodBrand, 'logoUrl'>;
+  /** Starts logging this food. Absent for an archived food. */
+  onLog?: () => void;
   busy?: boolean;
   onEdit: () => void;
   onFavourite: () => void;
@@ -104,8 +111,9 @@ export function FoodCard({
             {food.name}
           </p>
           {(food.brand || source) && (
-            <p className="truncate text-[11px] text-ink-faint">
-              {[food.brand, source].filter(Boolean).join(' · ')}
+            <p className="mt-0.5 flex items-center gap-1 text-[11px] text-ink-faint">
+              {food.brand && <BrandMark name={food.brand} brand={brand} size={14} className="rounded" />}
+              <span className="truncate">{[food.brand, source].filter(Boolean).join(' · ')}</span>
             </p>
           )}
         </div>
@@ -127,6 +135,16 @@ export function FoodCard({
         </dl>
 
         <div className="pointer-events-auto mt-auto flex items-center justify-end gap-0.5 border-t border-border pt-2">
+          {onLog && (
+            <button
+              type="button"
+              onClick={onLog}
+              aria-label={`Log ${food.name}`}
+              className="mr-auto flex h-8 items-center gap-1 rounded-lg bg-accent-solid/10 px-2.5 text-xs font-semibold text-accent transition hover:bg-accent-solid/20 active:scale-95"
+            >
+              <Plus size={14} aria-hidden /> Log
+            </button>
+          )}
           {onShare && !food.archived && (
             <IconButton label={`Share ${food.name}`} onClick={onShare}>
               <Share2 size={15} />
