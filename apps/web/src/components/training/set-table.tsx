@@ -393,7 +393,7 @@ function LoggedRow({
       badge={
         records.length > 0 ? (
           <span
-            className="rounded-full bg-warning-solid/15 px-1.5 py-0.5 text-[10px] font-semibold text-warning"
+            className="rounded-full bg-warning-solid px-1 py-px text-[9px] font-bold leading-none text-white shadow-sm"
             title={`Personal record: ${records.map((kind) => RECORD_LABELS[kind]).join(', ')}`}
             aria-label={`Personal record: ${records.map((kind) => RECORD_LABELS[kind]).join(', ')}`}
           >
@@ -448,6 +448,9 @@ function Row({
       )}
     >
       <div className="flex items-center gap-2 text-sm">
+        {/* A record's badge sits on the corner of the set's number, so the row keeps its height. */}
+        <span className="relative shrink-0">
+          {badge && <span className="absolute -right-2 -top-1.5 z-10 flex">{badge}</span>}
         <button
           type="button"
           className={clsx(
@@ -462,6 +465,7 @@ function Row({
         >
           {SET_TYPE_SHORT[fields.type] || index}
         </button>
+        </span>
         {columns.map((column) => (
           <div key={column.key} className="flex-1">
             <SetInput
@@ -492,9 +496,8 @@ function Row({
           <Check className="h-5 w-5" strokeWidth={3} />
         </button>
       </div>
-      {(caption || badge || problem) && (
+      {(caption || problem) && (
         <p className="mt-0.5 flex items-center gap-1.5 pl-11 pr-12 text-[11px] text-ink-faint">
-          {badge}
           {problem ? <span className="text-danger">{problem}</span> : <span className="truncate">{caption}</span>}
         </p>
       )}
