@@ -312,6 +312,8 @@ export class MessagesService implements OnModuleInit {
       const card = await this.card(userId, dto.postId);
       if ('unavailable' in card)
         throw new BadRequestException('You can only send posts you can see.');
+      // A link-only post opens for the person it is sent to.
+      await this.posts.shareWith(userId, dto.postId, otherId);
     }
     const text = dto.text?.trim();
     const result = await this.messages

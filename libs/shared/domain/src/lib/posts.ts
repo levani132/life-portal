@@ -77,13 +77,16 @@ export function canReadFoodPost(input: {
   friends: boolean;
   blocked: boolean;
   enabled: boolean;
+  /** A link-only post this viewer was sent, or whose link they opened. Never beats a block. */
+  granted?: boolean;
 }): boolean {
   return (
     input.enabled &&
     !input.blocked &&
     (input.own ||
       input.audience === 'public' ||
-      (input.audience === 'friends' && input.friends))
+      (input.audience === 'friends' && input.friends) ||
+      input.granted === true)
   );
 }
 /**

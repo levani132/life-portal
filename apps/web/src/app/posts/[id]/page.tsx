@@ -20,8 +20,11 @@ export default function PostPage() {
 function PostDetail() {
   const { id } = useParams<{ id: string }>();
   // `?share=1`: arrived from sharing something in Food or Training, so the share sheet opens.
-  const share = useSearchParams().get('share') === '1';
-  const result = useApi<FoodPost>(`/posts/${id}`, SOCIAL_REFRESH);
+  const params = useSearchParams();
+  const share = params.get('share') === '1';
+  // A link-only post's key, from its link: the server opens the post to this account with it.
+  const key = params.get('k');
+  const result = useApi<FoodPost>(`/posts/${id}${key ? `?k=${encodeURIComponent(key)}` : ''}`, SOCIAL_REFRESH);
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader title="Post" />

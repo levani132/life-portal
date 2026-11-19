@@ -101,7 +101,12 @@ export function PostShareSheet({
   const [notice, setNotice] = useState('');
   const [showLink, setShowLink] = useState(false);
   const linkInput = useRef<HTMLInputElement>(null);
-  const url = () => new URL(`/posts/${postId}`, window.location.origin).href;
+  // A link-only post's link carries its key: without it the link opens for nobody new.
+  const url = () => {
+    const link = new URL(`/posts/${postId}`, window.location.origin);
+    if (post.shareKey) link.searchParams.set('k', post.shareKey);
+    return link.href;
+  };
   const canNativeShare = typeof navigator !== 'undefined' && !!navigator.share;
   const heads = canMessage ? shareHeads(inbox.data, friends.data?.people) : [];
   const loadingHeads = canMessage && (inbox.isLoading || friends.isLoading) && !heads.length;
@@ -354,7 +359,9 @@ export function PostShareSheet({
             </Link>
           )}
           <p className="text-[11px] text-ink-faint">
-            Links open only for people this post is shared with.
+            {post.linkOnly
+              ? 'Not on any wall or feed. It opens for the people you send it to, and for anyone signed in who has its link.'
+              : 'Links open only for people this post is shared with.'}
             {imageAllowed
               ? ' An image can be shared anywhere.'
               : ' Images are for your own and public posts, so this one stays with its audience.'}

@@ -422,6 +422,7 @@ export function PostCard({
               id={post.id}
               audience={post.audience}
               isOwner={post.isOwner}
+              linkOnly={post.linkOnly}
             />
           </div>
         </div>

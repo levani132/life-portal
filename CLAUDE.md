@@ -187,6 +187,12 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   don't widen it or add a sibling. Share images are only for own or public posts
   (`canShareImage()`), and the canvas must load the photo with `fetch` (CORS, no-store), never
   an `<img>`, or the cached copy taints it. See `docs/modules/posts.md`.
+- **A link-only post is a private post with `linkKey` and `linkViewers`, not a new audience.**
+  Lists, feeds, reposts and the public preview must keep treating it as private; only
+  `readable()` lets a listed viewer in, and never past a block. The key is checked in the query,
+  is 128 random bits (post ids are guessable), and a viewer is added only by presenting it or by
+  being sent the post in a message. Choosing an audience removes both fields. Don't add the key
+  to any list response. See `docs/modules/posts.md`.
 - **A post may have no food.** `publication`, `previewHash` and `kind` are optional; check
   `post.kind` (web) or `row.publication` (API) before touching food fields.
 - **Badge awards are written once and never edited or deleted** (`$setOnInsert`, unique per

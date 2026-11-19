@@ -112,6 +112,8 @@ export class CreatePostDto {
   @IsString() @MaxLength(120) title!: string;
   @IsString() @MaxLength(1000) caption!: string;
   @IsIn(AUDIENCES) audience!: Audience;
+  /** Make it link-only: private, but open to people it is sent to or who have its link. */
+  @ValidateIf((_, v: unknown) => v !== undefined) @IsBoolean() linkOnly?: boolean;
   /** Spec 036: a Training attachment, with the hash of the preview the author saw. */
   @ValidateIf((_, v: unknown) => v !== undefined)
   @ValidateNested()

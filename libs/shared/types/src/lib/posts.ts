@@ -104,6 +104,13 @@ export interface FoodPost {
   title: string;
   caption: string;
   audience: Audience;
+  /**
+   * A link-only post: private (on no wall, in no feed), but open to the people it was sent to
+   * in a message and to anyone who opens its link, which carries `shareKey`.
+   */
+  linkOnly?: boolean;
+  /** The secret part of a link-only post's link (`/posts/<id>?k=<shareKey>`). */
+  shareKey?: string;
   /** Absent for a post without food (text and/or media only). */
   kind?: FoodPostKind;
   day?: string;

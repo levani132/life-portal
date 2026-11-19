@@ -79,6 +79,11 @@ const SCAN_LIMIT = 100;
  */
 export const postGone = () => new NotFoundException({ code: 'POST_GONE', message: 'Post not found.' });
 
+/** A link-only post's key: 16 random bytes, base64url. */
+const LINK_KEY = /^[A-Za-z0-9_-]{16,64}$/;
+/** The most people one link-only post is opened to. */
+export const LINK_VIEWERS_MAX = 200;
+
 @Injectable()
 export class PostsService {
   constructor(
@@ -180,6 +185,8 @@ export class PostsService {
       title: row.title,
       caption: row.caption,
       audience: row.audience,
+      // Whoever can read a link-only post may pass its link on, so they get the key.
+      ...(row.linkKey ? { linkOnly: true, shareKey: row.linkKey } : {}),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
       version: 1 as const,
@@ -232,6 +239,7 @@ export class PostsService {
       row.title === dto.title.trim() &&
       row.caption === dto.caption.trim() &&
       row.audience === dto.audience &&
+      !!row.linkKey === (dto.linkOnly === true && dto.audience === 'private') &&
       (row.media ?? []).map((m) => m.id).join() === (dto.mediaIds ?? []).join()
     );
   }
@@ -305,6 +313,8 @@ export class PostsService {
             title: dto.title.trim(),
             caption: dto.caption.trim(),
             audience: dto.audience,
+            // Link-only is a private post with a secret key; any other audience has no key.
+            ...(dto.linkOnly && dto.audience === 'private' ? { linkKey: randomBytes(16).toString('base64url') } : {}),
             version: 1,
           },
         },
@@ -335,8 +345,10 @@ export class PostsService {
     row: FoodPostRecord,
   ): Promise<PostAuthor | null> {
     const own = row.userId === viewerId;
+    // A link-only post: also for the people it was sent to, or who opened its link.
+    const granted = !own && !!row.linkKey && !!row.linkViewers?.includes(viewerId);
     const [author, reported] = await Promise.all([
-      this.readableAuthor(viewerId, row),
+      this.readableAuthor(viewerId, row, granted),
       own
         ? null
         : this.reports.exists({
@@ -352,6 +364,7 @@ export class PostsService {
   private async readableAuthor(
     viewerId: string,
     row: Pick<FoodPostRecord, 'userId' | 'audience'>,
+    granted = false,
   ): Promise<PostAuthor | null> {
     const own = row.userId === viewerId;
     const [connection, enabled, author] = await Promise.all([
@@ -366,6 +379,7 @@ export class PostsService {
         friends: connection?.state === 'accepted',
         blocked: !!connection?.blockedBy.length,
         enabled,
+        granted,
       })
       ? author
       : null;
@@ -380,9 +394,34 @@ export class PostsService {
     if (!row || !author) throw postGone();
     return { row, author };
   }
-  async detail(userId: string, id: string) {
+  /**
+   * `key` is the secret from a link-only post's link. Presenting the right one adds the viewer
+   * to the post's readers, so everything else about the post (likes, comments, copying) works
+   * for them without the key. A wrong key changes nothing and the read fails like any other.
+   */
+  async detail(userId: string, id: string, key?: string) {
+    if (key && LINK_KEY.test(key)) {
+      this.id(id);
+      await this.posts.updateOne(
+        { _id: id, linkKey: key, userId: { $ne: userId }, deleted: { $ne: true }, [`linkViewers.${LINK_VIEWERS_MAX - 1}`]: { $exists: false } },
+        { $addToSet: { linkViewers: userId } },
+      );
+    }
     const { row, author } = await this.read(userId, id);
     return this.dto(row, author, userId, false);
+  }
+  /**
+   * Sending a link-only post in a message lets the recipient read it. Only someone who can
+   * already read it can pass it on, the same as forwarding its link. Nothing happens for any
+   * other post.
+   */
+  async shareWith(senderId: string, id: string, recipientId: string): Promise<void> {
+    const { row } = await this.read(senderId, id);
+    if (!row.linkKey || row.userId === recipientId) return;
+    await this.posts.updateOne(
+      { _id: id, linkKey: row.linkKey, [`linkViewers.${LINK_VIEWERS_MAX - 1}`]: { $exists: false } },
+      { $addToSet: { linkViewers: recipientId } },
+    );
   }
   /**
    * The link preview for anyone, signed in or not (spec 017). The same live checks a stranger
@@ -780,7 +819,8 @@ export class PostsService {
     this.id(id);
     const result = await this.posts.updateOne(
       { _id: id, userId, deleted: { $ne: true }, ...ORIGINAL },
-      { $set: { audience } },
+      // Choosing an audience ends link-only sharing: the link stops working for everyone.
+      { $set: { audience }, $unset: { linkKey: '', linkViewers: '' } },
     );
     if (!result.matchedCount) throw new NotFoundException('Post not found.');
     return { audience };
@@ -806,6 +846,8 @@ export class PostsService {
           // Spec 036: the copy permission. Copies already made are the copiers' own and stay.
           ...(dto.allowCopy !== undefined ? { allowCopy: dto.allowCopy } : {}),
         },
+        // A link-only post stays one only while it stays private.
+        ...(dto.audience !== 'private' ? { $unset: { linkKey: '', linkViewers: '' } } : {}),
       },
     );
     if (!changed.matchedCount) throw new NotFoundException('Post not found.');

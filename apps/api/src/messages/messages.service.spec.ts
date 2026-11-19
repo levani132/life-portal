@@ -46,6 +46,7 @@ function fixture() {
     own: jest.fn(async () => ({ displayName: 'Ana' })),
   };
   const posts = {
+    shareWith: jest.fn(async () => undefined),
     detail: jest.fn(async (): Promise<unknown> => ({
       id: 'p'.repeat(24),
       title: 'Lunch',

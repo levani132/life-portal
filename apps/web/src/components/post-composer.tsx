@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Users,
   X,
+  Link2,
 } from 'lucide-react';
 import {
   MAX_POST_MEDIA,
@@ -57,6 +58,7 @@ const audiences = {
   friends: { label: 'Friends', icon: Users },
   public: { label: 'Everyone in Life Portal', icon: Globe },
 };
+const LINK_ONLY_LABEL = 'Only people I send it to';
 const SLOT_LABELS: Record<MealSlot, string> = {
   breakfast: 'Breakfast',
   lunch: 'Lunch',
@@ -119,6 +121,8 @@ export function PostComposer({
   const [draft, setDraft] = useState({ title: '', caption: '' });
   const [captionOnly, setCaptionOnly] = useState(false);
   const [audience, setAudience] = useState<Audience>(defaultAudience ?? 'friends');
+  // Link-only: a private post that opens for the people it is sent to. Not on anyone's wall.
+  const [linkOnly, setLinkOnly] = useState(false);
   const audienceTouched = useRef(!!defaultAudience);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [picking, setPicking] = useState(false);
@@ -140,7 +144,7 @@ export function PostComposer({
   const dayStartHour = profile.data?.profile.dayStartHour ?? 4;
   useEffect(() => {
     const preferred = profile.data?.profile.defaultFoodVisibility;
-    if (preferred && !audienceTouched.current) setAudience(preferred);
+    if (preferred && !audienceTouched.current && !linkOnly) setAudience(preferred);
   }, [profile.data]);
   const done = (path: string) => (onDone ? onDone(path) : onClose());
 
@@ -312,7 +316,8 @@ export function PostComposer({
         requestId,
         title: draft.title,
         caption: draft.caption,
-        audience,
+        // A post kept for later cannot be link-only yet, so it is kept as "Only me": never wider.
+        audience: linkOnly ? 'private' : audience,
         ...(food ? { source: food.source } : {}),
         // Spec 036: only what the author previewed; it is checked again before it is published.
         ...(training && trainingPreview ? { training, trainingHash: trainingPreview.trainingHash, allowCopy } : {}),
@@ -338,7 +343,8 @@ export function PostComposer({
       ...(attachments.length ? { mediaIds: mediaIds() } : {}),
       title: draft.title.trim(),
       caption: draft.caption.trim(),
-      audience,
+      audience: linkOnly ? 'private' : audience,
+      ...(linkOnly ? { linkOnly: true } : {}),
       requestId,
     });
     await revalidate('/posts');
@@ -354,7 +360,7 @@ export function PostComposer({
       const post = await createPost(food && preview ? food.source : undefined, preview?.previewHash);
       // Shared from Food or Training: the new post opens with its share sheet, to send it to a
       // friend or outside the app straight away.
-      done(`/posts/${post.id}${initialSource || initialTraining ? '?share=1' : ''}`);
+      done(`/posts/${post.id}${initialSource || initialTraining || linkOnly ? '?share=1' : ''}`);
     } catch (e) {
       if (e instanceof NetworkError) {
         setNoConnection(true);
@@ -469,7 +475,7 @@ export function PostComposer({
   const cameraHeight =
     dragHeight ?? (camera === 'full' ? '100%' : camera === 'half' ? '50%' : 0);
   const cameraVisible = dragHeight !== null ? dragHeight > 40 : camera !== 'hidden';
-  const AudienceIcon = audiences[audience].icon;
+  const AudienceIcon = linkOnly ? Link2 : audiences[audience].icon;
   const atLimit = attachments.length >= MAX_POST_MEDIA;
   const slotLabel = SLOT_LABELS[mealContextNow(dayStartHour).slot];
   const firstPhoto = attachments[0]?.media;
@@ -530,9 +536,32 @@ export function PostComposer({
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {(initialSource || initialTraining) && (
-            <p className="border-b border-border bg-surface px-4 py-2 text-xs text-ink-muted">
-              Sharing makes a post. Once you press Share, you can send it to a friend or to another app.
-            </p>
+            <div className="border-b border-border bg-surface px-4 py-2.5">
+              <div className="grid grid-cols-2 gap-2" role="group" aria-label="How to share">
+                {([[false, 'Post on my wall'], [true, 'Just send it']] as const).map(([value, label]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    aria-pressed={linkOnly === value}
+                    onClick={() => {
+                      audienceTouched.current = true;
+                      setLinkOnly(value);
+                    }}
+                    className={clsx(
+                      'rounded-xl border px-3 py-2 text-sm font-medium transition-colors',
+                      linkOnly === value ? 'border-accent bg-accent-solid/10 text-accent' : 'border-border text-ink-muted',
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-ink-muted">
+                {linkOnly
+                  ? 'Not on your wall or in any feed. After you press Share, pick who to send it to; only they, and people with its link, can open it.'
+                  : 'It goes on your wall for the audience below. After you press Share you can also send it to a friend or another app.'}
+              </p>
+            </div>
           )}
           {error && (
             <div className="px-4 pt-3">
@@ -710,16 +739,18 @@ export function PostComposer({
           )}
           <div
             className="relative ml-auto flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm text-ink-muted hover:bg-ink/5 focus-within:ring-2 focus-within:ring-accent"
-            title={audiences[audience].label}
+            title={linkOnly ? LINK_ONLY_LABEL : audiences[audience].label}
           >
             <AudienceIcon size={16} aria-hidden="true" />
-            <span>{audience === 'public' ? 'Everyone' : audiences[audience].label}</span>
+            <span>{linkOnly ? 'Send only' : audience === 'public' ? 'Everyone' : audiences[audience].label}</span>
             <ChevronDown size={13} aria-hidden="true" />
             <select
               aria-label="Post audience"
-              value={audience}
+              value={linkOnly ? 'link' : audience}
               onChange={(event) => {
                 audienceTouched.current = true;
+                if (event.target.value === 'link') return setLinkOnly(true);
+                setLinkOnly(false);
                 setAudience(event.target.value as Audience);
               }}
               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
@@ -729,6 +760,7 @@ export function PostComposer({
                   {value.label}
                 </option>
               ))}
+              <option value="link">{LINK_ONLY_LABEL}</option>
             </select>
           </div>
         </div>

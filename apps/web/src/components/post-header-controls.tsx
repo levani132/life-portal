@@ -1,7 +1,9 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Globe, Lock, MoreHorizontal, Users } from 'lucide-react';
+import { ChevronDown, Globe, Lock, MoreHorizontal, Users,
+  Link2,
+} from 'lucide-react';
 import type { Audience } from '@life-portal/shared-types';
 import { api } from '../lib/api';
 import { revalidate } from '../lib/hooks';
@@ -34,25 +36,35 @@ const audiences = {
   friends: { label: 'Friends', icon: Users },
   public: { label: 'Everyone in Life Portal', icon: Globe },
 };
+/** A private post that opens for the people it was sent to, or who have its link. */
+const LINK_ONLY = { label: 'Only people I send it to', icon: Link2 };
 export function PostAudienceControl({
   id,
   audience,
   isOwner,
+  linkOnly = false,
 }: {
   id: string;
   audience: Audience;
   isOwner: boolean;
+  /** A private post open to the people it was sent to. Choosing an audience ends that. */
+  linkOnly?: boolean;
 }) {
   const [value, setValue] = useState(audience);
+  const [link, setLink] = useState(linkOnly);
+  useEffect(() => {
+    setLink(linkOnly);
+  }, [linkOnly]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => {
     setValue(audience);
   }, [audience]);
-  const Icon = audiences[value].icon;
+  const shown = link && value === 'private' ? LINK_ONLY : audiences[value];
+  const Icon = shown.icon;
   if (!isOwner)
     return (
-      <span title={audiences[value].label} aria-label={audiences[value].label}>
+      <span title={shown.label} aria-label={shown.label}>
         <Icon size={13} aria-hidden="true" />
       </span>
     );
@@ -60,7 +72,7 @@ export function PostAudienceControl({
     <span className="relative inline-flex items-center">
       <span
         className="group relative inline-flex h-7 items-center gap-1 rounded-md px-1.5 transition hover:bg-special-solid/10 focus-within:bg-special-solid/10 focus-within:ring-2 focus-within:ring-accent"
-        title={`Audience: ${audiences[value].label}`}
+        title={`Audience: ${shown.label}`}
       >
         <Icon size={13} aria-hidden="true" />
         <ChevronDown
@@ -71,11 +83,14 @@ export function PostAudienceControl({
         <select
           aria-label="Change post audience"
           className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          value={value}
+          value={link && value === 'private' ? 'link' : value}
           disabled={busy}
           onChange={async (event) => {
+            if (event.target.value === 'link') return;
             const next = event.target.value as Audience;
             const previous = value;
+            const wasLink = link;
+            setLink(false);
             setBusy(true);
             setError('');
             setValue(next);
@@ -86,6 +101,7 @@ export function PostAudienceControl({
               );
             } catch (e) {
               setValue(previous);
+              setLink(wasLink);
               setError(
                 e instanceof Error ? e.message : 'Could not change audience.',
               );
@@ -94,6 +110,7 @@ export function PostAudienceControl({
             }
           }}
         >
+          {link && value === 'private' && <option value="link">{LINK_ONLY.label}</option>}
           {Object.entries(audiences).map(([key, option]) => (
             <option key={key} value={key}>
               {option.label}

@@ -2552,3 +2552,29 @@ The thresholds are WCAG's (4.5:1 body text, 3:1 for faint and status text).
 **Fixed colours stay fixed** where a theme has no business: brand colours, photos' overlays,
 rank materials, and images drawn for outside the page. The list is the allowlist in
 `apps/web/src/lib/theme-roles.spec.ts`.
+
+## 2026-11-19 · Link-only posts are private posts with a key, not a fourth audience
+
+**Why:** the owner wants to send a food or a workout to one person, in a message or through
+another app, without it appearing on their wall. A message can only carry a post, and a private
+post could not be opened by the person it was sent to.
+
+**A private post plus a key and a reader list**, not a new `Audience` value. `Audience` is shared
+with module visibility, and every feed, profile and repost rule already hides private posts. A
+new value would have had to be excluded in each of those places, and one missed place would
+leak. As it is, only the single-post read knows about the reader list.
+
+**The link carries a secret key.** Post ids are Mongo ids: sequential enough to guess. The key
+is 128 random bits.
+
+**Opening the link adds you to the readers**, so likes, comments and copying then work without
+threading the key through every route. Anyone signed in with the link can open it and pass it
+on; that is what "has the link" means. It is capped at 200 readers per post.
+
+**Still no public route.** A link-only post needs an account to open. The one public posts
+route stays for public posts only.
+
+**Choosing an audience revokes the link** for everyone, so there is a way to take it back.
+
+**Not done:** a link-only post written offline is kept as "Only me" (never wider) and has no
+link until it is shared again.

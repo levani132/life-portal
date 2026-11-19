@@ -41,6 +41,13 @@ export class FoodPostRecord {
   @Prop({ default: '', maxlength: 1000 }) caption!: string;
   @Prop({ type: String, enum: AUDIENCES, default: 'private' })
   audience!: Audience;
+  /**
+   * A link-only post: `audience` stays `private`, so every list and feed treats it as private,
+   * and this key is the secret in its link. Absent on every other post.
+   */
+  @Prop() linkKey?: string;
+  /** Who may read a link-only post besides its author: people sent it, or who opened the link. */
+  @Prop({ type: [String], default: undefined }) linkViewers?: string[];
   @Prop({ default: 1 }) version!: number;
   @Prop({ default: false, index: true }) deleted!: boolean;
   /**

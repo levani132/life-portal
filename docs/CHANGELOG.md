@@ -4,6 +4,11 @@ User-visible changes. Newest first.
 
 ## 2026-11-19: Sharing
 
+- **Send something without posting it.** Sharing from Food or Training now asks "Post on my wall"
+  or "Just send it". "Just send it" makes a post that is on no wall and in no feed: it opens only
+  for the people you send it to in a message, and for people signed in who have its link. The
+  audience list has the same choice ("Only people I send it to") for any post. Choosing another
+  audience later switches the link off.
 - **Share from Food or Training, then send it on.** Sharing a food, a meal, a workout or a plan
   still makes a post, and the new post now opens with its share sheet, so you can send it to a
   friend in a message, copy its link or hand it to another app straight away.

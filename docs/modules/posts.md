@@ -251,6 +251,34 @@ Posts show media in a swipeable carousel framed by the first item (clamped to 4:
 
 Home shows the feed under the widgets. With the `forYou` flag (019) it is two tabs, **For You** (default, `GET /for-you`) and **Friends** (the Wall, unchanged; not "Following", since friendship is mutual), in `home-feed.tsx`: each keeps its own page and Older/Newer history, switching restores that tab's scroll once the feed is scrolled into, the choice lasts the browser session, an empty For You offers Friends, and the strip is tap/keyboard only (`data-no-tab-swipe`). The strip is **not sticky**: when the header hides on scroll, anything pinned to the top sits in the iPhone status-bar band and shows through hollow, so it scrolls away with the feed and the header brings navigation back on scroll up. A For You card's menu adds **Not interested** and **Hide {name} from For You**; either collapses the card into a one-line note with Undo, and hiding an author also removes their other cards from the page until Undo. Without the flag Home shows "From your friends" as before. Wall is the fourth bottom tab when all three features are enabled. Food offers entry/meal/day/food/database share actions, each opening `/new` with that selection attached; logging offers a dismissible share action afterward. Profiles open Posts, with About alongside for permitted live widgets. Posts can be reviewed, edited, deleted, imported, reported or hidden. Each post's footer has three buttons: Like, Comment and Share. Share opens a bottom sheet (`post-share-sheet.tsx`): with the `messages` feature, a row of chat heads (recent conversations first, then friends you have not talked to) where a tap sends the post as a reference, so its audience still applies (see [messages](messages.md)); below it, Repost/Reposted (only for another member's non-private post), Save foods (another member's post with food: closes the sheet and opens the import dialog), Copy link and, where the browser has one, More… for the system share sheet. A third row, **Share to** (017), scrolls sideways: Instagram and TikTok (share the Story image), WhatsApp, Messenger (touch devices only, it opens the app's URL scheme), Facebook and X (web share intents from `shareTargetUrl()`), and Save image. The image buttons appear only where `canShareImage()` allows it: your own posts, or public ones. A repost card shows "↻ <name> reposted · time" above the original's header and is keyed by `repost.id` in lists. The link opens only for signed-in viewers the post's audience already allows. Developer Menu includes the report queue.
 
+## Link-only posts
+
+For sending something to particular people without posting it: a food, a meal, a workout.
+
+A link-only post is a **private** post (`audience: 'private'`) with two extra fields on
+`food_posts`: `linkKey` (16 random bytes, base64url) and `linkViewers` (user ids, at most 200).
+Because its audience is private, every list, feed, profile, search, repost rule and the public
+preview treat it exactly as a private post. Only the single-post read path knows more:
+`readable()` also lets in a viewer listed in `linkViewers`, through `canReadFoodPost`'s
+`granted`, which never beats a block, a report, deletion or the author's access being off.
+
+A viewer gets onto the list in two ways:
+
+- **Opening the link.** `GET /posts/:id?k=<key>` with the right key adds the signed-in viewer,
+  then reads as usual. A wrong or malformed key changes nothing. There is still no public route:
+  the person must be signed in.
+- **Being sent it.** `MessagesService.send` calls `PostsService.shareWith(sender, post,
+  recipient)` after its usual check that the sender can see the post.
+
+The response carries `linkOnly: true` and `shareKey` for anyone who can read it (having the link
+means being able to pass it on). Created with `POST /posts { audience: 'private', linkOnly:
+true }`. Choosing any audience (`PATCH /posts/:id/audience`), or editing it to a non-private
+one, removes the key and the list: the link stops working for everyone.
+
+In the app: the composer's audience list has "Only people I send it to", and a post started
+from a Food or Training share button offers "Post on my wall" or "Just send it". After
+publishing from either, the post opens with its share sheet (`?share=1`).
+
 ## Sharing outside the app (017)
 
 **Story image.** `apps/web/src/lib/share-image.ts` draws a 1080×1920 PNG in the browser: brand, a card with the first photo, author, title, and the macro rings with grams and shares. Nothing is uploaded or stored. The sheet renders it as soon as it opens, so `navigator.share({files})` runs inside the tap (iOS refuses a share started after an `await` that outlived the gesture); where files cannot be shared it downloads. The photo is loaded with `fetch(url, {mode: 'cors', cache: 'no-store'})` and `createImageBitmap`, **not** an `<img>`: the post already showed that URL without CORS, and the browser's cached copy taints the canvas. A tainted canvas is redrawn without the photo.

@@ -208,7 +208,7 @@ it('updates only the audience and only for the post owner', async () => {
   await f.service.updateAudience('owner', id, 'friends');
   expect(f.posts.updateOne).toHaveBeenCalledWith(
     { _id: id, userId: 'owner', deleted: { $ne: true }, repostOf: { $exists: false } },
-    { $set: { audience: 'friends' } },
+    { $set: { audience: 'friends' }, $unset: { linkKey: '', linkViewers: '' } },
   );
   f.posts.updateOne.mockResolvedValue({ matchedCount: 0 });
   await expect(
@@ -847,5 +847,65 @@ describe('training attachments (spec 036)', () => {
     await f.service.remove('owner', String(f.row._id));
     expect(f.posts.updateOne.mock.calls[0][1].$unset).toMatchObject({ training: '', trainingHash: '', allowCopy: '' });
     expect(f.training.removePhotos).toHaveBeenCalledWith(expect.objectContaining({ kind: 'exercise' }));
+  });
+});
+
+describe('link-only posts', () => {
+  const KEY = 'abcdefghijklmnopqrstuv';
+  const linked = () => {
+    const f = fixture();
+    Object.assign(f.row, { linkKey: KEY });
+    return f;
+  };
+
+  it('stays closed to a stranger who has no key', async () => {
+    const f = linked();
+    await expect(f.service.detail('stranger', String(f.row._id))).rejects.toThrow();
+  });
+
+  it('opens for someone it was shared with, and gives them the key to pass on', async () => {
+    const f = linked();
+    Object.assign(f.row, { linkViewers: ['friend'] });
+    expect(await f.service.detail('friend', String(f.row._id))).toMatchObject({ isOwner: false, linkOnly: true, shareKey: KEY, audience: 'private' });
+  });
+
+  it('adds the viewer only when the key matches, and never beats a block', async () => {
+    const f = linked();
+    await expect(f.service.detail('stranger', String(f.row._id), KEY)).rejects.toThrow();
+    expect(f.posts.updateOne).toHaveBeenCalledWith(
+      expect.objectContaining({ linkKey: KEY, userId: { $ne: 'stranger' } }),
+      { $addToSet: { linkViewers: 'stranger' } },
+    );
+    Object.assign(f.row, { linkViewers: ['stranger'] });
+    f.graph.between.mockResolvedValue({ state: 'none', blockedBy: ['owner'] });
+    await expect(f.service.detail('stranger', String(f.row._id))).rejects.toThrow();
+  });
+
+  it('ignores a key that is not shaped like one', async () => {
+    const f = linked();
+    await expect(f.service.detail('stranger', String(f.row._id), '{"$ne":""}')).rejects.toThrow();
+    expect(f.posts.updateOne).not.toHaveBeenCalled();
+  });
+
+  it('a post with no key is not opened by being listed as a viewer', async () => {
+    const f = fixture();
+    Object.assign(f.row, { linkViewers: ['stranger'] });
+    await expect(f.service.detail('stranger', String(f.row._id))).rejects.toThrow();
+  });
+
+  it('sending it in a message opens it for the recipient, only if the sender can read it', async () => {
+    const f = linked();
+    await f.service.shareWith('owner', String(f.row._id), 'friend');
+    expect(f.posts.updateOne).toHaveBeenCalledWith(expect.objectContaining({ linkKey: KEY }), { $addToSet: { linkViewers: 'friend' } });
+    f.posts.updateOne.mockClear();
+    await expect(f.service.shareWith('stranger', String(f.row._id), 'friend')).rejects.toThrow();
+    expect(f.posts.updateOne).not.toHaveBeenCalled();
+  });
+
+  it('choosing an audience ends link sharing', async () => {
+    const f = linked();
+    f.posts.updateOne.mockResolvedValue({ matchedCount: 1 });
+    await f.service.updateAudience('owner', String(f.row._id), 'friends');
+    expect(f.posts.updateOne).toHaveBeenCalledWith(expect.anything(), { $set: { audience: 'friends' }, $unset: { linkKey: '', linkViewers: '' } });
   });
 });

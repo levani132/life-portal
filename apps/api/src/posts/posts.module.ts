@@ -207,11 +207,13 @@ class PostsController {
   ) {
     return this.posts.updateAudience(userId, id, dto.audience);
   }
+  /** `?k=` is a link-only post's key: the right one opens the post to this account. */
   @Get(':id') detail(
     @CurrentUser('userId') userId: string,
     @Param('id') id: string,
+    @Query('k') key?: string,
   ) {
-    return this.posts.detail(userId, id);
+    return this.posts.detail(userId, id, typeof key === 'string' ? key : undefined);
   }
   @Patch(':id') update(
     @CurrentUser('userId') userId: string,
