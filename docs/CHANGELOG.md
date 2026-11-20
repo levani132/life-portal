@@ -2,6 +2,16 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-20: Log several foods at once
+
+- **"Add another food" in the log sheet.** After choosing a food and its amount, add another
+  instead of recording straight away: the first one folds into a line at the top and the search
+  is ready for the next. Each food keeps the meal it was added for, so one sheet can cover
+  breakfast and lunch together.
+- **The meal buttons show how many foods are waiting** in each, the rings show your day with all
+  of them, and one button records the lot ("Record 4 foods"). Tap a waiting food to change it,
+  or the × to drop it. Closing the sheet with foods waiting asks first.
+
 ## 2026-11-19: Tab bar stays at the bottom after switching apps
 
 - **The tab bar no longer ends up in the middle of the screen** after you leave the app with the

@@ -14,6 +14,7 @@ import {
   Sunrise,
   Utensils,
   type LucideIcon,
+  X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
@@ -104,6 +105,9 @@ export function LogFoodModal({
     entry ? String(entry.servings) : initialFood ? '1' : '',
   );
   const [entryDay, setEntryDay] = useState(entry?.day ?? day);
+  // Foods already chosen in this sheet and waiting to be recorded with the rest: each keeps the
+  // meal and amount it was added with. Recorded together by the one button at the end.
+  const [basket, setBasket] = useState<Waiting[]>([]);
 
   // Reopening for a different slot, day or entry must not show the last one's numbers.
   useEffect(() => {
@@ -112,6 +116,7 @@ export function LogFoodModal({
     setSlot(entry?.slot ?? initialSlot);
     setFoodId(entry?.foodId ?? initialFood?.id);
     setEntryDay(entry?.day ?? day);
+    setBasket([]);
     setAmountText(entry ? String(entry.amount) : initialFood ? String(initialFood.servingSize) : '');
     setServingsText(entry ? String(entry.servings) : initialFood ? '1' : '');
     // `initialFood` by id: the list re-creates the object on every read.
@@ -199,7 +204,55 @@ export function LogFoodModal({
     [overview.data?.suggestions, slot, foods],
   );
 
+  /** The food being set up now, as something that can wait: only once it has a food and an amount. */
+  const current: Waiting | undefined =
+    !editing && food && validAmount ? { key: `${food.id}:${slot}:${Date.now()}`, food, slot, amount: Math.round(amount) } : undefined;
+  const waitingTotals = basket.reduce<EntryTotals | undefined>(
+    (sum, item) => plus(sum, entryTotals(item.amount, item.food)),
+    undefined,
+  );
+
+  /** Keeps the current food for later and clears the form for the next one. */
+  const addAnother = () => {
+    if (!current) return;
+    setBasket((items) => [...items, current]);
+    setFoodId(undefined);
+    setAmountText('');
+    setServingsText('');
+    clearError();
+  };
+  /** Brings a waiting food back into the form; whatever was being set up waits in its place. */
+  const reopen = (item: Waiting) => {
+    setBasket((items) => [...items.filter((other) => other.key !== item.key), ...(current ? [current] : [])]);
+    setSlot(item.slot);
+    setFoodId(item.food.id);
+    setAmountText(String(item.amount));
+    setServingsText(String(amountToServings(item.amount, item.food.servingSize)));
+  };
+  // Closing with foods waiting would lose them, so it asks first.
+  const requestClose = () => {
+    if (basket.length && !window.confirm(`Discard the ${basket.length} food${basket.length === 1 ? '' : 's'} you added?`)) return;
+    onClose();
+  };
+  const toRecord = [...basket, ...(current ? [current] : [])];
+
   const submit = () => {
+    if (!editing) {
+      if (!toRecord.length) return;
+      let last: MealEntry | undefined;
+      // One after another: each is kept on the device at once and sent when there is a connection
+      // (spec 029), so a dropped connection midway loses nothing.
+      void run(async () => {
+        for (const item of toRecord) last = await foodWrites.logEntry(item.food, { day: entryDay, slot: item.slot, amount: item.amount });
+      }, { revalidate: false }).then((ok) => {
+        if (ok) {
+          setBasket([]);
+          onLogged?.(last);
+          onClose();
+        }
+      });
+      return;
+    }
     if (!facts || !validAmount) return;
     let recorded: MealEntry | undefined;
     // Spec 029: kept on the device and shown at once (marked "not saved yet" until the server
@@ -230,18 +283,53 @@ export function LogFoodModal({
     <>
       <Modal
         open={open}
-        onClose={onClose}
+        onClose={requestClose}
         title={editing ? 'Correct a meal' : 'Log food'}
         headerAction={
           <DayPicker day={entryDay} today={today} onChange={setEntryDay} />
         }
         onSubmit={submit}
-        submitLabel={editing ? 'Save' : 'Record meal'}
+        submitLabel={editing ? 'Save' : toRecord.length > 1 ? `Record ${toRecord.length} foods` : 'Record meal'}
         pending={pending}
         error={error}
         wide
       >
-        <MealChooser value={slot} onChange={setSlot} />
+        <MealChooser value={slot} onChange={setSlot} waiting={basket} />
+
+        {/* Foods already added in this sheet, one line each: tap to change, × to drop. */}
+        {basket.length > 0 && (
+          <ul className="space-y-1" aria-label="Foods added">
+            {basket.map((item) => {
+              const totals = entryTotals(item.amount, item.food);
+              const { label, color } = SLOTS[item.slot];
+              return (
+                <li key={item.key} className="flex items-center gap-2 rounded-xl border border-border bg-surface pl-2.5 pr-1 text-sm">
+                  <span className="h-6 w-1 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden />
+                  <button type="button" onClick={() => reopen(item)} className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left" aria-label={`Change ${item.food.name}`}>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{item.food.name}</span>
+                      <span className="block truncate text-xs text-ink-faint">
+                        {item.amount} {item.food.unit} · {label}
+                      </span>
+                    </span>
+                    <span className="tabular shrink-0 text-xs font-semibold">
+                      {totals.energyKcal}
+                      <span className="ml-0.5 font-normal text-ink-faint">kcal</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="flex h-9 w-8 shrink-0 items-center justify-center rounded-lg text-ink-faint hover:text-danger"
+                    aria-label={`Remove ${item.food.name}`}
+                    onClick={() => setBasket((items) => items.filter((other) => other.key !== item.key))}
+                  >
+                    <X size={15} aria-hidden />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
 
         {editing ? (
           <div className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5">
@@ -364,11 +452,20 @@ export function LogFoodModal({
 
             <MealImpact
               eaten={eaten}
-              added={preview}
+              added={plus(waitingTotals, preview)}
               targets={overview.data?.targets}
               loading={overview.isLoading}
             />
+            {current && (
+              <button type="button" className="btn-ghost w-full justify-center" onClick={addAnother}>
+                <Plus size={15} aria-hidden /> Add another food
+              </button>
+            )}
           </>
+        )}
+        {/* Nothing being set up, but foods waiting: the rings still show the day with them. */}
+        {!facts && waitingTotals && (
+          <MealImpact eaten={eaten} added={waitingTotals} targets={overview.data?.targets} loading={overview.isLoading} />
         )}
       </Modal>
       {addingFood && (
@@ -387,9 +484,12 @@ export function LogFoodModal({
 function MealChooser({
   value,
   onChange,
+  waiting = [],
 }: {
   value: MealSlot;
   onChange: (slot: MealSlot) => void;
+  /** Foods added and not yet recorded: each meal shows how many it holds. */
+  waiting?: readonly Waiting[];
 }) {
   return (
     <div className="grid grid-cols-5 gap-1.5" role="radiogroup" aria-label="Meal">
@@ -404,7 +504,7 @@ function MealChooser({
             aria-checked={selected}
             onClick={() => onChange(option)}
             className={clsx(
-              'flex flex-col items-center gap-1 rounded-xl border px-0.5 py-2 text-[10px] font-medium tracking-tight transition active:scale-95 sm:text-[11px]',
+              'relative flex flex-col items-center gap-1 rounded-xl border px-0.5 py-2 text-[10px] font-medium tracking-tight transition active:scale-95 sm:text-[11px]',
               selected ? 'text-ink' : 'border-border text-ink-muted hover:text-ink',
             )}
             style={
@@ -423,6 +523,14 @@ function MealChooser({
               <Icon size={16} strokeWidth={2.2} />
             </span>
             <span className="max-w-full truncate">{label}</span>
+            {waiting.some((item) => item.slot === option) && (
+              <span
+                className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-ink px-1 text-[10px] font-bold leading-none text-surface"
+                aria-label={`${waiting.filter((item) => item.slot === option).length} added`}
+              >
+                {waiting.filter((item) => item.slot === option).length}
+              </span>
+            )}
           </button>
         );
       })}
@@ -517,6 +625,25 @@ function shortDay(day: string) {
     month: 'short',
     timeZone: 'UTC',
   });
+}
+
+/** A food added in the sheet and waiting to be recorded. */
+interface Waiting {
+  key: string;
+  food: FoodWithUsage;
+  slot: MealSlot;
+  amount: number;
+}
+
+/** Two totals added; either may be missing. */
+function plus(a: EntryTotals | undefined, b: EntryTotals | undefined): EntryTotals | undefined {
+  if (!a || !b) return a ?? b;
+  return {
+    energyKcal: a.energyKcal + b.energyKcal,
+    proteinMg: a.proteinMg + b.proteinMg,
+    carbMg: a.carbMg + b.carbMg,
+    fatMg: a.fatMg + b.fatMg,
+  };
 }
 
 function subtract(a: EntryTotals, b: EntryTotals): EntryTotals {
