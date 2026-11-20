@@ -779,39 +779,35 @@ function SlotSuggestions({
 
   const { style } = SLOT_STYLES[slot];
   return (
-    <div className={clsx('mx-1.5 mb-1.5 rounded-xl border border-dashed p-2.5 sm:mx-4 sm:mb-3', style.border, style.tint)}>
-      <p className={clsx('flex items-center gap-1.5 text-[13px] font-semibold', style.text)}>
-        <Sparkles className="h-3.5 w-3.5" aria-hidden /> Suggestions
+    <div className="mx-1.5 mb-2 sm:mx-4 sm:mb-3">
+      <p className={clsx('mb-1 flex items-center gap-1 px-1 text-[11px] font-semibold', style.text)}>
+        <Sparkles className="h-3 w-3" aria-hidden /> Suggestions
+        <span className="font-normal text-ink-faint">· tap to add</span>
       </p>
-      <p className="mb-2 mt-0.5 text-[11px] text-ink-faint">
-        From your recent meals · Tap to add to {slotLabel.toLowerCase()}.
-      </p>
-      <div className="flex flex-wrap gap-2">
+      {/* Two to a line: a name and its calories, small enough that a meal's suggestions take a
+          row or two, not half the screen. */}
+      <div className="grid grid-cols-2 gap-1.5">
         {suggestions.map((suggestion) => (
           <button
             key={suggestion.foodId}
             type="button"
-            className="flex min-h-11 max-w-full items-center gap-3 rounded-lg border border-border bg-surface-raised px-2.5 py-1.5 text-left text-[13px] text-ink-muted transition hover:text-ink active:scale-95 disabled:opacity-50"
-            aria-label={`Add suggested ${suggestion.name} to ${slotLabel.toLowerCase()}`}
+            className={clsx(
+              'flex min-h-9 items-center gap-1.5 rounded-lg border border-dashed px-2 py-1 text-left text-xs transition active:scale-95 disabled:opacity-50',
+              style.border,
+              style.tint,
+            )}
+            aria-label={`Add suggested ${suggestion.name}, ${suggestion.amount} ${suggestion.unit}, to ${slotLabel.toLowerCase()}`}
             onClick={() => log(suggestion)}
             disabled={pending}
             title={
               suggestion.dayCount > 1
-                ? `${slotLabel} on ${suggestion.dayCount} of the last 14 days, most recently ${formatDay(suggestion.lastDay)}`
-                : `${slotLabel}, ${formatDay(suggestion.lastDay)}`
+                ? `${suggestion.amount} ${suggestion.unit}. ${slotLabel} on ${suggestion.dayCount} of the last 14 days, most recently ${formatDay(suggestion.lastDay)}`
+                : `${suggestion.amount} ${suggestion.unit}. ${slotLabel}, ${formatDay(suggestion.lastDay)}`
             }
           >
-            <span className="min-w-0">
-              <span className="block truncate font-medium text-ink">
-                {suggestion.name}
-              </span>
-              <span className="tabular block text-ink-faint">
-                {suggestion.amount} {suggestion.unit} ·{' '}
-                {suggestion.totals.energyKcal} kcal
-                {suggestion.dayCount > 1 && ` · ${suggestion.dayCount} days`}
-              </span>
-            </span>
-            <Plus size={15} className={clsx('shrink-0', style.text)} aria-hidden="true" />
+            <Plus size={13} className={clsx('shrink-0', style.text)} aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate font-medium text-ink">{suggestion.name}</span>
+            <span className="tabular shrink-0 text-[11px] text-ink-muted">{suggestion.totals.energyKcal}</span>
           </button>
         ))}
       </div>
