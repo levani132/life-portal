@@ -1,6 +1,6 @@
 # Roadmap
 
-Where Life Portal is, where it is going, and in what order. Updated 2026-11-11. Product
+Where Life Portal is, where it is going, and in what order. Updated 2026-11-20. Product
 direction comes from the owner; the order and the architecture tiers are recommendations agreed
 in conversation, not commitments. Costs are rough late-2026 list prices, order of magnitude only.
 
@@ -14,31 +14,29 @@ the same day. The core stays free; AI is the paid part.
 |---|---|---|
 | **Money** | Loans with payoff scenarios, free-money cash flow, items to sell, shares and the ESPP plan, spending from bank messages (Shortcut ingest), multi-currency with daily FX history | 002 |
 | **Work and life** | EPAM boards, side projects, personal plans | — |
-| **Food** | Nutrition tracking, food profile and activity targets, Apple Health sync with resumable batches, AI assistant connectors (MCP with OAuth: ChatGPT, Claude) | 001, 004, 010, 011 |
-| **Social** | Friends, shared widgets, shared daily diary, posts (text, photos, 30 s camera video, food) with likes, comments and Share, a camera-first new post page that can create and log a food, a Share sheet with chats, reposts, Save foods and app buttons, Story share images and public link previews, Home feed | 006–009, 014–017 |
-| **Platform** | Onboarding and setup, feature flags per cohort and user, installable PWA, push notifications with Activity and icon badge, direct messages, tabs that stay alive with swipe navigation | 003, 005, 012, 013 |
+| **Food** | Nutrition tracking, food profile and activity targets, Apple Health sync with resumable batches, AI assistant connectors (MCP with OAuth: ChatGPT, Claude), brands with logos (public and own) and brand filters, logging several foods for several meals in one go, suggestions from recent meals, collapsible meals | 001, 004, 010, 011 |
+| **Training** | Exercise catalogue and logging, ready-made and own plans, the workout flow (rest, supersets, pinned bar), levels. Built and off for production: strength ranks, monthly tournaments, sharing and copying workouts, plans and exercises | 020, 023–025, 036 |
+| **Social** | Friends, shared widgets, shared daily diary, posts (text, photos, 30 s camera video, food, training) with likes, comments and Share, a camera-first new post page, a Share sheet with chats, reposts and app buttons, Story share images and public link previews, Home feed, link-only posts (sent to particular people, on no wall) | 006–009, 014–017 |
+| **Offline** | Training, food and social writes work with no connection and sync later; conflicts are shown, never merged silently; sync health counters for the admin | 027–035 |
+| **Look and feel** | Colour themes as data with an admin page (v0 and Crisp), glass surfaces, a floating tab bar that shrinks on scroll, resizable Home widgets, the Food page redesign | 037 |
+| **Platform** | Onboarding and setup, feature flags per cohort and user, installable PWA, push notifications with Activity and icon badge, direct messages, tabs that stay alive with swipe navigation, CI running the checks on every push | 003, 005, 012, 013 |
 
 **Infrastructure is Tier 0** (about $0/month): Vercel Hobby, Render free (kept awake by a cron
 job), MongoDB Atlas M0.
 
+**How the last weeks went:** almost all work since 2026-11-11 was polish and sub-features that
+this list did not name (offline, themes, brands, widgets, sharing), in line with "the focus
+until then is polish". Of the numbered steps below, only Training moved.
+
 ### Known gaps to close before a public launch
 
-No public launch is planned soon; the focus until then is polish. These gaps are a gate for the
-day launch is scheduled, not the next step. Found in a review on 2026-11-11 by reading the code:
-
-- **No password reset and no email.** Auth has register, login, refresh, change-password and
-  logout only; a person who forgets their password is locked out for good.
-- **No rate limits** on login, register or anything else.
-- **No error monitoring** in production.
-- **`apps/api-e2e` is still the generated "Hello API" test**, so nothing boots the real app
-  against a database automatically.
-
-Done since the review (2026-11-11): CI runs `npm run check` on every push to main
-(`.github/workflows/check.yml`), and the access module, friend profiles and diaries, people
-search, connection actions and money widget sharing have their own tests.
+No public launch is planned soon. These are a gate for the day launch is scheduled. The first
+three have moved into the numbered steps, because friends already use the app.
 
 - **Account deletion and data export.** Health data is a GDPR special category. Every module
   doc lists what deletion must remove.
+- **`apps/api-e2e` is still the generated "Hello API" test.** `npm run test:integration` boots
+  the real app against a database, but needs one supplied; nothing runs it automatically.
 - **Real-device checks** of push, messages and swiping on an iPhone.
 - **Tier 0 limits:** Atlas M0 has 512 MB; Vercel Hobby does not allow commercial use, and Render
   free is kept awake by a cron job.
@@ -48,56 +46,81 @@ search, connection actions and money widget sharing have their own tests.
 - **The money modules are built for one person** (the seeded loan, ESPP plan and EPAM boards).
   Decide whether they stay owner-only behind a flag or become a product for everyone, before
   strangers see them.
+- **Brand logos** are other companies' trademarks, uploaded by the admin. Check their use with
+  an adviser before the app is commercial.
+
+### Open decisions
+
+- **Should a shared link open without an account?** Today every post needs sign-in, link-only
+  ones included. A public page would make sharing to WhatsApp useful to people who have not
+  joined, and is a deliberate privacy step.
+- **AI meal photos or more polish first?** The AI step is the main paid feature and has not been
+  started.
+- **Money modules:** owner-only for good, or a product.
 
 ## Where we want to be (next, in order)
 
 1. ~~**Photos in posts.**~~ Done in 014: R2 with signed links, EXIF stripped on the phone,
    plus 30-second camera video and text-only posts.
-2. **AI meal guess from a photo** (next: a button on the new post page's New food card), behind a feature flag that stays off until there are API
-   keys. One provider interface, so adding the key is the only step left. Every guess is stored
-   as a labelled estimate with its basis until the person confirms it (principle 6). Paid
-   feature; the MCP connectors remain the free alternative.
-3. **Explore and search built around food.** Filter posts by macros ("600 kcal dinners, 40g+
-   protein"). Diet tags (vegan, keto, high-protein) are computed from the facts, never stored
-   by hand (the first six, high-protein to high-fibre, exist since #8: `postTopics()`). Image moderation (CSAM scanning, nudity) must exist before public images.
-4. **Groups and challenges.** Streaks, protein-target days, logging streaks, staying within
+2. **Safety net for the people already using it.** Password reset by email (today a forgotten
+   password locks the account for good), rate limits on login and register, and error
+   monitoring in production. Small, and overdue now that friends use the app.
+3. **Switch on what is built.** Strength ranks, tournaments, training sharing, the Crisp theme
+   and link-only posts are finished or nearly so and off for everyone but the owner. Each needs
+   a review on a real device, then its flag turned on for friends, then for everyone.
+4. **Official accounts: content for an empty feed.** A new person should not land on an empty
+   feed. A few accounts that belong to the app, **clearly labelled as official and automated**,
+   publish useful things: meal ideas with real macros that can be saved to your foods, training
+   plans that can be copied, a weekly challenge.
+   - **Never fake people.** No invented meals "eaten today", no invented personal records, no
+     accounts talking to each other to look like a crowd. Decided 2026-11-20: undisclosed bot
+     accounts deceive the people the app is for, are noticed quickly in a small network, and can
+     fall under consumer-protection rules on fake engagement.
+   - **Three to five accounts**, by theme (kitchen, training, challenges), one or two posts a day
+     each. They may answer real people under their own posts, as themselves.
+   - **Out of anything competitive:** no ranks, tournaments or leaderboards, and not offered as
+     friend suggestions.
+   - **Needs:** an account kind with a visible badge and those exclusions; a way to post as such
+     an account (the connector handles foods only today); a scheduled job that drafts posts,
+     approved by the owner at first and automatic once the output is trusted.
+5. **AI meal guess from a photo** (a button on the new post page's New food card), behind a
+   feature flag that stays off until there are API keys. One provider interface, so adding the
+   key is the only step left. Every guess is stored as a labelled estimate with its basis until
+   the person confirms it (principle 6). Paid feature; the MCP connectors remain the free
+   alternative.
+6. **Groups and challenges.** Streaks, protein-target days, logging streaks, staying within
    calories. A challenge sees only a computed score, never the diary. Group chat reuses the
-   messages module (conversations already have a members shape).
-5. **Training and sports.** A module for sessions, sets and later GPS tracks, stored as events.
-   Personal records, distance and ranks are computed on read. Leaderboards are opt-in and
-   friends- or group-only by default. Imported workouts count as "verified", manual ones as
-   "self-reported". Moved ahead of diet plans (2026-11-12), because programs (diet, training or
-   both) need both halves. Phases: 1 exercise catalogue and logging (spec 020, complete 2026-11-12, behind the
-   `training` flag), 2 workout plans: ready-made and own plans, starting a workout from a plan
-   (spec 023, complete 2026-11-12), 3 training UI overhaul: colour by muscle group and plan, a weekly
-   header, progress in the open workout, History by week (spec 024, complete 2026-11-12), workout flow: duplicate days, done/current
-   exercises, rest per exercise, supersets, a pinned workout bar (spec 025, complete 2026-11-12),
-   4 strength ranks and levels: **levels done** (#5a, `trainingLevels` flag); **strength ranks
-   built** (#5b, `trainingRanks` flag, off for production; 287 exercises in frozen standards
-   `v1`, ratio-based ones labelled provisional): personal,
-   per exercise, against fixed versioned standards, never other members' data; current (90 days)
-   and highest-ever ranks. v1 frozen 2026-11-13; production rollout waits on a separate go-ahead. *In progress (#12):*
-   opt-in **monthly** tournaments (calendar-month seasons) among similarly ranked members. Built
-   behind `tournaments`: UTC calendar, men's and women's categories with explicit consent,
-   lock-time snapshot and groups, scoring (owner formula), live standings and frozen results,
-   withdrawal, voiding, retention and reminders. Production rollout waits on review
-   (`docs/modules/tournaments.md`).
-   *Later, not built:* ranks and levels may become a modest credibility signal for creators'
-   training content in For You, with relevance and quality staying primary, no suppression of
-   beginners, imported ("verified") workouts weighted over self-reported ones, and resistance to
-   gamed logs.
-   **Sharing built** (spec 036, `trainingPosts` flag, off for production): workout, plan and
-   exercise posts with a copy switch and partial plans, and copying into your own plans and
-   exercises. Still to come: friend leaderboards, a post carrying a plan and meals together, then
-   programs, with paid programs last.
-6. **Video through a service.** 014 records 30-second clips in the app and stores them as-is.
+   messages module (conversations already have a members shape). Ahead of search (2026-11-20):
+   a small group of friends will use a challenge before it needs search.
+7. **Explore and search built around food.** Filter posts by macros ("600 kcal dinners, 40g+
+   protein"). Diet tags (vegan, keto, high-protein) are computed from the facts, never stored
+   by hand (the first six, high-protein to high-fibre, exist since #8: `postTopics()`). Image
+   moderation (CSAM scanning, nudity) must exist before public images.
+8. **Training and sports, the rest.** Stored as events; personal records, distance and ranks
+   are computed on read. Leaderboards are opt-in and friends- or group-only by default. Imported
+   workouts count as "verified", manual ones as "self-reported".
+   - **Done:** catalogue and logging (020), plans (023), the training UI and workout flow
+     (024, 025), levels (#5a).
+   - **Built, off for production** (step 3 turns them on): strength ranks (#5b, 287 exercises in
+     frozen standards `v1`, personal and against fixed standards, never other members' data);
+     monthly tournaments (#12, see `docs/modules/tournaments.md`); sharing and copying workouts,
+     plans and exercises (036).
+   - **Still to come:** friend leaderboards, a post carrying a plan and meals together, then
+     programs, with paid programs last. GPS tracks need the native app (step 10).
+   - **Later, not built:** ranks and levels may become a modest credibility signal for creators'
+     training content in For You, with relevance and quality staying primary, no suppression of
+     beginners, imported workouts weighted over self-reported ones, and resistance to gamed logs.
+9. **Video through a service.** 014 records 30-second clips in the app and stores them as-is.
    Next: transcoding through Mux or Cloudflare Stream so every clip plays everywhere, library
    videos and 60 seconds. No reels scroller until people make video on their own.
-7. **Native apps.** Wrap the web app with Capacitor and add HealthKit and background location.
-   Background GPS (skiing, rides) is the one thing a PWA cannot do.
+10. **Native apps.** Wrap the web app with Capacitor and add HealthKit and background location.
+    Background GPS (skiing, rides) is the one thing a PWA cannot do.
 
-Also wanted, unscheduled: quote reposts (a repost with your own text), a public web page for public posts (017 gives link previews; opening one still needs sign-in), a native Instagram Stories sticker with a link back (needs the Capacitor app), recipes (steps and time on combination posts), message requests from
-non-friends, reactions, typing indicators, stories (the inbox's friend row is ready for rings).
+Also wanted, unscheduled: more themes, real refraction for the glass (tried 2026-11-18: it works
+in Safari only for small elements and looked poor; shelved), quote reposts (a repost with your
+own text), a native Instagram Stories sticker with a link back (needs the Capacitor app), recipes
+(steps and time on combination posts), message requests from non-friends, reactions, typing
+indicators, stories (the inbox's friend row is ready for rings).
 
 ## Architecture by tier
 
