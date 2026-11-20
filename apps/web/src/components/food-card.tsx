@@ -64,6 +64,7 @@ export function FoodCard({
         <FoodArt
           name={food.name}
           imageUrl={food.image?.url}
+          brand={food.brand}
           macros={food.perServing}
           className="transition duration-300 group-hover:scale-105"
         />

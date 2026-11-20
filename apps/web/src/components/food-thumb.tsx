@@ -36,6 +36,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { macroShares } from '@life-portal/shared-domain';
+import { useBrands } from '../lib/brands';
 import { MACRO_COLORS, withAlpha } from '../lib/macro-colors';
 
 /** First match wins, so the more specific words come first ("egg" before "bread" in "egg bread"). */
@@ -92,23 +93,28 @@ export function dominantMacroColor(macros: {
 }
 
 /**
- * A food's picture, or — when it has none — an icon guessed from its name on a tile tinted by
- * its main macro (protein purple, carbs blue, fat amber), so a list reads at a glance.
+ * What stands for a food, in this order: its own picture; else its brand's logo; else an icon
+ * guessed from its name on a tile tinted by its main macro (protein purple, carbs blue, fat
+ * amber), so a list reads at a glance.
  */
 export function FoodThumb({
   name,
   imageUrl,
+  brand,
   macros,
   size = 36,
   className,
 }: {
   name: string;
   imageUrl?: string;
+  /** The food's brand name: its logo is shown when the food has no picture of its own. */
+  brand?: string;
   macros: { proteinMg: number; carbMg: number; fatMg: number };
   size?: number;
   className?: string;
 }) {
   const style = { width: size, height: size };
+  const logoUrl = useBrands().find(brand)?.logoUrl;
   if (imageUrl) {
     return (
       <img
@@ -117,6 +123,12 @@ export function FoodThumb({
         style={style}
         className={clsx('shrink-0 rounded-lg object-cover', className)}
       />
+    );
+  }
+  if (logoUrl) {
+    return (
+      // Every logo is the same white square (`prepareLogo`), so it fills the tile as a picture does.
+      <img src={logoUrl} alt="" loading="lazy" style={style} className={clsx('shrink-0 rounded-lg bg-white object-cover', className)} />
     );
   }
   const Icon = foodIcon(name);
@@ -140,14 +152,18 @@ export function FoodThumb({
 export function FoodArt({
   name,
   imageUrl,
+  brand,
   macros,
   className,
 }: {
   name: string;
   imageUrl?: string;
+  /** The food's brand name: its logo is shown when the food has no picture of its own. */
+  brand?: string;
   macros: { proteinMg: number; carbMg: number; fatMg: number };
   className?: string;
 }) {
+  const logoUrl = useBrands().find(brand)?.logoUrl;
   if (imageUrl) {
     return (
       <img
@@ -157,6 +173,10 @@ export function FoodArt({
         className={clsx('h-full w-full object-cover', className)}
       />
     );
+  }
+  if (logoUrl) {
+    // Contained, not cropped: the card is wider than the logo's square.
+    return <img src={logoUrl} alt="" loading="lazy" className={clsx('h-full w-full bg-white object-contain', className)} />;
   }
   const Icon = foodIcon(name);
   const color = dominantMacroColor(macros);

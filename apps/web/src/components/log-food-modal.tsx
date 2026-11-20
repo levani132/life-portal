@@ -336,6 +336,7 @@ export function LogFoodModal({
             <FoodThumb
               name={entry.facts.name}
               imageUrl={food?.image?.url}
+              brand={entry.facts.brand}
               macros={entry.totals}
               size={44}
             />
@@ -371,7 +372,7 @@ export function LogFoodModal({
                     aria-label={`Choose ${suggestion.name}, ${suggestion.amount} ${suggestion.unit}`}
                     className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition hover:bg-surface active:scale-[0.99]"
                   >
-                    <FoodThumb name={item.name} imageUrl={item.image?.url} macros={item.perServing} size={36} />
+                    <FoodThumb name={item.name} imageUrl={item.image?.url} brand={item.brand} macros={item.perServing} size={36} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm text-ink">{suggestion.name}</span>
                       <span className="tabular block truncate text-xs text-ink-faint">

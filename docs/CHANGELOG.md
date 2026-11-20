@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-20: Brand logos stand in for missing food photos
+
+- **A food with no photo shows its brand's logo.** In the food chooser, the suggestions and the
+  food cards, each food shows its own photo if it has one, otherwise its brand's logo, otherwise
+  the icon guessed from its name.
+
 ## 2026-11-20: Log several foods at once
 
 - **"Add another food" in the log sheet.** After choosing a food and its amount, add another

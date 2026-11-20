@@ -115,6 +115,7 @@ export function FoodCombobox({
         <FoodThumb
           name={selected.name}
           imageUrl={selected.image?.url}
+          brand={selected.brand}
           macros={selected.perServing}
           size={44}
         />
@@ -213,6 +214,7 @@ export function FoodCombobox({
                 <FoodThumb
                   name={food.name}
                   imageUrl={food.image?.url}
+                  brand={food.brand}
                   macros={food.perServing}
                   size={36}
                 />
@@ -222,7 +224,8 @@ export function FoodCombobox({
                     {food.name}
                   </span>
                   <span className="flex items-center gap-1 text-xs text-ink-faint">
-                    {food.brand && <BrandMark name={food.brand} brand={brands.find(food.brand)} size={14} className="rounded" />}
+                    {/* Beside the name only when the picture is the food's own: otherwise the tile already is the logo. */}
+                    {food.brand && (food.image?.url || !brands.find(food.brand)?.logoUrl) && <BrandMark name={food.brand} brand={brands.find(food.brand)} size={14} className="rounded" />}
                     <span className="truncate">{[food.brand, servingText(food)].filter(Boolean).join(' · ')}</span>
                   </span>
                 </span>
