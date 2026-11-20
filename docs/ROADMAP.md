@@ -1,6 +1,7 @@
 # Roadmap
 
-Where Life Portal is, where it is going, and in what order. Updated 2026-11-20. Product
+Where Life Portal is, where it is going, and in what order. Updated 2026-11-20. The admin sees this roadmap in the app (Menu → Roadmap); its content lives in
+`apps/api/src/roadmap/roadmap.data.ts`, which must change with this file. Product
 direction comes from the owner; the order and the architecture tiers are recommendations agreed
 in conversation, not commitments. Costs are rough late-2026 list prices, order of magnitude only.
 
@@ -57,6 +58,12 @@ three have moved into the numbered steps, because friends already use the app.
 - **AI meal photos or more polish first?** The AI step is the main paid feature and has not been
   started.
 - **Money modules:** owner-only for good, or a product.
+- **Where does the AI mark show?** The owner's proposal: on the page only, since anyone who opens
+  it sees it is AI-managed. The recommendation: a small mark beside the page's name wherever it
+  appears, because most people meet a post in the feed and never open the page.
+- **What may a promoted post target?** The business model rules out ads targeted on health data,
+  and in this app almost everything a person does is health data. Promotion would have to work
+  from language, country and what a person chose to follow, not from their diary.
 
 ## Where we want to be (next, in order)
 
@@ -68,52 +75,65 @@ three have moved into the numbered steps, because friends already use the app.
 3. **Switch on what is built.** Strength ranks, tournaments, training sharing, the Crisp theme
    and link-only posts are finished or nearly so and off for everyone but the owner. Each needs
    a review on a real device, then its flag turned on for friends, then for everyone.
-4. **Official accounts: content for an empty feed.** A new person should not land on an empty
-   feed. A few accounts that belong to the app, **clearly labelled as official and automated**,
-   publish useful things: meal ideas with real macros that can be saved to your foods, training
-   plans that can be copied, a weekly challenge.
-   - **Never fake people.** No invented meals "eaten today", no invented personal records, no
-     accounts talking to each other to look like a crowd. Decided 2026-11-20: undisclosed bot
-     accounts deceive the people the app is for, are noticed quickly in a small network, and can
-     fall under consumer-protection rules on fake engagement.
-   - **Three to five accounts**, by theme (kitchen, training, challenges), one or two posts a day
-     each. They may answer real people under their own posts, as themselves.
-   - **Out of anything competitive:** no ranks, tournaments or leaderboards, and not offered as
-     friend suggestions.
-   - **Needs:** an account kind with a visible badge and those exclusions; a way to post as such
-     an account (the connector handles foods only today); a scheduled job that drafts posts,
-     approved by the owner at first and automatic once the output is trusted.
-5. **AI meal guess from a photo** (a button on the new post page's New food card), behind a
+4. **Pages.** An account that is not a person: a page that one or more people manage, which
+   publishes content and nothing else. Decided 2026-11-20; details to be specified.
+   - **Content only.** A page cannot log food, workouts or weight, and stays out of ranks,
+     tournaments, leaderboards and friend suggestions. It is not a person.
+   - **The app's own pages come first** (kitchen, training, challenges), managed by the owner:
+     meal ideas that can be saved, plans that can be copied, a weekly challenge. They are what a
+     new person sees instead of an empty feed. Three to five, one or two posts a day each.
+   - **A page can be marked as AI-managed** by whoever runs it. On such a page, something a
+     human did is marked as human.
+   - **Never fake people.** No invented meals "eaten today", no invented records, no pages
+     talking to each other to look like a crowd. Undisclosed bot accounts deceive the people the
+     app is for, are noticed quickly in a small network, and can fall under consumer-protection
+     rules on fake engagement.
+   - **Later uses of the same thing:** restaurants with verified menus, gyms and brands with
+     challenges, coaches with plans (see the business model).
+5. **Assistant tools for pages, training and challenges.** The connector (MCP) handles food
+   only. Add tools to act as a page: read the public and friends feeds, create a post, comment,
+   react. Then the same for training, and for challenges once they exist. A tool acts as one
+   named page, never as the person behind it, and what it did is visible in the page's history.
+   This is what lets a scheduled job run an AI-managed page; its drafts are approved by the
+   owner at first.
+6. **AI meal guess from a photo** (a button on the new post page's New food card), behind a
    feature flag that stays off until there are API keys. One provider interface, so adding the
    key is the only step left. Every guess is stored as a labelled estimate with its basis until
    the person confirms it (principle 6). Paid feature; the MCP connectors remain the free
    alternative.
-6. **Groups and challenges.** Streaks, protein-target days, logging streaks, staying within
+7. **Groups and challenges.** Streaks, protein-target days, logging streaks, staying within
    calories. A challenge sees only a computed score, never the diary. Group chat reuses the
    messages module (conversations already have a members shape). Ahead of search (2026-11-20):
    a small group of friends will use a challenge before it needs search.
-7. **Explore and search built around food.** Filter posts by macros ("600 kcal dinners, 40g+
+8. **Plans.** One thing a person or a page can publish: a diet plan, a workout plan, or both,
+   with the creator's notes and advice. Others copy it into their own foods and plans (copying
+   training plans exists since 036). Free first; paid plans arrive with payments (step 10).
+9. **Explore and search built around food.** Filter posts by macros ("600 kcal dinners, 40g+
    protein"). Diet tags (vegan, keto, high-protein) are computed from the facts, never stored
    by hand (the first six, high-protein to high-fibre, exist since #8: `postTopics()`). Image
    moderation (CSAM scanning, nudity) must exist before public images.
-8. **Training and sports, the rest.** Stored as events; personal records, distance and ranks
-   are computed on read. Leaderboards are opt-in and friends- or group-only by default. Imported
-   workouts count as "verified", manual ones as "self-reported".
-   - **Done:** catalogue and logging (020), plans (023), the training UI and workout flow
-     (024, 025), levels (#5a).
-   - **Built, off for production** (step 3 turns them on): strength ranks (#5b, 287 exercises in
-     frozen standards `v1`, personal and against fixed standards, never other members' data);
-     monthly tournaments (#12, see `docs/modules/tournaments.md`); sharing and copying workouts,
-     plans and exercises (036).
-   - **Still to come:** friend leaderboards, a post carrying a plan and meals together, then
-     programs, with paid programs last. GPS tracks need the native app (step 10).
-   - **Later, not built:** ranks and levels may become a modest credibility signal for creators'
-     training content in For You, with relevance and quality staying primary, no suppression of
-     beginners, imported workouts weighted over self-reported ones, and resistance to gamed logs.
-9. **Video through a service.** 014 records 30-second clips in the app and stores them as-is.
-   Next: transcoding through Mux or Cloudflare Stream so every clip plays everywhere, library
-   videos and 60 seconds. No reels scroller until people make video on their own.
-10. **Native apps.** Wrap the web app with Capacitor and add HealthKit and background location.
+10. **Payments, promoted posts and paid plans.** Anyone can pay to promote a post, or give a
+    budget to several posts and let the system decide where it goes, the way the large networks
+    do. It needs payments, a "Sponsored" label, a review of what is promoted, and enough people
+    for promotion to mean anything; it can be built before launch and switched on later. Paid
+    plans and the creator commission use the same payments.
+11. **Training and sports, the rest.** Stored as events; personal records, distance and ranks
+    are computed on read. Leaderboards are opt-in and friends- or group-only by default. Imported
+    workouts count as "verified", manual ones as "self-reported".
+    - **Done:** catalogue and logging (020), plans (023), the training UI and workout flow
+      (024, 025), levels (#5a).
+    - **Built, off for production** (step 3 turns them on): strength ranks (#5b, 287 exercises in
+      frozen standards `v1`, personal and against fixed standards, never other members' data);
+      monthly tournaments (#12, see `docs/modules/tournaments.md`); sharing and copying workouts,
+      plans and exercises (036).
+    - **Still to come:** friend leaderboards. GPS tracks need the native app (step 13).
+    - **Later, not built:** ranks and levels may become a modest credibility signal for creators'
+      training content in For You, with relevance and quality staying primary, no suppression of
+      beginners, imported workouts weighted over self-reported ones, and resistance to gamed logs.
+12. **Video through a service.** 014 records 30-second clips in the app and stores them as-is.
+    Next: transcoding through Mux or Cloudflare Stream so every clip plays everywhere, library
+    videos and 60 seconds. No reels scroller until people make video on their own.
+13. **Native apps.** Wrap the web app with Capacitor and add HealthKit and background location.
     Background GPS (skiing, rides) is the one thing a PWA cannot do.
 
 Also wanted, unscheduled: more themes, real refraction for the glass (tried 2026-11-18: it works
@@ -182,7 +202,8 @@ Free core: tracking, social, messages and connectors stay free. Paid:
 4. **Verified restaurant menus:** restaurants pay to list dishes with checked nutrition.
 5. **Coach marketplace, later:** paid programs, 10–20% commission.
 
-**Ruled out:** ads targeted on health data, and selling data.
+**Ruled out:** ads targeted on health data, and selling data. Promoted posts (step 10) must
+respect the first; see "Open decisions".
 
 Rough numbers: at 100k monthly users infrastructure is about a cent per user; 4% paying $5 is
 about $20k/month. Stripe on the web costs about 3%; Apple takes 15–30% in a native app, so web
