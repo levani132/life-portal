@@ -784,15 +784,15 @@ function SlotSuggestions({
         <Sparkles className="h-3 w-3" aria-hidden /> Suggestions
         <span className="font-normal text-ink-faint">· tap to add</span>
       </p>
-      {/* Two to a line: a name and its calories, small enough that a meal's suggestions take a
-          row or two, not half the screen. */}
-      <div className="grid grid-cols-2 gap-1.5">
+      {/* Each chip is as wide as its own name, so they wrap like tags: several short ones share a
+          line and a long one takes its own. */}
+      <div className="flex flex-wrap gap-1.5">
         {suggestions.map((suggestion) => (
           <button
             key={suggestion.foodId}
             type="button"
             className={clsx(
-              'flex min-h-9 items-center gap-1.5 rounded-lg border border-dashed px-2 py-1 text-left text-xs transition active:scale-95 disabled:opacity-50',
+              'flex min-h-9 max-w-full items-center gap-1.5 rounded-full border border-dashed py-1 pl-2 pr-2.5 text-left text-xs transition active:scale-95 disabled:opacity-50',
               style.border,
               style.tint,
             )}
@@ -806,7 +806,7 @@ function SlotSuggestions({
             }
           >
             <Plus size={13} className={clsx('shrink-0', style.text)} aria-hidden="true" />
-            <span className="min-w-0 flex-1 truncate font-medium text-ink">{suggestion.name}</span>
+            <span className="min-w-0 truncate font-medium text-ink">{suggestion.name}</span>
             <span className="tabular shrink-0 text-[11px] text-ink-muted">{suggestion.totals.energyKcal}</span>
           </button>
         ))}
