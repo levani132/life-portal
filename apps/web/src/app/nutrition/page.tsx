@@ -543,7 +543,7 @@ function SlotSection({
 
   return (
     <section className={clsx('card overflow-hidden border-l-4', style.edge)} aria-label={label}>
-      <header className="flex items-center gap-3 p-3 sm:p-4">
+      <header className="flex items-center gap-2.5 p-2.5 sm:p-4">
         {/* The icon and title fold the meal away: its total and macro line stay in the header. */}
         <button
           type="button"
@@ -553,7 +553,7 @@ function SlotSection({
           onClick={() => setCollapsed(!collapsed)}
         >
           <span
-            className={clsx('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow', style.gradient)}
+            className={clsx('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow', style.gradient)}
             aria-hidden
           >
             <SlotIcon className="h-5 w-5" />
@@ -561,7 +561,7 @@ function SlotSection({
           <span className="block min-w-0 flex-1">
             <span className="flex items-center gap-1">
               {/* A heading by role: an <h2> may not sit inside a button. */}
-              <span role="heading" aria-level={2} className="text-sm font-bold">{label}</span>
+              <span role="heading" aria-level={2} className="text-base font-bold leading-tight">{label}</span>
               <ChevronDown className={clsx('h-4 w-4 shrink-0 text-ink-faint transition-transform duration-200', collapsed && '-rotate-90')} aria-hidden />
               {collapsed && slot.entries.length > 0 && (
                 <span className="text-[11px] font-medium text-ink-faint">
@@ -573,7 +573,7 @@ function SlotSection({
               <span className="block text-xs text-ink-faint">Nothing yet</span>
             ) : (
               <>
-                <span className="block truncate text-xs text-ink-faint">
+                <span className="block truncate text-[13px] text-ink-muted">
                   <span className={clsx('font-semibold tabular', style.text)}>{slot.totals.energyKcal.toLocaleString()} kcal</span>
                   {' · '}
                   <MacroLine totals={slot.totals} />
@@ -622,7 +622,7 @@ function SlotSection({
       </header>
 
       {!collapsed && slot.entries.length > 0 && (
-        <ul className="space-y-1.5 px-3 pb-3 sm:px-4">
+        <ul className="space-y-1 px-1.5 pb-1.5 sm:px-4 sm:pb-3">
           {slot.entries.map((entry) => {
             // On a phone the row's actions are behind it: swipe left, or all the way to remove.
             const actions: SwipeAction[] = [
@@ -635,14 +635,14 @@ function SlotSection({
             return (
             <li key={entry.id}>
               <SwipeRow actions={actions} className="rounded-xl">
-              <div className="flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-sm">
+              <div className="flex items-center gap-2 rounded-xl bg-surface px-2.5 py-2 text-[15px] leading-snug">
               <span className={clsx('h-8 w-1 shrink-0 rounded-full', style.dot)} aria-hidden />
               <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">
+                <p className="truncate font-semibold">
                   {entry.facts.name}
                   {entry.facts.brand && <span className="ml-1 text-xs font-normal text-ink-faint">{entry.facts.brand}</span>}
                 </p>
-                <p className="truncate text-xs text-ink-faint">
+                <p className="truncate text-[13px] text-ink-muted">
                   {entry.amount} {entry.unit}
                   {entry.servings > 0 && ` · ${entry.servings} serving${entry.servings === 1 ? '' : 's'}`}
                   {' · '}
@@ -659,7 +659,7 @@ function SlotSection({
                 )}
               </div>
               <span className="shrink-0 text-right leading-tight">
-                <span className="tabular block font-bold">{entry.totals.energyKcal}</span>
+                <span className="tabular block text-base font-bold">{entry.totals.energyKcal}</span>
                 <span className="block text-[10px] text-ink-faint">kcal</span>
               </span>
               {/* With a mouse or trackpad the same three actions stay visible. */}
@@ -771,8 +771,8 @@ function SlotSuggestions({
 
   const { style } = SLOT_STYLES[slot];
   return (
-    <div className={clsx('mx-3 mb-3 rounded-xl border border-dashed p-3 sm:mx-4', style.border, style.tint)}>
-      <p className={clsx('flex items-center gap-1.5 text-xs font-semibold', style.text)}>
+    <div className={clsx('mx-1.5 mb-1.5 rounded-xl border border-dashed p-2.5 sm:mx-4 sm:mb-3', style.border, style.tint)}>
+      <p className={clsx('flex items-center gap-1.5 text-[13px] font-semibold', style.text)}>
         <Sparkles className="h-3.5 w-3.5" aria-hidden /> Suggestions
       </p>
       <p className="mb-2 mt-0.5 text-[11px] text-ink-faint">
@@ -783,7 +783,7 @@ function SlotSuggestions({
           <button
             key={suggestion.foodId}
             type="button"
-            className="flex min-h-11 max-w-full items-center gap-3 rounded-lg border border-border bg-surface-raised px-2.5 py-1.5 text-left text-xs text-ink-muted transition hover:text-ink active:scale-95 disabled:opacity-50"
+            className="flex min-h-11 max-w-full items-center gap-3 rounded-lg border border-border bg-surface-raised px-2.5 py-1.5 text-left text-[13px] text-ink-muted transition hover:text-ink active:scale-95 disabled:opacity-50"
             aria-label={`Add suggested ${suggestion.name} to ${slotLabel.toLowerCase()}`}
             onClick={() => log(suggestion)}
             disabled={pending}

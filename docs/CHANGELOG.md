@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-20: Food day is easier to read
+
+- **Bigger text, tighter boxes.** On the Food day, meal names, food names, amounts, macros and
+  calories are a size larger and less faint, and the space between a meal's box and the foods
+  inside it is smaller, so the same content takes about the same room but reads more easily.
+
 ## 2026-11-20: Brand logos stand in for missing food photos
 
 - **A food with no photo shows its brand's logo.** In the food chooser, the suggestions and the
