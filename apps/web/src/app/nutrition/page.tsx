@@ -36,6 +36,7 @@ import { CheatQueue } from '../../components/cheat-queue';
 import { BrandFilter } from '../../components/brand-filter';
 import { BrandsManager } from '../../components/brands-manager';
 import { FoodCard } from '../../components/food-card';
+import { FoodThumb } from '../../components/food-thumb';
 import { useBrands } from '../../lib/brands';
 import { GlassPill } from '../../components/glass-pill';
 import { FoodHero, MacroLine, SLOT_STYLES } from '../../components/food-day';
@@ -636,7 +637,14 @@ function SlotSection({
             <li key={entry.id}>
               <SwipeRow actions={actions} className="rounded-xl">
               <div className="flex items-center gap-2 rounded-xl bg-surface px-2.5 py-2 text-[15px] leading-snug">
-              <span className={clsx('h-8 w-1 shrink-0 rounded-full', style.dot)} aria-hidden />
+              {/* The food's photo, else its brand's logo, else an icon from its name. */}
+              <FoodThumb
+                name={entry.facts.name}
+                imageUrl={foods.find((food) => food.id === entry.foodId)?.image?.url}
+                brand={entry.facts.brand}
+                macros={entry.totals}
+                size={38}
+              />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">
                   {entry.facts.name}
