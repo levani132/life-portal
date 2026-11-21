@@ -2622,3 +2622,21 @@ leaves it lifted when it has. Clamping it to "never up" fixed one position and n
 against the page's box, so the screen sliding down by `offsetTop` is exactly how far both edges
 are off. The reported height is ignored. A focused field is also blurred when the app is
 hidden, which is what leads to the state in the first place.
+
+---
+
+## 2026-11-22 · Vercel installs from the root lockfile (`apps/web/vercel.json` `installCommand`)
+
+**What happened:** setting `CSP_ENFORCE` and redeploying *without* the build cache failed with
+`NEXT_NO_VERSION`. The Root Directory is `apps/web`, which has no `package.json`, so Vercel's Next.js
+builder wrote a stand-in with only a `vercel-build: next build` script, ran `npm install` against
+it (installing nothing), and found `next` and every other dependency only because the build cache
+restored an old `node_modules`. Production was being built from whatever that cache held, not
+from `package-lock.json`, so a dependency added or upgraded at the root would never have reached
+Vercel.
+
+**Decision:** `apps/web/vercel.json` sets `installCommand` to `cd ../.. && npm ci`, so every build
+installs exactly the root lockfile (the builder runs it with `apps/web` as its cwd and finds `next`
+by resolving upward). The build itself is still the builder's `next build` in `apps/web`.
+`vercel-config.spec.ts` checks the command is there. `npm ci` deletes `node_modules` first, so builds
+no longer reuse cached modules; that costs some seconds and buys a reproducible install.

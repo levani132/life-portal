@@ -25,7 +25,10 @@ describe('vercel.json', () => {
     ]);
   });
 
-  it('leaves the build to the Vercel project settings in apps/web', () => {
-    expect(Object.keys(web).sort()).toEqual(['$schema', 'routes']);
+  it('installs from the root lockfile and leaves the build to the Vercel project settings', () => {
+    // Without this, Vercel installs nothing in apps/web (it has no package.json) and every
+    // dependency comes from the build cache; a build without the cache fails with NEXT_NO_VERSION.
+    expect(Object.keys(web).sort()).toEqual(['$schema', 'installCommand', 'routes']);
+    expect(web.installCommand).toMatch(/^cd \.\.\/\.\. && npm ci\b/);
   });
 });

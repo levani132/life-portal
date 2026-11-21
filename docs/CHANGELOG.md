@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-22: Web deploys no longer depend on Vercel's build cache
+
+- **A redeploy without the build cache now works.** Vercel installs the web app's dependencies
+  from the repository's lockfile on every build instead of reusing whatever an earlier build left
+  behind, so "Redeploy" with the cache unticked no longer fails with `NEXT_NO_VERSION`.
+
 ## 2026-11-20: Food day is easier to read
 
 - **Bigger text, tighter boxes.** On the Food day, meal names, food names, amounts, macros and
