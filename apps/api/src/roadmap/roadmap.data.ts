@@ -39,6 +39,19 @@ export const ROADMAP: Roadmap = {
       points: ['Strength ranks', 'Monthly tournaments', 'Training sharing and copying', 'The Crisp theme', 'Link-only posts', 'Each: a check on a real device, then on for friends, then for everyone'],
     },
     {
+      title: 'Your portal',
+      status: 'next',
+      summary: 'Make "portal" a real thing: a person’s profile becomes their portal, showing their widgets and modules to others as far as they choose.',
+      points: [
+        'One page for a life: food and training today, more later',
+        'The person decides per module: private, friends or public; private stays the default',
+        'Sharing by module already exists; this makes it the centre of the profile and names it',
+        'Money is the person’s choice too, later, with a plain warning',
+        'What a portal says is what its owner entered: nothing is shown as checked unless it was',
+        '"Profile" becomes "Portal" everywhere, with an address a person can send',
+      ],
+    },
+    {
       title: 'Pages',
       status: 'next',
       summary: 'An account that is not a person: managed by people, publishing content and nothing else.',

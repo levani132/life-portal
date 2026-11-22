@@ -84,7 +84,22 @@ three have moved into the numbered steps, because friends already use the app.
 3. **Switch on what is built.** Strength ranks, tournaments, training sharing, the Crisp theme
    and link-only posts are finished or nearly so and off for everyone but the owner. Each needs
    a review on a real device, then its flag turned on for friends, then for everyone.
-4. **Pages.** An account that is not a person: a page that one or more people manage, which
+4. **Your portal.** Make "portal" a real thing in the app, so "check my portal" is literally
+   true (decided 2026-11-22; it is what the name promises). A person's profile becomes their
+   portal: the same widgets and modules they see themselves, shown to others as far as they
+   choose.
+   - **One page for a life:** food and training today; later whatever else the person tracks.
+     A friend who opens it finds how that person eats and trains, not only their posts.
+   - **The person decides, per module:** private, friends or public. Private stays the default
+     for everything. Sharing by module exists since 006 (`moduleVisibility`, shared widgets and
+     the shared diary); this step turns it into the centre of the profile and names it.
+   - **Money is the person's choice too,** later and with a plain warning: it is the kind of
+     information scams are built on, and once public it cannot be taken back.
+   - **Self-declared, and shown as such.** What a portal says is what its owner entered. Nothing
+     is presented as checked unless it was (imported workouts are the one "verified" kind).
+   - **The words follow:** "Profile" becomes "Portal" in the tab bar, the menu, sharing and
+     links, and a portal has an address a person can send.
+5. **Pages.** An account that is not a person: a page that one or more people manage, which
    publishes content and nothing else. Decided 2026-11-20; details to be specified.
    - **Content only.** A page cannot log food, workouts or weight, and stays out of ranks,
      tournaments, leaderboards and friend suggestions. It is not a person.
@@ -99,34 +114,34 @@ three have moved into the numbered steps, because friends already use the app.
      rules on fake engagement.
    - **Later uses of the same thing:** restaurants with verified menus, gyms and brands with
      challenges, coaches with plans (see the business model).
-5. **Assistant tools for pages, training and challenges.** The connector (MCP) handles food
+6. **Assistant tools for pages, training and challenges.** The connector (MCP) handles food
    only. Add tools to act as a page: read the public and friends feeds, create a post, comment,
    react. Then the same for training, and for challenges once they exist. A tool acts as one
    named page, never as the person behind it, and what it did is visible in the page's history.
    This is what lets a scheduled job run an AI-managed page; its drafts are approved by the
    owner at first.
-6. **AI meal guess from a photo** (a button on the new post page's New food card), behind a
+7. **AI meal guess from a photo** (a button on the new post page's New food card), behind a
    feature flag that stays off until there are API keys. One provider interface, so adding the
    key is the only step left. Every guess is stored as a labelled estimate with its basis until
    the person confirms it (principle 6). Paid feature; the MCP connectors remain the free
    alternative.
-7. **Groups and challenges.** Streaks, protein-target days, logging streaks, staying within
+8. **Groups and challenges.** Streaks, protein-target days, logging streaks, staying within
    calories. A challenge sees only a computed score, never the diary. Group chat reuses the
    messages module (conversations already have a members shape). Ahead of search (2026-11-20):
    a small group of friends will use a challenge before it needs search.
-8. **Plans.** One thing a person or a page can publish: a diet plan, a workout plan, or both,
+9. **Plans.** One thing a person or a page can publish: a diet plan, a workout plan, or both,
    with the creator's notes and advice. Others copy it into their own foods and plans (copying
-   training plans exists since 036). Free first; paid plans arrive with payments (step 10).
-9. **Explore and search built around food.** Filter posts by macros ("600 kcal dinners, 40g+
+   training plans exists since 036). Free first; paid plans arrive with payments (step 11).
+10. **Explore and search built around food.** Filter posts by macros ("600 kcal dinners, 40g+
    protein"). Diet tags (vegan, keto, high-protein) are computed from the facts, never stored
    by hand (the first six, high-protein to high-fibre, exist since #8: `postTopics()`). Image
    moderation (CSAM scanning, nudity) must exist before public images.
-10. **Payments, promoted posts and paid plans.** Anyone can pay to promote a post, or give a
+11. **Payments, promoted posts and paid plans.** Anyone can pay to promote a post, or give a
     budget to several posts and let the system decide where it goes, the way the large networks
     do. It needs payments, a "Sponsored" label, a review of what is promoted, and enough people
     for promotion to mean anything; it can be built before launch and switched on later. Paid
     plans and the creator commission use the same payments.
-11. **Training and sports, the rest.** Stored as events; personal records, distance and ranks
+12. **Training and sports, the rest.** Stored as events; personal records, distance and ranks
     are computed on read. Leaderboards are opt-in and friends- or group-only by default. Imported
     workouts count as "verified", manual ones as "self-reported".
     - **Done:** catalogue and logging (020), plans (023), the training UI and workout flow
@@ -135,14 +150,14 @@ three have moved into the numbered steps, because friends already use the app.
       frozen standards `v1`, personal and against fixed standards, never other members' data);
       monthly tournaments (#12, see `docs/modules/tournaments.md`); sharing and copying workouts,
       plans and exercises (036).
-    - **Still to come:** friend leaderboards. GPS tracks need the native app (step 13).
+    - **Still to come:** friend leaderboards. GPS tracks need the native app (step 14).
     - **Later, not built:** ranks and levels may become a modest credibility signal for creators'
       training content in For You, with relevance and quality staying primary, no suppression of
       beginners, imported workouts weighted over self-reported ones, and resistance to gamed logs.
-12. **Video through a service.** 014 records 30-second clips in the app and stores them as-is.
+13. **Video through a service.** 014 records 30-second clips in the app and stores them as-is.
     Next: transcoding through Mux or Cloudflare Stream so every clip plays everywhere, library
     videos and 60 seconds. No reels scroller until people make video on their own.
-13. **Native apps.** Wrap the web app with Capacitor and add HealthKit and background location.
+14. **Native apps.** Wrap the web app with Capacitor and add HealthKit and background location.
     Background GPS (skiing, rides) is the one thing a PWA cannot do.
 
 Also wanted, unscheduled: more themes, real refraction for the glass (tried 2026-11-18: it works
@@ -211,7 +226,7 @@ Free core: tracking, social, messages and connectors stay free. Paid:
 4. **Verified restaurant menus:** restaurants pay to list dishes with checked nutrition.
 5. **Coach marketplace, later:** paid programs, 10–20% commission.
 
-**Ruled out:** ads targeted on health data, and selling data. Promoted posts (step 10) must
+**Ruled out:** ads targeted on health data, and selling data. Promoted posts (step 11) must
 respect the first; see "Open decisions".
 
 Rough numbers: at 100k monthly users infrastructure is about a cent per user; 4% paying $5 is
