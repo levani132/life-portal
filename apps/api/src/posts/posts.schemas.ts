@@ -66,6 +66,9 @@ export class FoodPostRecord {
   /** The automatic check of this post's photos. Absent: never checked (no photos, or private). */
   @Prop({ type: String, enum: ['ok', 'flagged'] }) mediaCheck?: 'ok' | 'flagged';
   @Prop({ type: [String], default: undefined }) checkCategories?: string[];
+  /** What the check scored, per category (0 to 1), and when: numbers only, for tuning the rule. */
+  @Prop({ type: Object }) checkScores?: Record<string, number>;
+  @Prop({ type: Date }) checkedAt?: Date;
   /** A reviewer kept the post: reports no longer hide it, though they still reach the queue. */
   @Prop({ type: Date }) reviewedAt?: Date;
   createdAt!: Date;

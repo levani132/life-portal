@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
 import { Model, Types, isValidObjectId } from 'mongoose';
-import type { ModerationItem, ModerationQueue, ReportReason } from '@life-portal/shared-types';
+import type { ModerationCheck, ModerationItem, ModerationQueue, ReportReason } from '@life-portal/shared-types';
 import { imageHoldCategories, reportsHoldPost } from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
 import { reviewNeededEmail } from '../auth/emails';
@@ -90,16 +90,17 @@ export class PostModerationService {
       const urls = signed.flatMap((item) => (item.kind === 'video' ? (item.posterUrl ? [item.posterUrl] : []) : [item.url]));
       const verdict = urls.length ? await this.checker.check(urls) : { flagged: [] };
       const hold = imageHoldCategories(verdict.flagged);
+      const record = { checkedAt: new Date(), ...(verdict.scores && Object.keys(verdict.scores).length ? { checkScores: verdict.scores } : {}) };
       if (hold.length) {
         const flagged = await this.posts.updateOne(
           { _id: postId, heldReason: 'checking' },
-          { $set: { heldReason: 'check', mediaCheck: 'flagged', checkCategories: hold } },
+          { $set: { heldReason: 'check', mediaCheck: 'flagged', checkCategories: hold, ...record } },
         );
         if (flagged.matchedCount) this.tellReviewer();
       } else {
         await this.posts.updateOne(
           { _id: postId, heldReason: 'checking' },
-          { $set: { mediaCheck: 'ok' }, $unset: { heldAt: '', heldReason: '' } },
+          { $set: { mediaCheck: 'ok', ...record }, $unset: { heldAt: '', heldReason: '' } },
         );
       }
     } catch (error) {
@@ -196,6 +197,29 @@ export class PostModerationService {
     }
     items.sort((a, b) => Number(!!b.held) - Number(!!a.held) || b.reportCount - a.reportCount);
     return { items, imageCheck: !!this.checker };
+  }
+
+  /**
+   * The latest automatic checks, as numbers only: when, the verdict and the scores. No text, no
+   * photo and no author, so it shows how the check behaves without opening anyone's post.
+   */
+  async recentChecks(userId: string): Promise<ModerationCheck[]> {
+    this.access.requireDeveloper(userId);
+    const rows = await this.posts
+      .find({ checkedAt: { $exists: true } })
+      .sort({ checkedAt: -1 })
+      .limit(30)
+      .select('checkedAt mediaCheck checkScores userId')
+      .lean();
+    return rows.map((row) => ({
+      checkedAt: (row.checkedAt as Date).toISOString(),
+      result: row.mediaCheck === 'flagged' ? 'flagged' : 'ok',
+      mine: row.userId === userId,
+      scores: Object.entries(row.checkScores ?? {})
+        .map(([category, score]) => ({ category, score }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 4),
+    }));
   }
 
   /** The reviewer decides the post is fine: it is shown again and its reports are closed. */

@@ -228,6 +228,15 @@ export interface ModerationItem {
   reports: { reason: ReportReason; count: number }[];
   reportCount: number;
 }
+/** One automatic photo check, as numbers only (developer only): no post, no person. */
+export interface ModerationCheck {
+  checkedAt: string;
+  result: 'ok' | 'flagged';
+  /** Whether the checked post is the developer's own. */
+  mine: boolean;
+  /** The highest-scoring categories, 0 to 1. */
+  scores: { category: string; score: number }[];
+}
 export interface ModerationQueue {
   items: ModerationItem[];
   /** Whether photos are checked automatically on this server. */

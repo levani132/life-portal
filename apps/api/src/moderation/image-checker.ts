@@ -4,6 +4,8 @@ import { CONFIG, type AppConfig } from '../config/configuration';
 /** What a check says about a set of images: the categories it flagged, by the service's names. */
 export interface ImageVerdict {
   flagged: string[];
+  /** The service's score per category, 0 to 1: the highest across the images. Kept for tuning. */
+  scores?: Record<string, number>;
 }
 
 /**
@@ -26,7 +28,7 @@ export class ImageCheckError extends Error {
 }
 
 interface ModerationAnswer {
-  results?: { categories?: Record<string, boolean> }[];
+  results?: { categories?: Record<string, boolean>; category_scores?: Record<string, number> }[];
 }
 
 /**
@@ -45,6 +47,7 @@ export class OpenAiImageChecker implements ImageChecker {
 
   async check(urls: string[]): Promise<ImageVerdict> {
     const flagged = new Set<string>();
+    const scores: Record<string, number> = {};
     for (const url of urls) {
       let response: Response;
       try {
@@ -62,8 +65,11 @@ export class OpenAiImageChecker implements ImageChecker {
       const categories = answer?.results?.[0]?.categories;
       if (!categories || typeof categories !== 'object') throw new ImageCheckError('The image check gave an answer that could not be read.');
       for (const [name, on] of Object.entries(categories)) if (on === true) flagged.add(name);
+      for (const [name, score] of Object.entries(answer?.results?.[0]?.category_scores ?? {})) {
+        if (typeof score === 'number' && Number.isFinite(score)) scores[name] = Math.max(scores[name] ?? 0, Math.round(score * 1000) / 1000);
+      }
     }
-    return { flagged: [...flagged].sort() };
+    return { flagged: [...flagged].sort(), scores };
   }
 }
 

@@ -72,6 +72,18 @@ describe('PostModerationService', () => {
     expect(w.sent).toEqual([]);
   });
 
+  it('keeps the scores of each check and lists them to the developer as numbers only', async () => {
+    const w = world({ checker: { provider: 'openai', check: async () => ({ flagged: [], scores: { sexual: 0.31, violence: 0.02, harassment: 0.001 } }) } });
+    const id = await w.add({ userId: DEV, title: 'Secret title', heldAt: new Date(), heldReason: 'checking', media: [{ key: 'a.jpg', kind: 'image' }] });
+    await w.service.check(id);
+    expect(w.post(id)).toMatchObject({ mediaCheck: 'ok', checkScores: { sexual: 0.31 } });
+    await expect(w.service.recentChecks('someone')).rejects.toBeInstanceOf(ForbiddenException);
+    const checks = await w.service.recentChecks(DEV);
+    expect(checks).toEqual([{ checkedAt: expect.any(String), result: 'ok', mine: true, scores: [{ category: 'sexual', score: 0.31 }, { category: 'violence', score: 0.02 }, { category: 'harassment', score: 0.001 }] }]);
+    expect(JSON.stringify(checks)).not.toMatch(/Secret|a\.jpg/);
+    expect(JSON.stringify(checks)).not.toContain(id);
+  });
+
   it('keeps a flagged post hidden, records why and tells the reviewer without naming anything', async () => {
     const w = world({ checker: { provider: 'openai', check: async () => ({ flagged: ['sexual', 'violence'] }) } });
     const id = await w.add({ heldAt: new Date(), heldReason: 'checking', media: [{ key: 'a.jpg', kind: 'image' }] });

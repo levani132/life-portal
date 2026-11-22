@@ -1,5 +1,5 @@
 'use client';
-import { REPORT_REASON_LABELS, type ModerationItem, type ModerationQueue, type PortalState } from '@life-portal/shared-types';
+import { REPORT_REASON_LABELS, type ModerationCheck, type ModerationItem, type ModerationQueue, type PortalState } from '@life-portal/shared-types';
 import Link from 'next/link';
 import { AppShell, PageHeader } from '../../../components/app-shell';
 import { PostMediaCarousel } from '../../../components/post-media';
@@ -31,6 +31,7 @@ function Review() {
     portal.data.access.social &&
     portal.data.access.nutrition;
   const queue = useApi<ModerationQueue>(allowed ? '/posts/moderation' : null);
+  const checks = useApi<ModerationCheck[]>(allowed ? '/posts/moderation/checks' : null);
   const action = useAction();
   if (!portal.data) return <Spinner />;
   if (!allowed) return <ErrorNote message="The review queue is available to the developer." />;
@@ -145,6 +146,32 @@ function Review() {
             </article>
           ))}
         </div>
+      )}
+      {checks.data && checks.data.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-sm font-semibold">Latest photo checks</h2>
+          <p className="mt-1 text-xs text-ink-faint">
+            What the automatic check scored, from 0 to 1. Numbers only: no post and no person.
+          </p>
+          <ul className="card mt-3 divide-y divide-border text-xs">
+            {checks.data.map((check, index) => (
+              <li key={`${check.checkedAt}-${index}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2.5">
+                <span className={check.result === 'flagged' ? 'font-semibold text-danger' : 'font-semibold text-success'}>
+                  {check.result === 'flagged' ? 'Held' : 'Passed'}
+                </span>
+                <span className="text-ink-faint">
+                  {new Date(check.checkedAt).toLocaleString()}
+                  {check.mine ? ' · yours' : ''}
+                </span>
+                <span className="text-ink-muted">
+                  {check.scores.length
+                    ? check.scores.map((entry) => `${entry.category} ${entry.score.toFixed(3)}`).join(' · ')
+                    : 'no scores recorded'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </div>
   );

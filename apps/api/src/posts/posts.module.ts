@@ -148,6 +148,9 @@ class PostsController {
   @Get('moderation') moderationQueue(@CurrentUser('userId') userId: string) {
     return this.moderation.queue(userId);
   }
+  @Get('moderation/checks') moderationChecks(@CurrentUser('userId') userId: string) {
+    return this.moderation.recentChecks(userId);
+  }
   @Post('moderation/:postId/keep') @HttpCode(200) moderationKeep(
     @CurrentUser('userId') userId: string,
     @Param('postId') postId: string,

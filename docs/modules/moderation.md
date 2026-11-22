@@ -16,7 +16,9 @@ carries `held: 'checking' | 'review'`; nobody else ever learns a post is held.
 | `check` | The automatic check flagged the photos; `checkCategories` says what | The reviewer keeps or removes it |
 | `reports` | `reportsHoldPost()`: one `child_safety` report, or 3 open reports | The reviewer keeps or removes it |
 
-Other fields: `mediaCheck: 'ok' | 'flagged'` (absent: never checked), `reviewedAt` (a reviewer
+Other fields: `mediaCheck: 'ok' | 'flagged'` (absent: never checked), `checkedAt` and `checkScores`
+(the service's score per category, 0 to 1, kept so the rule can be tuned;
+`GET /posts/moderation/checks` lists the latest 30 to the developer as numbers only), `reviewedAt` (a reviewer
 kept it: reports no longer hide it, though they still reach the queue).
 
 ## The automatic check

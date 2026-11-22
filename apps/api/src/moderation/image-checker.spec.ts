@@ -1,7 +1,7 @@
 import { ImageCheckError, OpenAiImageChecker } from './image-checker';
 
 const answer = (categories: Record<string, boolean>, status = 200) =>
-  ({ ok: status < 300, status, json: async () => ({ results: [{ flagged: true, categories }] }) }) as Response;
+  ({ ok: status < 300, status, json: async () => ({ results: [{ flagged: true, categories, category_scores: Object.fromEntries(Object.entries(categories).map(([name, on], i) => [name, on ? 0.91234 : 0.01 * (i + 1)])) }] }) }) as Response;
 
 describe('OpenAiImageChecker', () => {
   it('sends one image link per request and gathers the flagged categories', async () => {
@@ -10,7 +10,7 @@ describe('OpenAiImageChecker', () => {
       .mockResolvedValueOnce(answer({ sexual: false, violence: true }))
       .mockResolvedValueOnce(answer({ sexual: true, violence: true }));
     const verdict = await new OpenAiImageChecker('sk-key', fetchImpl as unknown as typeof fetch).check(['https://files/a.jpg?sig=1', 'https://files/b.jpg?sig=2']);
-    expect(verdict).toEqual({ flagged: ['sexual', 'violence'] });
+    expect(verdict).toEqual({ flagged: ['sexual', 'violence'], scores: { sexual: 0.912, violence: 0.912 } });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://api.openai.com/v1/moderations');
