@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-22: An upload that cannot get through says so
+
+- **A photo upload that makes no progress for 25 seconds stops with a reason** ("this network
+  or a VPN may be blocking photo storage") where it used to spin for over a minute and fail
+  without one.
+
 ## 2026-11-22: Terms, privacy policy and community rules
 
 - **Three pages anyone can read**, signed in or not: Terms (`/terms`), Privacy policy

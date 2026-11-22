@@ -244,6 +244,9 @@ export function recorderType(): string | undefined {
   ].find((type) => MediaRecorder.isTypeSupported(type));
 }
 
+/** How long an upload may make no progress at all before it is given up. */
+const UPLOAD_STALL_MS = 25_000;
+
 function put(
   target: SignedUpload,
   body: Blob,
@@ -257,14 +260,42 @@ function put(
     xhr.open('PUT', target.url);
     for (const [name, value] of Object.entries(target.headers))
       xhr.setRequestHeader(name, name === 'content-type' ? contentType : value);
-    xhr.upload.onprogress = (event) => onProgress(event.loaded);
-    xhr.onload = () =>
-      xhr.status >= 200 && xhr.status < 300
-        ? resolve()
-        : reject(new Error(`Upload failed (${xhr.status}).`));
-    xhr.onerror = () => reject(new Error('Upload failed. Check your connection.'));
-    xhr.onabort = () => reject(new DOMException('Upload cancelled.', 'AbortError'));
+    // A network that silently drops the storage address (some VPNs and office networks do)
+    // leaves the request hanging for over a minute. Give up once nothing has moved for a while,
+    // and say what is likely wrong, instead of a spinner that never ends.
+    let stalled = false;
+    let watchdog: ReturnType<typeof setTimeout> | undefined;
+    const watch = () => {
+      clearTimeout(watchdog);
+      watchdog = setTimeout(() => {
+        stalled = true;
+        xhr.abort();
+      }, UPLOAD_STALL_MS);
+    };
+    const done = () => clearTimeout(watchdog);
+    xhr.upload.onprogress = (event) => {
+      watch();
+      onProgress(event.loaded);
+    };
+    xhr.onload = () => {
+      done();
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`Upload failed (${xhr.status}).`));
+    };
+    xhr.onerror = () => {
+      done();
+      reject(new Error('Upload failed. Check your connection.'));
+    };
+    xhr.onabort = () => {
+      done();
+      reject(
+        stalled
+          ? new Error('The upload is not getting through. This network or a VPN may be blocking photo storage: try another connection.')
+          : new DOMException('Upload cancelled.', 'AbortError'),
+      );
+    };
     signal.addEventListener('abort', () => xhr.abort(), { once: true });
+    watch();
     xhr.send(body);
   });
 }
