@@ -24,7 +24,7 @@ async function person(): Promise<Account> {
 
 async function tokens(email: string, atLeast = 1): Promise<string[]> {
   for (let i = 0; i < 50; i++) {
-    const mail = await api.db.collection('dev_mail').find({ to: email, subject: 'Confirm your email for Life Portal' }).sort({ createdAt: -1 }).toArray();
+    const mail = await api.db.collection('dev_mail').find({ to: email, subject: 'Confirm your email for LifePortal' }).sort({ createdAt: -1 }).toArray();
     if (mail.length >= atLeast) return mail.map((m) => /verify-email#token=([A-Za-z0-9_-]+)/.exec(m['text'] as string)?.[1] as string);
     await new Promise((resolve) => setTimeout(resolve, 100));
   }

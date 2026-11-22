@@ -34,7 +34,7 @@ const login = (email: string, password: string) => api.call(null, 'POST', '/auth
 async function linkFor(email: string, after = 0): Promise<{ token: string; text: string; html: string; count: number }> {
   for (let i = 0; i < 50; i++) {
     // Sign-up also sends a verification email (S5); only the reset ones count here.
-    const mail = await api.db.collection('dev_mail').find({ to: email, subject: 'Reset your Life Portal password' }).sort({ createdAt: -1 }).toArray();
+    const mail = await api.db.collection('dev_mail').find({ to: email, subject: 'Reset your LifePortal password' }).sort({ createdAt: -1 }).toArray();
     if (mail.length > after) {
       const text = mail[0]['text'] as string;
       const token = /reset-password#token=([A-Za-z0-9_-]+)/.exec(text)?.[1] as string;
@@ -46,7 +46,7 @@ async function linkFor(email: string, after = 0): Promise<{ token: string; text:
 }
 
 it('reports that reset works on this server', async () => {
-  expect((await api.call(null, 'GET', '/auth/capabilities')).body).toEqual({ passwordReset: true, emailVerification: true, google: false });
+  expect((await api.call(null, 'GET', '/auth/capabilities')).body).toEqual({ passwordReset: true, emailVerification: true, google: false, inviteRequired: false });
 });
 
 describe('asking for a link', () => {
