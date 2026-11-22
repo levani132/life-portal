@@ -87,6 +87,18 @@ export const ROADMAP: Roadmap = {
       points: ['Published by a person or a page', 'Free first; paid plans arrive with payments'],
     },
     {
+      title: 'The desktop version',
+      status: 'later',
+      summary: 'The app is built for a phone and merely works on a wide screen. Making it good there is long work, done in parts.',
+      points: [
+        'Navigation in the header instead of the bottom tabs',
+        'A search bar in the header, once search exists',
+        'Side columns: today’s numbers, friends, suggestions, and later clearly labelled, controlled promotion',
+        'Layouts that use the width: the Food day, a workout, a post beside its comments',
+        'Nothing changes on a phone',
+      ],
+    },
+    {
       title: 'Explore and search built around food',
       status: 'partial',
       summary: 'Find posts by what is in them: "600 kcal dinners, 40g+ protein".',

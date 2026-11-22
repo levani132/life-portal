@@ -133,17 +133,28 @@ three have moved into the numbered steps, because friends already use the app.
    a small group of friends will use a challenge before it needs search.
 9. **Plans.** One thing a person or a page can publish: a diet plan, a workout plan, or both,
    with the creator's notes and advice. Others copy it into their own foods and plans (copying
-   training plans exists since 036). Free first; paid plans arrive with payments (step 11).
-10. **Explore and search built around food.** Filter posts by macros ("600 kcal dinners, 40g+
+   training plans exists since 036). Free first; paid plans arrive with payments (step 12).
+10. **The desktop version.** The app is designed for a phone and merely works on a wide screen.
+    Making it good there is a long piece of work, done in parts (asked for 2026-11-22):
+    - **Navigation in the header** instead of the bottom tabs, which belong to a thumb.
+    - **A search bar in the header,** once search exists (the next step).
+    - **Side columns** beside the feed and the modules: things worth seeing at a glance (today's
+      numbers, friends, suggestions), and later a place for clearly labelled, controlled
+      promotion (see payments and promoted posts).
+    - **Layouts that use the width:** the Food day, a workout, a post and its comments side by
+      side, tables where a phone has cards, hover and keyboard where a phone has long-press.
+    - **Unchanged on a phone.** Nothing here may make the phone version worse; the wide layout is
+      an addition, switched by width.
+11. **Explore and search built around food.** Filter posts by macros ("600 kcal dinners, 40g+
    protein"). Diet tags (vegan, keto, high-protein) are computed from the facts, never stored
    by hand (the first six, high-protein to high-fibre, exist since #8: `postTopics()`). Image
    moderation (CSAM scanning, nudity) must exist before public images.
-11. **Payments, promoted posts and paid plans.** Anyone can pay to promote a post, or give a
+12. **Payments, promoted posts and paid plans.** Anyone can pay to promote a post, or give a
     budget to several posts and let the system decide where it goes, the way the large networks
     do. It needs payments, a "Sponsored" label, a review of what is promoted, and enough people
     for promotion to mean anything; it can be built before launch and switched on later. Paid
     plans and the creator commission use the same payments.
-12. **Training and sports, the rest.** Stored as events; personal records, distance and ranks
+13. **Training and sports, the rest.** Stored as events; personal records, distance and ranks
     are computed on read. Leaderboards are opt-in and friends- or group-only by default. Imported
     workouts count as "verified", manual ones as "self-reported".
     - **Done:** catalogue and logging (020), plans (023), the training UI and workout flow
@@ -152,14 +163,14 @@ three have moved into the numbered steps, because friends already use the app.
       frozen standards `v1`, personal and against fixed standards, never other members' data);
       monthly tournaments (#12, see `docs/modules/tournaments.md`); sharing and copying workouts,
       plans and exercises (036).
-    - **Still to come:** friend leaderboards. GPS tracks need the native app (step 14).
+    - **Still to come:** friend leaderboards. GPS tracks need the native app (step 15).
     - **Later, not built:** ranks and levels may become a modest credibility signal for creators'
       training content in For You, with relevance and quality staying primary, no suppression of
       beginners, imported workouts weighted over self-reported ones, and resistance to gamed logs.
-13. **Video through a service.** 014 records 30-second clips in the app and stores them as-is.
+14. **Video through a service.** 014 records 30-second clips in the app and stores them as-is.
     Next: transcoding through Mux or Cloudflare Stream so every clip plays everywhere, library
     videos and 60 seconds. No reels scroller until people make video on their own.
-14. **Native apps.** Wrap the web app with Capacitor and add HealthKit and background location.
+15. **Native apps.** Wrap the web app with Capacitor and add HealthKit and background location.
     Background GPS (skiing, rides) is the one thing a PWA cannot do.
 
 Also wanted, unscheduled: more themes, real refraction for the glass (tried 2026-11-18: it works
@@ -228,7 +239,7 @@ Free core: tracking, social, messages and connectors stay free. Paid:
 4. **Verified restaurant menus:** restaurants pay to list dishes with checked nutrition.
 5. **Coach marketplace, later:** paid programs, 10–20% commission.
 
-**Ruled out:** ads targeted on health data, and selling data. Promoted posts (step 11) must
+**Ruled out:** ads targeted on health data, and selling data. Promoted posts (step 12) must
 respect the first; see "Open decisions".
 
 Rough numbers: at 100k monthly users infrastructure is about a cent per user; 4% paying $5 is
