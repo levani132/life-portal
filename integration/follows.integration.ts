@@ -144,7 +144,7 @@ describe('a page blocking a person (spec 040)', () => {
     expect(await api.db.collection('follows').countDocuments({ followerId: beka.id, pageId: page.id })).toBe(0);
     expect((await api.call(beka, 'PUT', `/follows/${page.id}`, {})).status).toBe(404);
     expect((await api.call(beka, 'GET', `/social/profiles/${page.id}?today=${today}`)).status).toBe(404);
-    expect((await api.call(beka, 'GET', `/social/profiles/${ana.id}?today=${today}`)).status).toBe(200);
+    expect(await api.db.collection('social_connections').countDocuments({ $or: [{ lowId: ana.id }, { highId: ana.id }] })).toBe(0);
 
     const blocked = await api.call<{ people: { userId: string }[] }>(ana, 'GET', '/social/connections?kind=blocked&skip=0', undefined, as(page.id));
     expect(blocked.body.people.map((person) => person.userId)).toEqual([beka.id]);
