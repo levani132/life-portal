@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-22: Pages, part three: People (admin)
+
+- **Menu → People** (admin): find a person or a page by name or username. Set how many pages one
+  person may create (a number, no limit, or back to the default of three), suspend or restore an
+  account or a page on its own, and mark a page official.
+- A suspended page's manager is told by email and keeps their own account.
+
 ## 2026-11-22: Pages, part two: Follow
 
 - **Follow a page** from its profile. No approval; the page shows how many follow it, never who.

@@ -8,22 +8,31 @@ import {
   ForbiddenException,
   Get,
   Global,
+  Header,
   HttpCode,
   Inject,
   Injectable,
   Module,
+  NotFoundException,
   Param,
   Patch,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { InjectModel, MongooseModule } from '@nestjs/mongoose';
-import { IsBoolean, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
+import { Type } from 'class-transformer';
 import { Model, Types, isValidObjectId } from 'mongoose';
 import {
   ACT_AS_HEADER,
   PAGE_BIO_MAX,
+  PAGE_LIMIT_MAX,
+  PAGE_LIMIT_NONE,
+  type AdminAccount,
+  type AdminAccountsPage,
+  type SetPageLimitRequest,
   PAGE_NAME_MAX,
   type CreatePageRequest,
   type Identity,
@@ -79,6 +88,7 @@ export class PagesService {
     private readonly social: SocialService,
     private readonly accounts: AccountService,
     @Inject(CONFIG) private readonly config: AppConfig,
+    private readonly follows: FollowsService,
   ) {}
 
   private async requireOn(personId: string): Promise<void> {
@@ -185,6 +195,73 @@ export class PagesService {
     return { official };
   }
 
+  /**
+   * The owner's People screen: people or pages, by name or username, 30 at a time. Names and
+   * marks only: no email and nothing an account keeps.
+   */
+  async adminList(developerId: string, query: AdminListDto): Promise<AdminAccountsPage> {
+    this.access.requireDeveloper(developerId);
+    const pages = query.kind === 'pages';
+    const text = (query.q ?? '').trim().slice(0, 60);
+    const filter: Record<string, unknown> = pages ? { kind: 'page' } : { kind: { $ne: 'page' } };
+    if (text) {
+      const byUsername = await this.social.idsByUsernamePrefix(text.toLowerCase().replace(/^@/, ''));
+      const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter['$or'] = [{ name: { $regex: escaped, $options: 'i' } }, { _id: { $in: byUsername.filter((id) => isValidObjectId(id)) } }];
+    }
+    const rows = await this.users
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .skip(query.skip ?? 0)
+      .limit(ADMIN_PAGE_SIZE + 1)
+      .select('name kind suspendedAt pageLimit official aiManaged managers')
+      .lean<PageRow[]>();
+    const shown = rows.slice(0, ADMIN_PAGE_SIZE);
+    const ids = shown.map((row) => String(row._id));
+    const managerIds = [...new Set(shown.flatMap((row) => row.managers ?? []))];
+    const [profiles, managers, created] = await Promise.all([
+      this.social.summaries(ids),
+      managerIds.length ? this.users.find({ _id: { $in: managerIds } }).select('name').lean<{ _id: Types.ObjectId; name: string }[]>() : Promise.resolve([] as { _id: Types.ObjectId; name: string }[]),
+      pages ? Promise.resolve([] as { _id: string; n: number }[]) : this.users.aggregate<{ _id: string; n: number }>([{ $match: { kind: 'page', createdBy: { $in: ids } } }, { $group: { _id: '$createdBy', n: { $sum: 1 } } }]),
+    ]);
+    const managerName = new Map(managers.map((row) => [String(row._id), row.name]));
+    const createdBy = new Map(created.map((row) => [row._id, row.n]));
+    const accounts: AdminAccount[] = [];
+    for (const row of shown) {
+      const id = String(row._id);
+      const username = profiles.get(id)?.username;
+      const base = { id, name: profiles.get(id)?.displayName ?? row.name, ...(username ? { username } : {}), suspended: !!row.suspendedAt };
+      accounts.push(
+        pages
+          ? {
+              ...base,
+              kind: 'page',
+              official: row.official === true,
+              aiManaged: row.aiManaged === true,
+              followerCount: await this.follows.followerCount(id),
+              managers: (row.managers ?? []).map((managerId) => managerName.get(managerId) ?? 'Unknown'),
+            }
+          : {
+              ...base,
+              kind: 'person',
+              ...(typeof row.pageLimit === 'number' ? { pageLimit: row.pageLimit } : {}),
+              pagesCreated: createdBy.get(id) ?? 0,
+              ...(id === this.config.developerUserId ? { developer: true as const } : {}),
+            },
+      );
+    }
+    return { accounts, hasMore: rows.length > ADMIN_PAGE_SIZE };
+  }
+
+  /** The owner sets how many pages one person may create: a number, `-1` for none, `null` for the default. */
+  async setPageLimit(developerId: string, personId: string, limit: number | null): Promise<{ pageLimit: number | null }> {
+    this.access.requireDeveloper(developerId);
+    if (!isValidObjectId(personId)) throw new NotFoundException('Account not found.');
+    const changed = await this.users.updateOne({ _id: personId, kind: { $ne: 'page' } }, limit === null ? { $unset: { pageLimit: '' } } : { $set: { pageLimit: limit } });
+    if (!changed.matchedCount) throw new NotFoundException('Account not found.');
+    return { pageLimit: limit };
+  }
+
   /** Deletes the page and everything it holds, the way an account is deleted. */
   async remove(personId: string, pageId: string): Promise<{ success: true }> {
     const row = await this.managed(personId, pageId);
@@ -271,6 +348,36 @@ export class PagesController {
   }
 }
 
+const ADMIN_PAGE_SIZE = 30;
+
+export class AdminListDto {
+  @IsOptional() @IsIn(['people', 'pages']) kind?: 'people' | 'pages';
+  @IsOptional() @IsString() @MaxLength(60) q?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(100_000) skip?: number;
+}
+
+export class PageLimitDto implements SetPageLimitRequest {
+  @ValidateIf((dto: PageLimitDto) => dto.limit !== null) @IsInt() @Min(PAGE_LIMIT_NONE) @Max(PAGE_LIMIT_MAX) limit!: number | null;
+}
+
+/** The owner's People screen (spec 040): find an account, set its page limit. Developer only. */
+@AsPerson()
+@Controller('people-admin')
+export class PeopleAdminController {
+  constructor(private readonly pages: PagesService) {}
+
+  @Get()
+  @Header('Cache-Control', 'no-store')
+  list(@CurrentUser('userId') userId: string, @Query() query: AdminListDto): Promise<AdminAccountsPage> {
+    return this.pages.adminList(userId, query);
+  }
+
+  @Put(':id/page-limit')
+  pageLimit(@CurrentUser('userId') userId: string, @Param('id') id: string, @Body() dto: PageLimitDto) {
+    return this.pages.setPageLimit(userId, id, dto.limit);
+  }
+}
+
 export class OfficialDto {
   @IsBoolean() official!: boolean;
 }
@@ -337,7 +444,7 @@ export class IdentityController {
 @Global()
 @Module({
   imports: [MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]), SocialModule, AccountModule],
-  controllers: [PagesController, PageOfficialController, IdentityController, FollowsController],
+  controllers: [PagesController, PageOfficialController, PeopleAdminController, IdentityController, FollowsController],
   providers: [PagesService, ActingGuard],
   exports: [PagesService, ActingGuard],
 })

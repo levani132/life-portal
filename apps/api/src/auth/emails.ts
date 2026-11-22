@@ -110,6 +110,21 @@ export function postRemovedEmail(to: string, name: string, post: { title: string
 }
 
 /** Tells a person their account was suspended (spec 039). */
+/** Spec 040: a page was suspended; its manager keeps their own account. */
+export function pageSuspendedEmail(to: string, name: string, pageName: string, rulesLink: string | undefined, support?: string): MailMessage {
+  const lines = [
+    `Hi ${name},`,
+    `Your LifePortal page "${pageName}" has been suspended for breaking the Community Rules. Nobody can use the app as it, and what it posted is not shown to anyone. Nothing has been deleted, and your own account is not affected.`,
+    appeal(support),
+  ];
+  return {
+    to,
+    subject: 'LifePortal: your page was suspended',
+    text: `${lines.join('\n\n')}\n${rulesLink ? `\n${rulesLink}\n` : ''}`,
+    html: layout(lines, rulesLink ? { href: rulesLink, label: 'Read the Community Rules' } : undefined),
+  };
+}
+
 export function accountSuspendedEmail(to: string, name: string, rulesLink: string | undefined, support?: string): MailMessage {
   const lines = [
     `Hi ${name},`,

@@ -58,6 +58,37 @@ export interface UpdatePageRequest {
   aiManaged?: boolean;
 }
 
+/** How high the owner may set one person's page limit. */
+export const PAGE_LIMIT_MAX = 1000;
+
+/** One account on the owner's People screen (developer only). */
+export interface AdminAccount {
+  id: string;
+  kind: 'person' | 'page';
+  name: string;
+  username?: string;
+  suspended: boolean;
+  /** A person: the limit set for them (`-1`: none), absent for the default; and how many they created. */
+  pageLimit?: number;
+  pagesCreated?: number;
+  developer?: true;
+  /** A page: its marks, its followers and who manages it. */
+  official?: boolean;
+  aiManaged?: boolean;
+  followerCount?: number;
+  managers?: string[];
+}
+
+export interface AdminAccountsPage {
+  accounts: AdminAccount[];
+  hasMore: boolean;
+}
+
+/** `limit: null` returns the person to the default. */
+export interface SetPageLimitRequest {
+  limit: number | null;
+}
+
 /** Who the app is being used as right now. */
 export type Identity =
   | { kind: 'person'; id: string }

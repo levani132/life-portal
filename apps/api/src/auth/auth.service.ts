@@ -21,7 +21,8 @@ import { tokenHash } from './session-rules';
 import type { ChangePasswordDto, LoginDto, RegisterDto } from './dto/auth.dto';
 import { RATE_RULES } from './security/rate-limit-rules';
 import { MAILER, type Mailer } from '../mail/mailer';
-import { accountSuspendedEmail, supportAddress } from './emails';
+import { accountSuspendedEmail,
+  pageSuspendedEmail, supportAddress } from './emails';
 import { PASSWORD_MESSAGES, passwordProblem } from './security/password-policy';
 import { SecurityService, type RequestContext } from './security/security.service';
 
@@ -218,10 +219,17 @@ export class AuthService {
     if (!result.matchedCount) throw new BadRequestException('Unknown account.');
     await this.sessions.revokeAll(userId, 'suspended');
     await this.security.record('account_suspended', ctx, userId);
-    const user = await this.userModel.findById(userId).select('email name').lean();
+    const user = await this.userModel.findById(userId).select('email name kind managers').lean();
     if (this.mailer && user) {
       const rules = this.config.webBaseUrl ? `${this.config.webBaseUrl}/rules` : undefined;
-      void this.mailer.send(accountSuspendedEmail(user.email, user.name, rules, supportAddress(this.config.mail?.from))).catch(() => undefined);
+      const support = supportAddress(this.config.mail?.from);
+      if (user.kind === 'page') {
+        // Spec 040: a page has no mailbox. Its managers are told, and keep their own accounts.
+        const managers = await this.userModel.find({ _id: { $in: (user.managers ?? []).filter((id) => Types.ObjectId.isValid(id)) } }).select('email name').lean();
+        for (const manager of managers) void this.mailer.send(pageSuspendedEmail(manager.email, manager.name, user.name, rules, support)).catch(() => undefined);
+      } else {
+        void this.mailer.send(accountSuspendedEmail(user.email, user.name, rules, support)).catch(() => undefined);
+      }
     }
     return { success: true };
   }

@@ -248,6 +248,12 @@ export class SocialService implements OnModuleInit {
     }
     return out;
   }
+  /** Accounts whose username starts with this, for the owner's People screen. */
+  async idsByUsernamePrefix(prefix: string): Promise<string[]> {
+    if (!/^[a-z0-9_-]{1,30}$/.test(prefix)) return [];
+    const rows = await this.profiles.find({ username: { $regex: `^${prefix}` } }).select('userId').limit(200).lean();
+    return rows.map((row) => row.userId);
+  }
   /** Whether a username is free, for a page being created. */
   async usernameFree(username: string): Promise<boolean> {
     return !(await this.profiles.exists({ username: username.toLowerCase() }));

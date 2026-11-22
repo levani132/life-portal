@@ -5,6 +5,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { FoodPost, Identity, MyPages, PageSummary } from '@life-portal/shared-types';
+import type { AdminAccountsPage } from '@life-portal/shared-types';
 import { startApi, type Account, type TestApi } from './harness';
 
 let api: TestApi;
@@ -124,5 +125,51 @@ describe('a page', () => {
     expect((await api.call(ana, 'POST', '/account/delete', { confirmEmail: ana.email })).status).toBe(200);
     expect(await api.db.collection('users').countDocuments({ $or: [{ email: ana.email }, { managers: ana.id }] })).toBe(0);
     expect(await api.db.collection('food_posts').countDocuments({ userId: second.id })).toBe(0);
+  });
+
+  it('lets the owner change one person\'s page limit, and suspend a page alone', async () => {
+    const owner = await api.account('owner');
+    const ana = await api.account('ana');
+    const tag = randomUUID().slice(0, 6);
+    for (const n of [1, 2, 3]) await pageOf(ana, `l${n}-${tag}`);
+    const limit = (who: Account, value: number | null) => api.call(who, 'PUT', `/people-admin/${ana.id}/page-limit`, { limit: value });
+    // Nobody but the owner sees People or changes a limit.
+    expect((await limit(ana, 20)).status).toBe(403);
+    expect((await api.call(ana, 'GET', '/people-admin')).status).toBe(403);
+
+    const { CONFIG } = await import('../apps/api/src/config/configuration');
+    api.app.get<{ developerUserId?: string }>(CONFIG).developerUserId = owner.id;
+    try {
+      expect((await limit(owner, 4)).status).toBe(200);
+      const fourth = await pageOf(ana, `l4-${tag}`);
+      expect((await api.call<{ code?: string }>(ana, 'POST', '/pages', { name: 'Five', username: `l5-${tag}` })).body.code).toBe('PAGE_LIMIT');
+      expect((await limit(owner, -1)).status).toBe(200);
+      await pageOf(ana, `l5-${tag}`);
+      // Back to the default: what exists stays, and no more can be made.
+      expect((await limit(owner, null)).status).toBe(200);
+      expect((await api.call<{ code?: string }>(ana, 'POST', '/pages', { name: 'Six', username: `l6-${tag}` })).body.code).toBe('PAGE_LIMIT');
+      expect((await limit(owner, 5000)).status).toBe(400);
+
+      const people = await api.call<AdminAccountsPage>(owner, 'GET', '/people-admin?kind=people&q=ana');
+      const row = people.body.accounts.find((account) => account.id === ana.id);
+      expect(row).toMatchObject({ kind: 'person', pagesCreated: 5, suspended: false });
+      expect(row?.pageLimit).toBeUndefined();
+      expect(JSON.stringify(people.body)).not.toContain(ana.email);
+      const pages = await api.call<AdminAccountsPage>(owner, 'GET', `/people-admin?kind=pages&q=l4-${tag}`);
+      expect(pages.body.accounts).toEqual([expect.objectContaining({ id: fourth.id, kind: 'page', followerCount: 0, official: false })]);
+      expect(pages.body.accounts[0].managers).toHaveLength(1);
+
+      // Suspending the page alone: nobody acts as it, its posts are hidden, its manager is untouched.
+      const posted = await api.call<FoodPost>(ana, 'POST', '/posts', text('Before'), as(fourth.id));
+      expect((await api.call(owner, 'POST', `/auth/accounts/${fourth.id}/suspend`, { reason: 'test' })).status).toBeLessThan(300);
+      const acting = await api.call<{ code?: string }>(ana, 'GET', '/social/me', undefined, as(fourth.id));
+      expect([acting.status, acting.body.code]).toEqual([403, 'PAGE_SUSPENDED']);
+      expect((await api.call(owner, 'GET', `/posts/${posted.body.id}`)).status).toBe(404);
+      expect((await api.call(ana, 'GET', '/auth/me')).status).toBe(200);
+      expect((await api.call(owner, 'POST', `/auth/accounts/${fourth.id}/unsuspend`)).status).toBeLessThan(300);
+      expect((await api.call(ana, 'GET', '/social/me', undefined, as(fourth.id))).status).toBe(200);
+    } finally {
+      api.app.get<{ developerUserId?: string }>(CONFIG).developerUserId = undefined;
+    }
   });
 });

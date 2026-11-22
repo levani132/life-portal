@@ -39,9 +39,9 @@ device check before the `pages` switch is turned on for anyone but the owner.
 - [ ] T031 Notifications for a page reach its managers' devices, named and linking with `?as=`.
 - [ ] T032 `aiManaged` on the profile; `byPerson` on posts and comments.
 - [ ] T033 Export includes a person's pages. (Deleting a page, and pages going with their only manager, were done with slice 1.)
-- [ ] T034 Suspending a page alone; a suspended person cannot act.
-- [ ] T035 `pageLimit` per person; People screen (search, limit, suspend, official).
-- [ ] T036 Numbers excludes pages from people.
+- [x] T034 Suspending a page alone; a suspended person cannot act.
+- [x] T035 `pageLimit` per person; People screen (search, limit, suspend, official).
+- [x] T036 Numbers excludes pages from people.
 - [ ] T037 Terms, privacy policy and rules mention pages; `LEGAL_VERSION`.
 - [ ] T038 Integration test: delete a page and find nothing; limit raised and lowered.
 - [ ] T039 Docs, roadmap, changelog; device check; turn the switch on.
@@ -50,3 +50,17 @@ device check before the `pages` switch is turned on for anyone but the owner.
 
 - [ ] T040 A page's library screens in Food and Training (the routes are open; the screens are not built), and attaching food or a plan to a page's post.
 - [ ] T041 Offline stores kept per identity, so switching need not clear them.
+
+## Open concerns
+
+Logged 2026-11-22, after slice 2. Each is closed by the task named, or by a decision from the owner.
+
+| Concern | State |
+|---|---|
+| A page cannot block a person; only a person can block a page. A harassed page has no defence of its own. | Open: T029 |
+| Pages to follow disappear once someone follows five (`SUGGEST_UNTIL_FOLLOWING`). The number was picked without the owner; after that there is no place to browse pages except search and For You. | Open: owner to say whether to keep, change the number, or add a permanent "Pages" list (e.g. on Friends) |
+| The privacy policy, terms and rules do not mention pages or follows (who you follow is stored). Fine while the switch is on for the owner and the internal group only; must land before it is on for everyone. | Open: T037, blocks T039 |
+| The People screen searches by name and username, not email (spec asks for email too). Left out so the screen shows no address. | Open: owner to say whether email search is wanted |
+| A suspended person's pages stay visible: only the person is hidden. Suspend each page too if it should go. | Open: decide whether suspending a person should hide the pages only they manage |
+| Per-identity offline stores (T041): switching identity clears what the device kept for offline use. | Deferred |
+| A page's library screens in Food and Training are not built (T040), so a page cannot yet attach a food or a plan to a post. | Deferred |

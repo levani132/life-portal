@@ -69,6 +69,7 @@ export function MenuContent() {
       ? [
           { href: '/settings/access', label: 'Feature access', icon: Flag },
           { href: '/settings/sync-health', label: 'Sync health', icon: Flag },
+          { href: '/settings/people', label: 'People', icon: Users },
           { href: '/settings/numbers', label: 'Numbers', icon: BarChart3 },
           { href: '/settings/errors', label: 'Errors', icon: Bug },
           { href: '/settings/themes', label: 'Themes', icon: Palette },

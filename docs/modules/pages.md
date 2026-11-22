@@ -102,6 +102,22 @@ Web: `components/follow.tsx` (`PageFollow` on a page's profile, `SuggestedPages`
 `OfficialMark`). Home's second tab is **Following**; pages to follow sit above it until five are
 followed. The owner sees an "Official" switch on any page's profile.
 
+## People (the owner's screen)
+
+Menu → People, developer only (`/settings/people`).
+
+| Route (person, developer only) | What |
+|---|---|
+| `GET /people-admin?kind=people\|pages&q=&skip=` | 30 accounts, newest first, by name or username prefix. A person: `pageLimit` (absent: default), `pagesCreated`. A page: `official`, `aiManaged`, `followerCount`, its managers' names. No email, nothing an account keeps |
+| `PUT /people-admin/:id/page-limit` | `{limit}`: 0 to 1000, `-1` for none, `null` for the default. Lowering it deletes nothing: existing pages stay, no more can be made |
+
+Suspend and restore use the existing `POST /auth/accounts/:id/suspend|unsuspend`, which work on
+a page as on a person: a suspended page cannot be acted as (`PAGE_SUSPENDED`), its features are
+all off so its posts are hidden, and its managers (not the page's unreachable address) get the
+email. The manager's own account is untouched. Suspending a person does not suspend their pages.
+
+Open concerns for this feature are listed at the end of `specs/040-pages/tasks.md`.
+
 ## Limits and deletion
 
 `mayCreatePage()`: three pages per person by default, counted by `createdBy`; `pageLimit` on the

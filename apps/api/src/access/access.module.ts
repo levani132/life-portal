@@ -190,7 +190,8 @@ export class AccessService {
   async listUsers(userId: string): Promise<AccessUser[]> {
     this.requireDeveloper(userId);
     const users = await this.users
-      .find()
+      // Spec 040: a page's features are fixed, so it has no place in this list.
+      .find({ kind: { $ne: 'page' } })
       .select('name cohort featureOverrides')
       .sort({ name: 1 })
       .limit(200)
