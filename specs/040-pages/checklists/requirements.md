@@ -34,6 +34,6 @@
 - No clarification markers: the open product choices were settled with defaults and recorded
   under Assumptions, so the owner can overturn any of them before planning. The four that change
   the build most: pages' posts are public or not shared (no followers-only audience); a page may
-  write first only to followers or people who wrote to it; 10 pages per person; the AI mark is on
+  write first only to followers or people who wrote to it; 3 pages per person by default, changeable per person by the owner (decided 2026-11-22); the AI mark is on
   the profile while the page mark is everywhere.
 - "Assistant (MCP) tools" is named in Assumptions only as an excluded later feature.

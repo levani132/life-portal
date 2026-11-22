@@ -148,9 +148,27 @@ A page's photos are checked like anyone's. Its posts can be reported, held, kept
 
 ---
 
+### User Story 9 - The owner manages people (Priority: P2)
+
+The owner opens **People** in the menu: a searchable list of accounts and pages. For a person it shows when they joined, whether they are suspended, how many pages they have and their page limit, and lets the owner change that limit (a number, or no limit), suspend or restore them, and open the feature switches that already exist per person. For a page it shows who manages it and lets the owner suspend or restore it and mark it as the app's own.
+
+**Why this priority**: The page limit is only useful if it can be lifted for the people who need more, and suspension and feature switches are scattered today.
+
+**Independent Test**: Find a person by name or email, raise their limit from 3 to 20, and confirm they can create a fourth page; set it back and confirm they cannot create another.
+
+**Acceptance Scenarios**:
+
+1. **Given** the owner on People, **When** they search by name, username or email, **Then** matching people and pages are listed.
+2. **Given** a person at their limit, **When** the owner raises or lifts it, **Then** that person can create more pages at once.
+3. **Given** any account other than the owner's, **When** it opens People, **Then** it is refused.
+4. **Given** a page in the list, **When** the owner marks it as the app's own or suspends it, **Then** the change shows to everyone at once.
+
+---
+
 ### Edge Cases
 
-- A person tries to create more pages than allowed: refused with the limit stated.
+- A person tries to create more pages than their limit: refused with the limit stated and how to ask for more (write to support).
+- The owner lowers a person's limit below the number of pages they already have: the existing pages stay; the person cannot create another until they are under the limit.
 - A page's manager is acting as the page on one device and as themselves on another: each device keeps its own choice.
 - A notification for a page arrives while the person is acting as themselves: it names the page, and opening it switches identity first.
 - A person follows a page, then the page is deleted or suspended: the follow disappears with it and Following shows nothing from it.
@@ -168,7 +186,7 @@ A page's photos are checked like anyone's. Its posts can be reported, held, kept
 **Pages and identity**
 
 - **FR-001**: A signed-in person MUST be able to create a page with a name, a unique username, an optional photo and an optional description.
-- **FR-002**: A person MUST be able to manage up to 10 pages.
+- **FR-002**: A person MUST be able to create up to 3 pages by default. The owner MUST be able to raise, lower or lift that limit for a specific person, and the owner's own account has no limit. The limit counts pages a person created; it does not limit how many pages a person may help manage once co-managers exist.
 - **FR-003**: A person who manages pages MUST be able to switch, without signing in again, between acting as themselves and acting as any one of their pages, and the app MUST show at all times which identity is in use.
 - **FR-004**: Everything done while acting as a page MUST belong to the page and MUST NOT reveal which person did it to anyone but the page's managers and the reviewer.
 - **FR-005**: A page MUST have no password or sign-in of its own; it is reached only through a manager's account.
@@ -209,6 +227,7 @@ A page's photos are checked like anyone's. Its posts can be reported, held, kept
 - **FR-028**: Deleting a personal account MUST delete every page that person alone manages; the data download MUST include the pages they manage.
 - **FR-029**: Notifications about a page MUST go to its managers' devices, name the page, and never mix with their personal notifications without that label.
 - **FR-030**: Actions queued while offline MUST be sent as the identity they were made with.
+- **FR-032**: The owner MUST have a People screen listing accounts and pages with search, showing each person's page count and limit, and allowing the limit to be changed, an account or page to be suspended or restored, and a page to be marked as the app's own. Nobody else may open it.
 - **FR-031**: The terms, privacy policy and community rules MUST describe pages: who is responsible for one, that a page is never a person, and the AI mark.
 
 ### Key Entities
@@ -224,6 +243,7 @@ A page's photos are checked like anyone's. Its posts can be reported, held, kept
 
 ### Measurable Outcomes
 
+- **SC-009**: The owner can find a person and change their page limit in under 30 seconds.
 - **SC-001**: A person can create a page and publish its first post in under 2 minutes.
 - **SC-002**: Switching between identities takes one or two taps and under 2 seconds, with no sign-in.
 - **SC-003**: A brand-new account with no friends sees at least 5 posts in For You the first time it opens Home.
@@ -240,7 +260,7 @@ A page's photos are checked like anyone's. Its posts can be reported, held, kept
 - **A page's posts are public or not shared.** "Followers only" is left out to keep the first version simple; it can be added later.
 - **Pages are always findable.** Unlike people, who choose whether strangers can find them, a page exists to be found.
 - **A page may write first only to its followers or to people who wrote to it.** This is the anti-spam default.
-- **10 pages per person** is a guard against abuse, not a product limit to sell around; it can change.
+- **3 pages per person by default** (owner's decision, 2026-11-22) is a guard against flooding, not a ceiling on what someone may run: the owner lifts or changes it per person from the People screen, and has no limit themselves.
 - **The AI mark shows on the page's profile; the page mark shows everywhere.** This follows the owner's stated preference (2026-11-20): someone who opens the page learns it is run with AI, and the "page" mark beside the name is what stops a page being mistaken for a person in a feed.
 - **"By a person" is set by the manager** when they act by hand on an AI-run page. Detecting it automatically arrives with the assistant tools in a later feature, where actions made by a tool can be told apart from actions made in the app.
 - **One manager per page for now.** Inviting co-managers, roles and transferring a page are a later feature.
