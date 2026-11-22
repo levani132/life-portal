@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-22: Numbers for the admin
+
+- **Menu → Numbers** shows how many accounts exist and how many are new, how many people were
+  active today and over 7 and 30 days, how many came back a day, a week and a month after
+  joining, and how many logged food, trained or posted, with a table per day. Totals only: no
+  person is shown, and nothing new is tracked.
+
 ## 2026-11-22: Anyone can sign up
 
 - **Registration is open.** The invite code field is gone from sign-up (it returns by itself if

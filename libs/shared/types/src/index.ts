@@ -26,3 +26,4 @@ export * from './lib/brands';
 export * from './lib/roadmap';
 export * from './lib/errors';
 export * from './lib/account';
+export * from './lib/usage';

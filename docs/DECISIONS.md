@@ -2759,3 +2759,19 @@ privacy policy (who handles what, what the checking service receives, what delet
 a description of existing behaviour. A change to that behaviour changes the page and
 `LEGAL_VERSION` in the same commit. They were drafted without a lawyer and should be read by
 one; the operator's legal name and address are in `apps/web/src/lib/brand.ts`.
+
+## 2026-11-22 · Usage numbers are computed from the records, not tracked
+
+**No events, no tracker.** What the owner needs first (how many people, how many come back, what
+they use) is already implied by the records: a meal entry, a workout, a post each say who and
+which day. `usageReport()` (pure, "today" passed in) reduces those pairs to counts. Nothing is
+stored for it (principle 3), nothing new is collected, and the privacy policy's "no analytics"
+stays true.
+
+**The cost is that "active" means "did something".** Opening the app and only reading leaves no
+record, so it is not counted. That is said on the page. Counting visits is the second part of
+the roadmap step and a separate decision.
+
+**A second module reads other modules' collections by name, read-only.** `UsageService` reads
+who and when from seven collections through the driver, like `AccountService` does for
+deletion. It reads no content and returns no id.

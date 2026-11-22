@@ -288,8 +288,10 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   038): owned, custom or kept. A test fails when one is missing, so add a new collection there in
   the same change, and if its rows hold a stored file add it to `FILE_COLLECTIONS`. Deleting an
   account removes files first and the account row last; it keeps nothing, badge awards included.
-  `AccountService` is the only code allowed to reach other modules' collections by name. See
-  `docs/modules/account.md`.
+  `AccountService` is the only code allowed to reach other modules' collections by name, with
+  one read-only exception: `UsageService` (Menu → Numbers) reads who and which day from the
+  collections in `USAGE_SOURCES` and returns counts, never an id or any content. See
+  `docs/modules/account.md` and `docs/modules/usage.md`.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for

@@ -114,9 +114,11 @@ three have moved into the numbered steps, because friends already use the app.
 3. **Numbers: know how the app is used.** Asked for 2026-11-22, the day registration opened.
    Nothing measures use today beyond the For You measurement (off), sync health and the error
    log, so there is no way to tell whether a change helped.
-   - **First, from what is already stored,** computed on read (principle 3) and shown on an admin
-     page: new accounts per day, people active per day, week and month, how many come back after
-     1, 7 and 30 days, and how many log food, log a workout, or post. Totals only, no person.
+   - ~~**First, from what is already stored.**~~ Done 2026-11-22 (Menu → Numbers,
+     `docs/modules/usage.md`): accounts, new accounts, people active today and over 7 and 30
+     days, how many new accounts did anything, who came back after 1, 7 and 30 days, and how
+     many logged food, trained, weighed in, posted or engaged, with a table per day. Computed
+     on read; totals only.
    - **Then where sign-up loses people and where visitors come from:** a counter for the public
      pages with no cookie and no person, our own (like sync health) or a self-hosted tool such
      as Plausible or Umami. The privacy policy says there is no third-party analytics; using an
