@@ -5,6 +5,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ErrorsModule } from '../errors/errors.module';
 import { RoadmapModule } from '../roadmap/roadmap.module';
 import { ThemesModule } from '../themes/themes.module';
 import { AccessModule, ModuleAccessGuard } from '../access/access.module';
@@ -73,6 +74,7 @@ import { IdempotencyModule } from '../idempotency/idempotency.module';
     McpModule,
     ThemesModule,
     RoadmapModule,
+    ErrorsModule,
   ],
   providers: [
     // Guarding globally means a new controller ships authenticated unless it opts out with

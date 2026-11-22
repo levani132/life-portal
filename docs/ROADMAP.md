@@ -1,6 +1,6 @@
 # Roadmap
 
-Where Life Portal is, where it is going, and in what order. Updated 2026-11-20. The admin sees this roadmap in the app (Menu → Roadmap); its content lives in
+Where Life Portal is, where it is going, and in what order. Updated 2026-11-22. The admin sees this roadmap in the app (Menu → Roadmap); its content lives in
 `apps/api/src/roadmap/roadmap.data.ts`, which must change with this file. Product
 direction comes from the owner; the order and the architecture tiers are recommendations agreed
 in conversation, not commitments. Costs are rough late-2026 list prices, order of magnitude only.
@@ -58,6 +58,10 @@ three have moved into the numbered steps, because friends already use the app.
 - **AI meal photos or more polish first?** The AI step is the main paid feature and has not been
   started.
 - **Money modules:** owner-only for good, or a product.
+- **When does the invite code go?** It is one setting on the API host (`REGISTRATION_INVITE_CODE`):
+  removing it opens registration to anyone. Before that: email configured (so a forgotten
+  password is recoverable), account deletion, and a view on moderation, since strangers can
+  then post.
 - **Where does the AI mark show?** The owner's proposal: on the page only, since anyone who opens
   it sees it is AI-managed. The recommendation: a small mark beside the page's name wherever it
   appears, because most people meet a post in the feed and never open the page.
@@ -69,9 +73,14 @@ three have moved into the numbered steps, because friends already use the app.
 
 1. ~~**Photos in posts.**~~ Done in 014: R2 with signed links, EXIF stripped on the phone,
    plus 30-second camera video and text-only posts.
-2. **Safety net for the people already using it.** Password reset by email (today a forgotten
-   password locks the account for good), rate limits on login and register, and error
-   monitoring in production. Small, and overdue now that friends use the app.
+2. **Safety net for the people already using it.** Built; one step is the owner's.
+   - **Done:** password reset by email, email verification, sign-in rate limits, a security log,
+     per-device sessions and Continue with Google (#27, #28, 2026-11-15); an error log for the
+     admin, on the server and on people's pages (2026-11-22, `docs/modules/errors.md`).
+   - **Owner's step:** email is not configured in production, so password reset and email
+     verification are switched off there (checked 2026-11-22). It needs a Resend account, a
+     verified sending domain, and `MAIL_PROVIDER`, `RESEND_API_KEY` and `MAIL_FROM` on the API
+     host. Do this before removing the invite code.
 3. **Switch on what is built.** Strength ranks, tournaments, training sharing, the Crisp theme
    and link-only posts are finished or nearly so and off for everyone but the owner. Each needs
    a review on a real device, then its flag turned on for friends, then for everyone.

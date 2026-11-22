@@ -6,7 +6,7 @@ import type { Roadmap } from '@life-portal/shared-types';
  * model, which are the owner's and not for every visitor's browser.
  */
 export const ROADMAP: Roadmap = {
-  updated: '2026-11-20',
+  updated: '2026-11-22',
   direction:
     'A private-by-default life dashboard that grows into a Strava-like social app for food, training and sports, where calories eaten and burned live on the same day. The core stays free; AI is the paid part.',
   areas: [
@@ -23,9 +23,14 @@ export const ROADMAP: Roadmap = {
     { title: 'Photos in posts', status: 'done', summary: 'Photos, 30-second camera video and text-only posts.' },
     {
       title: 'Safety net',
-      status: 'next',
-      summary: 'What the people already using the app need.',
-      points: ['Password reset by email: today a forgotten password locks the account for good', 'Rate limits on login and register', 'Error monitoring in production'],
+      status: 'built',
+      summary: 'Built. One step is yours: email is not set up in production, so password reset is off there.',
+      points: [
+        'Done: password reset, email verification, sign-in rate limits, security log, Continue with Google',
+        'Done: an error log for you, from the server and from people’s pages',
+        'Yours: a Resend account, a verified sending domain and three settings on the API host',
+        'Do this before removing the invite code',
+      ],
     },
     {
       title: 'Switch on what is built',
@@ -104,6 +109,7 @@ export const ROADMAP: Roadmap = {
     { question: 'Should a shared link open without an account?', detail: 'Today every post needs sign-in. A public page makes sharing useful to people who have not joined, and is a deliberate privacy step.' },
     { question: 'AI meal photos or more polish first?', detail: 'It is the main paid feature and has not been started.' },
     { question: 'Money modules: yours for good, or a product?', detail: 'They are seeded for one person today.' },
+    { question: 'When does the invite code go?', detail: 'It is one setting on the API host. Before removing it: email set up, account deletion, and a view on moderation, since strangers can then post.' },
     { question: 'Where does the AI mark show?', detail: 'On the page only, or beside the page’s name everywhere it appears. Most people meet a post in the feed and never open the page.' },
     { question: 'What may a promoted post target?', detail: 'Ads targeted on health data are ruled out, and here almost everything a person does is health data.' },
   ],

@@ -12,6 +12,7 @@ import {
   Bell,
   Palette,
   Map,
+  Bug,
 } from 'lucide-react';
 import { MODULES, type PortalState } from '@life-portal/shared-types';
 import { PageHeader } from './page-header';
@@ -64,6 +65,7 @@ export function MenuContent() {
       ? [
           { href: '/settings/access', label: 'Feature access', icon: Flag },
           { href: '/settings/sync-health', label: 'Sync health', icon: Flag },
+          { href: '/settings/errors', label: 'Errors', icon: Bug },
           { href: '/settings/themes', label: 'Themes', icon: Palette },
           { href: '/settings/roadmap', label: 'Roadmap', icon: Map },
           ...(data.access.foodPosts &&

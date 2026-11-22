@@ -14,6 +14,14 @@ User-visible changes. Newest first.
   calories are a size larger and less faint, and the space between a meal's box and the foods
   inside it is smaller, so the same content takes about the same room but reads more easily.
 
+## 2026-11-22: Errors are noticed
+
+- **The admin has an error log** (Menu → Errors): what broke on the server and on people's
+  pages, grouped by kind and counted, for today, 7 or 30 days. It holds no accounts or personal
+  details.
+- **A page that crashes says so** and offers "Try again", with the tabs still working, where it
+  used to show a blank screen.
+
 ## 2026-11-20: Brand logos stand in for missing food photos
 
 - **A food with no photo shows its brand's logo.** In the food chooser, the suggestions and the

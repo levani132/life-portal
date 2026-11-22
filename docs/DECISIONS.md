@@ -2640,3 +2640,21 @@ installs exactly the root lockfile (the builder runs it with `apps/web` as its c
 by resolving upward). The build itself is still the builder's `next build` in `apps/web`.
 `vercel-config.spec.ts` checks the command is there. `npm ci` deletes `node_modules` first, so builds
 no longer reuse cached modules; that costs some seconds and buys a reproducible install.
+
+## 2026-11-22 · Error monitoring is an in-house, scrubbed log, not a hosted service yet
+
+**Why now:** friends use the app and the only way to learn of a production error was to be told.
+
+**An own log rather than Sentry.** A hosted service would receive stack traces and request
+context from an app holding health and money data, needs an account, a key and another host in
+the content policy, and is more than a handful of users need. The log here stores a scrubbed
+message, a route or page *pattern* and a count: no account, no body, no address with ids. It
+costs one small collection with a 30-day expiry. Sentry stays the Tier 1 choice.
+
+**The filter changes no response.** It extends Nest's own filter and delegates to it, so every
+answer is byte-for-byte what it was; it only looks first. Only crashes and 5xx are recorded: a
+4xx is a refusal, and recording those would bury the real faults.
+
+**Scrubbed where it is stored, not where it is thrown.** Messages are written all over the code
+and by libraries (Mongoose quotes the failing value). One scrub at the single writer is the only
+place that can be relied on.

@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
 import type { ReactNode } from 'react';
 import { themeBootScript } from '@life-portal/shared-domain';
+import { ErrorWatch } from '../components/error-watch';
 import { ThemeLoader } from '../components/theme-loader';
 import { ThemeSync } from '../components/theme-preference';
 import { AuthProvider } from '../lib/auth-context';
@@ -72,6 +73,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <ThemeSync />
         <AuthProvider>
           <ThemeLoader />
+          <ErrorWatch />
           <PortalShell>{children}</PortalShell>
         </AuthProvider>
         <ServiceWorkerRegistration />

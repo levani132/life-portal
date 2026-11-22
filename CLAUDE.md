@@ -265,6 +265,11 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   `theme-roles.spec.ts`, which also holds the allowlist of fixed colours. Theme values are only
   ever `r g b` and are re-checked wherever they are written into a stylesheet; v0 is code, never
   a row; there is no public themes route. See `docs/modules/themes.md`.
+- **The error log holds no person.** `error_events` is a scrubbed message, a route or page
+  *pattern* and a count: never an account, a body, a query string or an address with ids.
+  `ErrorsService.record()` scrubs everything it is given, is never awaited and never throws.
+  `RecordingExceptionFilter` must keep delegating to Nest's own filter (it changes no response)
+  and records only crashes and 5xx. See `docs/modules/errors.md`.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for

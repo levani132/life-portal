@@ -24,3 +24,4 @@ export * from './lib/tournaments';
 export * from './lib/sync-health';
 export * from './lib/brands';
 export * from './lib/roadmap';
+export * from './lib/errors';
