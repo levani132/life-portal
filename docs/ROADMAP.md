@@ -32,8 +32,8 @@ until then is polish". Of the numbered steps below, only Training moved.
 **2026-11-22:** the app got its own address and email, and the two things that stood between
 it and open registration were built: leaving with your data (038) and photo moderation (039).
 Terms, a privacy policy and community rules followed the same day. What remains before the
-invite code goes is the owner's: the photo check's key, the operator's legal name in the
-documents and a lawyer's read of them, and a test on a phone.
+invite code goes is the owner's: the photo check's key, a lawyer's read of the
+documents, and a test on a phone.
 
 ### Known gaps to close before a public launch
 
@@ -44,8 +44,9 @@ three have moved into the numbered steps, because friends already use the app.
   Menu → Your data and account.
 - **Terms, privacy policy and community rules:** written 2026-11-22 as pages in the app
   (`/terms`, `/privacy`, `/rules`), with an explicit tick for health information at sign-up.
-  **Owner's steps:** put the operator's legal name and address in `apps/web/src/lib/brand.ts`
-  once the company exists, and have a lawyer read the three pages.
+  The operator is named as the owner's individual-entrepreneur registration
+  (`apps/web/src/lib/brand.ts`); change it when a company takes over. **Owner's step:** have a
+  lawyer read the three pages.
 - **`apps/api-e2e` is still the generated "Hello API" test.** `npm run test:integration` boots
   the real app against a database, but needs one supplied; nothing runs it automatically.
 - **Real-device checks** of push, messages and swiping on an iPhone.
@@ -78,8 +79,8 @@ three have moved into the numbered steps, because friends already use the app.
 - **When does the invite code go?** It is one setting on the API host (`REGISTRATION_INVITE_CODE`):
   removing it opens registration to anyone. Email is configured, people can delete their account and take
   their data, and photos are moderated (all 2026-11-22). Terms, a privacy policy and community rules are written.
-  Still before that: the photo check's key on the API host, the operator's legal name in the
-  documents, and a test on a phone with a second account.
+  Still before that: the photo check's key on the API host and a test on a phone with a second
+  account.
 - **Where does the AI mark show?** The owner's proposal: on the page only, since anyone who opens
   it sees it is AI-managed. The recommendation: a small mark beside the page's name wherever it
   appears, because most people meet a post in the feed and never open the page.
