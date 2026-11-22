@@ -34,7 +34,9 @@ export type SecurityEventType =
   | 'google_signin'
   | 'google_linked'
   | 'google_unlinked'
-  | 'google_failed';
+  | 'google_failed'
+  /** Spec 038. Recorded with no account: the account is gone. */
+  | 'account_deleted';
 
 /**
  * A security event (issue #27 S2), kept 90 days. Never an email, a password, a token or a raw IP:

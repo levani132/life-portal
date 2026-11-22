@@ -13,6 +13,7 @@ import {
   Palette,
   Map,
   Bug,
+  Database,
 } from 'lucide-react';
 import { MODULES, type PortalState } from '@life-portal/shared-types';
 import { PageHeader } from './page-header';
@@ -52,6 +53,7 @@ export function MenuContent() {
       icon: Sparkles,
     },
     { href: '/settings', label: 'Settings', icon: Settings },
+    { href: '/settings/data', label: 'Your data and account', icon: Database },
     ...(data?.access.nutrition
       ? [
           {

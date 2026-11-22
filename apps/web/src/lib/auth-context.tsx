@@ -31,6 +31,8 @@ interface AuthState {
   adopt: (session: AuthSession, to?: string) => Promise<void>;
   /** Signs out. With unsent changes on this device it asks first (spec 027). */
   logout: () => Promise<void>;
+  /** After the account was deleted (spec 038): forgets it on this device without asking the server anything. */
+  forget: () => Promise<void>;
   /** Opened from the remembered account because the server could not be reached (spec 027). */
   offlineSession: boolean;
 }
@@ -117,6 +119,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [adopt],
   );
 
+  /** Everything this device holds of the account, unsent changes included, and back to sign-in. */
+  const forget = useCallback(async () => {
+    setAskLogout(false);
+    tokens.clear();
+    if (user) await deleteOfflineData(user.id);
+    forgetDraftsInMemory();
+    forgetUser();
+    setOfflineSession(false);
+    setUser(null);
+    await mutate(() => true, undefined, { revalidate: false });
+    router.push('/login');
+  }, [router, user]);
+
   /** Signs out for real. This account's offline data on this device goes with it. */
   const signOut = useCallback(async () => {
     setAskLogout(false);
@@ -128,15 +143,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await api.post('/auth/logout').catch((error: unknown) => {
       if (!(error instanceof ApiError) && !(error instanceof NetworkError)) throw error;
     });
-    tokens.clear();
-    if (user) await deleteOfflineData(user.id);
-    forgetDraftsInMemory();
-    forgetUser();
-    setOfflineSession(false);
-    setUser(null);
-    await mutate(() => true, undefined, { revalidate: false });
-    router.push('/login');
-  }, [router, user]);
+    await forget();
+  }, [forget]);
 
   // Spec 027: never silently discard writes that are still on this device.
   const logout = useCallback(async () => {
@@ -148,8 +156,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [signOut]);
 
   const value = useMemo<AuthState>(
-    () => ({ user, loading, login, register, adopt, logout, offlineSession }),
-    [user, loading, login, register, adopt, logout, offlineSession],
+    () => ({ user, loading, login, register, adopt, logout, forget, offlineSession }),
+    [user, loading, login, register, adopt, logout, forget, offlineSession],
   );
 
   return (

@@ -2677,3 +2677,32 @@ tones, which is how the pending US mark's logo writes the same word.
 
 **The address will be `lifeportal.one`.** Every plain ending (.com, .app, .net, .org, .ai, .me,
 .io, .co) is taken; the hyphenated forms were rejected because people type the name without one.
+
+## 2026-11-22 · Deleting an account is immediate, complete, and done by one module
+
+**One module reaches into every collection, by name.** Principle 1 gives each module its own
+collections, and deletion is the one job that is about all of them at once. The alternative, an
+`eraseFor(userId)` on each of thirty modules, is thirty places to forget. `AccountService` works
+from one table (`ACCOUNT_PLAN`) through the database driver, and a test reads the API's source
+and fails when a collection is not in the table. Nothing else may use that route into other
+modules' data.
+
+**No grace period and no tombstone.** A delayed deletion needs a state every query would have to
+respect, and keeps health data for weeks after the person asked for it to go. Instead the
+confirmation is strong (password, or the email typed out for Google accounts), and an email to
+the deleted address is how a deletion nobody asked for is noticed.
+
+**Files first, the account row last.** A stored file whose record is gone can never be found
+again, so if storage refuses a delete, nothing in the database is touched. The account row goes
+last so an interrupted run can be repeated after signing in again.
+
+**Conversations go for both people.** A message thread with a deleted account would keep that
+person's words in someone else's inbox. Deleting the whole conversation also deletes what the
+other person wrote in it; that is the price of not keeping anything.
+
+**Copies stay with whoever made them, without the name.** A food, exercise or plan someone
+saved from a post is theirs (spec 007, 036). The label "Shared by Ana" becomes "Shared by a
+former member".
+
+**Badge awards are deleted too.** They are otherwise written once and never removed; an account
+that no longer exists is the exception.

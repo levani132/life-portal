@@ -24,6 +24,8 @@ export const RATE_RULES = {
   forgotByAccount: { bucket: 'forgot:acct', limit: 3, windowMs: 60 * MIN },
   resetByIp: { bucket: 'reset:ip', limit: 20, windowMs: 60 * MIN },
   verifyByUser: { bucket: 'verify:user', limit: 5, windowMs: 60 * MIN },
+  exportByUser: { bucket: 'export:user', limit: 6, windowMs: 60 * MIN },
+  deleteAccountByUser: { bucket: 'delete:user', limit: 5, windowMs: 60 * MIN },
   googleByIp: { bucket: 'google:ip', limit: 60, windowMs: 15 * MIN },
 } as const satisfies Record<string, RateRule>;
 

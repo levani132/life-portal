@@ -19,14 +19,17 @@ function iconUrl(link: string): string | null {
   }
 }
 
-function layout(paragraphs: string[], link: { href: string; label: string }): string {
+function layout(paragraphs: string[], link?: { href: string; label: string }, iconFrom?: string): string {
   const body = paragraphs.map((p) => `<p style="margin:0 0 16px">${escape(p)}</p>`).join('');
-  const icon = iconUrl(link.href);
+  const icon = iconUrl(link?.href ?? iconFrom ?? '');
   const mark = icon
     ? `<td style="padding:0 10px 0 0;vertical-align:middle"><img src="${escape(icon)}" width="36" height="36" alt="" style="display:block;border:0;border-radius:9px"></td>`
     : '';
   const header = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px"><tr>${mark}<td style="vertical-align:middle;font-size:20px;font-weight:700;letter-spacing:-0.01em;color:#0c0e14">${WORDMARK}</td></tr></table>`;
-  return `<!doctype html><html><body style="margin:0;padding:24px 12px;background:#f3f4f6;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.5;color:#1a1a1a"><div style="max-width:480px;margin:0 auto;padding:28px 24px;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px">${header}${body}<p style="margin:24px 0"><a href="${escape(link.href)}" style="display:inline-block;background:#0c0e14;color:#ffffff;padding:11px 18px;border-radius:9px;font-weight:600;text-decoration:none">${escape(link.label)}</a></p><p style="margin:0;color:#666666;font-size:13px;word-break:break-all">Or paste this link into your browser:<br>${escape(link.href)}</p></div></body></html>`;
+  const action = link
+    ? `<p style="margin:24px 0"><a href="${escape(link.href)}" style="display:inline-block;background:#0c0e14;color:#ffffff;padding:11px 18px;border-radius:9px;font-weight:600;text-decoration:none">${escape(link.label)}</a></p><p style="margin:0;color:#666666;font-size:13px;word-break:break-all">Or paste this link into your browser:<br>${escape(link.href)}</p>`
+    : '';
+  return `<!doctype html><html><body style="margin:0;padding:24px 12px;background:#f3f4f6;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.5;color:#1a1a1a"><div style="max-width:480px;margin:0 auto;padding:28px 24px;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px">${header}${body}${action}</div></body></html>`;
 }
 
 /** The password-reset email (issue #27). The link carries the token in its fragment. */
@@ -56,5 +59,20 @@ export function verifyEmail(to: string, name: string, link: string, hours: numbe
     subject: 'Confirm your email for LifePortal',
     text: `${lines.join('\n\n')}\n\n${link}\n`,
     html: layout(lines, { href: link, label: 'Confirm email' }),
+  };
+}
+
+/** Sent once an account is deleted (spec 038), so a deletion nobody asked for is noticed. */
+export function accountDeletedEmail(to: string, name: string, webOrigin?: string): MailMessage {
+  const lines = [
+    `Hi ${name},`,
+    'Your LifePortal account and everything in it have been deleted, as you asked. This cannot be undone.',
+    "If you didn't ask for this, reply to this email straight away.",
+  ];
+  return {
+    to,
+    subject: 'Your LifePortal account was deleted',
+    text: `${lines.join('\n\n')}\n`,
+    html: layout(lines, undefined, webOrigin),
   };
 }

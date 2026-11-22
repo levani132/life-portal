@@ -45,3 +45,4 @@ export * from './lib/tournament-scoring';
 export * from './lib/sync-health';
 export * from './lib/brands';
 export * from './lib/error-reports';
+export * from './lib/account';

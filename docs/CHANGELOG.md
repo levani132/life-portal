@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-22: Leave, and take your data with you
+
+- **Download your data** (Menu → Your data and account): one file with everything the app holds
+  about you, and links to your photos and videos.
+- **Delete your account** on the same page: everything goes at once, on every device, after your
+  password (or your email address, if you sign in with Google). It cannot be undone.
+
 ## 2026-11-22: Web deploys no longer depend on Vercel's build cache
 
 - **A redeploy without the build cache now works.** Vercel installs the web app's dependencies

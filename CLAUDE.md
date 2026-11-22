@@ -270,6 +270,12 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   `ErrorsService.record()` scrubs everything it is given, is never awaited and never throws.
   `RecordingExceptionFilter` must keep delegating to Nest's own filter (it changes no response)
   and records only crashes and 5xx. See `docs/modules/errors.md`.
+- **Every collection is listed in `ACCOUNT_PLAN`** (`apps/api/src/account/account-plan.ts`, spec
+  038): owned, custom or kept. A test fails when one is missing, so add a new collection there in
+  the same change, and if its rows hold a stored file add it to `FILE_COLLECTIONS`. Deleting an
+  account removes files first and the account row last; it keeps nothing, badge awards included.
+  `AccountService` is the only code allowed to reach other modules' collections by name. See
+  `docs/modules/account.md`.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for
