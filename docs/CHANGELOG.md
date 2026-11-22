@@ -1427,3 +1427,10 @@ Health uploads now accept a sample array encoded as JSON text by Shortcuts, whil
 ### Generated Shortcut dictionary-state correction
 
 Fixed an invalid field tag in the reference batching generator: `WFItemType=1` denotes a Dictionary, not a Number, and was paired with text state for sample values. The generator now consistently emits Text dictionary fields, which the receiver already validates and converts. Added a structural assertion to prevent that mismatch. Corrected output passes the local signer's loading stage; this environment still reports iCloud sharing unavailable, so signing and iPhone execution are not claimed verified.
+
+## 2026-11-22: the app has its own address
+
+- The app now lives at `https://lifeportal.one` (`www` redirects there). The old
+  `life-portal-tan.vercel.app` address still answers. Password reset and email verification are
+  switched on in production: mail is sent through Resend from `lifeportal.one`, and mail to any
+  address on the domain is forwarded by ImprovMX. No code changed; runbooks name the new address.

@@ -23,10 +23,10 @@ Found from the repo's homepage, the API's CORS answer and `/api/health` on 2026-
 
 | | Value |
 |---|---|
-| Web origin (`WEB_BASE_URL`) | `https://life-portal-tan.vercel.app` |
+| Web origin (`WEB_BASE_URL`) | `https://lifeportal.one` (since 2026-11-22) |
 | API origin (`API_PUBLIC_URL`) | `https://life-portal.onrender.com` |
 | **Authorized redirect URI** | `https://life-portal.onrender.com/api/auth/google/callback` |
-| Authorized domains | `vercel.app`, `onrender.com` |
+| Authorized domains | `lifeportal.one`, `onrender.com` |
 
 If either origin changes (a custom domain), update the variable and the redirect URI together.
 

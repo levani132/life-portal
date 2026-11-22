@@ -12,7 +12,7 @@ calls Render directly and keeps tokens as before.
 
 | | Value |
 |---|---|
-| Web origin | `https://life-portal-tan.vercel.app` |
+| Web origin | `https://lifeportal.one` (since 2026-11-22; `life-portal-tan.vercel.app` still answers) |
 | API origin | `https://life-portal.onrender.com` |
 | Where Vercel forwards `/api` | `https://life-portal.onrender.com/api` (in `apps/web/vercel.json`) |
 | Vercel Root Directory | `apps/web` |
@@ -60,7 +60,7 @@ Then **redeploy**. `NEXT_PUBLIC_*` values are baked in at build time, so a redep
 
 ## 4. Check it
 
-1. Open `https://life-portal-tan.vercel.app/api/health`. It should say `"proxied": true` and
+1. Open `https://lifeportal.one/api/health`. It should say `"proxied": true` and
    `"proxy": "ok"`. Otherwise `proxy` names the step that failed, never a value:
    - `unconfigured`: Render has no `WEB_PROXY_SECRET` (or the API has not restarted since).
    - `no-header`: the request arrived without `x-lp-proxy`; the route's header transform did not

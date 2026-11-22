@@ -79,7 +79,7 @@ services:
       # ---- Continue with Google (issue #28): all of these, or none. ----
       # Setup: docs/runbooks/google-oauth.md. The secret lives in the dashboard only.
       # The web app's origin, for links and the Google return page.
-      # This deployment: https://life-portal-tan.vercel.app
+      # This deployment: https://lifeportal.one
       - key: WEB_BASE_URL
         sync: false
       # This service's public origin, no /api. This deployment: https://life-portal.onrender.com
