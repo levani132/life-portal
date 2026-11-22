@@ -55,6 +55,11 @@ export default function TermsPage() {
           <li>A reported post, or one the automatic check flags, may be hidden and is looked at by a person on our side, who can see it whatever audience you chose.</li>
           <li>We may remove content that breaks these terms or the rules, and suspend or close an account that does so seriously or repeatedly. If you think we got it wrong, write to <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.</li>
         </ul>
+        <p>
+          <strong>These are efforts, not a guarantee.</strong> We do not look at everything people post before it
+          appears, automatic checks miss things, and a report takes time to reach a person. We do not promise that
+          nothing harmful, wrong or offensive will ever appear in the app.
+        </p>
       </LegalSection>
 
       <LegalSection title="6. Connecting an AI assistant or another app">
@@ -72,16 +77,30 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="8. No guarantee">
+      <LegalSection title="8. Who is responsible for what">
         <p>
-          We work to keep the app running and your data safe, but it is provided as it is. It may be slow, change, or be
-          unavailable for a time, and a feature may be removed. Keep your own copy of anything you cannot afford to
+          <strong>You are responsible</strong> for what you post, for how you use the app, and for the decisions you
+          make with what it shows you.
+        </p>
+        <p>
+          <strong>We are not responsible</strong> for what other members post, say or do, in the app or outside it; for
+          content our checks did not catch; for food facts and other information that comes from members or from
+          outside sources; for what an assistant or another app you connected does; or for the services of other
+          companies the app relies on.
+        </p>
+        <p>
+          <strong>We answer only for actual, direct harm that we ourselves cause</strong> by breaking these terms or the
+          law deliberately or through gross negligence, and only to the extent the law requires. We are not liable for
+          indirect losses, lost data, lost income or lost opportunity.
+        </p>
+        <p>
+          The app is provided as it is. We work to keep it running and your data safe, but it may be slow, change, or
+          be unavailable for a time, and a feature may be removed. Keep your own copy of anything you cannot afford to
           lose: Menu → Your data and account gives you all of it as a file.
         </p>
         <p>
-          As far as the law allows, we are not liable for indirect losses, or for decisions you make based on figures
-          the app shows. Nothing here limits rights the consumer law of your country gives you and that cannot be
-          signed away.
+          Nothing here limits rights the law gives you and that cannot be signed away, including under the consumer and
+          data protection law of your country.
         </p>
       </LegalSection>
 
@@ -93,10 +112,11 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="10. Law">
+      <LegalSection title="10. Law and disputes">
         <p>
-          These terms are governed by the law of Georgia. If you live in another country, you keep the protection its
-          consumer law gives you.
+          These terms are governed by the law of Georgia, and disputes are decided by the courts of Georgia. If you
+          live in another country, you keep the protection its consumer law gives you and that cannot be signed away.
+          Write to us first: most things can be settled by a message.
         </p>
       </LegalSection>
     </LegalPage>
