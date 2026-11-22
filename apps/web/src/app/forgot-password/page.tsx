@@ -1,5 +1,5 @@
 'use client';
-
+import { APP_NAME } from '../../lib/brand';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ApiError, request } from '../../lib/api';
@@ -47,7 +47,7 @@ export default function ForgotPasswordPage() {
 
         {available === false ? (
           <p role="status" className="card p-5 text-sm text-ink-muted">
-            Password reset by email isn&apos;t available on this Life Portal yet. Ask the person who runs it.
+            Password reset by email isn&apos;t available on this {APP_NAME} yet. Ask the person who runs it.
           </p>
         ) : sent ? (
           <p role="status" className="card p-5 text-sm">

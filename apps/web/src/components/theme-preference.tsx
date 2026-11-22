@@ -1,5 +1,5 @@
 'use client';
-
+import { APP_NAME } from '../lib/brand';
 import { useEffect, useSyncExternalStore } from 'react';
 import { THEME_APPLIED_EVENT } from '../lib/theme-runtime';
 import { Field, Panel, Select } from './ui';
@@ -71,7 +71,7 @@ export function ThemePreferenceControl() {
   return (
     <Panel
       title="Appearance"
-      description="Choose how Life Portal looks in this browser."
+      description={`Choose how ${APP_NAME} looks in this browser.`}
     >
       <Field
         label="Theme"

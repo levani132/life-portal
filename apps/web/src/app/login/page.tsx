@@ -1,4 +1,5 @@
 'use client';
+import { Wordmark } from '../../components/wordmark';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -64,8 +65,8 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <h1 className="mb-1 text-lg font-semibold tracking-tight">
-          Life<span className="text-accent">Portal</span>
+        <h1 className="mb-1 text-lg">
+          <Wordmark />
         </h1>
         <p className="mb-6 text-sm text-ink-muted">Sign in to see where you stand.</p>
 

@@ -1,10 +1,11 @@
+import { APP_NAME } from '../../../lib/brand';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { macroLine } from '@life-portal/shared-domain';
 import { fetchPublicPreview } from '../../../lib/public-preview';
 
 const GENERIC = {
-  title: 'A post on Life Portal',
+  title: `A post on ${APP_NAME}`,
   description: 'Food, training and the numbers behind them. Sign in to see this post.',
 };
 
@@ -20,16 +21,16 @@ export async function generateMetadata({
   const { id } = await params;
   const preview = await fetchPublicPreview(id);
   const title = preview
-    ? `${preview.title || 'A post'} · ${preview.authorName} on Life Portal`
+    ? `${preview.title || 'A post'} · ${preview.authorName} on ${APP_NAME}`
     : GENERIC.title;
   const description = preview
     ? [macroLine(preview.macros), preview.caption].filter(Boolean).join(' — ') ||
-      `Shared by ${preview.authorName} on Life Portal.`
+      `Shared by ${preview.authorName} on ${APP_NAME}.`
     : GENERIC.description;
   return {
     title,
     description,
-    openGraph: { title, description, type: 'article', siteName: 'Life Portal' },
+    openGraph: { title, description, type: 'article', siteName: APP_NAME },
     twitter: { card: 'summary_large_image', title, description },
   };
 }

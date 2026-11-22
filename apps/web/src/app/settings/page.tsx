@@ -1,5 +1,5 @@
 'use client';
-
+import { APP_NAME } from '../../lib/brand';
 import Link from 'next/link';
 import { HealthConnectionSettings } from '../../components/apple-health';
 import { HealthShortcutAdminSetting } from '../../components/health-shortcut-admin-setting';
@@ -69,7 +69,7 @@ function Settings() {
       <div className="mx-auto max-w-2xl">
         <PageHeader
           title="Settings"
-          subtitle="Make Life Portal work for you."
+          subtitle={`Make ${APP_NAME} work for you.`}
         />
         <div className="mb-4">
           <ThemePreferenceControl />

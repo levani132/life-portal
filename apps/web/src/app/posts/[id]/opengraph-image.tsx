@@ -1,3 +1,4 @@
+import { APP_NAME, APP_WORDMARK } from '../../../lib/brand';
 import { ImageResponse } from 'next/og';
 import { MACRO_HEX } from '../../../lib/macro-colors';
 import { macroShares, ringArcs } from '@life-portal/shared-domain';
@@ -6,7 +7,7 @@ import { fetchPublicPreview } from '../../../lib/public-preview';
 
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
-export const alt = 'A post on Life Portal';
+export const alt = `A post on ${APP_NAME}`;
 
 const BG = '#0C0E14';
 const INK = '#F4F5F8';
@@ -116,8 +117,7 @@ function Rings({ macros }: { macros: NonNullable<PublicPostPreview['macros']> })
 function Brand() {
   return (
     <div style={{ display: 'flex', fontSize: 34 }}>
-      <span style={{ color: INK }}>Life</span>
-      <span style={{ color: ACCENT }}>Portal</span>
+      <span style={{ color: INK, fontWeight: 700 }}>{APP_WORDMARK}</span>
     </div>
   );
 }
@@ -125,8 +125,8 @@ function Brand() {
 export default async function Image({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const preview = await fetchPublicPreview(id);
-  const title = preview?.title || (preview ? 'A post' : 'A post on Life Portal');
-  const fonts = await loadFonts(`LifePortal ${title} ${preview?.authorName ?? ''} by kcal Protein Carbs Fat 0123456789g·% Sign in to see it`);
+  const title = preview?.title || (preview ? 'A post' : `A post on ${APP_NAME}`);
+  const fonts = await loadFonts(`${APP_WORDMARK} ${title} ${preview?.authorName ?? ''} by kcal Protein Carbs Fat 0123456789g·% Sign in to see it`);
   const fontFamily = fonts.map((font) => font.name).join(', ') || undefined;
 
   return new ImageResponse(

@@ -1,4 +1,5 @@
 'use client';
+import { APP_NAME } from '../lib/brand';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Globe, Lock, MoreHorizontal, Users,
@@ -34,7 +35,7 @@ export function PostDateLink({ id, date }: { id: string; date: string }) {
 const audiences = {
   private: { label: 'Only me', icon: Lock },
   friends: { label: 'Friends', icon: Users },
-  public: { label: 'Everyone in Life Portal', icon: Globe },
+  public: { label: `Everyone in ${APP_NAME}`, icon: Globe },
 };
 /** A private post that opens for the people it was sent to, or who have its link. */
 const LINK_ONLY = { label: 'Only people I send it to', icon: Link2 };

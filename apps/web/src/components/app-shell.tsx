@@ -1,4 +1,5 @@
 'use client';
+import { Wordmark } from './wordmark';
 import { HealthSyncBridge } from './apple-health';
 
 import clsx from 'clsx';
@@ -139,8 +140,8 @@ function Portal({ children }: { children: ReactNode }) {
             <div className="flex h-10 items-center pl-2">
               <SyncStatus />
             </div>
-            <Link href="/" className="font-semibold tracking-tight">
-              Life<span className="text-accent">Portal</span>
+            <Link href="/" aria-label="Home">
+              <Wordmark />
             </Link>
             <div className="flex justify-end pr-2">
               <ActivityBell access={portal.data.access} />

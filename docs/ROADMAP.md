@@ -58,6 +58,9 @@ three have moved into the numbered steps, because friends already use the app.
 - **AI meal photos or more polish first?** The AI step is the main paid feature and has not been
   started.
 - **Money modules:** owner-only for good, or a product.
+- **The name and its trademark.** "Life Portal" is kept (see DECISIONS, 2026-11-22). To do: file
+  in the EU and Georgia once the app shows its worth, and get a specialist's view before
+  marketing in the US, where two unrelated companies hold or have applied for the name.
 - **When does the invite code go?** It is one setting on the API host (`REGISTRATION_INVITE_CODE`):
   removing it opens registration to anyone. Before that: email configured (so a forgotten
   password is recoverable), account deletion, and a view on moderation, since strangers can

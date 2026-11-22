@@ -1,4 +1,5 @@
 'use client';
+import { APP_NAME } from '../lib/brand';
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import clsx from 'clsx';
 import {
@@ -56,7 +57,7 @@ import { requestNotificationOffer } from './notifications';
 const audiences = {
   private: { label: 'Only me', icon: Lock },
   friends: { label: 'Friends', icon: Users },
-  public: { label: 'Everyone in Life Portal', icon: Globe },
+  public: { label: `Everyone in ${APP_NAME}`, icon: Globe },
 };
 const LINK_ONLY_LABEL = 'Only people I send it to';
 const SLOT_LABELS: Record<MealSlot, string> = {

@@ -1,5 +1,5 @@
 'use client';
-
+import { APP_NAME } from '../lib/brand';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Bell, Share, SquarePlus } from 'lucide-react';
@@ -126,7 +126,7 @@ function AddToHomeScreen() {
   return (
     <div className="space-y-3 text-sm">
       <p>
-        On iPhone, notifications only work from the Life Portal app on your Home Screen.
+        On iPhone, notifications only work from the {APP_NAME} app on your Home Screen.
       </p>
       <ol className="space-y-2 text-ink-muted">
         <li className="flex items-center gap-2">
@@ -135,7 +135,7 @@ function AddToHomeScreen() {
         <li className="flex items-center gap-2">
           <span>2.</span> Choose <SquarePlus size={16} aria-hidden /> Add to Home Screen.
         </li>
-        <li>3. Open Life Portal from your Home Screen and turn notifications on there.</li>
+        <li>3. Open {APP_NAME} from your Home Screen and turn notifications on there.</li>
       </ol>
     </div>
   );
@@ -178,8 +178,8 @@ function EnableButton({ onDone }: { onDone: () => void }) {
 function BlockedHelp() {
   return (
     <p className="rounded-lg border border-warning-solid/40 bg-warning-solid/10 px-3 py-2 text-xs text-warning">
-      Notifications are blocked for Life Portal on this device. Allow them in your device’s
-      settings (on iPhone: Settings › Notifications › Life Portal), then come back here.
+      Notifications are blocked for {APP_NAME} on this device. Allow them in your device’s
+      settings (on iPhone: Settings › Notifications › {APP_NAME}), then come back here.
     </p>
   );
 }
@@ -319,7 +319,7 @@ export function NotificationSettings() {
         ) : support.support === 'unsupported' ? (
           <p className="text-sm text-ink-muted">
             This browser can’t receive notifications. Try Chrome, Edge, Firefox or Safari, or
-            the Life Portal app on your Home Screen.
+            the {APP_NAME} app on your Home Screen.
           </p>
         ) : blocked ? (
           <BlockedHelp />

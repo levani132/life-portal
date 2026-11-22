@@ -1,4 +1,5 @@
 'use client';
+import { APP_NAME } from '../lib/brand';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -74,7 +75,7 @@ export function PostShareSheet({
   onClose: () => void;
 }) {
   const postId = post.id;
-  const title = post.title || post.contentLabel || 'Life Portal post';
+  const title = post.title || post.contentLabel || `${APP_NAME} post`;
   const imageAllowed = canShareImage({ own: post.isOwner, audience: post.audience });
   // Drawn as soon as the sheet opens, so the share call runs inside the tap: iOS refuses a share
   // sheet that opens after slow work.

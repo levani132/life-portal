@@ -1,4 +1,5 @@
 'use client';
+import { APP_NAME } from '../lib/brand';
 import { useEffect, useId, useRef } from 'react';
 import type { HealthShortcutPromptKind } from '../lib/health-shortcut-install';
 
@@ -75,7 +76,7 @@ export function HealthShortcutDialog({
         <p>
           Automatic syncing is optional. After installing, open the Shortcut in
           Shortcuts and enable its scheduled runs; installation alone does not
-          enable them. You can always tap Sync in Life Portal manually.
+          enable them. You can always tap Sync in {APP_NAME} manually.
         </p>
       </div>
       <div className="mt-5 flex flex-wrap gap-2">

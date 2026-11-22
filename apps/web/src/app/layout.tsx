@@ -1,3 +1,4 @@
+import { APP_NAME } from '../lib/brand';
 import './global.css';
 import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
@@ -11,9 +12,9 @@ import { PortalShell } from '../components/app-shell';
 import { ServiceWorkerRegistration } from '../components/service-worker';
 
 export const metadata: Metadata = {
-  title: 'Life Portal',
+  title: APP_NAME,
   description: 'Debts, cash flow, assets, work, plans and food in one place.',
-  applicationName: 'Life Portal',
+  applicationName: APP_NAME,
   // Private dashboard: keep it out of search results even if the URL leaks.
   robots: { index: false, follow: false },
   icons: {
@@ -26,7 +27,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: 'Life Portal',
+    title: APP_NAME,
     // `black-translucent` lets the app paint under the status bar; the safe-area padding in
     // global.css is what keeps the header out from under the clock.
     statusBarStyle: 'black-translucent',

@@ -122,6 +122,7 @@ export const ROADMAP: Roadmap = {
     { question: 'Should a shared link open without an account?', detail: 'Today every post needs sign-in. A public page makes sharing useful to people who have not joined, and is a deliberate privacy step.' },
     { question: 'AI meal photos or more polish first?', detail: 'It is the main paid feature and has not been started.' },
     { question: 'Money modules: yours for good, or a product?', detail: 'They are seeded for one person today.' },
+    { question: 'The name and its trademark', detail: 'Life Portal is kept. Nothing is registered in the EU, UK or Georgia; two unrelated US companies hold or have applied for it. File in the EU and Georgia once the app shows its worth; get a specialist’s view before the US.' },
     { question: 'When does the invite code go?', detail: 'It is one setting on the API host. Before removing it: email set up, account deletion, and a view on moderation, since strangers can then post.' },
     { question: 'Where does the AI mark show?', detail: 'On the page only, or beside the page’s name everywhere it appears. Most people meet a post in the feed and never open the page.' },
     { question: 'What may a promoted post target?', detail: 'Ads targeted on health data are ruled out, and here almost everything a person does is health data.' },

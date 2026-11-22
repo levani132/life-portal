@@ -1,4 +1,5 @@
 'use client';
+import { Wordmark } from '../../../components/wordmark';
 
 import type { GoogleErrorCode, GoogleExchangeResult } from '@life-portal/shared-types';
 import Link from 'next/link';
@@ -71,7 +72,7 @@ export default function GoogleReturnPage() {
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <h1 className="mb-4 text-lg font-semibold tracking-tight">
-          Life<span className="text-accent">Portal</span>
+          <Wordmark />
         </h1>
         {state.kind === 'working' && (
           <p role="status" className="card p-5 text-sm">

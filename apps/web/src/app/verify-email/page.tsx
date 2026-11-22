@@ -1,5 +1,5 @@
 'use client';
-
+import { APP_NAME } from '../../lib/brand';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ApiError, request } from '../../lib/api';
@@ -36,7 +36,7 @@ export default function VerifyEmailPage() {
           {state === 'error' && <p>That did not work. Check your connection and open the link again.</p>}
           {state !== 'working' && (
             <Link href="/" className="btn-primary block w-full text-center">
-              Open Life Portal
+              Open {APP_NAME}
             </Link>
           )}
         </div>

@@ -1,4 +1,5 @@
 'use client';
+import { APP_NAME } from '../lib/brand';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, RefreshCw, XCircle } from 'lucide-react';
 import type { ActivityAdjustment } from '@life-portal/shared-types';
@@ -391,7 +392,7 @@ export function HealthConnectionSettings() {
   ) : (
     <Panel title="Apple Health & Shortcuts">
       <p className="text-sm text-ink-muted">
-        Health syncing works only on iOS. Open Life Portal on your iPhone or
+        Health syncing works only on iOS. Open {APP_NAME} on your iPhone or
         iPad to install the Shortcut, connect Apple Health and set up scheduled
         syncing. Desktop and Android cannot collect Apple Health samples.
       </p>

@@ -1,3 +1,4 @@
+import { APP_NAME } from './brand';
 import type { GoogleErrorCode } from '@life-portal/shared-types';
 import { API_URL } from './api';
 
@@ -74,7 +75,7 @@ const GOOGLE_ERRORS: Record<GoogleErrorCode, string> = {
   cancelled: 'Google sign-in was cancelled.',
   expired: 'That sign-in took too long or was already used. Try again.',
   email_unverified: 'Google has not verified the email on that Google account, so it cannot be used here.',
-  already_linked_elsewhere: 'That Google account is already linked to a different Life Portal account.',
+  already_linked_elsewhere: `That Google account is already linked to a different ${APP_NAME} account.`,
   account_has_google: 'This account is already linked to a different Google account. Unlink it first.',
   failed: 'Google sign-in did not work. Try again.',
 };

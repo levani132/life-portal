@@ -1,3 +1,4 @@
+import { APP_NAME } from './brand';
 import { ApiError, NetworkError } from './api';
 
 /**
@@ -27,9 +28,9 @@ export function loadErrorMessage(kind: LoadErrorKind, error: unknown): string {
     case 'offline':
       return 'You’re offline.';
     case 'unreachable':
-      return 'Can’t reach Life Portal right now.';
+      return `Can’t reach ${APP_NAME} right now.`;
     case 'server':
-      return 'Life Portal is having trouble right now.';
+      return `${APP_NAME} is having trouble right now.`;
     case 'session':
       return 'Your session has ended. Please sign in again.';
     default:

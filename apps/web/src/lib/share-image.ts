@@ -1,4 +1,5 @@
 'use client';
+import { APP_NAME } from './brand';
 import { macroShares, ringArcs } from '@life-portal/shared-domain';
 import { MACRO_HEX } from './macro-colors';
 import type { FoodPost } from '@life-portal/shared-types';
@@ -177,7 +178,7 @@ function draw(post: FoodPost, photo: ImageBitmap | null): HTMLCanvasElement {
   ctx.textAlign = 'center';
   ctx.fillStyle = MUTED;
   ctx.font = `500 34px ${FONT}`;
-  ctx.fillText('Shared from Life Portal', W / 2, H - 150);
+  ctx.fillText(`Shared from ${APP_NAME}`, W / 2, H - 150);
   return canvas;
 }
 

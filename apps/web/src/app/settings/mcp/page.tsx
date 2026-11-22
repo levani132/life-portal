@@ -1,5 +1,5 @@
 'use client';
-
+import { APP_NAME } from '../../../lib/brand';
 import { useState } from 'react';
 import { AppShell, PageHeader } from '../../../components/app-shell';
 import { ErrorNote, Panel, Spinner } from '../../../components/ui';
@@ -50,23 +50,23 @@ function McpSetup() {
     <>
       <PageHeader
         title="AI Assistant Setup"
-        subtitle="Connect ChatGPT, Claude, or other AI assistants to your Life Portal nutrition data."
+        subtitle={`Connect ChatGPT, Claude, or other AI assistants to your ${APP_NAME} nutrition data.`}
       />
 
       {error && <ErrorNote message={error} />}
 
       <div className="grid gap-6">
         {oauth?.enabled && (
-          <Panel title="Connect ChatGPT · Beta" description="First time? Add your own Life Portal connection, then sign in.">
+          <Panel title="Connect ChatGPT · Beta" description={`First time? Add your own ${APP_NAME} connection, then sign in.`}>
             <div className="space-y-4 text-sm text-ink-muted">
-              <p>Life Portal is in private testing. You do not need to find it in the public plugin directory. Follow these steps once for your ChatGPT account.</p>
+              <p>{APP_NAME} is in private testing. You do not need to find it in the public plugin directory. Follow these steps once for your ChatGPT account.</p>
               <a className="btn-primary inline-flex" href="https://chatgpt.com/plugins" target="_blank" rel="noopener noreferrer">
                 Open ChatGPT Plugins
               </a>
               <ol className="list-decimal space-y-3 pl-5">
                 <li>In ChatGPT, open <strong>Plugins</strong>, select <strong>+</strong>, then <strong>Add custom MCP server</strong>.</li>
                 <li>
-                  Name it <strong>Life Portal</strong>. For the description, enter <strong>Track my meals, macros and nutrition goals.</strong> Choose a public server URL and paste the address below.
+                  Name it <strong>{APP_NAME}</strong>. For the description, enter <strong>Track my meals, macros and nutrition goals.</strong> Choose a public server URL and paste the address below.
                   <div className="mt-2 rounded-lg border border-line bg-surface-sunken p-3">
                     <span className="mb-1 block text-xs font-medium text-ink">Server URL</span>
                     <code className="block break-all text-xs">{mcpUrl}</code>
@@ -78,8 +78,8 @@ function McpSetup() {
                 </li>
                 <li>Choose <strong>OAuth</strong> authentication. If advanced options appear, choose <strong>Dynamic Client Registration</strong> and use <code>nutrition</code> as the scope. No client ID, client secret or manual token is needed.</li>
                 <li>Review the requested access and ChatGPT&apos;s notice, then choose <strong>Create as a plugin</strong>. Install or select <strong>Connect</strong> when prompted.</li>
-                <li>On the Life Portal sign-in page, use <strong>your own Life Portal email and password</strong> and approve nutrition access. The assistant connects to your account&apos;s meals, foods, goals and weight records.</li>
-                <li>Start a new chat, type <strong>@Life Portal</strong> and select your connection. Try: <strong>&ldquo;Show today&apos;s meals and macros.&rdquo;</strong> If sign-in appears on this first request instead, complete it then.</li>
+                <li>On the {APP_NAME} sign-in page, use <strong>your own {APP_NAME} email and password</strong> and approve nutrition access. The assistant connects to your account&apos;s meals, foods, goals and weight records.</li>
+                <li>Start a new chat, type <strong>@{APP_NAME}</strong> and select your connection. Try: <strong>&ldquo;Show today&apos;s meals and macros.&rdquo;</strong> If sign-in appears on this first request instead, complete it then.</li>
               </ol>
               <div className="rounded-lg border border-line bg-surface-sunken p-3 space-y-2">
                 <p className="font-medium text-ink">Setting up on iPhone?</p>
@@ -88,7 +88,7 @@ function McpSetup() {
               </div>
               <details>
                 <summary className="cursor-pointer font-medium text-ink">Already connected?</summary>
-                <p className="mt-2">Select Life Portal with @ in a new chat. If it asks you to reconnect, open its connection in ChatGPT and sign in again. A connection marked &ldquo;Desktop only&rdquo; needs the hosted setup above before it can be used on your phone.</p>
+                <p className="mt-2">Select {APP_NAME} with @ in a new chat. If it asks you to reconnect, open its connection in ChatGPT and sign in again. A connection marked &ldquo;Desktop only&rdquo; needs the hosted setup above before it can be used on your phone.</p>
               </details>
               <a className="inline-block text-xs underline" href="https://developers.openai.com/plugins/deploy/connect-chatgpt#add-the-mcp-server" target="_blank" rel="noopener noreferrer">ChatGPT&apos;s official connection guide</a>
               <p>To stop access from connected assistants, disconnect them here. You can reconnect at any time.</p>

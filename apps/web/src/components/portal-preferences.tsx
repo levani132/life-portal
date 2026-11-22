@@ -1,5 +1,5 @@
 'use client';
-
+import { APP_NAME } from '../lib/brand';
 import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -280,7 +280,7 @@ function PreferencesEditor({
                         <>
                           <option value="friends">Friends</option>
                           <option value="public">
-                            Everyone in Life Portal
+                            Everyone in {APP_NAME}
                           </option>
                         </>
                       )}

@@ -1,3 +1,4 @@
+import { APP_NAME } from '../lib/brand';
 import type { MetadataRoute } from 'next';
 
 /**
@@ -9,8 +10,8 @@ import type { MetadataRoute } from 'next';
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: '/',
-    name: 'Life Portal',
-    short_name: 'Life Portal',
+    name: APP_NAME,
+    short_name: APP_NAME,
     description: 'Debts, cash flow, assets, work, plans and food in one place.',
     start_url: '/',
     scope: '/',

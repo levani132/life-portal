@@ -1,4 +1,5 @@
 'use client';
+import { APP_NAME } from '../lib/brand';
 import { Avatar } from './avatar';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -662,7 +663,7 @@ function EditPost({ post, onClose }: { post: FoodPost; onClose: () => void }) {
         >
           <option value="private">Only me</option>
           <option value="friends">Friends</option>
-          <option value="public">Everyone in Life Portal</option>
+          <option value="public">Everyone in {APP_NAME}</option>
         </Select>
       </Field>
       {post.training && (

@@ -2658,3 +2658,22 @@ answer is byte-for-byte what it was; it only looks first. Only crashes and 5xx a
 **Scrubbed where it is stored, not where it is thrown.** Messages are written all over the code
 and by libraries (Mongoose quotes the failing value). One scrub at the single writer is the only
 place that can be relied on.
+
+## 2026-11-22 · The name is kept, written in one place, and its mark is one colour
+
+**The name stays "Life Portal" for now.** "LIFEPORTAL" is claimed in the US by two unrelated
+companies (a registered mark for communications consulting; a pending one for an app that stores
+end-of-life documents), and nothing is registered in the EU, the UK or Georgia (TMview,
+2026-11-22). The owner launches in Georgia and the EU, will file there once the app shows its
+worth, and leaves the US until it is a market. Not legal advice; a specialist should confirm.
+
+**So a rename has to be cheap.** `apps/web/src/lib/brand.ts` holds the name (`APP_NAME`) and
+the wordmark (`APP_WORDMARK`); everything that says the name to a person reads it from there.
+The iOS Shortcut's name ("Life Portal Health") is not changed with it: people have it installed
+under that name.
+
+**The wordmark is one colour** (`components/wordmark.tsx`). It was "Life" and "Portal" in two
+tones, which is how the pending US mark's logo writes the same word.
+
+**The address will be `lifeportal.one`.** Every plain ending (.com, .app, .net, .org, .ai, .me,
+.io, .co) is taken; the hyphenated forms were rejected because people type the name without one.
