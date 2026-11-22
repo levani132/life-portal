@@ -539,6 +539,14 @@ export class SocialService implements OnModuleInit {
         const profile = await this.profiles
           .findOne({ userId: targetId })
           .lean();
+        // Someone blocked before they ever made a profile is still listed, by their account
+        // name, so the block can be lifted.
+        if (!profile && query.kind === 'blocked') {
+          const user = await this.users.findById(targetId).select('name').lean();
+          return user
+            ? { userId: targetId, displayName: user.name, username: '', bio: '', relationship: relationshipFor(row, userId, targetId), muted: false }
+            : null;
+        }
         if (
           !profile ||
           (query.kind !== 'blocked' && !(await this.enabled(targetId)))
@@ -581,10 +589,13 @@ export class SocialService implements OnModuleInit {
     // account has disabled social access. No action trusts a client-supplied actor ID.
     if (dto.action !== 'unblock') {
       const target = await this.profiles.findOne({ userId: targetId }).lean();
-      if (!target || !(await this.enabled(targetId)))
+      // A block needs no profile on the other side: someone who follows or writes to a page
+      // may never have opened their own profile, and must still be blockable.
+      const blockable = dto.action === 'block' && !target && !!(await this.users.exists({ _id: targetId }));
+      if (!blockable && (!target || !(await this.enabled(targetId))))
         throw new NotFoundException('Profile not found.');
       // Spec 040: a page has followers, not friends.
-      if (target.kind === 'page' && dto.action !== 'block')
+      if (target?.kind === 'page' && dto.action !== 'block')
         throw new ConflictException({ code: 'NOT_A_PERSON', message: 'A page cannot be a friend. You can follow it.' });
       if (
         dto.action !== 'block' &&
