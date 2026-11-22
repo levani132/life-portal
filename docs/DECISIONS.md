@@ -2775,3 +2775,29 @@ the roadmap step and a separate decision.
 **A second module reads other modules' collections by name, read-only.** `UsageService` reads
 who and when from seven collections through the driver, like `AccountService` does for
 deletion. It reads no content and returns no id.
+
+## 2026-11-22 · A page is an account you act as, and routes are closed to pages by default
+
+**A page is a `users` row of kind `page`.** Every module already finds an author, a feature set
+and a suspension by user id. A second kind of thing would have meant a second lookup in each of
+them; a second kind of row means none. The cost is a reserved, undeliverable email on the row,
+because the field is required and unique.
+
+**Acting is a header on the person's session, checked on every request.** The web app holds one
+sign-in. A second session for the page would have to be issued, refreshed and revoked in step
+with the first. With a header, signing out, a suspension or losing the page takes effect on the
+next request, and nothing can be left signed in as a page.
+
+**Closed unless opened.** A route does one of three things with the header: ignore it
+(`@AsPerson`), run as the page (`@ForPages`), or refuse. Refusal is what an unmarked route does.
+The alternative, marking what pages may not do, fails silently the day someone adds a route that
+logs something. This way a forgotten marker costs a page a feature, not a person their privacy.
+
+**Switching identity reloads the app and clears the offline store.** Everything on screen, in
+memory and kept on the device belongs to one identity. Until the offline store is kept per
+identity, a clean start is the only way to be sure a page's write is never sent as the person or
+the other way round; a switch also waits for the outbox to empty.
+
+**Three pages per person, changeable per person, none for the owner** (owner's decision). It is
+a guard against flooding a feed that needs no approval to reach, not a ceiling on what someone
+may run.

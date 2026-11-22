@@ -77,7 +77,8 @@ export class MongoUsageStore implements UsageStore {
     const rows = await this.connection
       .collection('users')
       .aggregate<{ _id: unknown; d: string }>([
-        { $match: { createdAt: { $gte: startOf(sinceDay) } } },
+        // Spec 040: a page is not a person and is not a sign-up.
+        { $match: { createdAt: { $gte: startOf(sinceDay) }, kind: { $ne: 'page' } } },
         { $project: { d: dayOf('createdAt') } },
       ])
       .toArray();
@@ -85,7 +86,7 @@ export class MongoUsageStore implements UsageStore {
   }
 
   accounts(): Promise<number> {
-    return this.connection.collection('users').countDocuments({});
+    return this.connection.collection('users').countDocuments({ kind: { $ne: 'page' } });
   }
 }
 

@@ -1,4 +1,5 @@
 import type { AuthSession, AuthTokens } from '@life-portal/shared-types';
+import { ACTING_ENDED_CODES, actingHeaders, actingPageId, stopActing } from './identity';
 
 /**
  * Browser API client.
@@ -271,6 +272,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   const headers: Record<string, string> = { ...SESSION_HEADERS, ...options.headers };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
+  // Spec 040: while acting as a page, every request says so. The server decides what it means.
+  if (!anonymous) Object.assign(headers, actingHeaders());
   if (!anonymous) {
     const access = tokens.access;
     if (access) headers['Authorization'] = `Bearer ${access}`;
@@ -303,7 +306,12 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     throw new ApiError('Your session has expired. Please sign in again.', 401);
   }
 
-  if (!response.ok) throw await parseError(response);
+  if (!response.ok) {
+    const error = await parseError(response);
+    // The page was deleted, suspended, or is no longer this person's: back to the person.
+    if (actingPageId() && error.code && ACTING_ENDED_CODES.includes(error.code)) stopActing();
+    throw error;
+  }
   if (method !== 'GET') {
     for (const listener of writeListeners) {
       try {

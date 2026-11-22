@@ -45,8 +45,10 @@ const SIZE_SHARE: Record<WidgetSize, string> = { half: '50%', wide: '75%', full:
 
 export function Dashboard() {
   // Issue #34: Home reads again on its own after a failure (resume, reconnect, backoff).
-  const { data, error, isLoading, mutate: reload } = useApi<DashboardResponse>('/dashboard', RECOVERS);
   const portal = useApi<PortalState>('/portal');
+  // Spec 040: a page has no widgets; its Home is the feeds.
+  const isPage = !!portal.data?.page;
+  const { data, error, isLoading, mutate: reload } = useApi<DashboardResponse>(isPage || !portal.data ? null : '/dashboard', RECOVERS);
   const [logging, setLogging] = useState<MealSlot | null>(null);
   const router = useRouter();
   // Play starts the plan's next workout the card names (issue #7), or an empty one.
@@ -128,7 +130,16 @@ export function Dashboard() {
     return () => window.removeEventListener('keydown', onKey);
   }, [editing]);
 
-  if (isLoading && !data) return <Spinner label="Opening Home…" />;
+  if (isPage) {
+    return (
+      <div className="mx-auto max-w-3xl">
+        <h1 className="sr-only">Home</h1>
+        <PostDrafts />
+        {portal.data?.access.forYou ? <HomeFeed /> : null}
+      </div>
+    );
+  }
+  if ((isLoading || !portal.data) && !data) return <Spinner label="Opening Home…" />;
   if (!data) {
     if (!error) return null;
     // Home's cards mix money, stocks and work with food and training, so none of it is kept on

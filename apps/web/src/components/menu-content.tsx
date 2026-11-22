@@ -20,6 +20,7 @@ import { MODULES, type PortalState } from '@life-portal/shared-types';
 import { PageHeader } from './page-header';
 import { useAuth } from '../lib/auth-context';
 import { useApi } from '../lib/hooks';
+import { IdentitySwitcher } from './identity-switcher';
 export function MenuContent() {
   const { user, logout } = useAuth();
   const { data } = useApi<PortalState>('/portal');
@@ -83,9 +84,29 @@ export function MenuContent() {
         ]
       : []),
   ];
+  // Spec 040: acting as a page, the menu is the switcher and the page's own profile.
+  if (data?.page) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <PageHeader title="Menu" subtitle="You are using the app as a page" />
+        <IdentitySwitcher />
+        <div className="card divide-y divide-border">
+          <Link href="/settings/profile" className="flex min-h-16 items-center gap-3 px-5 py-4 hover:bg-surface-raised">
+            <Settings size={20} className="text-accent" />
+            <span className="flex-1">Edit the page’s profile</span>
+            <ChevronRight size={18} className="text-ink-faint" />
+          </Link>
+        </div>
+        <p className="mt-4 text-xs text-ink-faint">
+          A page publishes content only. To log food or a workout, or to change your own settings, switch back to yourself.
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader title="Menu" subtitle={user?.name} />
+      <IdentitySwitcher />
       <div className="card divide-y divide-border">
         {links.map(({ href, label, icon: Icon, badge }) => (
           <Link

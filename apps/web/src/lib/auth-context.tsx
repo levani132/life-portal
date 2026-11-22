@@ -20,6 +20,7 @@ import { forgetUser, rememberedUser, rememberUser } from './offline/account';
 import { deleteOfflineData, endOffline, outbox, startOffline } from './offline/runtime';
 import { PendingLogout } from '../components/pending-logout';
 import { forgetDraftsInMemory } from './training-drafts';
+import { rememberActingPage } from './identity';
 
 interface AuthState {
   user: User | null;
@@ -123,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const forget = useCallback(async () => {
     setAskLogout(false);
     tokens.clear();
+    rememberActingPage(null);
     if (user) await deleteOfflineData(user.id);
     forgetDraftsInMemory();
     forgetUser();

@@ -2,6 +2,15 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-22: Pages, part one
+
+- **Create a page** (Menu → Create a page): an account that is not a person, for publishing
+  content. Up to three per person. Switch to it from the same menu and the app becomes the
+  page's: its feed, its profile, its posts. A bar at the top says which identity is in use.
+- **A page posts text, photos and video**, to everyone or to nobody, and is marked "Page"
+  beside its name. It has no diary, workouts, weight, friends or badges.
+- Available to accounts with the Pages feature switched on. Following pages comes next.
+
 ## 2026-11-22: Numbers for the admin
 
 - **Menu → Numbers** shows how many accounts exist and how many are new, how many people were

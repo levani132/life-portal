@@ -3,8 +3,8 @@ import { mayCreatePage, pageAccess, pageLimitFor, pagesRemaining } from './pages
 describe('pages rules (spec 040)', () => {
   it('gives a page everything social and the two libraries, and nothing personal', () => {
     const access = pageAccess();
-    for (const on of ['social', 'foodPosts', 'postMedia', 'messages', 'forYou', 'nutrition', 'training', 'trainingPosts'] as const) expect(access[on]).toBe(true);
-    for (const off of ['money', 'stocks', 'loans', 'items', 'personal', 'projects', 'epam', 'trainingLevels', 'trainingRanks', 'tournaments', 'forYouMetrics', 'pages'] as const) expect(access[off]).toBe(false);
+    for (const on of ['social', 'foodPosts', 'postMedia', 'forYou', 'nutrition', 'training', 'trainingPosts'] as const) expect(access[on]).toBe(true);
+    for (const off of ['messages', 'money', 'stocks', 'loans', 'items', 'personal', 'projects', 'epam', 'trainingLevels', 'trainingRanks', 'tournaments', 'forYouMetrics', 'pages'] as const) expect(access[off]).toBe(false);
   });
 
   it('limits a person to three pages unless the owner says otherwise, and never the developer', () => {

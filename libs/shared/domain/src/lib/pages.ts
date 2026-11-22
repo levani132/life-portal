@@ -5,7 +5,8 @@ import { FEATURE_IDS, PAGE_LIMIT_DEFAULT, PAGE_LIMIT_NONE, type FeatureAccess, t
  * and Training for the library a page publishes from. No money, no work, and nothing that
  * compares people: levels, ranks and tournaments are a person's.
  */
-const PAGE_FEATURES: readonly FeatureId[] = ['social', 'foodPosts', 'postMedia', 'messages', 'forYou', 'forYouRanking', 'push', 'nutrition', 'training', 'trainingPosts'];
+// Messages join in slice 3, with the rule for who a page may write to first.
+const PAGE_FEATURES: readonly FeatureId[] = ['social', 'foodPosts', 'postMedia', 'forYou', 'forYouRanking', 'push', 'nutrition', 'training', 'trainingPosts'];
 
 export function pageAccess(): FeatureAccess {
   return Object.fromEntries(FEATURE_IDS.map((id) => [id, PAGE_FEATURES.includes(id)])) as FeatureAccess;

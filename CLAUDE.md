@@ -279,6 +279,14 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   for posts other people can reach, and never with an account or text; a failed check leaves
   the post held (fail closed). The email to the reviewer names no post and no person. See
   `docs/modules/moderation.md`.
+- **A route is closed to pages unless it says otherwise** (spec 040). A person acts as a page
+  with the `x-lp-act-as` header; `ActingGuard` then needs a marker from `auth/acting.ts`:
+  `@AsPerson()` (ignore the header: sign-in, account, admin), `@ForPages()` (run as the page) or
+  nothing, which is a 403. Never open a route that logs food, a workout, weight or anything that
+  compares people. In a `@ForPages()` route `userId` is the page and `actorId` the person: never
+  show `actorId` to anyone but the page's managers. A page is a `users` row of kind `page`, so
+  anything that counts or lists *people* must leave `kind: 'page'` out. See
+  `docs/modules/pages.md`.
 - **The privacy policy describes what the code does** (`apps/web/src/app/privacy`, `/terms`,
   `/rules`). Adding an outside service that receives personal data, changing what is sent to one,
   what deletion removes or how long something is kept means editing the page and bumping

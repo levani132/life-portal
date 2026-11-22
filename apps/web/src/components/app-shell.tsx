@@ -1,5 +1,6 @@
 'use client';
 import { Wordmark } from './wordmark';
+import { ActingBar } from './identity-switcher';
 import { HealthSyncBridge } from './apple-health';
 
 import clsx from 'clsx';
@@ -73,7 +74,9 @@ function Portal({ children }: { children: ReactNode }) {
     portal.data?.access.social ? '/social/requests/count' : null,
     { revalidateOnFocus: true, refreshInterval: 30000 },
   );
-  useBadgeCheckOnStart(!!portal.data, !!portal.data?.access.nutrition);
+  // Spec 040: a page has no badges, workouts or health data, so nothing asks for them.
+  const isPage = !!portal.data?.page;
+  useBadgeCheckOnStart(!!portal.data && !isPage, !!portal.data?.access.nutrition);
   const needsSetup =
     !!portal.data && !portal.data.setupCompleted && !portal.data.setupDismissed;
   useEffect(() => {
@@ -148,10 +151,11 @@ function Portal({ children }: { children: ReactNode }) {
             </div>
           </div>
           {/* Spec 025: while a workout is open. Inside the header, so it counts in --header-offset. */}
-          <WorkoutBar enabled={!!portal.data.access.training} push={!!portal.data.access.push} />
+          <WorkoutBar enabled={!!portal.data.access.training && !isPage} push={!!portal.data.access.push} />
+          <ActingBar />
         </ScrollHeader>
       )}
-      <HealthSyncBridge key={user.id} enabled={portal.data.access.nutrition} />
+      <HealthSyncBridge key={user.id} enabled={portal.data.access.nutrition && !isPage} />
       <NotificationsBridge
         key={`push-${user.id}`}
         access={portal.data.access}

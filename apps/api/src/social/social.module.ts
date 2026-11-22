@@ -532,6 +532,9 @@ export class SocialService implements OnModuleInit {
       const target = await this.profiles.findOne({ userId: targetId }).lean();
       if (!target || !(await this.enabled(targetId)))
         throw new NotFoundException('Profile not found.');
+      // Spec 040: a page has followers, not friends.
+      if (target.kind === 'page' && dto.action !== 'block')
+        throw new ConflictException({ code: 'NOT_A_PERSON', message: 'A page cannot be a friend. You can follow it.' });
       if (
         dto.action !== 'block' &&
         (await this.graph.isBlocked(userId, targetId))

@@ -42,6 +42,7 @@ import { METRICS_KEY } from './for-you-preferences';
 import { MacroRings } from './macro-rings';
 import { CopyTrainingButton, TrainingAttachmentView } from './training/training-post';
 import { revalidate, useAction, useApi } from '../lib/hooks';
+import { PageMark } from './identity-switcher';
 import { SOCIAL_REFRESH } from '../lib/social-hooks';
 import {
   FeedMetricsContext,
@@ -414,6 +415,7 @@ export function PostCard({
           >
             {post.author.displayName}
           </Link>
+          {post.author.isPage && <PageMark className="ml-1.5" />}
           <div className="flex items-center gap-1 text-[11px] leading-tight text-ink-faint">
             <PostDateLink id={post.id} date={post.createdAt} />
             {hasFood && (

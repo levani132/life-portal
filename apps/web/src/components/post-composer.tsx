@@ -33,6 +33,7 @@ import {
 import { clampAspect, postHasContent, publicationMacros } from '@life-portal/shared-domain';
 import { api, NetworkError } from '../lib/api';
 import { revalidate, useApi } from '../lib/hooks';
+import { actingPageId } from '../lib/identity';
 import { mealContextNow } from '../lib/local-day';
 import { prepareImage, uploadMedia, type PreparedMedia } from '../lib/media';
 import { splitPostDraft } from '../lib/post-draft';
@@ -141,12 +142,18 @@ export function PostComposer({
   const viewport = useVisualViewport();
   const mediaConfig = useApi<MediaConfig>('/media/config');
   const mediaAvailable = !!mediaConfig.data?.available;
-  const profile = useApi<{ profile: NutritionProfile }>('/nutrition/profile');
+  // Spec 040: a page has no nutrition profile, posts to everyone or to nobody, and (until its
+  // library screens exist) posts text, photos and video.
+  const isPage = !!actingPageId();
+  const profile = useApi<{ profile: NutritionProfile }>(isPage ? null : '/nutrition/profile');
   const dayStartHour = profile.data?.profile.dayStartHour ?? 4;
   useEffect(() => {
     const preferred = profile.data?.profile.defaultFoodVisibility;
     if (preferred && !audienceTouched.current && !linkOnly) setAudience(preferred);
   }, [profile.data]);
+  useEffect(() => {
+    if (isPage && !audienceTouched.current) setAudience('public');
+  }, [isPage]);
   const done = (path: string) => (onDone ? onDone(path) : onClose());
 
   const source = food?.source;
@@ -712,20 +719,24 @@ export function PostComposer({
         </div>
 
         <div className="flex shrink-0 items-center gap-1 border-t border-border px-2 py-1.5">
-          <ToolButton label={food ? 'Replace the food' : 'Add from Food'} onClick={() => setPicking(true)}>
-            <Plus size={22} />
-          </ToolButton>
-          <ToolButton
-            label="New food"
-            pressed={!!newFood}
-            onClick={() => {
-              setFood(null);
-              setTraining(null);
-              setNewFood((current) => current ?? EMPTY_FOOD);
-            }}
-          >
-            <CookingPot size={20} />
-          </ToolButton>
+          {!isPage && (
+            <>
+              <ToolButton label={food ? 'Replace the food' : 'Add from Food'} onClick={() => setPicking(true)}>
+                <Plus size={22} />
+              </ToolButton>
+              <ToolButton
+                label="New food"
+                pressed={!!newFood}
+                onClick={() => {
+                  setFood(null);
+                  setTraining(null);
+                  setNewFood((current) => current ?? EMPTY_FOOD);
+                }}
+              >
+                <CookingPot size={20} />
+              </ToolButton>
+            </>
+          )}
           {mediaAvailable && (
             <>
               <ToolButton label="Add photos" disabled={atLimit} onClick={() => library.current?.click()}>
@@ -756,11 +767,13 @@ export function PostComposer({
               }}
               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             >
-              {Object.entries(audiences).map(([key, value]) => (
-                <option key={key} value={key}>
-                  {value.label}
-                </option>
-              ))}
+              {Object.entries(audiences)
+                .filter(([key]) => !isPage || key !== 'friends')
+                .map(([key, value]) => (
+                  <option key={key} value={key}>
+                    {value.label}
+                  </option>
+                ))}
               <option value="link">{LINK_ONLY_LABEL}</option>
             </select>
           </div>

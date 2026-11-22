@@ -46,6 +46,7 @@ import { PostsList } from './posts';
 import { badgeDefinition, type PortalState } from '@life-portal/shared-types';
 import { api } from '../lib/api';
 import { revalidate, useAction, useApi } from '../lib/hooks';
+import { PageMark } from './identity-switcher';
 import { ErrorNote, Input, Spinner } from './ui';
 import { Avatar } from './avatar';
 import { DropdownMenu, type DropdownItem } from './dropdown-menu';
@@ -412,7 +413,7 @@ export function ProfileView({ userId }: { userId?: string }) {
   // The badge collection holds private progress, so it is only on your own, un-previewed profile.
   const tabs = [
     ...(posts ? (['posts'] as const) : []),
-    ...(own && preview === 'normal' ? (['badges'] as const) : []),
+    ...(own && preview === 'normal' && !person.isPage ? (['badges'] as const) : []),
     'about' as const,
   ];
   const shown = tabs.find((value) => value === tab) ?? tabs[0];
@@ -444,20 +445,21 @@ export function ProfileView({ userId }: { userId?: string }) {
           </div>
           <h1 className="mt-3 break-words text-2xl font-semibold leading-tight">
             {person.displayName}
+            {person.isPage && <PageMark className="ml-2" />}
           </h1>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-ink-faint">
             <span>@{person.username}</span>
-            <RelationshipChip person={person} />
+            {!person.isPage && <RelationshipChip person={person} />}
           </p>
-          <HeaderBadges userId={person.userId} live={own && preview === 'normal'} />
+          {!person.isPage && <HeaderBadges userId={person.userId} live={own && preview === 'normal'} />}
           {person.bio && (
             <p className="mt-3 whitespace-pre-wrap break-words text-ink-muted">
               {person.bio}
             </p>
           )}
           {own ? (
-            <OwnStats person={person} />
-          ) : (
+            person.isPage ? null : <OwnStats person={person} />
+          ) : person.isPage ? null : (
             <ProfileActions person={person} />
           )}
         </div>
