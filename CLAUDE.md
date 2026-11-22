@@ -13,6 +13,8 @@ training.
 4. `docs/ROADMAP.md` — what's built, what's next and in what order, the infrastructure tiers
    and the business model. The admin sees it in the app (Menu → Roadmap), from
    `apps/api/src/roadmap/roadmap.data.ts`: change that file with the document.
+5. `docs/PLATFORMS.md` — every outside service and account the app depends on, and why. Add a
+   service there in the same change that starts using it.
 
 ## The six principles, in one line each
 
