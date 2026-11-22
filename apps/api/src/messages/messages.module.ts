@@ -35,6 +35,8 @@ import { ForPages } from '../auth/acting';
 /** Every route needs `messages`; every response is private and uncached (spec FR-025). */
 @RequireModule('messages')
 @UseInterceptors(SocialNoStore)
+// Spec 040: a page has its own conversations; who it may write to is `canMessage()`'s rule.
+@ForPages()
 @Controller('messages')
 export class MessagesController {
   constructor(private readonly messages: MessagesService) {}
@@ -42,7 +44,6 @@ export class MessagesController {
   @Get('conversations') inbox(@CurrentUser('userId') userId: string) {
     return this.messages.inbox(userId);
   }
-  @ForPages()
   @Get('unread') async unread(@CurrentUser('userId') userId: string) {
     return { count: await this.messages.unreadCount(userId) };
   }

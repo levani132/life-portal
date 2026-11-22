@@ -3,7 +3,8 @@
 import type { Identity, MyPages, PageSummary } from '@life-portal/shared-types';
 import { PAGE_BIO_MAX, PAGE_NAME_MAX } from '@life-portal/shared-types';
 import { Check, Megaphone, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { ApiError, api } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
 import { useApi } from '../lib/hooks';
@@ -219,9 +220,38 @@ function CreatePage({ onClose, onCreated }: { onClose: () => void; onCreated: (p
 }
 
 /** The bar under the header while acting as a page: which page, and the way back. */
+/**
+ * A link that says which identity it is for (`?as=<pageId>`, or `?as=me`): a page's notification
+ * opens the app as that page. The switch follows the same rules as the menu's: nothing unsent
+ * is left behind, and the app starts again. With unsent changes the link opens as you are.
+ */
+function useActAsLink(userId: string | undefined) {
+  const pathname = usePathname();
+  useEffect(() => {
+    if (!userId) return;
+    const url = new URL(window.location.href);
+    const as = url.searchParams.get('as');
+    if (!as) return;
+    const target = as === 'me' ? null : /^[0-9a-f]{24}$/.test(as) ? as : undefined;
+    url.searchParams.delete('as');
+    const clean = url.pathname + url.search + url.hash;
+    if (target === undefined || target === actingPageId() || outbox.count() > 0) {
+      window.history.replaceState(window.history.state, '', clean);
+      return;
+    }
+    void deleteOfflineData(userId)
+      .catch(() => undefined)
+      .then(() => {
+        rememberActingPage(target);
+        window.location.replace(clean);
+      });
+  }, [pathname, userId]);
+}
+
 export function ActingBar() {
   const identity = useIdentity();
   const { user } = useAuth();
+  useActAsLink(user?.id);
   const [error, setError] = useState<string | null>(null);
   if (!user || !actingPageId()) return null;
   const name = identity?.kind === 'page' ? identity.page.name : 'a page';

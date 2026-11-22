@@ -465,6 +465,7 @@ export function ProfileView({ userId }: { userId?: string }) {
               page={person}
               own={own}
               canMarkOfficial={!actingPageId() && portal.data?.cohort === 'developer'}
+              canMessage={messagingAvailable(portal.data?.access)}
             />
           )}
           {own ? (

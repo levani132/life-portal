@@ -24,6 +24,7 @@ import { useApi } from '../lib/hooks';
 import { useSheetDrag } from '../lib/sheet-drag';
 import { useSocialApi } from '../lib/social-hooks';
 import { Avatar, errorText, FRIENDS_KEY, openConversation } from './messages';
+import { actingPageId } from '../lib/identity';
 import { ErrorNote } from './ui';
 
 interface Head {
@@ -95,7 +96,7 @@ export function PostShareSheet({
   const touch =
     typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
   const inbox = useApi<InboxEntry[]>(canMessage ? '/messages/conversations' : null);
-  const friends = useSocialApi<{ people: SocialPerson[] }>(canMessage ? FRIENDS_KEY : null);
+  const friends = useSocialApi<{ people: SocialPerson[] }>(canMessage && !actingPageId() ? FRIENDS_KEY : null);
   const [sent, setSent] = useState<Record<string, string>>({});
   const [sending, setSending] = useState<string | null>(null);
   const [error, setError] = useState('');

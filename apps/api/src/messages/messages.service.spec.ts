@@ -44,6 +44,7 @@ function fixture() {
   const social = {
     authors: jest.fn(async () => new Map([['ben', { userId: 'ben', displayName: 'Ben', username: 'ben' }]])),
     own: jest.fn(async () => ({ displayName: 'Ana' })),
+    pagesAmong: jest.fn(async () => new Set<string>()),
   };
   const posts = {
     shareWith: jest.fn(async () => undefined),

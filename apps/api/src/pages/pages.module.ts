@@ -46,6 +46,7 @@ import { AccessService, RequireModule } from '../access/access.module';
 import { FollowsService } from '../follows/follows.module';
 import { AccountModule } from '../account/account.module';
 import { AccountService } from '../account/account.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ACT_MODE, AsPerson, ForPages, type ActMode } from '../auth/acting';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
@@ -89,7 +90,17 @@ export class PagesService {
     private readonly accounts: AccountService,
     @Inject(CONFIG) private readonly config: AppConfig,
     private readonly follows: FollowsService,
+    private readonly notifications: NotificationsService,
   ) {}
+
+  /** A page has no devices: its notifications go to its managers' (docs/modules/notifications.md). */
+  onModuleInit() {
+    this.notifications.registerPageResolver(async (userId) => {
+      if (!isValidObjectId(userId)) return null;
+      const page = await this.users.findOne({ _id: userId, kind: 'page' }).select('name managers').lean();
+      return page ? { name: page.name, managers: page.managers ?? [] } : null;
+    });
+  }
 
   private async requireOn(personId: string): Promise<void> {
     if (!(await this.access.forUser(personId)).access.pages) {

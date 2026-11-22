@@ -225,6 +225,22 @@ export function groupActivity(rows: ActivityRow[], seenAt?: Date): ActivityItem[
   });
 }
 
+/**
+ * Spec 040: a notification for a page, shown on its manager's device. It is titled with the
+ * page, so it never reads as the manager's own, and it opens the app as the page.
+ */
+export function pageNotification(
+  text: { title: string; body: string },
+  url: string,
+  page: { id: string; name: string },
+): { title: string; body: string; url: string } {
+  return {
+    title: `${clip(page.name, TITLE_LIMIT) || 'Your page'} (page)`,
+    body: `${text.title}: ${text.body}`,
+    url: `${url}${url.includes('?') ? '&' : '?'}as=${page.id}`,
+  };
+}
+
 /** Whether a subscription endpoint points at a known push service over HTTPS. */
 export function isPushServiceEndpoint(endpoint: string): boolean {
   let url: URL;

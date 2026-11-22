@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { BadgeCheck } from 'lucide-react';
 import type { SocialProfile, SuggestedPage } from '@life-portal/shared-types';
 import { api } from '../lib/api';
@@ -33,9 +34,11 @@ function useFollow(pageId: string) {
 }
 
 /** On a page's profile: how many follow it, and the button to follow or stop. */
-export function PageFollow({ page, own, canMarkOfficial }: { page: SocialProfile; own: boolean; canMarkOfficial: boolean }) {
+export function PageFollow({ page, own, canMarkOfficial, canMessage }: { page: SocialProfile; own: boolean; canMarkOfficial: boolean; canMessage: boolean }) {
   const follow = useFollow(page.userId);
   const official = useAction();
+  const message = useAction();
+  const router = useRouter();
   return (
     <div className="mt-4 space-y-2">
       <div className="flex flex-wrap items-center gap-3">
@@ -48,6 +51,24 @@ export function PageFollow({ page, own, canMarkOfficial }: { page: SocialProfile
             onClick={() => void follow.set(!page.following)}
           >
             {page.following ? 'Following' : 'Follow'}
+          </button>
+        )}
+        {!own && canMessage && (
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={message.pending}
+            onClick={() =>
+              void message.run(
+                async () => {
+                  const { id } = await api.post<{ id: string }>('/messages/conversations', { userId: page.userId });
+                  router.push(`/messages/${id}`);
+                },
+                { revalidate: false },
+              )
+            }
+          >
+            Message
           </button>
         )}
         {page.followerCount !== undefined && <span className="text-sm text-ink-muted">{followers(page.followerCount)}</span>}
@@ -71,7 +92,7 @@ export function PageFollow({ page, own, canMarkOfficial }: { page: SocialProfile
           Official LifePortal page (only you see this switch)
         </label>
       )}
-      {(follow.error ?? official.error) && <ErrorNote message={(follow.error ?? official.error) as string} />}
+      {(follow.error ?? official.error ?? message.error) && <ErrorNote message={(follow.error ?? official.error ?? message.error) as string} />}
     </div>
   );
 }

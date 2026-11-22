@@ -18,6 +18,26 @@ describe('pairKey', () => {
   });
 });
 
+describe('canMessage with a page (spec 040)', () => {
+  const none = { aIsPage: false, bIsPage: false, bFollowsA: false, bWroteToA: false };
+  it('lets anyone write to a page, friends or not', () => {
+    expect(canMessage({ connection: null, accessA: all, accessB: all, page: { ...none, bIsPage: true } })).toBeNull();
+    expect(canMessage({ connection: null, accessA: all, accessB: all, page: { ...none, aIsPage: true, bIsPage: true } })).toBeNull();
+  });
+  it('lets a page write to a person only if they follow it or wrote to it', () => {
+    expect(canMessage({ connection: null, accessA: all, accessB: all, page: { ...none, aIsPage: true } })).toBe('page-first');
+    expect(canMessage({ connection: null, accessA: all, accessB: all, page: { ...none, aIsPage: true, bFollowsA: true } })).toBeNull();
+    expect(canMessage({ connection: null, accessA: all, accessB: all, page: { ...none, aIsPage: true, bWroteToA: true } })).toBeNull();
+  });
+  it('still honours a block and the feature switches', () => {
+    expect(canMessage({ connection: { state: 'none', blockedBy: ['b'] }, accessA: all, accessB: all, page: { ...none, bIsPage: true } })).toBe('blocked');
+    expect(canMessage({ connection: null, accessA: { ...all, messages: false }, accessB: all, page: { ...none, bIsPage: true } })).toBe('feature');
+  });
+  it('changes nothing between two people', () => {
+    expect(canMessage({ connection: null, accessA: all, accessB: all, page: none })).toBe('not-friends');
+  });
+});
+
 describe('canMessage', () => {
   it('allows accepted, unblocked friends who both have the feature', () => {
     expect(canMessage({ connection: friends, accessA: all, accessB: all })).toBeNull();

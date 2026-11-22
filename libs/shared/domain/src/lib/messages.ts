@@ -13,12 +13,23 @@ export function canMessage(input: {
   connection?: { state: string; blockedBy: string[] } | null;
   accessA: FeatureAccess | null;
   accessB: FeatureAccess | null;
+  /**
+   * Spec 040, when either side is a page. Anyone may write to a page. A page may write to a
+   * person only if that person follows it or has written to it: a page never writes first to
+   * someone who has nothing to do with it. Friendship plays no part.
+   */
+  page?: { aIsPage: boolean; bIsPage: boolean; bFollowsA: boolean; bWroteToA: boolean };
 }): CannotSendReason | null {
-  const { connection, accessA, accessB } = input;
+  const { connection, accessA, accessB, page } = input;
   if (connection?.blockedBy.length) return 'blocked';
+  const features = accessA?.messages && accessA.social && accessB?.messages && accessB.social;
+  if (page?.aIsPage || page?.bIsPage) {
+    if (!features) return 'feature';
+    if (!page.bIsPage && !page.bFollowsA && !page.bWroteToA) return 'page-first';
+    return null;
+  }
   if (connection?.state !== 'accepted') return 'not-friends';
-  if (!accessA?.messages || !accessA.social || !accessB?.messages || !accessB.social)
-    return 'feature';
+  if (!features) return 'feature';
   return null;
 }
 

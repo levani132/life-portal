@@ -6,6 +6,7 @@ import {
   Injectable,
   NotFoundException,
   OnModuleInit,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -32,6 +33,7 @@ import {
 import { AccessService } from '../access/access.module';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PostsService } from '../posts/posts.service';
+import { FollowsService } from '../follows/follows.module';
 import { SocialGraphService } from '../social-graph/social-graph.module';
 import { SocialService } from '../social/social.module';
 import { Conversation, ConversationMember, Message } from './messages.schemas';
@@ -44,6 +46,7 @@ const UNREAD_CAP = 99;
 
 const CANNOT_SEND: Record<CannotSendReason, string> = {
   'not-friends': 'You can message friends only.',
+  'page-first': 'A page can write only to people who follow it or have written to it.',
   blocked: 'You can’t message this person.',
   feature: 'Messages aren’t available for this conversation.',
 };
@@ -68,6 +71,7 @@ export class MessagesService implements OnModuleInit {
     private readonly social: SocialService,
     private readonly posts: PostsService,
     private readonly notifications: NotificationsService,
+    @Optional() private readonly follows?: FollowsService,
   ) {}
 
   /** The `message` notification type and the unread badge (docs/modules/notifications.md). */
@@ -107,7 +111,22 @@ export class MessagesService implements OnModuleInit {
       this.accessFor(a),
       this.accessFor(b),
     ]);
-    return canMessage({ connection, accessA, accessB });
+    // Spec 040: with a page on either side the rule is about following, not friendship.
+    const pages = await this.social.pagesAmong([a, b]);
+    if (!pages.size) return canMessage({ connection, accessA, accessB });
+    const aIsPage = pages.has(a);
+    const bIsPage = pages.has(b);
+    const reachable = aIsPage && !bIsPage;
+    const [bFollowsA, bWroteToA] = reachable
+      ? await Promise.all([this.follows?.isFollowing(b, a) ?? false, this.wroteTo(b, a)])
+      : [false, false];
+    return canMessage({ connection, accessA, accessB, page: { aIsPage, bIsPage, bFollowsA, bWroteToA } });
+  }
+
+  /** Whether `from` has a message in their conversation with `to`. */
+  private async wroteTo(from: string, to: string): Promise<boolean> {
+    const row = await this.conversations.findOne({ kind: 'direct', pair: pairKey(from, to) }).select('_id').lean();
+    return !!row && !!(await this.messages.exists({ conversationId: String(row._id), senderId: from }));
   }
 
   /** Membership is part of every lookup: someone else's conversation looks like none at all. */

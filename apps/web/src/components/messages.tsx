@@ -28,6 +28,8 @@ import { api, ApiError } from '../lib/api';
 import { useApi } from '../lib/hooks';
 import { postTimeLabel } from '../lib/post-time';
 import { useSocialApi } from '../lib/social-hooks';
+import { actingPageId } from '../lib/identity';
+import { PageMark } from './identity-switcher';
 import { EmptyState, ErrorNote, Modal, Spinner } from './ui';
 
 /** While a conversation is on screen and the app is visible (research R1). */
@@ -74,7 +76,8 @@ export function Inbox() {
     revalidateOnFocus: true,
     refreshInterval: INBOX_MS,
   });
-  const friends = useSocialApi<{ people: SocialPerson[] }>(FRIENDS_KEY);
+  // Spec 040: a page has followers, not friends, so there is nobody to offer.
+  const friends = useSocialApi<{ people: SocialPerson[] }>(actingPageId() ? null : FRIENDS_KEY);
   const hasFriends = !!friends.data?.people.length;
   return (
     <div className="mx-auto max-w-2xl">
@@ -119,6 +122,7 @@ export function Inbox() {
                     )}
                   >
                     {entry.other.displayName}
+                    {entry.other.isPage && <PageMark className="ml-1.5" />}
                   </span>
                   <span
                     className={clsx(
@@ -485,6 +489,7 @@ export function Conversation({ id }: { id: string }) {
           className="min-w-0 flex-1 truncate font-semibold"
         >
           {other.displayName}
+          {other.isPage && <PageMark className="ml-1.5" />}
         </Link>
         <button
           type="button"
@@ -574,7 +579,9 @@ export function Conversation({ id }: { id: string }) {
           />
         ) : (
           <p className="py-2 text-center text-sm text-ink-muted">
-            You can’t reply to this conversation.
+            {actingPageId()
+              ? 'A page can write only to people who follow it or have written to it.'
+              : 'You can’t reply to this conversation.'}
           </p>
         )}
       </div>

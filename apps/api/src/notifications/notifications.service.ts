@@ -22,6 +22,7 @@ import {
   groupActivity,
   notificationTag,
   notificationText,
+  pageNotification,
   shouldNotify,
   shouldRemind,
   typeEnabled,
@@ -104,6 +105,12 @@ export class NotificationsService {
     private readonly access: AccessService,
     private readonly graph: SocialGraphService,
   ) {}
+
+  /** Spec 040: who manages a page, set by the pages module. A page has no devices of its own. */
+  private pageOf?: (userId: string) => Promise<{ name: string; managers: string[] } | null>;
+  registerPageResolver(resolver: (userId: string) => Promise<{ name: string; managers: string[] } | null>) {
+    this.pageOf = resolver;
+  }
 
   register(def: NotificationTypeDef) {
     this.types.set(def.type, def);
@@ -321,11 +328,14 @@ export class NotificationsService {
     if (skip) return;
     if (def.canStillSee && !(await def.canStillSee(event))) return;
     if (def.suppress && (await def.suppress(event))) return;
-    const devices = await this.devices.find({ userId: event.recipientId }).lean();
+    // Spec 040: a page's notifications go to its managers' devices, labelled as the page's.
+    const page = (await this.pageOf?.(event.recipientId)) ?? null;
+    const holders = page ? page.managers.filter((id) => id !== event.actorId) : [event.recipientId];
+    const devices = holders.length ? await this.devices.find({ userId: { $in: holders } }).lean() : [];
     if (!devices.length) return;
     const others = await this.collapse(event, def.collapseKey(event), def.windowMs);
     if (others === null) return;
-    await this.sendToDevices(devices, event, def, prefs ?? undefined, others);
+    await this.sendToDevices(devices, event, def, prefs ?? undefined, others, page ? { id: event.recipientId, name: page.name } : undefined);
   }
 
   private async sendToDevices(
@@ -334,6 +344,7 @@ export class NotificationsService {
     def: NotificationTypeDef,
     prefs: { showCommentPreviews?: boolean; showMessagePreviews?: boolean } | undefined,
     others: number,
+    page?: { id: string; name: string },
   ) {
     const key = def.collapseKey(event);
     const text = notificationText(event, {
@@ -341,14 +352,14 @@ export class NotificationsService {
       showMessagePreviews: prefs?.showMessagePreviews === true,
       others,
     });
-    const payload = {
-      ...text,
-      url: def.url(event),
-      tag: notificationTag(event.type, key),
-      badge: await this.badgeCount(event.recipientId),
-    };
+    const shown = page ? pageNotification(text, def.url(event), page) : { ...text, url: def.url(event) };
+    const tag = notificationTag(event.type, page ? `${page.id}:${key}` : key);
+    // The badge is the device owner's own count; a page's unread items do not add to it.
+    const badges = new Map<string, number>();
+    for (const device of devices) if (!badges.has(device.userId)) badges.set(device.userId, await this.badgeCount(device.userId));
     await Promise.all(
       devices.map(async (device) => {
+        const payload = { ...shown, tag, badge: badges.get(device.userId) ?? 0 };
         const result = await this.sender.send(device, payload);
         if (result === 'gone')
           await this.devices.deleteOne({ _id: device._id, endpoint: device.endpoint });

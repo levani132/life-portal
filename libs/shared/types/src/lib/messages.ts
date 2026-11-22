@@ -11,6 +11,9 @@ export interface ChatPerson {
   username: string;
   /** A signed, short-lived link to their profile photo. */
   avatarUrl?: string;
+  /** Spec 040: a page, not a person; and the app's own page. */
+  isPage?: true;
+  official?: true;
 }
 
 /** A shared post as the viewer may see it right now, or nothing at all. */
@@ -36,7 +39,8 @@ export interface ChatMessage {
   createdAt: string;
 }
 
-export type CannotSendReason = 'not-friends' | 'blocked' | 'feature';
+/** `page-first`: a page may not write first to someone who neither follows it nor wrote to it. */
+export type CannotSendReason = 'not-friends' | 'blocked' | 'feature' | 'page-first';
 
 export interface ConversationView {
   id: string;

@@ -6,6 +6,7 @@ import {
   isPushServiceEndpoint,
   notificationTag,
   notificationText,
+  pageNotification,
   shouldNotify,
   shouldRemind,
   type ActivityRow,
@@ -125,6 +126,17 @@ describe('shouldNotify', () => {
         connection: { blockedBy: [], mutedBy: ['fan'] },
       }),
     ).toBeNull();
+  });
+});
+
+describe('pageNotification (spec 040)', () => {
+  it('is titled with the page, names the actor in the body and opens as the page', () => {
+    expect(pageNotification({ title: 'Ana', body: 'commented on your post' }, '/posts/p1', { id: 'pg1', name: 'Kitchen' })).toEqual({
+      title: 'Kitchen (page)',
+      body: 'Ana: commented on your post',
+      url: '/posts/p1?as=pg1',
+    });
+    expect(pageNotification({ title: 'Ana', body: 'x' }, '/posts/p1?c=2', { id: 'pg1', name: '' })).toMatchObject({ title: 'Your page (page)', url: '/posts/p1?c=2&as=pg1' });
   });
 });
 

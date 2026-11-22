@@ -254,6 +254,11 @@ export class SocialService implements OnModuleInit {
     const rows = await this.profiles.find({ username: { $regex: `^${prefix}` } }).select('userId').limit(200).lean();
     return rows.map((row) => row.userId);
   }
+  /** Which of these accounts are pages. */
+  async pagesAmong(userIds: string[]): Promise<Set<string>> {
+    const rows = await this.profiles.find({ userId: { $in: userIds }, kind: 'page' }).select('userId').lean();
+    return new Set(rows.map((row) => row.userId));
+  }
   /** Whether a username is free, for a page being created. */
   async usernameFree(username: string): Promise<boolean> {
     return !(await this.profiles.exists({ username: username.toLowerCase() }));
