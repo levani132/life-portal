@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Headers, HttpCode, Inject, Ip, Param, Po
 import type { Request, Response } from 'express';
 import { CONFIG, type AppConfig } from '../config/configuration';
 import { SessionCookies } from './session-cookie';
-import type { AuthCapabilities, AuthSession, AuthSessionInfo, AuthTokens, User } from '@life-portal/shared-types';
+import type { AuthCapabilities, AuthSession, AuthSessionInfo, AuthTokens, SuspendedAccount, User } from '@life-portal/shared-types';
 import { AuthService } from './auth.service';
 import {
   ChangePasswordDto,
@@ -49,6 +49,7 @@ export class AuthController {
       passwordReset: this.resets.available,
       emailVerification: this.verification.available,
       google: this.google.enabled,
+      inviteRequired: this.auth.inviteRequired,
     };
   }
 
@@ -205,6 +206,12 @@ export class AuthController {
   suspend(@CurrentUser('userId') userId: string, @Param('id') id: string, @Body() dto: SuspendDto, @Ip() ip: string) {
     this.access.requireDeveloper(userId);
     return this.auth.suspend(id, dto.reason ?? '', { ip });
+  }
+
+  @Get('accounts/suspended')
+  suspendedAccounts(@CurrentUser('userId') userId: string): Promise<SuspendedAccount[]> {
+    this.access.requireDeveloper(userId);
+    return this.auth.suspendedAccounts();
   }
 
   @Post('accounts/:id/unsuspend')

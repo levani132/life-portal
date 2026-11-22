@@ -1,6 +1,7 @@
 'use client';
-import { REPORT_REASON_LABELS, type ModerationCheck, type ModerationItem, type ModerationQueue, type PortalState } from '@life-portal/shared-types';
+import { REPORT_REASON_LABELS, type ModerationCheck, type ModerationItem, type SuspendedAccount, type ModerationQueue, type PortalState } from '@life-portal/shared-types';
 import Link from 'next/link';
+import { useState } from 'react';
 import { AppShell, PageHeader } from '../../../components/app-shell';
 import { PostMediaCarousel } from '../../../components/post-media';
 import { Chip, ErrorNote, Spinner } from '../../../components/ui';
@@ -32,6 +33,9 @@ function Review() {
     portal.data.access.nutrition;
   const queue = useApi<ModerationQueue>(allowed ? '/posts/moderation' : null);
   const checks = useApi<ModerationCheck[]>(allowed ? '/posts/moderation/checks' : null);
+  const suspended = useApi<SuspendedAccount[]>(allowed ? '/auth/accounts/suspended' : null);
+  // Authors of posts removed during this visit, so their account can still be suspended.
+  const [removed, setRemoved] = useState<ModerationItem['author'][]>([]);
   const action = useAction();
   if (!portal.data) return <Spinner />;
   if (!allowed) return <ErrorNote message="The review queue is available to the developer." />;
@@ -41,7 +45,7 @@ function Review() {
     void action.run(
       async () => {
         await fn();
-        await queue.mutate();
+        await Promise.all([queue.mutate(), suspended.mutate()]);
       },
       { revalidate: false },
     );
@@ -116,7 +120,12 @@ function Review() {
                 <button
                   className="btn-danger"
                   disabled={action.pending}
-                  onClick={() => act(() => api.delete(`/posts/moderation/${item.postId}`), 'Remove this post for good? Its text and photos are erased.')}
+                  onClick={() =>
+                    act(async () => {
+                      await api.delete(`/posts/moderation/${item.postId}`);
+                      setRemoved((before) => (before.some((author) => author.id === item.author.id) ? before : [...before, item.author]));
+                    }, 'Remove this post for good? Its text and photos are erased.')
+                  }
                 >
                   Remove the post
                 </button>
@@ -146,6 +155,66 @@ function Review() {
             </article>
           ))}
         </div>
+      )}
+      {removed.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-sm font-semibold">Removed just now</h2>
+          <p className="mt-1 text-xs text-ink-faint">The people whose posts you removed on this visit.</p>
+          <ul className="card mt-3 divide-y divide-border text-sm">
+            {removed.map((author) => {
+              const isSuspended = suspended.data?.some((account) => account.id === author.id) ?? author.suspended;
+              return (
+                <li key={author.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                  <Link href={`/people/${author.id}`} className="font-medium hover:text-accent-hover">
+                    {author.displayName}
+                  </Link>
+                  {isSuspended ? (
+                    <span className="text-xs text-danger">Suspended</span>
+                  ) : (
+                    <button
+                      className="btn-ghost text-danger"
+                      disabled={action.pending}
+                      onClick={() =>
+                        act(
+                          () => api.post(`/auth/accounts/${author.id}/suspend`, { reason: 'A removed post' }),
+                          `Suspend ${author.displayName}? They are signed out everywhere, cannot sign in, and nothing they posted is shown.`,
+                        )
+                      }
+                    >
+                      Suspend the account
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+      {suspended.data && suspended.data.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-sm font-semibold">Suspended accounts</h2>
+          <p className="mt-1 text-xs text-ink-faint">Signed out, unable to sign in, and nothing they posted is shown. Nothing is deleted.</p>
+          <ul className="card mt-3 divide-y divide-border text-sm">
+            {suspended.data.map((account) => (
+              <li key={account.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                <div>
+                  <p className="font-medium">{account.name}</p>
+                  <p className="text-xs text-ink-faint">
+                    Since {new Date(account.suspendedAt).toLocaleDateString()}
+                    {account.reason ? ` · ${account.reason}` : ''}
+                  </p>
+                </div>
+                <button
+                  className="btn-ghost"
+                  disabled={action.pending}
+                  onClick={() => act(() => api.post(`/auth/accounts/${account.id}/unsuspend`))}
+                >
+                  Restore
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
       {checks.data && checks.data.length > 0 && (
         <section className="mt-10">

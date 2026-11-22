@@ -61,11 +61,11 @@ Last reviewed: 2026-11-22.
 
 | Service | For | When |
 |---|---|---|
-| A payments provider | Paid features, promoted posts | Roadmap step 12 |
+| A payments provider | Paid features, promoted posts | Roadmap step 13 |
 | A hash-matching service (PhotoDNA, Thorn Safer, or Cloudflare's scanner) | Matching known abuse images, which the photo check does not do | Before large-scale public photos |
 | Zoho Mail or Google Workspace | Replying *from* `support@lifeportal.one` | When forwarding is not enough |
 | EUIPO and Sakpatenti | Registering the trademark | Once the app shows its worth |
-| A video service (Mux or Cloudflare Stream) | Video that plays everywhere | Roadmap step 14 |
+| A video service (Mux or Cloudflare Stream) | Video that plays everywhere | Roadmap step 15 |
 
 ## If the owner's Gmail is lost
 

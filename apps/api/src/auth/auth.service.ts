@@ -12,7 +12,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { randomBytes, randomUUID } from 'node:crypto';
 import * as bcrypt from 'bcryptjs';
-import { LEGAL_VERSION, type AuthSession, type AuthTokens, type JwtPayload, type RefreshRefusal, type User as UserDto } from '@life-portal/shared-types';
+import { LEGAL_VERSION, type SuspendedAccount, type AuthSession, type AuthTokens, type JwtPayload, type RefreshRefusal, type User as UserDto } from '@life-portal/shared-types';
 import { CONFIG, type AppConfig } from '../config/configuration';
 import { User, type UserDocument } from './schemas/user.schema';
 import { SessionsService } from './sessions.service';
@@ -68,8 +68,8 @@ export class AuthService {
 
     const email = dto.email.toLowerCase().trim();
     assertPasswordPolicy(dto.password, email);
-    // Accepted for now (#27): registration is invite-only, and a clear answer helps invitees.
-    // Make it generic before sign-up is opened to the public.
+    // Registration is open since 2026-11-22, so this answer lets anyone test whether an address
+    // has an account. Still to do (docs/ROADMAP.md): make it generic.
     if (await this.userModel.exists({ email })) {
       throw new ConflictException('That email is already registered.');
     }
@@ -223,6 +223,22 @@ export class AuthService {
       void this.mailer.send(accountSuspendedEmail(user.email, user.name, rules, supportAddress(this.config.mail?.from))).catch(() => undefined);
     }
     return { success: true };
+  }
+
+  /** Every suspended account, newest first, for the developer's list. */
+  async suspendedAccounts(): Promise<SuspendedAccount[]> {
+    const rows = await this.userModel
+      .find({ suspendedAt: { $exists: true } })
+      .sort({ suspendedAt: -1 })
+      .limit(200)
+      .select('name suspendedAt suspendedReason')
+      .lean();
+    return rows.map((row) => ({
+      id: String(row._id),
+      name: row.name,
+      suspendedAt: (row.suspendedAt as Date).toISOString(),
+      ...(row.suspendedReason ? { reason: row.suspendedReason } : {}),
+    }));
   }
 
   async unsuspend(userId: string, ctx: RequestContext = {}): Promise<{ success: true }> {

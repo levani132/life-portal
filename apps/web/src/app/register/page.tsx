@@ -18,10 +18,14 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [canGoogle, setCanGoogle] = useState(false);
+  const [needsInvite, setNeedsInvite] = useState(false);
   const [agreed, setAgreed] = useState(false);
 
   useEffect(() => {
-    void authCapabilities().then((caps) => setCanGoogle(caps.google));
+    void authCapabilities().then((caps) => {
+      setCanGoogle(caps.google);
+      setNeedsInvite(caps.inviteRequired === true);
+    });
   }, []);
 
   useEffect(() => {
@@ -98,9 +102,11 @@ export default function RegisterPage() {
               onChange={set('password')}
             />
           </Field>
-          <Field label="Invite code" hint="Enter it if you were given an invitation.">
-            <Input value={form.inviteCode} onChange={set('inviteCode')} />
-          </Field>
+          {needsInvite && (
+            <Field label="Invite code" hint="Creating an account needs an invitation for now.">
+              <Input required value={form.inviteCode} onChange={set('inviteCode')} />
+            </Field>
+          )}
 
           {error && <ErrorNote message={error} />}
 

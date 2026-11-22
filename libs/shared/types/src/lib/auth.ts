@@ -48,6 +48,16 @@ export interface AuthCapabilities {
   emailVerification: boolean;
   /** Continue with Google is configured (issue #28). */
   google: boolean;
+  /** Creating an account needs an invite code on this server. Absent on older servers: treat as no. */
+  inviteRequired?: boolean;
+}
+
+/** A suspended account, as the developer's list shows it (spec 039). */
+export interface SuspendedAccount {
+  id: string;
+  name: string;
+  suspendedAt: string;
+  reason?: string;
 }
 
 /** What `POST /auth/google/exchange` and the steps after it answer (issue #28). */

@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-22: Anyone can sign up
+
+- **Registration is open.** The invite code field is gone from sign-up (it returns by itself if
+  the server is ever set to need one again).
+- **Review queue:** after removing a post, its author stays listed under "Removed just now" so
+  the account can still be suspended, and a new list shows every suspended account with a
+  Restore button.
+
 ## 2026-11-22: You are told when a post is removed
 
 - **If a reviewer removes your post, you get an email** saying which post, that it broke the

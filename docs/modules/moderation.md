@@ -74,7 +74,8 @@ Reasons: `nudity`, `violence`, `child_safety`, `spam`, `harassment`, `privacy`, 
 
 ## Suspension (developer only)
 
-`POST /auth/accounts/:id/suspend {reason}` and `/unsuspend`. `users.suspendedAt` and
+`POST /auth/accounts/:id/suspend {reason}` and `/unsuspend`; `GET /auth/accounts/suspended` lists
+them (name, date, reason) for the review page. `users.suspendedAt` and
 `suspendedReason`. A suspended account: every session revoked, sign-in refused with 403
 `ACCOUNT_SUSPENDED` (password and Google), refresh refused, and `AccessService.forUser()` answers
 every feature off, which is what hides its posts from everyone. The developer account cannot be
