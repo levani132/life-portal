@@ -274,6 +274,25 @@ describe('profile photo and friend count', () => {
     expect(result.avatarUrl).toBe('https://signed/avatars/new.jpg');
   });
 
+  it('refuses a profile photo the check flags or cannot check, and keeps the old one (spec 039)', async () => {
+    const f = fixture();
+    f.profiles.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(withAvatar(VIEWER)) });
+    const checker = { provider: 'openai' as const, check: jest.fn() };
+    (f.service as unknown as { imageChecker: unknown }).imageChecker = checker;
+
+    checker.check.mockResolvedValueOnce({ flagged: ['sexual'] });
+    await expect(f.service.setAvatar(VIEWER, { mediaId: 'm1' } as never)).rejects.toMatchObject({ response: { code: 'PHOTO_REFUSED' } });
+    checker.check.mockRejectedValueOnce(new Error('down'));
+    await expect(f.service.setAvatar(VIEWER, { mediaId: 'm1' } as never)).rejects.toMatchObject({ response: { code: 'PHOTO_CHECK_DOWN' } });
+    expect(f.profiles.updateOne).not.toHaveBeenCalled();
+    expect(f.media.deleteKey.mock.calls).toEqual([['avatars/new.jpg'], ['avatars/new.jpg']]);
+
+    checker.check.mockResolvedValueOnce({ flagged: ['violence'] });
+    await f.service.setAvatar(VIEWER, { mediaId: 'm1' } as never);
+    expect(checker.check).toHaveBeenLastCalledWith(['https://signed/avatars/new.jpg']);
+    expect(f.profiles.updateOne).toHaveBeenCalledWith({ userId: VIEWER }, { $set: { avatarKey: 'avatars/new.jpg' } });
+  });
+
   it('removing a photo unsets it and deletes the file', async () => {
     const f = fixture();
     f.profiles.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(withAvatar(VIEWER)) });

@@ -110,7 +110,7 @@ export class AccessService {
   async forUser(userId: string) {
     const user = await this.users
       .findById(userId)
-      .select('cohort featureOverrides')
+      .select('cohort featureOverrides suspendedAt')
       .lean();
     if (!user) throw new UnauthorizedException('Account not found.');
     const cohort: UserCohort | 'developer' =
@@ -128,13 +128,29 @@ export class AccessService {
             DEFAULT_OFF_FEATURES.map((id) => [id, policy?.overrides?.[id]]),
           )
         : { ...policy?.overrides, ...user.featureOverrides };
-    return { cohort, access: resolveFeatureAccess(cohort, overrides) };
+    const access = resolveFeatureAccess(cohort, overrides);
+    // Spec 039: a suspended account has nothing switched on, so nothing of it is shown.
+    if (user.suspendedAt) for (const id of Object.keys(access) as FeatureId[]) access[id] = false;
+    return { cohort, access };
   }
   async require(userId: string, module: FeatureId) {
     if (!(await this.forUser(userId)).access[module])
       throw new ForbiddenException(
         'This module is not available for your account.',
       );
+  }
+  /** Which of these accounts are suspended (spec 039). */
+  async suspendedAmong(userIds: string[]): Promise<Set<string>> {
+    const ids = userIds.filter((id) => isValidObjectId(id));
+    if (!ids.length) return new Set();
+    const rows = await this.users.find({ _id: { $in: ids }, suspendedAt: { $exists: true } }).select('_id').lean();
+    return new Set(rows.map((row) => String(row._id)));
+  }
+  /** The address the developer's account signs in with, for notices about the app itself. */
+  async developerEmail(): Promise<string | undefined> {
+    const id = this.config.developerUserId;
+    if (!id || !isValidObjectId(id)) return undefined;
+    return (await this.users.findById(id).select('email').lean())?.email;
   }
   requireDeveloper(userId: string) {
     if (!this.config.developerUserId || userId !== this.config.developerUserId)

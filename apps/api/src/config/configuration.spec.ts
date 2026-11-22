@@ -1,4 +1,4 @@
-import { googleConfig, mailConfig, storageConfig, webBaseUrl } from './configuration';
+import { googleConfig, mailConfig, imageCheckConfig, storageConfig, webBaseUrl } from './configuration';
 
 describe('storageConfig', () => {
   const full = {
@@ -80,5 +80,13 @@ describe('googleConfig (issue #28)', () => {
     expect(googleConfig(local, 'http://localhost:4200')?.endpoints?.token).toBe('http://127.0.0.1:9999/token');
     expect(() => googleConfig({ ...full, GOOGLE_OIDC_TEST_BASE: 'http://127.0.0.1:9999' }, web)).toThrow('loopback');
     expect(() => googleConfig({ ...local, GOOGLE_OIDC_TEST_BASE: 'https://evil.example.com' }, web)).toThrow('loopback');
+  });
+
+  it('checks photos only with a provider and its key, and refuses a provider it does not know', () => {
+    expect(imageCheckConfig({})).toBeUndefined();
+    expect(imageCheckConfig({ OPENAI_API_KEY: 'k' })).toBeUndefined();
+    expect(imageCheckConfig({ IMAGE_CHECK_PROVIDER: 'OpenAI', OPENAI_API_KEY: ' k ' })).toEqual({ provider: 'openai', apiKey: 'k' });
+    expect(() => imageCheckConfig({ IMAGE_CHECK_PROVIDER: 'openai' })).toThrow('OPENAI_API_KEY');
+    expect(() => imageCheckConfig({ IMAGE_CHECK_PROVIDER: 'other', OPENAI_API_KEY: 'k' })).toThrow('must be "openai"');
   });
 });

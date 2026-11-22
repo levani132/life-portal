@@ -51,7 +51,8 @@ export type SessionRevokeReason =
   | 'revoked'
   | 'password_change'
   | 'password_reset'
-  | 'replay';
+  | 'replay'
+  | 'suspended';
 
 export type AuthSessionDocument = HydratedDocument<AuthSessionRecord>;
 export const AuthSessionSchema = SchemaFactory.createForClass(AuthSessionRecord);

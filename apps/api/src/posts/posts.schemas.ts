@@ -1,7 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import {
   AUDIENCES,
+  POST_HOLD_REASONS,
   REPORT_REASONS,
+  type PostHoldReason,
   type Audience,
   type ForYouReasonCode,
   type FoodPublication,
@@ -55,6 +57,17 @@ export class FoodPostRecord {
    * food or media). Its `requestId` is `repost:<original id>`, so one member reposts a post once.
    */
   @Prop() repostOf?: string;
+  /**
+   * Spec 039: while set, only the author can read the post. `heldReason` says why: its photos
+   * are waiting for the automatic check, the check flagged them, or people reported it.
+   */
+  @Prop({ type: Date }) heldAt?: Date;
+  @Prop({ type: String, enum: POST_HOLD_REASONS }) heldReason?: PostHoldReason;
+  /** The automatic check of this post's photos. Absent: never checked (no photos, or private). */
+  @Prop({ type: String, enum: ['ok', 'flagged'] }) mediaCheck?: 'ok' | 'flagged';
+  @Prop({ type: [String], default: undefined }) checkCategories?: string[];
+  /** A reviewer kept the post: reports no longer hide it, though they still reach the queue. */
+  @Prop({ type: Date }) reviewedAt?: Date;
   createdAt!: Date;
   updatedAt!: Date;
 }
@@ -72,6 +85,8 @@ export class PostReportRecord {
   @Prop({ type: String, enum: REPORT_REASONS, required: true })
   reason!: ReportReason;
   @Prop({ type: Date }) resolvedAt?: Date;
+  /** What the reviewer decided about the post this report was for. */
+  @Prop({ type: String, enum: ['removed', 'kept'] }) resolution?: 'removed' | 'kept';
   createdAt!: Date;
 }
 export const PostReportSchema = SchemaFactory.createForClass(PostReportRecord);

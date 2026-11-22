@@ -6,6 +6,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AccountModule } from '../account/account.module';
+import { ImageCheckModule } from '../moderation/image-checker';
 import { ErrorsModule } from '../errors/errors.module';
 import { RoadmapModule } from '../roadmap/roadmap.module';
 import { ThemesModule } from '../themes/themes.module';
@@ -49,6 +50,7 @@ import { IdempotencyModule } from '../idempotency/idempotency.module';
     ScheduleModule.forRoot(),
     StorageModule,
     MediaModule,
+    ImageCheckModule,
     AuthModule,
     IdempotencyModule,
     AccessModule,

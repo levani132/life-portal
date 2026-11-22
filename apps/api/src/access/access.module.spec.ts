@@ -13,7 +13,7 @@ const USER = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 
 function fixture(
   options: {
-    user?: { cohort?: string; featureOverrides?: object } | null;
+    user?: { cohort?: string; featureOverrides?: object; suspendedAt?: Date } | null;
     policy?: { overrides: object } | null;
     developerUserId?: string;
   } = {},
@@ -81,6 +81,13 @@ describe('feature access resolution', () => {
       user: { cohort: 'internal', featureOverrides: { epam: true } },
     });
     expect((await f.service.forUser(USER)).access.epam).toBe(false);
+  });
+
+  it('switches every feature off for a suspended account (spec 039)', async () => {
+    const f = fixture({ user: { cohort: 'internal', suspendedAt: new Date() }, policy: { overrides: { social: true } } });
+    const { access } = await f.service.forUser(USER);
+    expect(Object.values(access).every((on) => on === false)).toBe(true);
+    await expect(f.service.require(USER, 'social')).rejects.toThrow('not available');
   });
 
   it('answers 401 for a deleted account and 403 for a module it lacks', async () => {

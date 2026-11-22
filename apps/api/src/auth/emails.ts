@@ -76,3 +76,14 @@ export function accountDeletedEmail(to: string, name: string, webOrigin?: string
     html: layout(lines, undefined, webOrigin),
   };
 }
+
+/** Tells the developer a post waits for review (spec 039). It says nothing about the post. */
+export function reviewNeededEmail(to: string, link: string): MailMessage {
+  const lines = ['A post is waiting for your review: it was reported, or its photo did not pass the automatic check.', 'Until you decide, a held post is hidden from everyone but its author.'];
+  return {
+    to,
+    subject: 'LifePortal: a post needs review',
+    text: `${lines.join('\n\n')}\n\n${link}\n`,
+    html: layout(lines, { href: link, label: 'Open the review queue' }),
+  };
+}

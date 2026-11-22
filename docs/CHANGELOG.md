@@ -2,6 +2,19 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-22: Photos are checked, and reports reach someone
+
+- **A photo or clip you post is checked before anyone else sees it.** For a few seconds the
+  post shows only to you, with a note; then it appears for everyone. A photo that does not pass
+  stays hidden and goes to a person for review. Private posts are not sent anywhere. (The check
+  is switched on by the admin; until then posts publish as before.)
+- **Profile photos are checked the same way** when you save one.
+- **Reporting a post names what is wrong**: nudity, violence, a child at risk, spam,
+  harassment, private information, misleading advice. A post several people report is hidden
+  until it is reviewed.
+- **The admin has a review queue** (Menu → Review queue) showing each post with its photos,
+  and can keep it, remove it, or suspend the account that posted it.
+
 ## 2026-11-22: Leave, and take your data with you
 
 - **Download your data** (Menu → Your data and account): one file with everything the app holds

@@ -193,6 +193,14 @@ export class FakeModel {
     return { matchedCount: doc ? 1 : 0, upsertedCount: !doc && options.upsert ? 1 : 0 };
   }
 
+  async updateMany(filter: Filter, update: Record<string, Record<string, unknown>>) {
+    const rows = this.docs.filter((row) => matches(row, filter));
+    for (const row of rows) this.apply(row, update);
+    return { matchedCount: rows.length };
+  }
+
+  findById(id: unknown) { return this.findOne({ _id: id }); }
+
   async deleteOne(filter: Filter) {
     const index = this.docs.findIndex((row) => matches(row, filter));
     if (index >= 0) this.docs.splice(index, 1);

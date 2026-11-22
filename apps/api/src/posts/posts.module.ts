@@ -19,6 +19,7 @@ import {
   Put,
   Query,
   UseInterceptors,
+  HttpCode,
 } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { RequireModule } from '../access/access.module';
@@ -54,6 +55,8 @@ import {
   PostReportSchema,
 } from './posts.schemas';
 import { PostsService } from './posts.service';
+import { PostModerationService } from './post-moderation.service';
+import { MailModule } from '../mail/mail.module';
 import { ForYouService } from './for-you.service';
 import {
   FeedMetricKeyRecord,
@@ -71,6 +74,7 @@ class PostsController {
     private readonly engagement: PostEngagementService,
     private readonly forYouFeed: ForYouService,
     private readonly metrics: FeedMetricsService,
+    private readonly moderation: PostModerationService,
   ) {}
   @Post('preview') preview(
     @CurrentUser('userId') userId: string,
@@ -139,6 +143,22 @@ class PostsController {
     @Query() query: FeedMetricsReportDto,
   ) {
     return this.metrics.report(userId, query.range);
+  }
+  /** Spec 039, developer only: what waits for review, and the two decisions. */
+  @Get('moderation') moderationQueue(@CurrentUser('userId') userId: string) {
+    return this.moderation.queue(userId);
+  }
+  @Post('moderation/:postId/keep') @HttpCode(200) moderationKeep(
+    @CurrentUser('userId') userId: string,
+    @Param('postId') postId: string,
+  ) {
+    return this.moderation.keep(userId, postId);
+  }
+  @Delete('moderation/:postId') moderationRemove(
+    @CurrentUser('userId') userId: string,
+    @Param('postId') postId: string,
+  ) {
+    return this.moderation.remove(userId, postId);
   }
   @Get('reports') reports(@CurrentUser('userId') userId: string) {
     return this.posts.reportQueue(userId);
@@ -307,6 +327,7 @@ class PublicPostsController {
     NutritionModule,
     TrainingModule,
     SocialModule,
+    MailModule,
     MongooseModule.forFeature([
       { name: FoodPostRecord.name, schema: FoodPostSchema },
       { name: PostLikeRecord.name, schema: PostLikeSchema },
@@ -320,7 +341,7 @@ class PublicPostsController {
     ]),
   ],
   controllers: [PostsController, PublicPostsController],
-  providers: [PostsService, PostEngagementService, ForYouService, FeedMetricsService],
+  providers: [PostsService, PostEngagementService, ForYouService, FeedMetricsService, PostModerationService],
   // Messages renders shared posts through the same read authorization as opening one.
   exports: [PostsService],
 })

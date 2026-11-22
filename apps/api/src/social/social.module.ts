@@ -3,6 +3,10 @@ import {
   CallHandler,
   ConflictException,
   Controller,
+  Inject,
+  Optional,
+  ServiceUnavailableException,
+  UnprocessableEntityException,
   Delete,
   ExecutionContext,
   Get,
@@ -25,6 +29,8 @@ import {
   SchemaFactory,
 } from '@nestjs/mongoose';
 import { Model, isValidObjectId } from 'mongoose';
+import { imageHoldCategories } from '@life-portal/shared-domain';
+import { IMAGE_CHECKER, type ImageChecker } from '../moderation/image-checker';
 import {
   IsBoolean,
   IsDateString,
@@ -143,6 +149,7 @@ export class SocialService implements OnModuleInit {
     private readonly shared: SharedWidgetsService,
     private readonly notifications: NotificationsService,
     private readonly media: MediaService,
+    @Optional() @Inject(IMAGE_CHECKER) private readonly imageChecker: ImageChecker | null = null,
   ) {}
   /** Friend notifications and their Activity rows (docs/modules/notifications.md). */
   onModuleInit() {
@@ -282,9 +289,29 @@ export class SocialService implements OnModuleInit {
   async setAvatar(userId: string, dto: AvatarDto) {
     const previous = (await this.own(userId)).avatarKey;
     const { key } = await this.media.copyForAvatar(userId, dto.mediaId);
+    // Spec 039: a profile photo is shown to everyone, so it is checked before it is used.
+    const refusal = await this.avatarRefusal(key);
+    if (refusal) {
+      await this.media.deleteKey(key);
+      throw refusal;
+    }
     await this.profiles.updateOne({ userId }, { $set: { avatarKey: key } });
     if (previous) await this.media.deleteKey(previous);
     return { avatarUrl: await this.media.signKey(key) };
+  }
+  /** Why this stored image may not be a profile photo, or nothing when it may (or no check is set up). */
+  private async avatarRefusal(key: string): Promise<Error | undefined> {
+    if (!this.imageChecker) return undefined;
+    const url = await this.media.signKey(key);
+    if (!url) return undefined;
+    try {
+      const { flagged } = await this.imageChecker.check([url]);
+      return imageHoldCategories(flagged).length
+        ? new UnprocessableEntityException({ code: 'PHOTO_REFUSED', message: 'That photo can’t be used as a profile photo. Choose another one.' })
+        : undefined;
+    } catch {
+      return new ServiceUnavailableException({ code: 'PHOTO_CHECK_DOWN', message: 'Photos can’t be checked right now. Try again in a minute.' });
+    }
   }
   async removeAvatar(userId: string) {
     const previous = (await this.own(userId)).avatarKey;

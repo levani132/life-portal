@@ -60,6 +60,7 @@ import type {
   TrainingCopyDto,
   UpdatePostDto,
 } from './posts.dto';
+import { PostModerationService } from './post-moderation.service';
 
 /** Matches posts, not reposts. A repost row is never addressable by its own id. */
 const ORIGINAL = { repostOf: { $exists: false } };
@@ -100,6 +101,7 @@ export class PostsService {
     @InjectModel(FeedFeedbackRecord.name)
     private readonly feedback: Model<FeedFeedbackRecord>,
     @Optional() private readonly trainingPublications?: TrainingPublicationService,
+    @Optional() private readonly moderation?: PostModerationService,
   ) {}
 
   /** Spec 036: Training builds and reads its own snapshots; posts only stores them. */
@@ -194,6 +196,8 @@ export class PostsService {
       // From the whole publication, never the feed teaser, and from published content only.
       topics: postTopics({ caption: row.caption, publication: p }),
       isOwner: row.userId === viewerId,
+      // Spec 039: only its author ever learns a post is held.
+      ...(row.heldAt && row.userId === viewerId ? { held: row.heldReason === 'checking' ? ('checking' as const) : ('review' as const) } : {}),
       ...(await this.trainingPart(row, viewerId)),
     };
     // A post without food: text and/or photos only.
@@ -315,6 +319,10 @@ export class PostsService {
             audience: dto.audience,
             // Link-only is a private post with a secret key; any other audience has no key.
             ...(dto.linkOnly && dto.audience === 'private' ? { linkKey: randomBytes(16).toString('base64url') } : {}),
+            // Spec 039: photos others can reach are checked first; until then only the author sees the post.
+            ...(this.moderation?.holdsNew({ audience: dto.audience, linkKey: dto.linkOnly && dto.audience === 'private' ? 'new' : undefined, mediaCount: media.length })
+              ? { heldAt: new Date(), heldReason: 'checking' }
+              : {}),
             version: 1,
           },
         },
@@ -333,6 +341,7 @@ export class PostsService {
       throw new ConflictException('This publish request was already used.');
     if (media.length)
       await this.media.claim(userId, dto.requestId, String(row._id));
+    if (row.heldReason === 'checking') void this.moderation?.check(String(row._id));
     return this.dto(
       row,
       (await this.social.postAuthor(userId))!,
@@ -363,7 +372,7 @@ export class PostsService {
   /** Everything `readable()` checks except the viewer's report of this one post. */
   private async readableAuthor(
     viewerId: string,
-    row: Pick<FoodPostRecord, 'userId' | 'audience'>,
+    row: Pick<FoodPostRecord, 'userId' | 'audience' | 'heldAt'>,
     granted = false,
   ): Promise<PostAuthor | null> {
     const own = row.userId === viewerId;
@@ -380,6 +389,7 @@ export class PostsService {
         blocked: !!connection?.blockedBy.length,
         enabled,
         granted,
+        held: !!row.heldAt,
       })
       ? author
       : null;
@@ -432,7 +442,7 @@ export class PostsService {
     const missing = () => new NotFoundException('Post not found.');
     if (!isValidObjectId(id)) throw missing();
     const row = await this.posts
-      .findOne({ _id: id, audience: 'public', deleted: { $ne: true }, ...ORIGINAL })
+      .findOne({ _id: id, audience: 'public', deleted: { $ne: true }, heldAt: { $exists: false }, ...ORIGINAL })
       .lean();
     if (!row || !(await this.enabled(row.userId))) throw missing();
     const author = await this.social.postAuthor(row.userId);
@@ -661,7 +671,7 @@ export class PostsService {
 
   /** The For You query for live, public, original posts, excluding `excluded` authors. */
   forYouQuery(excluded: string[]) {
-    return { audience: 'public' as const, deleted: { $ne: true }, ...ORIGINAL, userId: { $nin: excluded } };
+    return { audience: 'public' as const, deleted: { $ne: true }, heldAt: { $exists: false }, ...ORIGINAL, userId: { $nin: excluded } };
   }
 
   /**
@@ -681,6 +691,7 @@ export class PostsService {
       (row) =>
         row.audience === 'public' &&
         !row.deleted &&
+        !row.heldAt &&
         !row.repostOf &&
         !out.has(row.userId) &&
         !notInterested.has(String(row._id)),
@@ -823,6 +834,7 @@ export class PostsService {
       { $set: { audience }, $unset: { linkKey: '', linkViewers: '' } },
     );
     if (!result.matchedCount) throw new NotFoundException('Post not found.');
+    await this.moderation?.onVisible(id);
     return { audience };
   }
   async update(userId: string, id: string, dto: UpdatePostDto) {
@@ -851,6 +863,7 @@ export class PostsService {
       },
     );
     if (!changed.matchedCount) throw new NotFoundException('Post not found.');
+    await this.moderation?.onVisible(id);
     return this.detail(userId, id);
   }
   async remove(userId: string, id: string) {
@@ -982,6 +995,7 @@ export class PostsService {
     } catch (error) {
       if ((error as { code?: number }).code !== 11000) throw error;
     }
+    await this.moderation?.onReport(id);
     return { success: true };
   }
   async reportQueue(userId: string): Promise<PostReport[]> {

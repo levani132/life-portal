@@ -90,3 +90,10 @@ services:
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
+
+      # ---- The automatic photo check (spec 039): both, or neither. ----
+      # Setup: docs/modules/moderation.md. The key lives in the dashboard only.
+      - key: IMAGE_CHECK_PROVIDER
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false

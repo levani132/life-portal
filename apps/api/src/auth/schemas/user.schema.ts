@@ -73,6 +73,16 @@ export class User {
    */
   @Prop()
   emailVerifiedAt?: Date;
+
+  /**
+   * Spec 039: set by the reviewer. A suspended account cannot sign in, has no session, and
+   * every feature reads as off for it, so nothing it posted is shown to anyone.
+   */
+  @Prop()
+  suspendedAt?: Date;
+
+  @Prop({ maxlength: 200 })
+  suspendedReason?: string;
 }
 
 export type UserDocument = HydratedDocument<User>;

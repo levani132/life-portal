@@ -78,6 +78,23 @@ export interface AppConfig {
    * button. `endpoints` is set only by `GOOGLE_OIDC_TEST_BASE`, a loopback fake for tests.
    */
   google?: GoogleConfig;
+  /**
+   * The automatic photo check (spec 039): `IMAGE_CHECK_PROVIDER=openai` with `OPENAI_API_KEY`,
+   * both or neither. Absent means photos are not checked automatically; reports still work.
+   */
+  imageCheck?: ImageCheckConfig;
+}
+
+export type ImageCheckConfig = { provider: 'openai'; apiKey: string };
+
+/** See `AppConfig.imageCheck`. Exported for its unit test. */
+export function imageCheckConfig(env: NodeJS.ProcessEnv): ImageCheckConfig | undefined {
+  const provider = env['IMAGE_CHECK_PROVIDER']?.trim().toLowerCase() || '';
+  const apiKey = env['OPENAI_API_KEY']?.trim() || '';
+  if (!provider) return undefined;
+  if (provider !== 'openai') throw new Error(`IMAGE_CHECK_PROVIDER must be "openai", got "${provider}".`);
+  if (!apiKey) throw new Error('IMAGE_CHECK_PROVIDER=openai needs OPENAI_API_KEY.');
+  return { provider, apiKey };
 }
 
 export interface GoogleConfig {
@@ -310,6 +327,7 @@ export function loadConfig(): AppConfig {
     webBaseUrl: web,
     mail: mailConfig(process.env, web),
     google: googleConfig(process.env, web),
+    imageCheck: imageCheckConfig(process.env),
   };
 }
 

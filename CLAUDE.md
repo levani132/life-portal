@@ -270,6 +270,13 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   `ErrorsService.record()` scrubs everything it is given, is never awaited and never throws.
   `RecordingExceptionFilter` must keep delegating to Nest's own filter (it changes no response)
   and records only crashes and 5xx. See `docs/modules/errors.md`.
+- **A held post is its author's alone** (spec 039). `food_posts.heldAt` is honoured by
+  `canReadFoodPost({held})`; a new query that reads posts without `readable()` must filter
+  `heldAt` itself (the public preview and For You candidates do). Never tell anyone but the
+  author that a post is held. Photos go to the checking service only as expiring links, only
+  for posts other people can reach, and never with an account or text; a failed check leaves
+  the post held (fail closed). The email to the reviewer names no post and no person. See
+  `docs/modules/moderation.md`.
 - **Every collection is listed in `ACCOUNT_PLAN`** (`apps/api/src/account/account-plan.ts`, spec
   038): owned, custom or kept. A test fails when one is missing, so add a new collection there in
   the same change, and if its rows hold a stored file add it to `FILE_COLLECTIONS`. Deleting an
@@ -291,6 +298,10 @@ docker run -d --name lp-mongo -p 27019:27017 mongo:7
 MONGODB_URI=mongodb://127.0.0.1:27019/lp-dev JWT_SECRET=$(openssl rand -hex 32) \
   npm run seed && npm run dev
 ```
+
+`apps/api/src/app/app.module.spec.ts` builds every provider without a database, so a provider a
+module cannot see now fails `npm run check`. It runs no query: schemas and numbers still need the
+real thing.
 
 Then log in and look at the numbers. If you touched projections, cross-links or schemas, check
 that a figure you expect to be non-zero actually is.

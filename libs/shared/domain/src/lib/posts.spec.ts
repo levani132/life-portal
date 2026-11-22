@@ -6,6 +6,8 @@ import type {
 import {
   canReadFoodPost,
   canRepost,
+  imageHoldCategories,
+  reportsHoldPost,
   canonicalPublication,
   publicationCalories,
   publicationMacros,
@@ -136,5 +138,27 @@ describe('canRepost', () => {
     expect(canRepost({ own: false, audience: 'friends' })).toBe(true);
     expect(canRepost({ own: false, audience: 'private' })).toBe(false);
     expect(canRepost({ own: true, audience: 'public' })).toBe(false);
+  });
+});
+
+describe('moderation rules (spec 039)', () => {
+  it('lets only its author read a held post, whatever the audience', () => {
+    const open = { audience: 'public' as const, friends: true, blocked: false, enabled: true, granted: true };
+    expect(canReadFoodPost({ ...open, own: false })).toBe(true);
+    expect(canReadFoodPost({ ...open, own: false, held: true })).toBe(false);
+    expect(canReadFoodPost({ ...open, own: true, held: true })).toBe(true);
+  });
+
+  it('hides a post on one child-safety report or three of anything, unless already reviewed', () => {
+    expect(reportsHoldPost([], false)).toBe(false);
+    expect(reportsHoldPost(['spam', 'nudity'], false)).toBe(false);
+    expect(reportsHoldPost(['spam', 'nudity', 'other'], false)).toBe(true);
+    expect(reportsHoldPost(['child_safety'], false)).toBe(true);
+    expect(reportsHoldPost(['child_safety', 'spam', 'spam'], true)).toBe(false);
+  });
+
+  it('holds for sexual, graphic and self-harm images, not for plain violence', () => {
+    expect(imageHoldCategories(['violence', 'harassment'])).toEqual([]);
+    expect(imageHoldCategories(['violence', 'violence/graphic', 'sexual', 'sexual'])).toEqual(['sexual', 'violence/graphic']);
   });
 });

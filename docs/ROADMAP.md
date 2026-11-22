@@ -34,15 +34,22 @@ until then is polish". Of the numbered steps below, only Training moved.
 No public launch is planned soon. These are a gate for the day launch is scheduled. The first
 three have moved into the numbered steps, because friends already use the app.
 
-- **Account deletion and data export.** Health data is a GDPR special category. Every module
-  doc lists what deletion must remove.
+- ~~**Account deletion and data export.**~~ Done 2026-11-22 (spec 038, `docs/modules/account.md`):
+  Menu → Your data and account.
+- **Terms, privacy policy and community rules.** There are none. Before strangers register they
+  must say: what is stored, that photos others can see are sent to a checking service, that a
+  reported post may be read by the reviewer, what is not allowed, and how to reach support.
 - **`apps/api-e2e` is still the generated "Hello API" test.** `npm run test:integration` boots
   the real app against a database, but needs one supplied; nothing runs it automatically.
 - **Real-device checks** of push, messages and swiping on an iPhone.
 - **Tier 0 limits:** Atlas M0 has 512 MB; Vercel Hobby does not allow commercial use, and Render
   free is kept awake by a cron job.
-- **Image moderation** (automated scanning) before public photos reach strangers at scale. The
-  For You feed (018) does exactly that, so its `forYou` flag stays off for production until then.
+- **Image moderation:** built 2026-11-22 (spec 039, `docs/modules/moderation.md`): photos others
+  can see are checked before they are shown, reports hide a post, the owner reviews and can
+  suspend an account. **Owner's steps:** set `IMAGE_CHECK_PROVIDER` and `OPENAI_API_KEY` on the
+  API host (until then photos are not checked), and decide on a service that matches known
+  child-abuse images, which this check does not do. `forYou` stays off for production until
+  the check is switched on.
 - **Camera video plays only where the recording browser's codec does** (no transcoding yet).
 - **The money modules are built for one person** (the seeded loan, ESPP plan and EPAM boards).
   Decide whether they stay owner-only behind a flag or become a product for everyone, before
@@ -62,9 +69,9 @@ three have moved into the numbered steps, because friends already use the app.
   in the EU and Georgia once the app shows its worth, and get a specialist's view before
   marketing in the US, where two unrelated companies hold or have applied for the name.
 - **When does the invite code go?** It is one setting on the API host (`REGISTRATION_INVITE_CODE`):
-  removing it opens registration to anyone. Email is configured (2026-11-22), so a forgotten
-  password is recoverable. Still before that: account deletion, and a view on moderation, since strangers can
-  then post.
+  removing it opens registration to anyone. Email is configured, people can delete their account and take
+  their data, and photos are moderated (all 2026-11-22). Still before that: the photo check's key
+  on the API host, and terms, a privacy policy and community rules (see the gaps above).
 - **Where does the AI mark show?** The owner's proposal: on the page only, since anyone who opens
   it sees it is AI-managed. The recommendation: a small mark beside the page's name wherever it
   appears, because most people meet a post in the feed and never open the page.
@@ -83,6 +90,10 @@ three have moved into the numbered steps, because friends already use the app.
    - **Switched on 2026-11-22:** the app has its own address, `https://lifeportal.one`. Email is
      sent through Resend from that domain, so password reset and email verification work in
      production (checked on the live address); mail to the domain is forwarded by ImprovMX.
+   - **Ready for strangers (2026-11-22):** people can download their data and delete their
+     account (038); photos others can see are checked before they are shown, reports hide a
+     post, and the owner has a review queue and can suspend an account (039). The owner's steps
+     are under the known gaps: the photo check's key, and terms, privacy policy and rules.
 3. **Switch on what is built.** Strength ranks, tournaments, training sharing, the Crisp theme
    and link-only posts are finished or nearly so and off for everyone but the owner. Each needs
    a review on a real device, then its flag turned on for friends, then for everyone.
@@ -148,7 +159,7 @@ three have moved into the numbered steps, because friends already use the app.
 11. **Explore and search built around food.** Filter posts by macros ("600 kcal dinners, 40g+
    protein"). Diet tags (vegan, keto, high-protein) are computed from the facts, never stored
    by hand (the first six, high-protein to high-fibre, exist since #8: `postTopics()`). Image
-   moderation (CSAM scanning, nudity) must exist before public images.
+   moderation exists since 039; matching known abuse images is still open.
 12. **Payments, promoted posts and paid plans.** Anyone can pay to promote a post, or give a
     budget to several posts and let the system decide where it goes, the way the large networks
     do. It needs payments, a "Sponsored" label, a review of what is promoted, and enough people

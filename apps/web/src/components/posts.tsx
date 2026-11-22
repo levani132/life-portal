@@ -3,7 +3,7 @@ import { APP_NAME } from '../lib/brand';
 import { Avatar } from './avatar';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Apple,
   CalendarDays,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import {
   REPORT_REASONS,
+  REPORT_REASON_LABELS,
   type Audience,
   type FeedMetricEvent,
   type FeedMetricsStatus,
@@ -281,6 +282,13 @@ export function PostCard({
   );
   const card = useRef<HTMLElement>(null);
   useImpression(card, recordMetric ? () => recordMetric('impression') : null);
+  // Spec 039: the photo check takes a few seconds; look again so the note goes away by itself.
+  const checking = post.held === 'checking';
+  useEffect(() => {
+    if (!checking) return;
+    const timer = window.setTimeout(() => void revalidate('/posts'), 5000);
+    return () => window.clearTimeout(timer);
+  }, [checking, post.updatedAt]);
   async function remove() {
     if (
       await action.run(
@@ -448,6 +456,13 @@ export function PostCard({
         />
       </div>
       {forYou && <ForYouReasons reasons={post.reasons} />}
+      {post.held && (
+        <p role="status" className="mt-3 rounded-lg bg-warning-solid/10 px-3 py-2 text-xs text-warning">
+          {post.held === 'checking'
+            ? 'Your photo is being checked. Only you can see this post until that is done, usually in a few seconds.'
+            : 'Only you can see this post for now: it is waiting for a review.'}
+        </p>
+      )}
       {post.title && post.title !== post.contentLabel && (
         <h2 className="mt-3 whitespace-pre-wrap break-words text-lg font-semibold">
           {post.title}
@@ -709,7 +724,7 @@ function ReportPost({
         >
           {REPORT_REASONS.map((r) => (
             <option key={r} value={r}>
-              {r[0].toUpperCase() + r.slice(1)}
+              {REPORT_REASON_LABELS[r]}
             </option>
           ))}
         </Select>

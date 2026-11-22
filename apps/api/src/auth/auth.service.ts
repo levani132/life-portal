@@ -132,7 +132,7 @@ export class AuthService {
     }
 
     const user = await this.userModel.findById(payload.sub);
-    if (!user) throw refused('SESSION_ENDED', 'Your session has been signed out.');
+    if (!user || user.suspendedAt) throw refused('SESSION_ENDED', 'Your session has been signed out.');
 
     const next = await this.signTokens(user, payload.sid);
     const refusal = await this.sessions.rotate({
@@ -201,6 +201,27 @@ export class AuthService {
     return { success: true };
   }
 
+  /**
+   * Suspends an account (spec 039): every device is signed out and it cannot sign in again
+   * until it is restored. Who may do this is the caller's check.
+   */
+  async suspend(userId: string, reason: string, ctx: RequestContext = {}): Promise<{ success: true }> {
+    if (!Types.ObjectId.isValid(userId)) throw new BadRequestException('Unknown account.');
+    if (userId === this.config.developerUserId) throw new BadRequestException('The developer account cannot be suspended.');
+    const result = await this.userModel.updateOne({ _id: userId }, { $set: { suspendedAt: new Date(), suspendedReason: reason.trim().slice(0, 200) } });
+    if (!result.matchedCount) throw new BadRequestException('Unknown account.');
+    await this.sessions.revokeAll(userId, 'suspended');
+    await this.security.record('account_suspended', ctx, userId);
+    return { success: true };
+  }
+
+  async unsuspend(userId: string, ctx: RequestContext = {}): Promise<{ success: true }> {
+    if (!Types.ObjectId.isValid(userId)) throw new BadRequestException('Unknown account.');
+    await this.userModel.updateOne({ _id: userId }, { $unset: { suspendedAt: 1, suspendedReason: 1 } });
+    await this.security.record('account_restored', ctx, userId);
+    return { success: true };
+  }
+
   async findById(userId: string): Promise<UserDto> {
     const user = await this.userModel.findById(userId);
     if (!user) throw new UnauthorizedException('Account not found.');
@@ -239,6 +260,7 @@ export class AuthService {
   }
 
   private async issueSession(user: UserDocument, device: string): Promise<AuthSession> {
+    if (user.suspendedAt) throw suspended();
     const sessionId = new Types.ObjectId();
     const tokens = await this.signTokens(user, String(sessionId));
     await this.sessions.create({
@@ -275,4 +297,12 @@ export class AuthService {
 
 function refused(code: RefreshRefusal, message: string): UnauthorizedException {
   return new UnauthorizedException({ code, message });
+}
+
+/** What a suspended account is told at every way of signing in (spec 039). */
+function suspended(): ForbiddenException {
+  return new ForbiddenException({
+    code: 'ACCOUNT_SUSPENDED',
+    message: 'This account has been suspended for breaking the rules. If you think this is a mistake, write to support.',
+  });
 }

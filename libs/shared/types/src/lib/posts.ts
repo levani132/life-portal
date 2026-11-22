@@ -111,6 +111,11 @@ export interface FoodPost {
   linkOnly?: boolean;
   /** The secret part of a link-only post's link (`/posts/<id>?k=<shareKey>`). */
   shareKey?: string;
+  /**
+   * Only ever sent to the author: nobody else can see the post for now. `checking`: its photos
+   * are being checked, usually for a few seconds. `review`: it is waiting for a person.
+   */
+  held?: 'checking' | 'review';
   /** Absent for a post without food (text and/or media only). */
   kind?: FoodPostKind;
   day?: string;
@@ -173,6 +178,9 @@ export interface PostImportResult {
   savedMealId?: string;
 }
 export const REPORT_REASONS = [
+  'nudity',
+  'violence',
+  'child_safety',
   'spam',
   'harassment',
   'privacy',
@@ -180,6 +188,51 @@ export const REPORT_REASONS = [
   'other',
 ] as const;
 export type ReportReason = (typeof REPORT_REASONS)[number];
+/** What the report dialog and the review queue call each reason. */
+export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
+  nudity: 'Nudity or sexual content',
+  violence: 'Violence or gore',
+  child_safety: 'Something that puts a child at risk',
+  spam: 'Spam',
+  harassment: 'Harassment or hate',
+  privacy: 'Shows someone’s private information',
+  misleading: 'Misleading or dangerous advice',
+  other: 'Something else',
+};
+
+/**
+ * Why a post is hidden from everyone but its author (spec 039):
+ * `checking` while its photos wait for the automatic check, `check` when that check flagged
+ * them, `reports` when enough people reported it. A reviewer keeps or removes it.
+ */
+export const POST_HOLD_REASONS = ['checking', 'check', 'reports'] as const;
+export type PostHoldReason = (typeof POST_HOLD_REASONS)[number];
+
+/** One post waiting for the reviewer (developer only). */
+export interface ModerationItem {
+  postId: string;
+  author: { id: string; displayName: string; username?: string; suspended: boolean };
+  title: string;
+  caption: string;
+  audience: Audience;
+  linkOnly: boolean;
+  createdAt: string;
+  /** Signed for this read, like any post's. */
+  media: PostMedia[];
+  /** What the post's food or training attachment is called, if it has one. */
+  attachment?: string;
+  held?: PostHoldReason;
+  heldAt?: string;
+  /** What the automatic check named, when it flagged the post. */
+  checkCategories?: string[];
+  reports: { reason: ReportReason; count: number }[];
+  reportCount: number;
+}
+export interface ModerationQueue {
+  items: ModerationItem[];
+  /** Whether photos are checked automatically on this server. */
+  imageCheck: boolean;
+}
 export interface PostReport {
   id: string;
   postId: string;

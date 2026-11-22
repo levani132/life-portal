@@ -95,6 +95,19 @@ describe('post read authorization and publish retries', () => {
     });
     expect(f.graph.between).not.toHaveBeenCalled();
   });
+  it('shows a held post to its author only, and tells only the author it is held (spec 039)', async () => {
+    const f = fixture();
+    f.row.audience = 'public';
+    Object.assign(f.row, { heldAt: new Date(), heldReason: 'check' });
+    await expect(f.service.detail('reader', String(f.row._id))).rejects.toThrow(NotFoundException);
+    expect(await f.service.detail('owner', String(f.row._id))).toMatchObject({ isOwner: true, held: 'review' });
+    Object.assign(f.row, { heldReason: 'checking' });
+    expect(await f.service.detail('owner', String(f.row._id))).toMatchObject({ held: 'checking' });
+    Object.assign(f.row, { heldAt: undefined, heldReason: undefined });
+    const open = await f.service.detail('reader', String(f.row._id));
+    expect(open.isOwner).toBe(false);
+    expect('held' in open).toBe(false);
+  });
   it('computes topics on read from the whole publication and the caption (issue #8)', async () => {
     const f = fixture();
     f.row.caption = 'Breakfast #Oats #oats';
@@ -402,6 +415,7 @@ describe('public link previews (spec 017)', () => {
       _id: String(f.row._id),
       audience: 'public',
       deleted: { $ne: true },
+      heldAt: { $exists: false },
       repostOf: { $exists: false },
     });
     expect(Object.keys(preview).sort()).toEqual(['authorName', 'caption', 'id', 'label', 'title']);

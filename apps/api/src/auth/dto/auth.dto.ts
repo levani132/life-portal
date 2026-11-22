@@ -107,3 +107,8 @@ export class GoogleSignupDto {
   @MaxLength(200)
   inviteCode?: string;
 }
+
+/** Spec 039: why an account is suspended, for the reviewer's own record. */
+export class SuspendDto {
+  @IsOptional() @IsString() @MaxLength(200) reason?: string;
+}

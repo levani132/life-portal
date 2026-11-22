@@ -74,7 +74,7 @@ export function MenuContent() {
           data.access.social &&
           data.access.nutrition
             ? [
-                { href: '/settings/reports', label: 'Post reports', icon: Flag },
+                { href: '/settings/reports', label: 'Review queue', icon: Flag },
                 { href: '/settings/for-you-metrics', label: 'For You measurement', icon: Flag },
               ]
             : []),

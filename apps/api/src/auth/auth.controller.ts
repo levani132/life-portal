@@ -12,6 +12,7 @@ import {
   RegisterDto,
   ResetPasswordDto,
   ResetTokenDto,
+  SuspendDto,
 } from './dto/auth.dto';
 import { PasswordResetService } from './password-reset.service';
 import { EmailVerificationService } from './email-verification.service';
@@ -20,6 +21,7 @@ import { CurrentUser, Public } from './current-user.decorator';
 import { deviceLabel } from './session-rules';
 import { SessionsService } from './sessions.service';
 import { SecurityService } from './security/security.service';
+import { AccessService } from '../access/access.module';
 
 @Controller('auth')
 export class AuthController {
@@ -30,6 +32,7 @@ export class AuthController {
     private readonly resets: PasswordResetService,
     private readonly verification: EmailVerificationService,
     private readonly google: GoogleAuthService,
+    private readonly access: AccessService,
     @Inject(CONFIG) config: AppConfig,
   ) {
     this.cookies = new SessionCookies(config.corsOrigins, config.refreshTokenTtlSeconds);
@@ -194,6 +197,21 @@ export class AuthController {
     const ended = await this.sessions.revokeAll(userId, 'revoked', sessionId);
     await this.security.record('sessions_revoked_others', { ip }, userId);
     return { success: true, ended };
+  }
+
+  /** Spec 039: the reviewer suspends an account, or restores it. Developer only. */
+  @Post('accounts/:id/suspend')
+  @HttpCode(200)
+  suspend(@CurrentUser('userId') userId: string, @Param('id') id: string, @Body() dto: SuspendDto, @Ip() ip: string) {
+    this.access.requireDeveloper(userId);
+    return this.auth.suspend(id, dto.reason ?? '', { ip });
+  }
+
+  @Post('accounts/:id/unsuspend')
+  @HttpCode(200)
+  unsuspend(@CurrentUser('userId') userId: string, @Param('id') id: string, @Ip() ip: string) {
+    this.access.requireDeveloper(userId);
+    return this.auth.unsuspend(id, { ip });
   }
 
   @Delete('sessions/:id')

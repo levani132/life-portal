@@ -2706,3 +2706,36 @@ former member".
 
 **Badge awards are deleted too.** They are otherwise written once and never removed; an account
 that no longer exists is the exception.
+
+## 2026-11-22 · Photos are held until checked, and the reviewer may read what was reported
+
+**Held, not published-then-removed.** A post with photos that other people can reach starts out
+visible to its author only (`heldAt`), and is released when the check passes. Publishing first
+and removing on a bad verdict would show the photo for the seconds that matter. If the checking
+service is down, posts stay held and are retried: failing closed costs a delay, failing open
+costs showing exactly what the check exists to stop.
+
+**Holding is one field that the read rule honours.** `canReadFoodPost({held})` is where every
+read path already goes, so a held post needs no new filter in feeds, links, reposts, messages or
+previews. Only the author's copy says it is held.
+
+**Only photos other people can reach are sent to the checking service**, as a link that expires,
+with no account and no text. A private post never leaves; it is checked when its audience is
+opened. This is a second place the app sends personal content to an outside service (after
+email), and the privacy policy must say so.
+
+**OpenAI's moderation endpoint, behind an interface.** It is free, takes an image link, and is
+built for this. It classifies what a picture shows; it does not match known child-abuse images,
+which needs a hash-matching service the app does not have yet. That gap is why a single
+"puts a child at risk" report hides a post at once. `ImageChecker` is the seam for a second
+service.
+
+**The reviewer reads reported and held posts whatever their audience.** Before, the developer
+got a post id and a reason, and removed blind. A decision about a photo cannot be made without
+seeing it. Private still means private from every other member; it no longer means private from
+the one person reviewing a post that someone who could see it reported, or that the check
+flagged.
+
+**Suspension switches the account's features off instead of deleting anything.** Posts are
+already unreadable when their author's features are off, so `forUser()` answering "nothing is
+on" hides everything with no new filter, and restoring brings it all back.

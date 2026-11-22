@@ -4,6 +4,7 @@ import type {
   PostSelection,
   PublishedFood,
   PublishedMacros,
+  ReportReason,
 } from '@life-portal/shared-types';
 import { entryTotals } from './nutrition';
 const FACT_KEYS = [
@@ -79,7 +80,10 @@ export function canReadFoodPost(input: {
   enabled: boolean;
   /** A link-only post this viewer was sent, or whose link they opened. Never beats a block. */
   granted?: boolean;
+  /** Spec 039: held for a check or a review. Only its author reads it until that is over. */
+  held?: boolean;
 }): boolean {
+  if (input.held && !input.own) return false;
   return (
     input.enabled &&
     !input.blocked &&
@@ -123,4 +127,29 @@ export function publicationMacros(
     },
     { energyKcal: 0, proteinG: 0, carbG: 0, fatG: 0 },
   );
+}
+
+/** Distinct reporters after which a post is hidden until someone reviews it (spec 039). */
+export const REPORTS_TO_HOLD = 3;
+
+/**
+ * Whether the reports on a post hide it until a reviewer looks. One report that a child is at
+ * risk is enough; anything else takes `REPORTS_TO_HOLD` people. A post a reviewer already kept
+ * is never hidden by reports again: they still reach the queue.
+ */
+export function reportsHoldPost(reasons: readonly ReportReason[], reviewed: boolean): boolean {
+  if (reviewed) return false;
+  return reasons.includes('child_safety') || reasons.length >= REPORTS_TO_HOLD;
+}
+
+/**
+ * The categories of an automatic image check that hide a post (spec 039). Deliberately not
+ * `violence` alone: sport and food photos trip it. The names are the checking service's.
+ */
+export const IMAGE_HOLD_CATEGORIES = ['sexual', 'sexual/minors', 'violence/graphic', 'self-harm', 'self-harm/intent', 'self-harm/instructions'] as const;
+
+/** Which of a check's flagged categories hide the post. Empty: it is fine. */
+export function imageHoldCategories(flagged: readonly string[]): string[] {
+  const hold = new Set<string>(IMAGE_HOLD_CATEGORIES);
+  return [...new Set(flagged)].filter((category) => hold.has(category)).sort();
 }
