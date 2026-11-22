@@ -62,8 +62,8 @@ three have moved into the numbered steps, because friends already use the app.
   in the EU and Georgia once the app shows its worth, and get a specialist's view before
   marketing in the US, where two unrelated companies hold or have applied for the name.
 - **When does the invite code go?** It is one setting on the API host (`REGISTRATION_INVITE_CODE`):
-  removing it opens registration to anyone. Before that: email configured (so a forgotten
-  password is recoverable), account deletion, and a view on moderation, since strangers can
+  removing it opens registration to anyone. Email is configured (2026-11-22), so a forgotten
+  password is recoverable. Still before that: account deletion, and a view on moderation, since strangers can
   then post.
 - **Where does the AI mark show?** The owner's proposal: on the page only, since anyone who opens
   it sees it is AI-managed. The recommendation: a small mark beside the page's name wherever it
@@ -76,14 +76,13 @@ three have moved into the numbered steps, because friends already use the app.
 
 1. ~~**Photos in posts.**~~ Done in 014: R2 with signed links, EXIF stripped on the phone,
    plus 30-second camera video and text-only posts.
-2. **Safety net for the people already using it.** Built; one step is the owner's.
+2. ~~**Safety net for the people already using it.**~~ Done and switched on (2026-11-22).
    - **Done:** password reset by email, email verification, sign-in rate limits, a security log,
      per-device sessions and Continue with Google (#27, #28, 2026-11-15); an error log for the
      admin, on the server and on people's pages (2026-11-22, `docs/modules/errors.md`).
-   - **Owner's step:** email is not configured in production, so password reset and email
-     verification are switched off there (checked 2026-11-22). It needs a Resend account, a
-     verified sending domain, and `MAIL_PROVIDER`, `RESEND_API_KEY` and `MAIL_FROM` on the API
-     host. Do this before removing the invite code.
+   - **Switched on 2026-11-22:** the app has its own address, `https://lifeportal.one`. Email is
+     sent through Resend from that domain, so password reset and email verification work in
+     production (checked on the live address); mail to the domain is forwarded by ImprovMX.
 3. **Switch on what is built.** Strength ranks, tournaments, training sharing, the Crisp theme
    and link-only posts are finished or nearly so and off for everyone but the owner. Each needs
    a review on a real device, then its flag turned on for friends, then for everyone.

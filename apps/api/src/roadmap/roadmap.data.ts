@@ -23,13 +23,12 @@ export const ROADMAP: Roadmap = {
     { title: 'Photos in posts', status: 'done', summary: 'Photos, 30-second camera video and text-only posts.' },
     {
       title: 'Safety net',
-      status: 'built',
-      summary: 'Built. One step is yours: email is not set up in production, so password reset is off there.',
+      status: 'done',
+      summary: 'Done and switched on. The app lives at lifeportal.one and sends its own email.',
       points: [
         'Done: password reset, email verification, sign-in rate limits, security log, Continue with Google',
         'Done: an error log for you, from the server and from people’s pages',
-        'Yours: a Resend account, a verified sending domain and three settings on the API host',
-        'Do this before removing the invite code',
+        'Switched on: the lifeportal.one address, email sending, password reset and email verification',
       ],
     },
     {
@@ -123,7 +122,7 @@ export const ROADMAP: Roadmap = {
     { question: 'AI meal photos or more polish first?', detail: 'It is the main paid feature and has not been started.' },
     { question: 'Money modules: yours for good, or a product?', detail: 'They are seeded for one person today.' },
     { question: 'The name and its trademark', detail: 'Life Portal is kept. Nothing is registered in the EU, UK or Georgia; two unrelated US companies hold or have applied for it. File in the EU and Georgia once the app shows its worth; get a specialist’s view before the US.' },
-    { question: 'When does the invite code go?', detail: 'It is one setting on the API host. Before removing it: email set up, account deletion, and a view on moderation, since strangers can then post.' },
+    { question: 'When does the invite code go?', detail: 'It is one setting on the API host. Email is set up. Still before removing it: account deletion, and a view on moderation, since strangers can then post.' },
     { question: 'Where does the AI mark show?', detail: 'On the page only, or beside the page’s name everywhere it appears. Most people meet a post in the feed and never open the page.' },
     { question: 'What may a promoted post target?', detail: 'Ads targeted on health data are ruled out, and here almost everything a person does is health data.' },
   ],
