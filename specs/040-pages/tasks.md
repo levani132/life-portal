@@ -34,16 +34,17 @@ device check before the `pages` switch is turned on for anyone but the owner.
 
 ## Slice 3: the rest
 
-- [ ] T029 A page can block a person (and see its blocked list); today only a person can block a page.
-- [ ] T030 Domain: `canMessage` page cases, with tests. Messages service uses them.
-- [ ] T031 Notifications for a page reach its managers' devices, named and linking with `?as=`.
-- [ ] T032 `aiManaged` on the profile; `byPerson` on posts and comments.
-- [ ] T033 Export includes a person's pages. (Deleting a page, and pages going with their only manager, were done with slice 1.)
+- [x] T029 A page can block a person (and see its blocked list); today only a person can block a page.
+- [x] T030 Domain: `canMessage` page cases, with tests. Messages service uses them.
+- [x] T031 Notifications for a page reach its managers' devices, named and linking with `?as=`.
+- [x] T032a `aiManaged` on the profile and beside the name everywhere.
+- [ ] T032b `byPerson` on posts and comments of a page run with AI (touches the composer, drafts and the outbox).
+- [x] T033 Export includes a person's pages. (Deleting a page, and pages going with their only manager, were done with slice 1.)
 - [x] T034 Suspending a page alone; a suspended person cannot act.
 - [x] T035 `pageLimit` per person; People screen (search, limit, suspend, official).
 - [x] T036 Numbers excludes pages from people.
-- [ ] T037 Terms, privacy policy and rules mention pages; `LEGAL_VERSION`.
-- [ ] T038 Integration test: delete a page and find nothing; limit raised and lowered.
+- [x] T037 Terms, privacy policy and rules mention pages; `LEGAL_VERSION`.
+- [x] T038 Integration test: delete a page and find nothing; limit raised and lowered.
 - [ ] T039 Docs, roadmap, changelog; device check; turn the switch on.
 
 ## Deferred from slice 1
@@ -57,10 +58,15 @@ Logged 2026-11-22, after slice 2. Each is closed by the task named, or by a deci
 
 | Concern | State |
 |---|---|
-| A page cannot block a person; only a person can block a page. A harassed page has no defence of its own. | Open: T029 |
+| A page cannot block a person; only a person can block a page. A harassed page has no defence of its own. | Closed 2026-11-22 (T029): a page can block and unblock; Menu → Blocked accounts |
 | Pages to follow disappear once someone follows five (`SUGGEST_UNTIL_FOLLOWING`). The number was picked without the owner; after that there is no place to browse pages except search and For You. | Open: owner to say whether to keep, change the number, or add a permanent "Pages" list (e.g. on Friends) |
-| The privacy policy, terms and rules do not mention pages or follows (who you follow is stored). Fine while the switch is on for the owner and the internal group only; must land before it is on for everyone. | Open: T037, blocks T039 |
+| The privacy policy, terms and rules do not mention pages or follows (who you follow is stored). | Closed 2026-11-22 (T037) in English. **Open:** the Georgian review copy does not have these paragraphs yet |
 | The People screen searches by name and username, not email (spec asks for email too). Left out so the screen shows no address. | Open: owner to say whether email search is wanted |
 | A suspended person's pages stay visible: only the person is hidden. Suspend each page too if it should go. | Open: decide whether suspending a person should hide the pages only they manage |
 | Per-identity offline stores (T041): switching identity clears what the device kept for offline use. | Deferred |
 | A page's library screens in Food and Training are not built (T040), so a page cannot yet attach a food or a plan to a post. | Deferred |
+| The "by a person" mark on a post or comment of an AI-run page is not built (T032b). The page-level "run with AI" mark is. | Open: build before any AI-run page posts by hand |
+| A personal notification tapped while acting as a page opens in the page's context (only a page's notification switches identity, with `?as=`). | Open: decide whether personal links should switch back |
+| A notification link for a page does not switch identity while unsent changes wait on the device; it opens as the current identity. | Accepted: same rule as the menu switch |
+| A page's notifications use the default preferences (no message or comment previews, every type on); a manager cannot mute one page's notifications. | Open |
+| A page can open a conversation with a follower through the API, but there is no screen listing followers to pick from (by design: follower lists are not shown). A page answers people who wrote first. | Accepted for now |

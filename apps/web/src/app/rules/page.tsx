@@ -28,6 +28,7 @@ export default function RulesPage() {
           <li><strong>Dangerous advice presented as fact:</strong> for example drug or steroid protocols, extreme dehydration, or telling someone to stop a medical treatment.</li>
           <li><strong>Other people’s private information</strong> or photos of them without their agreement.</li>
           <li><strong>Spam and deception:</strong> fake accounts, pretending to be someone else, invented results presented as real, undisclosed advertising, and selling anything illegal.</li>
+          <li><strong>A page that hides what it is:</strong> a page presented as a real person, or a page run with AI without its “run with AI” mark. Pages follow every rule here, and their managers answer for them.</li>
           <li><strong>Anything illegal</strong> where you live or in Georgia.</li>
         </ul>
       </LegalSection>

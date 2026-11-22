@@ -130,3 +130,27 @@ describe('following a page', () => {
     expect(await api.db.collection('follows').countDocuments({ followerId: gio.id })).toBe(0);
   });
 });
+
+describe('a page blocking a person (spec 040)', () => {
+  it('can block and unblock, and do nothing else with connections', async () => {
+    const ana = await api.account('ana');
+    const beka = await api.account('beka');
+    const page = await pageOf(ana, 'guard');
+    await api.call(beka, 'PUT', `/follows/${page.id}`, {});
+
+    expect((await api.call(ana, 'PUT', `/social/connections/${beka.id}`, { action: 'request' }, as(page.id))).status).toBe(409);
+    expect((await api.call(ana, 'PUT', `/social/connections/${beka.id}`, { action: 'block' }, as(page.id))).status).toBe(200);
+    // The follow is gone, the page is out of reach, and the block is the page's, not its manager's.
+    expect(await api.db.collection('follows').countDocuments({ followerId: beka.id, pageId: page.id })).toBe(0);
+    expect((await api.call(beka, 'PUT', `/follows/${page.id}`, {})).status).toBe(404);
+    expect((await api.call(beka, 'GET', `/social/profiles/${page.id}?today=${today}`)).status).toBe(404);
+    expect((await api.call(beka, 'GET', `/social/profiles/${ana.id}?today=${today}`)).status).toBe(200);
+
+    const blocked = await api.call<{ people: { userId: string }[] }>(ana, 'GET', '/social/connections?kind=blocked&skip=0', undefined, as(page.id));
+    expect(blocked.body.people.map((person) => person.userId)).toEqual([beka.id]);
+    expect((await api.call<{ people: unknown[] }>(ana, 'GET', '/social/connections?kind=friends&skip=0', undefined, as(page.id))).body.people).toEqual([]);
+
+    expect((await api.call(ana, 'PUT', `/social/connections/${beka.id}`, { action: 'unblock' }, as(page.id))).status).toBe(200);
+    expect((await api.call(beka, 'PUT', `/follows/${page.id}`, {})).status).toBe(200);
+  });
+});

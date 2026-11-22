@@ -45,6 +45,8 @@ export interface SocialPerson {
   isPage?: true;
   /** Spec 040: the app's own page. */
   official?: true;
+  /** Spec 040: a page its manager says is run with AI. */
+  aiManaged?: true;
 }
 export interface SocialProfile extends SocialPerson {
   widgets: SharedWidget[];

@@ -76,7 +76,7 @@ import { BoardsModule } from '../boards/boards.module';
 import { FxModule } from '../fx/fx.module';
 import { MediaService } from '../media/media.service';
 import { SharedWidgetsService } from './shared-widgets.service';
-import { ForPages, NotForPages } from '../auth/acting';
+import { ForPages } from '../auth/acting';
 
 @Schema({ ...baseSchemaOptions, collection: 'social_profiles' })
 class SocialProfile {
@@ -92,6 +92,8 @@ class SocialProfile {
   @Prop({ type: String, enum: ['page'] }) kind?: 'page';
   /** Spec 040: the app's own page; a copy of `users.official`, set only by the owner. */
   @Prop() official?: boolean;
+  /** Spec 040: run with AI, as its manager declared; a copy of `users.aiManaged`. */
+  @Prop() aiManaged?: boolean;
 }
 const ProfileSchema = SchemaFactory.createForClass(SocialProfile);
 export class ProfileUpdateDto implements SocialProfileUpdate {
@@ -198,7 +200,7 @@ export class SocialService implements OnModuleInit {
     if (!userIds.length) return new Map();
     const rows = await this.profiles
       .find({ userId: { $in: [...new Set(userIds)] } })
-      .select('userId displayName username avatarKey kind official')
+      .select('userId displayName username avatarKey kind official aiManaged')
       .lean();
     return new Map(
       await Promise.all(
@@ -219,6 +221,7 @@ export class SocialService implements OnModuleInit {
       ...(avatarUrl ? { avatarUrl } : {}),
       ...(profile.kind === 'page' ? { isPage: true as const } : {}),
       ...(profile.kind === 'page' && profile.official ? { official: true as const } : {}),
+      ...(profile.kind === 'page' && profile.aiManaged ? { aiManaged: true as const } : {}),
     };
   }
   /**
@@ -232,6 +235,10 @@ export class SocialService implements OnModuleInit {
       if ((error as { code?: number }).code === 11000) throw usernameTaken();
       throw error;
     }
+  }
+  /** Spec 040: a page's manager says it is run with AI; shown wherever the page is named. */
+  async setAiManaged(pageId: string, aiManaged: boolean): Promise<void> {
+    await this.profiles.updateOne({ userId: pageId, kind: 'page' }, aiManaged ? { $set: { aiManaged: true } } : { $unset: { aiManaged: '' } });
   }
   /** Spec 040: the owner marks a page as the app's own. */
   async setOfficial(pageId: string, official: boolean): Promise<void> {
@@ -521,6 +528,9 @@ export class SocialService implements OnModuleInit {
     query: ListDto,
     today: string,
   ): Promise<PeoplePage> {
+    // Spec 040: a page has no friends or requests; its one list is who it blocked.
+    if (query.kind !== 'blocked' && (await this.profiles.exists({ userId, kind: 'page' })))
+      return { people: [], hasMore: false, nextSkip: 0 };
     const rows = await this.graph.list(userId, query.kind, query.skip);
     const viewer = await this.access.forUser(userId);
     const people = await Promise.all(
@@ -564,6 +574,9 @@ export class SocialService implements OnModuleInit {
     this.oid(targetId);
     if (userId === targetId)
       throw new ConflictException('Choose another person.');
+    // Spec 040: a page can block and unblock, and nothing else here.
+    if (dto.action !== 'block' && dto.action !== 'unblock' && (await this.profiles.exists({ userId, kind: 'page' })))
+      throw new ConflictException({ code: 'NOT_A_PERSON', message: 'A page has followers, not friends.' });
     // Unblock always remains possible from the private blocked list, even if the other
     // account has disabled social access. No action trusts a client-supplied actor ID.
     if (dto.action !== 'unblock') {
@@ -640,7 +653,6 @@ export class SocialController {
     );
     return { count: page.people.length, more: page.hasMore };
   }
-  @NotForPages()
   @Get('connections') connections(
     @CurrentUser('userId') userId: string,
     @Query() query: ListDto,
@@ -663,7 +675,6 @@ export class SocialController {
   ) {
     return this.social.foodDiary(userId, id, today, query);
   }
-  @NotForPages()
   @Put('connections/:id') act(
     @CurrentUser('userId') userId: string,
     @Param('id') id: string,

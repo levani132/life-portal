@@ -97,6 +97,11 @@ export function MenuContent() {
             <span className="flex-1">Edit the page’s profile</span>
             <ChevronRight size={18} className="text-ink-faint" />
           </Link>
+          <Link href="/friends" className="flex min-h-16 items-center gap-3 px-5 py-4 hover:bg-surface-raised">
+            <Users size={20} className="text-accent" />
+            <span className="flex-1">Blocked accounts</span>
+            <ChevronRight size={18} className="text-ink-faint" />
+          </Link>
         </div>
         <p className="mt-4 text-xs text-ink-faint">
           A page publishes content only. To log food or a workout, or to change your own settings, switch back to yourself.

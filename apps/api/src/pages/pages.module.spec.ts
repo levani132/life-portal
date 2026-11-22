@@ -34,6 +34,7 @@ async function world(options: { pagesOff?: string[] } = {}) {
       profiles.set(id, input);
     },
     update: async (id: string, dto: { displayName: string; username: string; bio: string }) => { profiles.set(id, { displayName: dto.displayName, username: dto.username, bio: dto.bio }); },
+    setAiManaged: async () => undefined,
     summaries: async (ids: string[]) => new Map(ids.flatMap((id) => (profiles.has(id) ? [[id, profiles.get(id)!] as const] : []))),
   };
   const accounts = { erase: async (id: string) => { erased.push(id); } };

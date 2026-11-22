@@ -448,7 +448,7 @@ export function ProfileView({ userId }: { userId?: string }) {
           <h1 className="mt-3 break-words text-2xl font-semibold leading-tight">
             {person.displayName}
             {person.official && <OfficialMark className="ml-1.5" />}
-            {person.isPage && <PageMark className="ml-2" />}
+            {person.isPage && <PageMark className="ml-2" ai={person.aiManaged} />}
           </h1>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-ink-faint">
             <span>@{person.username}</span>
@@ -460,6 +460,7 @@ export function ProfileView({ userId }: { userId?: string }) {
               {person.bio}
             </p>
           )}
+          {person.aiManaged && <p className="mt-2 text-xs text-ink-muted">This page is run with AI.</p>}
           {person.isPage && (
             <PageFollow
               page={person}
@@ -470,7 +471,7 @@ export function ProfileView({ userId }: { userId?: string }) {
           )}
           {own ? (
             person.isPage ? null : <OwnStats person={person} />
-          ) : person.isPage ? null : (
+          ) : person.isPage || (actingPageId() && person.relationship !== 'blocked') ? null : (
             <ProfileActions person={person} />
           )}
         </div>

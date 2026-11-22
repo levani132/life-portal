@@ -417,7 +417,7 @@ export function PostCard({
             {post.author.displayName}
           </Link>
           {post.author.official && <OfficialMark className="ml-1" />}
-          {post.author.isPage && <PageMark className="ml-1.5" />}
+          {post.author.isPage && <PageMark className="ml-1.5" ai={post.author.aiManaged} />}
           <div className="flex items-center gap-1 text-[11px] leading-tight text-ink-faint">
             <PostDateLink id={post.id} date={post.createdAt} />
             {hasFood && (

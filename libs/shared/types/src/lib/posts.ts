@@ -65,6 +65,8 @@ export interface PostAuthor {
   isPage?: true;
   /** Spec 040: the app's own page. */
   official?: true;
+  /** Spec 040: a page its manager says is run with AI. */
+  aiManaged?: true;
 }
 /** Diet topics a post can carry (issue #8). Computed from published facts, never stored. */
 export const DIET_TOPICS = [

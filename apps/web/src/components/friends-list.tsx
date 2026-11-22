@@ -6,6 +6,7 @@ import type { ConnectionList, PeoplePage } from '@life-portal/shared-types';
 import { PageHeader } from './page-header';
 import { PersonCard, useSocialApi } from './social';
 import { ErrorNote, Spinner } from './ui';
+import { actingPageId } from '../lib/identity';
 const LABELS: Record<ConnectionList, string> = {
   friends: 'Friends',
   incoming: 'Requests',
@@ -13,7 +14,9 @@ const LABELS: Record<ConnectionList, string> = {
   blocked: 'Blocked',
 };
 export function Friends() {
-  const [kind, setKind] = useState<ConnectionList>('friends');
+  // Spec 040: a page has followers, not friends; its one list here is who it blocked.
+  const page = !!actingPageId();
+  const [kind, setKind] = useState<ConnectionList>(page ? 'blocked' : 'friends');
   const [skip, setSkip] = useState(0);
   const result = useSocialApi<PeoplePage>(
     `/social/connections?kind=${kind}&skip=${skip}`,
@@ -21,8 +24,8 @@ export function Friends() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
-        title="Friends"
-        subtitle="A little window into the things your friends choose to share."
+        title={page ? 'Blocked' : 'Friends'}
+        subtitle={page ? 'Accounts this page has blocked.' : 'A little window into the things your friends choose to share.'}
         actions={
           <Link href="/search" className="btn-primary">
             Find people
@@ -35,7 +38,7 @@ export function Friends() {
         aria-label="Connections"
       >
         <GlassPill />
-        {(Object.keys(LABELS) as ConnectionList[]).map((value) => (
+        {(Object.keys(LABELS) as ConnectionList[]).filter((value) => !page || value === 'blocked').map((value) => (
           <button
             type="button"
             key={value}

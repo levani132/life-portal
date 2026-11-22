@@ -14,6 +14,7 @@ export interface ChatPerson {
   /** Spec 040: a page, not a person; and the app's own page. */
   isPage?: true;
   official?: true;
+  aiManaged?: true;
 }
 
 /** A shared post as the viewer may see it right now, or nothing at all. */

@@ -122,7 +122,7 @@ export function Inbox() {
                     )}
                   >
                     {entry.other.displayName}
-                    {entry.other.isPage && <PageMark className="ml-1.5" />}
+                    {entry.other.isPage && <PageMark className="ml-1.5" ai={entry.other.aiManaged} />}
                   </span>
                   <span
                     className={clsx(
@@ -489,7 +489,7 @@ export function Conversation({ id }: { id: string }) {
           className="min-w-0 flex-1 truncate font-semibold"
         >
           {other.displayName}
-          {other.isPage && <PageMark className="ml-1.5" />}
+          {other.isPage && <PageMark className="ml-1.5" ai={other.aiManaged} />}
         </Link>
         <button
           type="button"

@@ -73,6 +73,25 @@ export function PageFollow({ page, own, canMarkOfficial, canMessage }: { page: S
         )}
         {page.followerCount !== undefined && <span className="text-sm text-ink-muted">{followers(page.followerCount)}</span>}
       </div>
+      {own && (
+        <label className="flex items-center gap-2 text-xs text-ink-muted">
+          <input
+            type="checkbox"
+            checked={!!page.aiManaged}
+            disabled={official.pending}
+            onChange={(event) =>
+              void official.run(
+                async () => {
+                  await api.patch(`/pages/${page.userId}`, { name: page.displayName, username: page.username, bio: page.bio, aiManaged: event.target.checked });
+                  await Promise.all([revalidate('/social'), revalidate('/pages'), revalidate('/identity')]);
+                },
+                { revalidate: false },
+              )
+            }
+          />
+          This page is run with AI (shown beside its name everywhere)
+        </label>
+      )}
       {canMarkOfficial && (
         <label className="flex items-center gap-2 text-xs text-ink-muted">
           <input

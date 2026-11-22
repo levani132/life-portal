@@ -24,6 +24,7 @@ export default function PrivacyPage() {
           <li><strong>What you log:</strong> foods and meals, body weight, nutrition goals, workouts, exercises, sets and plans. This is information about your health.</li>
           <li><strong>Activity from Apple Health,</strong> only if you set up the Shortcut that sends it: energy burned and similar daily totals.</li>
           <li><strong>What you share:</strong> your profile (name, username, photo, bio), posts, photos, short videos, comments, likes, friends, blocks and messages. Messages are stored so both people can read them; they are not end-to-end encrypted.</li>
+          <li><strong>Pages you follow and pages you manage:</strong> which pages you follow, and for a page you created, its profile, posts, messages and who manages it. A page’s follower count is shown; the list of who follows it is not shown to anyone, including the page.</li>
           <li><strong>Anything else you enter</strong> in a part of the app you switched on.</li>
           <li><strong>Sign-in and safety records:</strong> the devices signed in to your account, and a log of sign-in events (for example a failed password) kept for 90 days. It holds a scrambled form of the internet address, never the address itself.</li>
           <li><strong>Notification details,</strong> if you allow notifications: the address your phone or browser gives us to deliver them.</li>
@@ -53,6 +54,7 @@ export default function PrivacyPage() {
           <li>For each post you choose who sees it: only you, your friends, everyone in {APP_WORDMARK}, or the people you send its link to. You can change that or delete the post.</li>
           <li>You choose in Privacy and sharing which parts of your tracking friends or others may see, and whether people who are not your friends can find you.</li>
           <li>A food you mark as public can be found and copied by other members, without your name.</li>
+          <li><strong>A page</strong> is public: its profile and public posts can be seen by every member. Other members are not shown who manages a page; we know, and our reviewer can see it. A message you send to a page is read by whoever manages it.</li>
           <li><strong>Our reviewer</strong> can see a post that was reported or that the automatic check flagged, whatever audience you chose, to decide whether it breaks the <Link href="/rules">Community Rules</Link>. Nobody on our side reads your records or messages otherwise.</li>
         </ul>
       </LegalSection>

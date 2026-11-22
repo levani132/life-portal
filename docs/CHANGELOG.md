@@ -2,6 +2,18 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-22: Pages, part four: messages, notifications, blocking
+
+- **Message a page** from its profile; whoever runs it answers as the page. A page cannot write
+  first to someone who neither follows it nor wrote to it.
+- **A page's notifications reach its manager's phone**, titled with the page's name, and open
+  the app as that page.
+- **A page can block** an account (Menu → Blocked accounts while using the app as the page).
+- **"Run with AI"**: a page's manager can mark it on the page's profile; the mark then shows
+  beside the page's name everywhere.
+- Your data export now includes the pages you manage.
+- Terms, privacy policy and community rules now cover pages and following.
+
 ## 2026-11-22: Pages, part three: People (admin)
 
 - **Menu → People** (admin): find a person or a page by name or username. Set how many pages one

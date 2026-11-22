@@ -168,3 +168,12 @@ names an exercise or a weight.
   in all three collections.
 - The posts Activity source reads the owner's 500 most recent posts. Moving to a per-recipient
   query is the obvious change at larger scale. The source interface stays the same.
+
+## Notifications for a page (spec 040)
+
+A page has no devices or preferences. `NotificationsService.registerPageResolver()` (called by
+the pages module) says who manages a page; `deliver()` then sends to those managers' devices,
+skipping the manager who caused it, with `pageNotification()`'s text ("<page> (page)" as the
+title, the actor in the body) and `?as=<pageId>` on the link. The tag is prefixed with the page
+id, and each device's badge stays its owner's count. Every push still shows a notification.
+See [pages](pages.md).

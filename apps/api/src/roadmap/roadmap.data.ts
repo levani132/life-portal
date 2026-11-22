@@ -73,9 +73,12 @@ export const ROADMAP: Roadmap = {
     },
     {
       title: 'Pages',
-      status: 'next',
+      status: 'built',
       summary: 'An account that is not a person: managed by people, publishing content and nothing else.',
       points: [
+        'Built, behind the Pages switch: create and act as a page, Follow and Following, messages, notifications to the manager, blocking, the AI and official marks, Menu → People for you',
+        'Before it is on for everyone: a check on a real phone, the Georgian legal copy brought in line, and the open concerns decided',
+        'Still to build: the “by a person” mark on a post, a page’s Food and Training library screens',
         'Content only: no food, workout or weight logging; out of ranks, tournaments and friend suggestions',
         'The app’s own pages first (kitchen, training, challenges), so a new person never lands on an empty feed',
         'A page can be marked as AI-managed; on such a page, what a human did is marked as human',

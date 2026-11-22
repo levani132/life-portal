@@ -119,3 +119,11 @@ header (back, the person, mute) is the only header.
   typing indicators, editing, search.
 - No account deletion exists yet. When it is added, it must remove the member's messages, or
   turn them into "Former member" tombstones, and their conversation state.
+
+## Pages (spec 040)
+
+With a page on either side, `canMessage()` takes a `page` argument and friendship plays no part:
+anyone may write to a page; a page may write to a person only if they follow it or have written
+to it (`cannotSendReason: 'page-first'`); a block stops both. The conversation is the page's own
+(`memberIds` holds the page's id), so its manager reads it only while acting as the page. See
+[pages](pages.md).

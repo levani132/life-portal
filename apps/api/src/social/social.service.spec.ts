@@ -41,6 +41,7 @@ function fixture(
   const off = new Set(options.socialOff ?? []);
   const lean = <T>(value: T) => ({ lean: jest.fn().mockResolvedValue(value) });
   const profiles = {
+    exists: jest.fn(async () => null),
     findOne: jest
       .fn()
       .mockImplementation(({ userId }: { userId: string }) =>

@@ -4,10 +4,9 @@ Spec 040 (`specs/040-pages`). `apps/api/src/pages`, `apps/api/src/auth/acting.ts
 `libs/shared/domain/src/lib/pages.ts`, web `lib/identity.ts` and
 `components/identity-switcher.tsx`. Behind the `pages` feature.
 
-**Built so far: slices 1 and 2** (create a page, act as it, post as it, the page mark; follow a
-page, the Following feed, pages to follow, the official mark). Messages, notifications to
-managers, the AI mark, a page blocking someone, the People screen and the page limit's admin
-side are slice 3.
+**Built: slices 1 to 3**, except the "by a person" mark on a post (T032b), a page's library
+screens (T040) and per-identity offline stores (T041). Open concerns are listed at the end of
+`specs/040-pages/tasks.md`.
 
 ## What a page is
 
@@ -101,6 +100,28 @@ list of followers anywhere in the API.
 Web: `components/follow.tsx` (`PageFollow` on a page's profile, `SuggestedPages`,
 `OfficialMark`). Home's second tab is **Following**; pages to follow sit above it until five are
 followed. The owner sees an "Official" switch on any page's profile.
+
+## Messages, notifications, blocking, the AI mark
+
+- **Messages.** The messages routes are open to pages and `messages` is in `pageAccess()`.
+  `canMessage()` decides: anyone may write to a page; a page may write to a person only if they
+  follow it or have written to it (`page-first` otherwise); a block either way stops both.
+  Friendship plays no part when a page is on either side. The conversation belongs to the page:
+  its manager, as themselves, is not a member and cannot open it.
+- **Notifications.** A page has no devices. `PagesService` registers a resolver with
+  `NotificationsService`; a notification for a page is sent to its managers' devices (not to the
+  manager who caused it), titled "<page> (page)" with the actor in the body
+  (`pageNotification()`), and its link carries `?as=<pageId>`. The web app (`useActAsLink` in
+  `identity-switcher.tsx`) switches identity on such a link under the menu's rules. The badge
+  count on the device stays the device owner's own.
+- **Blocking.** `PUT /social/connections/:id` is open to a page for `block` and `unblock` only
+  (409 `NOT_A_PERSON` otherwise); `GET /social/connections` answers a page only for
+  `kind=blocked`. Menu → Blocked accounts.
+- **Run with AI.** `PATCH /pages/:id {aiManaged}` writes `users.aiManaged` and copies it to
+  `social_profiles.aiManaged`, so authors, chat headers and profiles carry `aiManaged` and the
+  mark reads "Page · AI". The manager sets it on the page's own profile.
+- **Export.** A person's export holds their pages under `pages.*` (profile, posts, media,
+  comments, follows, sent messages).
 
 ## People (the owner's screen)
 

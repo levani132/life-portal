@@ -76,6 +76,19 @@ export class AccountService {
     put('follows', await this.store.find('follows', { followerId: userId }, EXPORT_ROW_LIMIT));
     put('messages', await this.store.find('messages', { senderId: userId }, EXPORT_ROW_LIMIT));
 
+    // Spec 040: the pages this person manages are theirs too: profile, posts, photos, follows.
+    const pageIds = (await this.store.find('users', { kind: 'page', managers: userId })).map((row) => String(row['_id']));
+    if (pageIds.length) {
+      const ofPages = { userId: { $in: pageIds } };
+      const add = (name: string, rows: Row[]) => {
+        if ((FILE_COLLECTIONS as readonly string[]).includes(name)) storageKeysIn(rows, keys);
+        if (rows.length) data[`pages.${name}`] = rows.map((row) => exportRecord(row) as Row);
+      };
+      for (const name of ['social_profiles', 'food_posts', 'post_media', 'post_comments']) add(name, await this.store.find(name, ofPages, EXPORT_ROW_LIMIT));
+      add('follows', await this.store.find('follows', { followerId: { $in: pageIds } }, EXPORT_ROW_LIMIT));
+      add('messages', await this.store.find('messages', { senderId: { $in: pageIds } }, EXPORT_ROW_LIMIT));
+    }
+
     const files: AccountExport['files'] = [];
     if (this.storage.configured) {
       for (const key of keys) {

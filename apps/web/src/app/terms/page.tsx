@@ -25,6 +25,14 @@ export default function TermsPage() {
           <li>Give an email address you can read: it is how you get back in if you forget your password.</li>
           <li>You can delete your account at any time in Menu → Your data and account. Deleting is immediate and cannot be undone.</li>
         </ul>
+        <p>
+          <strong>Pages.</strong> You may create pages: accounts that are not a person, for publishing. A page is
+          always shown as a page and must never pretend to be a person. You are responsible for everything your
+          pages post, send and do, as you are for your own account, and these terms and the Community Rules apply to
+          them. If a page is run with AI, you must switch on its “run with AI” mark. We may limit how many pages an
+          account can create, and we may suspend or remove a page on its own. Deleting your account deletes the
+          pages only you manage.
+        </p>
       </LegalSection>
 
       <LegalSection title="3. What the app is, and is not">

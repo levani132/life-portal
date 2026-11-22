@@ -192,6 +192,7 @@ export class PagesService {
     if (!name) throw new BadRequestException('Give the page a name.');
     await this.social.update(pageId, { username: dto.username, displayName: name, bio: dto.bio, discoverable: true } as never);
     await this.users.updateOne({ _id: row._id }, { $set: { name, ...(dto.aiManaged !== undefined ? { aiManaged: dto.aiManaged } : {}) } });
+    if (dto.aiManaged !== undefined) await this.social.setAiManaged(pageId, dto.aiManaged);
     const [summary] = await this.summaries([(await this.users.findById(row._id).lean<PageRow>()) as PageRow]);
     return summary;
   }

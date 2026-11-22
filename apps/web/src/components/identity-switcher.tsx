@@ -14,14 +14,14 @@ import { Avatar } from './avatar';
 import { ErrorNote, Field, Input, Modal, Textarea } from './ui';
 
 /** The small mark that says a name belongs to a page, not a person (spec 040). */
-export function PageMark({ className = '' }: { className?: string }) {
+export function PageMark({ className = '', ai = false }: { className?: string; ai?: boolean }) {
   return (
     <span
       className={`inline-flex shrink-0 items-center gap-0.5 rounded-full bg-special-solid/10 px-1.5 py-px align-middle text-[10px] font-semibold uppercase tracking-wide text-special ${className}`}
-      title="This is a page, not a person"
+      title={ai ? 'This is a page, not a person. It is run with AI.' : 'This is a page, not a person'}
     >
       <Megaphone size={10} aria-hidden="true" />
-      Page
+      {ai ? 'Page · AI' : 'Page'}
     </span>
   );
 }
