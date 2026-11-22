@@ -125,9 +125,9 @@ three have moved into the numbered steps, because friends already use the app.
      outside service changes that page and is a decision, not a detail.
    - **Never:** a per-person history of what someone looked at, health information in
      analytics, or third-party trackers with cookies.
-4. **Switch on what is built.** Strength ranks, tournaments, training sharing, the Crisp theme
-   and link-only posts are finished or nearly so and off for everyone but the owner. Each needs
-   a review on a real device, then its flag turned on for friends, then for everyone.
+4. ~~**Switch on what is built.**~~ Done 2026-11-22: the owner switched every feature on for
+   everyone, except the money, shares, debts, items to sell, personal plans and projects modules,
+   which stay the owner's own.
 5. **Your portal.** Make "portal" a real thing in the app, so "check my portal" is literally
    true (decided 2026-11-22; it is what the name promises). A person's profile becomes their
    portal: the same widgets and modules they see themselves, shown to others as far as they

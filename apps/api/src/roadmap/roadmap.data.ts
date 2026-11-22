@@ -55,9 +55,8 @@ export const ROADMAP: Roadmap = {
     },
     {
       title: 'Switch on what is built',
-      status: 'next',
-      summary: 'Finished features that are still off for everyone but you.',
-      points: ['Strength ranks', 'Monthly tournaments', 'Training sharing and copying', 'The Crisp theme', 'Link-only posts', 'Each: a check on a real device, then on for friends, then for everyone'],
+      status: 'done',
+      summary: 'Every finished feature is on for everyone. The money, shares, debts, items, personal plans and projects modules stay yours.',
     },
     {
       title: 'Your portal',
