@@ -38,9 +38,9 @@ export const ROADMAP: Roadmap = {
       points: [
         'Done: download your data and delete your account (Menu → Your data and account)',
         'Done: photos others can see are checked before they are shown; reports hide a post; a review queue; account suspension',
-        'Yours: the photo check’s two settings on the API host',
+        'Done: the photo check is switched on, and a lawyer has read the documents',
         'Done: terms, a privacy policy and community rules, with a tick for health information at sign-up',
-        'Yours: a lawyer’s read of them',
+        'Yours: a test on a phone with a second account, then remove the invite code',
       ],
     },
     {
@@ -132,8 +132,6 @@ export const ROADMAP: Roadmap = {
     { title: 'Native apps', status: 'later', summary: 'The web app wrapped for the stores, with HealthKit and background GPS.' },
   ],
   gaps: [
-    { title: 'A lawyer’s read of the documents', detail: 'Terms, privacy policy and community rules are written and live, naming your individual-entrepreneur registration as the operator.' },
-    { title: 'Switch on the photo check', detail: 'Built. It needs two settings on the API host; until then photos are not checked automatically.' },
     { title: 'Known abuse images', detail: 'The photo check judges what a picture shows. Matching known child-abuse images needs a separate service.' },
     { title: 'Automatic end-to-end tests', detail: 'The real app is only booted against a database by hand.' },
     { title: 'Real-device checks', detail: 'Push, messages and swiping on an iPhone.' },
@@ -147,7 +145,7 @@ export const ROADMAP: Roadmap = {
     { question: 'AI meal photos or more polish first?', detail: 'It is the main paid feature and has not been started.' },
     { question: 'Money modules: yours for good, or a product?', detail: 'They are seeded for one person today.' },
     { question: 'The name and its trademark', detail: 'Life Portal is kept. Nothing is registered in the EU, UK or Georgia; two unrelated US companies hold or have applied for it. File in the EU and Georgia once the app shows its worth; get a specialist’s view before the US.' },
-    { question: 'When does the invite code go?', detail: 'It is one setting on the API host. Email, account deletion, data export and photo moderation are built. Terms, privacy policy and rules are written. Still before removing it: the photo check’s key on the API host and a test on a phone.' },
+    { question: 'When does the invite code go?', detail: 'It is one setting on the API host. Email, account deletion, data export and photo moderation are built. Terms, privacy policy and rules are written. The photo check is on and a lawyer has read them. What is left is a test on a phone with a second account.' },
     { question: 'Where does the AI mark show?', detail: 'On the page only, or beside the page’s name everywhere it appears. Most people meet a post in the feed and never open the page.' },
     { question: 'What may a promoted post target?', detail: 'Ads targeted on health data are ruled out, and here almost everything a person does is health data.' },
   ],

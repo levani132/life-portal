@@ -32,8 +32,8 @@ until then is polish". Of the numbered steps below, only Training moved.
 **2026-11-22:** the app got its own address and email, and the two things that stood between
 it and open registration were built: leaving with your data (038) and photo moderation (039).
 Terms, a privacy policy and community rules followed the same day. What remains before the
-invite code goes is the owner's: the photo check's key, a lawyer's read of the
-documents, and a test on a phone.
+invite code goes is the owner's: a test on a phone with a second
+account. The photo check is switched on and a lawyer has read the documents.
 
 ### Known gaps to close before a public launch
 
@@ -45,8 +45,8 @@ three have moved into the numbered steps, because friends already use the app.
 - **Terms, privacy policy and community rules:** written 2026-11-22 as pages in the app
   (`/terms`, `/privacy`, `/rules`), with an explicit tick for health information at sign-up.
   The operator is named as the owner's individual-entrepreneur registration
-  (`apps/web/src/lib/brand.ts`); change it when a company takes over. **Owner's step:** have a
-  lawyer read the three pages.
+  (`apps/web/src/lib/brand.ts`); change it when a company takes over. A lawyer read the three pages on
+  2026-11-22; have them read again before payments or a company change.
 - **`apps/api-e2e` is still the generated "Hello API" test.** `npm run test:integration` boots
   the real app against a database, but needs one supplied; nothing runs it automatically.
 - **Real-device checks** of push, messages and swiping on an iPhone.
@@ -55,7 +55,7 @@ three have moved into the numbered steps, because friends already use the app.
 - **Image moderation:** built 2026-11-22 (spec 039, `docs/modules/moderation.md`): photos others
   can see are checked before they are shown, reports hide a post, the owner reviews and can
   suspend an account. **Owner's steps:** set `IMAGE_CHECK_PROVIDER` and `OPENAI_API_KEY` on the
-  API host (until then photos are not checked), and decide on a service that matches known
+  API host (done 2026-11-22: the check is on), and decide on a service that matches known
   child-abuse images, which this check does not do. `forYou` stays off for production until
   the check is switched on.
 - **Camera video plays only where the recording browser's codec does** (no transcoding yet).
@@ -78,9 +78,9 @@ three have moved into the numbered steps, because friends already use the app.
   marketing in the US, where two unrelated companies hold or have applied for the name.
 - **When does the invite code go?** It is one setting on the API host (`REGISTRATION_INVITE_CODE`):
   removing it opens registration to anyone. Email is configured, people can delete their account and take
-  their data, and photos are moderated (all 2026-11-22). Terms, a privacy policy and community rules are written.
-  Still before that: the photo check's key on the API host and a test on a phone with a second
-  account.
+  their data, and photos are moderated (all 2026-11-22). Terms, a privacy policy and community rules are written
+  and read by a lawyer, and the photo check is switched on. What is left is a test on a phone
+  with a second account.
 - **Where does the AI mark show?** The owner's proposal: on the page only, since anyone who opens
   it sees it is AI-managed. The recommendation: a small mark beside the page's name wherever it
   appears, because most people meet a post in the feed and never open the page.
@@ -101,8 +101,9 @@ three have moved into the numbered steps, because friends already use the app.
      production (checked on the live address); mail to the domain is forwarded by ImprovMX.
    - **Ready for strangers (2026-11-22):** people can download their data and delete their
      account (038); photos others can see are checked before they are shown, reports hide a
-     post, and the owner has a review queue and can suspend an account (039). The owner's steps
-     are under the known gaps: the photo check's key, and terms, privacy policy and rules.
+     post, and the owner has a review queue and can suspend an account (039). The photo check is
+     switched on, and terms, privacy policy and rules are written and read by a lawyer. What is
+     left is the owner's test on a phone with a second account.
 3. **Switch on what is built.** Strength ranks, tournaments, training sharing, the Crisp theme
    and link-only posts are finished or nearly so and off for everyone but the owner. Each needs
    a review on a real device, then its flag turned on for friends, then for everyone.
