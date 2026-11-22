@@ -20,7 +20,7 @@ the same day. The core stays free; AI is the paid part.
 | **Social** | Friends, shared widgets, shared daily diary, posts (text, photos, 30 s camera video, food, training) with likes, comments and Share, a camera-first new post page, a Share sheet with chats, reposts and app buttons, Story share images and public link previews, Home feed, link-only posts (sent to particular people, on no wall) | 006–009, 014–017 |
 | **Offline** | Training, food and social writes work with no connection and sync later; conflicts are shown, never merged silently; sync health counters for the admin | 027–035 |
 | **Look and feel** | Colour themes as data with an admin page (v0 and Crisp), glass surfaces, a floating tab bar that shrinks on scroll, resizable Home widgets, the Food page redesign | 037 |
-| **Platform** | Onboarding and setup, feature flags per cohort and user, installable PWA, push notifications with Activity and icon badge, direct messages, tabs that stay alive with swipe navigation, CI running the checks on every push | 003, 005, 012, 013 |
+| **Platform** | Onboarding and setup, feature flags per cohort and user, installable PWA, push notifications with Activity and icon badge, direct messages, tabs that stay alive with swipe navigation, CI running the checks on every push, its own address (`lifeportal.one`) with email sending, password reset and email verification, an error log, download-your-data and account deletion (038), photo moderation with a review queue and account suspension (039; the automatic check waits for its key) | 003, 005, 012, 013 |
 
 **Infrastructure is Tier 0** (about $0/month): Vercel Hobby, Render free (kept awake by a cron
 job), MongoDB Atlas M0.
@@ -28,6 +28,11 @@ job), MongoDB Atlas M0.
 **How the last weeks went:** almost all work since 2026-11-11 was polish and sub-features that
 this list did not name (offline, themes, brands, widgets, sharing), in line with "the focus
 until then is polish". Of the numbered steps below, only Training moved.
+
+**2026-11-22:** the app got its own address and email, and the two things that stood between
+it and open registration were built: leaving with your data (038) and photo moderation (039).
+What remains before the invite code goes is the owner's: the photo check's key, and terms, a
+privacy policy and community rules.
 
 ### Known gaps to close before a public launch
 

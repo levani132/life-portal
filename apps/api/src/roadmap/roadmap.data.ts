@@ -17,7 +17,7 @@ export const ROADMAP: Roadmap = {
     { name: 'Social', items: ['Friends and shared widgets', 'Posts: text, photos, video, food, training', 'Likes, comments, reposts, Share', 'Home feed', 'Link-only posts', 'Direct messages'] },
     { name: 'Offline', items: ['Training, food and social work with no connection', 'Conflicts shown, never merged silently', 'Sync health for the admin'] },
     { name: 'Look and feel', items: ['Colour themes as data (v0, Crisp)', 'Glass surfaces', 'Tab bar that shrinks on scroll', 'Resizable Home widgets'] },
-    { name: 'Platform', items: ['Onboarding and setup', 'Feature flags per group and person', 'Installable app with push', 'Checks run on every push'] },
+    { name: 'Platform', items: ['Onboarding and setup', 'Feature flags per group and person', 'Installable app with push', 'Checks run on every push', 'Its own address and email: lifeportal.one', 'Download your data and delete your account', 'Photo moderation, a review queue and account suspension'] },
   ],
   steps: [
     { title: 'Photos in posts', status: 'done', summary: 'Photos, 30-second camera video and text-only posts.' },
