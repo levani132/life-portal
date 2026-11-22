@@ -2,6 +2,15 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-22: Terms, privacy policy and community rules
+
+- **Three pages anyone can read**, signed in or not: Terms (`/terms`), Privacy policy
+  (`/privacy`) and Community rules (`/rules`). They are linked from sign-in, sign-up and
+  Menu → Your data and account.
+- **Signing up asks for one tick**: that the health information you enter may be stored. The
+  line under the button says that creating an account means agreeing to the three documents
+  and being 16 or older.
+
 ## 2026-11-22: Photos are checked, and reports reach someone
 
 - **A photo or clip you post is checked before anyone else sees it.** For a few seconds the

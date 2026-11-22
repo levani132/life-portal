@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -17,6 +17,14 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   inviteCode?: string;
+
+  /**
+   * The person ticked the box agreeing to the terms, privacy policy and rules, and to their
+   * health information being stored. The web app always sends it; it is recorded with the date.
+   */
+  @IsOptional()
+  @IsBoolean()
+  agreed?: boolean;
 }
 
 export class LoginDto {

@@ -277,6 +277,11 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   for posts other people can reach, and never with an account or text; a failed check leaves
   the post held (fail closed). The email to the reviewer names no post and no person. See
   `docs/modules/moderation.md`.
+- **The privacy policy describes what the code does** (`apps/web/src/app/privacy`, `/terms`,
+  `/rules`). Adding an outside service that receives personal data, changing what is sent to one,
+  what deletion removes or how long something is kept means editing the page and bumping
+  `LEGAL_VERSION` in the same change. Health information is stored on an explicit tick at
+  sign-up; don't fold that box into the sentence under the button.
 - **Every collection is listed in `ACCOUNT_PLAN`** (`apps/api/src/account/account-plan.ts`, spec
   038): owned, custom or kept. A test fails when one is missing, so add a new collection there in
   the same change, and if its rows hold a stored file add it to `FILE_COLLECTIONS`. Deleting an

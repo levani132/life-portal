@@ -2739,3 +2739,23 @@ flagged.
 **Suspension switches the account's features off instead of deleting anything.** Posts are
 already unreadable when their author's features are off, so `forUser()` answering "nothing is
 on" hides everything with no new filter, and restoring brings it all back.
+
+## 2026-11-22 · One sentence for the terms, one tick for health information
+
+**Terms, privacy policy and rules are agreed to by creating the account**, stated in a line
+under the button with links. That is the usual and accepted form for a contract; a privacy
+policy is information, not something to consent to.
+
+**Health information gets its own unticked box.** Food, weight and training are health data, a
+special category under the GDPR and under Georgia's data protection law, and the ground for
+storing it is explicit consent: a clear, specific yes, which a sentence under a button is not.
+The box sits above both ways of signing up, and the Google button is inactive until it is
+ticked. The date and the documents' version are stored on the account (`agreedAt`,
+`agreedVersion`, `LEGAL_VERSION`). The server records the tick but does not refuse without it,
+because the integration tests register without a browser; the web app is the only client.
+
+**The documents are pages in the app, written to match what the code does.** Every claim in the
+privacy policy (who handles what, what the checking service receives, what deletion removes) is
+a description of existing behaviour. A change to that behaviour changes the page and
+`LEGAL_VERSION` in the same commit. They were drafted without a lawyer and should be read by
+one; the operator's legal name and address are in `apps/web/src/lib/brand.ts`.

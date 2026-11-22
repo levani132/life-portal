@@ -26,7 +26,7 @@ interface AuthState {
   /** True until the stored token has been checked, so pages do not flash the login screen. */
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (body: { email: string; password: string; name: string; inviteCode?: string }) => Promise<void>;
+  register: (body: { email: string; password: string; name: string; inviteCode?: string; agreed?: boolean }) => Promise<void>;
   /** Signs in with a session obtained elsewhere (Continue with Google, issue #28), then goes to `to`. */
   adopt: (session: AuthSession, to?: string) => Promise<void>;
   /** Signs out. With unsent changes on this device it asks first (spec 027). */
@@ -115,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const register = useCallback(
-    async (body: { email: string; password: string; name: string; inviteCode?: string }) => adopt(await api.register(body)),
+    async (body: { email: string; password: string; name: string; inviteCode?: string; agreed?: boolean }) => adopt(await api.register(body)),
     [adopt],
   );
 

@@ -11,7 +11,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { randomBytes, randomUUID } from 'node:crypto';
 import * as bcrypt from 'bcryptjs';
-import type { AuthSession, AuthTokens, JwtPayload, RefreshRefusal, User as UserDto } from '@life-portal/shared-types';
+import { LEGAL_VERSION, type AuthSession, type AuthTokens, type JwtPayload, type RefreshRefusal, type User as UserDto } from '@life-portal/shared-types';
 import { CONFIG, type AppConfig } from '../config/configuration';
 import { User, type UserDocument } from './schemas/user.schema';
 import { SessionsService } from './sessions.service';
@@ -76,6 +76,7 @@ export class AuthService {
       passwordHash: await bcrypt.hash(dto.password, BCRYPT_ROUNDS),
       roles: ['owner'],
       cohort: 'production',
+      ...(dto.agreed ? { agreedAt: new Date(), agreedVersion: LEGAL_VERSION } : {}),
     });
 
     await this.security.record('register', ctx, String(created._id));
@@ -245,6 +246,9 @@ export class AuthService {
       roles: ['owner'],
       cohort: 'production',
       emailVerifiedAt: input.emailVerifiedAt,
+      // The agreement is stated beside every "Continue with Google" button.
+      agreedAt: new Date(),
+      agreedVersion: LEGAL_VERSION,
     });
     await this.security.record('register', ctx, String(created._id), 'google');
     return created;

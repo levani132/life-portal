@@ -63,3 +63,12 @@ hand over a file only straight after a tap. After a deletion the device forgets 
 `account.service.spec.ts` runs export and deletion against an in-memory store with two accounts
 and asserts that nothing naming the deleted account is left anywhere and the other account is
 whole. `libs/shared/domain/src/lib/account.spec.ts` covers the two pure helpers.
+
+## Agreement at sign-up
+
+`users.agreedAt` and `agreedVersion` (`LEGAL_VERSION`, in shared types) record that the person
+agreed to the terms, privacy policy and community rules and to their health information being
+stored. Set by `POST /auth/register {agreed: true}` (the web app always sends it, from a required
+tick) and for accounts made with Google, where the tick gates the button on the sign-up page.
+Absent on accounts made before 2026-11-22. The three documents are `apps/web/src/app/terms`,
+`privacy` and `rules`, public routes rendered without the portal.

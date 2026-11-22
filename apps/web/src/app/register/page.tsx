@@ -8,6 +8,8 @@ import { useAuth } from '../../lib/auth-context';
 import { authCapabilities } from '../../lib/auth-capabilities';
 import { ErrorNote, Field, Input } from '../../components/ui';
 import { GoogleButton, OrDivider } from '../../components/google-button';
+import { LegalAgreement } from '../../components/legal-page';
+import { APP_WORDMARK } from '../../lib/brand';
 
 export default function RegisterPage() {
   const { register, user, loading } = useAuth();
@@ -16,6 +18,7 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [canGoogle, setCanGoogle] = useState(false);
+  const [agreed, setAgreed] = useState(false);
 
   useEffect(() => {
     void authCapabilities().then((caps) => setCanGoogle(caps.google));
@@ -39,6 +42,7 @@ export default function RegisterPage() {
         password: form.password,
         // Only sent when filled in; the API requires it if the server sets an invite code.
         inviteCode: form.inviteCode || undefined,
+        agreed,
       });
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Could not create the account.');
@@ -56,9 +60,25 @@ export default function RegisterPage() {
         </p>
 
         <form onSubmit={submit} className="card space-y-4 p-5">
+          {/* One box for both ways of signing up: health information needs a clear yes. */}
+          <label className="flex items-start gap-3 text-sm text-ink-muted">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-5 w-5 shrink-0 accent-[rgb(var(--accent-solid))]"
+              checked={agreed}
+              onChange={(event) => setAgreed(event.target.checked)}
+              required
+            />
+            <span>
+              I agree that {APP_WORDMARK} stores the health information I enter, such as food, body weight and
+              training, to show it back to me and to the people I choose.
+            </span>
+          </label>
           {canGoogle && (
             <>
-              <GoogleButton label="Sign up with Google" />
+              <div className={agreed ? undefined : 'pointer-events-none opacity-50'} aria-disabled={!agreed}>
+                <GoogleButton label="Sign up with Google" />
+              </div>
               <OrDivider />
             </>
           )}
@@ -87,6 +107,7 @@ export default function RegisterPage() {
           <button type="submit" className="btn-primary w-full" disabled={pending}>
             {pending ? 'Creating…' : 'Create account'}
           </button>
+          <LegalAgreement action="creating an account" />
         </form>
 
         <p className="mt-4 text-center text-xs text-ink-faint">

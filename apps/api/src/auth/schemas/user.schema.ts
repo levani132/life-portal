@@ -75,6 +75,17 @@ export class User {
   emailVerifiedAt?: Date;
 
   /**
+   * When the person agreed to the terms, privacy policy and community rules, and to their health
+   * information being stored, and which dated version (`LEGAL_VERSION`). Absent on accounts made
+   * before 2026-11-22, by invitation.
+   */
+  @Prop()
+  agreedAt?: Date;
+
+  @Prop({ maxlength: 20 })
+  agreedVersion?: string;
+
+  /**
    * Spec 039: set by the reviewer. A suspended account cannot sign in, has no session, and
    * every feature reads as off for it, so nothing it posted is shown to anyone.
    */

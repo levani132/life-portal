@@ -327,6 +327,6 @@ export const api = {
   login: (email: string, password: string) =>
     request<AuthSession>('/auth/login', { method: 'POST', body: { email, password }, anonymous: true }),
 
-  register: (body: { email: string; password: string; name: string; inviteCode?: string }) =>
+  register: (body: { email: string; password: string; name: string; inviteCode?: string; agreed?: boolean }) =>
     request<AuthSession>('/auth/register', { method: 'POST', body, anonymous: true }),
 };

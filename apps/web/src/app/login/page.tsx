@@ -9,6 +9,7 @@ import { authCapabilities } from '../../lib/auth-capabilities';
 import { useAuth } from '../../lib/auth-context';
 import { ErrorNote, Field, Input } from '../../components/ui';
 import { GoogleButton, OrDivider } from '../../components/google-button';
+import { LegalAgreement } from '../../components/legal-page';
 
 export default function LoginPage() {
   const { login, user, loading } = useAuth();
@@ -130,6 +131,9 @@ export default function LoginPage() {
             Create one
           </Link>
         </p>
+        <div className="mt-3">
+          <LegalAgreement action="signing in" />
+        </div>
       </div>
     </div>
   );

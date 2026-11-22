@@ -12,3 +12,14 @@ export const APP_NAME = 'Life Portal';
 
 /** The name as the wordmark writes it: one word. */
 export const APP_WORDMARK = 'LifePortal';
+
+/**
+ * Who runs the app, as the terms and the privacy policy name them. Until a company is
+ * registered this is the app's own name; replace it with the legal name (and add the address to
+ * `LEGAL_ADDRESS`) before registration is opened: the law asks a privacy policy to say who is
+ * responsible for the data.
+ */
+export const LEGAL_OPERATOR = 'LifePortal';
+export const LEGAL_ADDRESS = 'Tbilisi, Georgia';
+export const SUPPORT_EMAIL = 'support@lifeportal.one';
+export const PRIVACY_EMAIL = 'privacy@lifeportal.one';

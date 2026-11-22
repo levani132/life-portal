@@ -25,3 +25,9 @@ export interface DeleteAccountRequest {
 /** Error codes `POST /account/delete` answers with. */
 export const ACCOUNT_DELETE_CODES = ['WRONG_PASSWORD', 'CONFIRM_EMAIL', 'DEVELOPER_ACCOUNT', 'FILES_NOT_DELETED'] as const;
 export type AccountDeleteCode = (typeof ACCOUNT_DELETE_CODES)[number];
+
+/**
+ * The date of the terms, privacy policy and community rules a new account agrees to. Change it
+ * whenever one of them changes in substance; it is stored on the account as `agreedVersion`.
+ */
+export const LEGAL_VERSION = '2026-11-22';
