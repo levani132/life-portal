@@ -18,6 +18,7 @@ import { withWidgetSize } from '@life-portal/shared-domain';
 import { SUPPORTED_CURRENCIES } from '@life-portal/shared-types';
 import { baseSchemaOptions } from '../common/mongoose';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { AsPerson } from '../auth/acting';
 
 @Schema({ ...baseSchemaOptions, collection: 'user_settings' })
 export class UserSettings {
@@ -240,6 +241,7 @@ export class SettingsService {
   }
 }
 
+@AsPerson()
 @Controller('settings')
 export class SettingsController {
   constructor(private readonly settings: SettingsService) {}

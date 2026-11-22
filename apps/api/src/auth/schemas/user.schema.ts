@@ -75,6 +75,34 @@ export class User {
   emailVerifiedAt?: Date;
 
   /**
+   * Spec 040: a page is an account nobody signs in to. `kind` is absent for a person. A page has
+   * no password and no sign-in identity; its `email` is a reserved address that cannot receive
+   * mail, there only because the field is required and unique.
+   */
+  @Prop({ type: String, enum: ['page'] })
+  kind?: 'page';
+
+  /** A page's managers: the people who may act as it. One for now. */
+  @Prop({ type: [String], default: undefined })
+  managers?: string[];
+
+  /** The person who created the page. What their page limit counts. */
+  @Prop()
+  createdBy?: string;
+
+  /** The app's own page, set by the owner. */
+  @Prop()
+  official?: boolean;
+
+  /** Run with AI, as a manager declared. */
+  @Prop()
+  aiManaged?: boolean;
+
+  /** On a person: how many pages they may create. Absent: the default; -1: no limit. */
+  @Prop()
+  pageLimit?: number;
+
+  /**
    * When the person agreed to the terms, privacy policy and community rules, and to their health
    * information being stored, and which dated version (`LEGAL_VERSION`). Absent on accounts made
    * before 2026-11-22, by invitation.
@@ -98,3 +126,5 @@ export class User {
 
 export type UserDocument = HydratedDocument<User>;
 export const UserSchema = SchemaFactory.createForClass(User);
+UserSchema.index({ managers: 1 }, { sparse: true });
+UserSchema.index({ createdBy: 1 }, { sparse: true });

@@ -41,6 +41,8 @@ export interface SocialPerson {
   relationship: Relationship;
   muted: boolean;
   widgets?: SharedWidget[];
+  /** Spec 040: a page, not a person. A page has no friends and shares no tracking. */
+  isPage?: true;
 }
 export interface SocialProfile extends SocialPerson {
   widgets: SharedWidget[];

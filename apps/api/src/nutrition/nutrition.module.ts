@@ -65,6 +65,7 @@ import {
 import { BrandsController, BrandsService, FoodBrandRow, FoodBrandSchema } from './brands';
 import { NutritionService } from './nutrition.service';
 import { OpenFoodFactsProvider } from './openfoodfacts.provider';
+import { ForPages } from '../auth/acting';
 
 @RequireModule('nutrition')
 @Controller('nutrition')
@@ -94,6 +95,7 @@ export class NutritionController {
 
   // ---------------------------------------------------------------- foods
 
+  @ForPages()
   @Get('foods')
   listFoods(
     @CurrentUser('userId') userId: string,
@@ -109,16 +111,19 @@ export class NutritionController {
   }
 
   /** Open Food Facts search. Declared before `foods/:id` so the literal path wins the route. */
+  @ForPages()
   @Get('foods/lookup')
   lookup(@Query('q') q?: string) {
     return this.nutrition.searchLookup(q ?? '');
   }
 
+  @ForPages()
   @Get('foods/lookup/barcode/:code')
   lookupBarcode(@Param('code') code: string) {
     return this.nutrition.barcodeLookup(code);
   }
 
+  @ForPages()
   @Post('foods/import')
   importFood(
     @CurrentUser('userId') userId: string,
@@ -129,6 +134,7 @@ export class NutritionController {
 
   // ---------------------------------------------------------------- public foods (sharing)
 
+  @ForPages()
   @Get('foods/public')
   listPublicFoods(
     @CurrentUser('userId') userId: string,
@@ -143,6 +149,7 @@ export class NutritionController {
     });
   }
 
+  @ForPages()
   @Post('foods/import-public/:id')
   importPublicFood(
     @CurrentUser('userId') userId: string,
@@ -151,6 +158,7 @@ export class NutritionController {
     return this.nutrition.importPublicFood(userId, id);
   }
 
+  @ForPages()
   @Post('foods')
   createFood(
     @CurrentUser('userId') userId: string,
@@ -159,6 +167,7 @@ export class NutritionController {
     return this.nutrition.createFood(userId, dto);
   }
 
+  @ForPages()
   @Patch('foods/:id')
   updateFood(
     @CurrentUser('userId') userId: string,
@@ -168,6 +177,7 @@ export class NutritionController {
     return this.nutrition.updateFood(userId, id, dto);
   }
 
+  @ForPages()
   @Delete('foods/:id')
   removeFood(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     return this.nutrition.removeFood(userId, id);
@@ -217,11 +227,13 @@ export class NutritionController {
 
   // ---------------------------------------------------------------- saved meals
 
+  @ForPages()
   @Get('meals')
   listMeals(@CurrentUser('userId') userId: string) {
     return this.nutrition.listSavedMeals(userId);
   }
 
+  @ForPages()
   @Post('meals')
   createMeal(
     @CurrentUser('userId') userId: string,
@@ -238,6 +250,7 @@ export class NutritionController {
     return this.nutrition.saveSlotAsMeal(userId, dto);
   }
 
+  @ForPages()
   @Patch('meals/:id')
   updateMeal(
     @CurrentUser('userId') userId: string,
@@ -247,6 +260,7 @@ export class NutritionController {
     return this.nutrition.updateSavedMeal(userId, id, dto);
   }
 
+  @ForPages()
   @Delete('meals/:id')
   removeMeal(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     return this.nutrition.removeSavedMeal(userId, id);

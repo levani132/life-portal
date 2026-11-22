@@ -10,6 +10,7 @@ import { SessionCookies } from '../auth/session-cookie';
 import { CONFIG, type AppConfig } from '../config/configuration';
 import { MailModule } from '../mail/mail.module';
 import { ACCOUNT_STORE, AccountService, type AccountStore } from './account.service';
+import { AsPerson } from '../auth/acting';
 
 /** `AccountStore` on the real database, through the driver: no model, so no module is imported. */
 @Injectable()
@@ -34,6 +35,7 @@ export class DeleteAccountDto implements DeleteAccountRequest {
   @IsOptional() @IsString() @MaxLength(320) confirmEmail?: string;
 }
 
+@AsPerson()
 @Controller('account')
 export class AccountController {
   private readonly cookies: SessionCookies;
@@ -72,5 +74,6 @@ export class AccountController {
   imports: [AuthModule, MailModule],
   controllers: [AccountController],
   providers: [AccountService, { provide: ACCOUNT_STORE, useClass: MongoAccountStore }],
+  exports: [AccountService],
 })
 export class AccountModule {}

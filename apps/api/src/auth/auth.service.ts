@@ -106,7 +106,8 @@ export class AuthService {
 
     const hash = user?.passwordHash ?? (await timingDummy());
     const matches = await bcrypt.compare(dto.password, hash);
-    if (!user || !matches) {
+    // Spec 040: nobody signs in as a page, whatever its row holds.
+    if (!user || !matches || user.kind === 'page') {
       await this.security.record('login_failed', ctx, user ? String(user._id) : undefined);
       throw new UnauthorizedException('Incorrect email or password.');
     }
@@ -282,7 +283,7 @@ export class AuthService {
   /** Starts a normal session for someone another method has signed in (#28). */
   async startSession(userId: string, device: string): Promise<AuthSession> {
     const user = await this.userModel.findById(userId);
-    if (!user) throw new UnauthorizedException('Account not found.');
+    if (!user || user.kind === 'page') throw new UnauthorizedException('Account not found.');
     user.lastLoginAt = new Date();
     await user.save();
     return this.issueSession(user, device);

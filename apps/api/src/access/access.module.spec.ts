@@ -13,7 +13,7 @@ const USER = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 
 function fixture(
   options: {
-    user?: { cohort?: string; featureOverrides?: object; suspendedAt?: Date } | null;
+    user?: { cohort?: string; featureOverrides?: object; suspendedAt?: Date; kind?: 'page' } | null;
     policy?: { overrides: object } | null;
     developerUserId?: string;
   } = {},
@@ -88,6 +88,15 @@ describe('feature access resolution', () => {
     const { access } = await f.service.forUser(USER);
     expect(Object.values(access).every((on) => on === false)).toBe(true);
     await expect(f.service.require(USER, 'social')).rejects.toThrow('not available');
+  });
+
+  it('gives a page its fixed features whatever the switches say, and none when suspended (spec 040)', async () => {
+    const f = fixture({ user: { kind: 'page', cohort: 'production', featureOverrides: { money: true, social: false } }, policy: { overrides: { money: true } } });
+    const who = await f.service.forUser(USER);
+    expect(who.page).toBe(true);
+    expect(who.access).toMatchObject({ social: true, foodPosts: true, nutrition: true, training: true, money: false, tournaments: false, pages: false });
+    const gone = await fixture({ user: { kind: 'page', suspendedAt: new Date() } }).service.forUser(USER);
+    expect(Object.values(gone.access).every((on) => on === false)).toBe(true);
   });
 
   it('answers 401 for a deleted account and 403 for a module it lacks', async () => {

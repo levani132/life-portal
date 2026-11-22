@@ -5,8 +5,10 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { MediaUploadDto } from './media.dto';
 import { MediaUploadRecord, MediaUploadSchema } from './media.schemas';
 import { MediaService } from './media.service';
+import { ForPages } from '../auth/acting';
 
 @RequireModule('postMedia')
+@ForPages()
 @Controller('media')
 class MediaController {
   constructor(private readonly media: MediaService) {}

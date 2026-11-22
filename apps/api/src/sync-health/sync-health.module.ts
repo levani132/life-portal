@@ -5,12 +5,14 @@ import { IsIn } from 'class-validator';
 import { SYNC_HEALTH_RANGES } from '@life-portal/shared-types';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { SyncHealthDaily, SyncHealthDailySchema, SyncHealthService } from './sync-health.service';
+import { AsPerson } from '../auth/acting';
 
 export class SyncHealthReportDto {
   @Type(() => Number) @IsIn(SYNC_HEALTH_RANGES) range = 7;
 }
 
 /** Issue #22: content-free sync counters. Written by the idempotency interceptor. */
+@AsPerson()
 @Controller('sync-health')
 export class SyncHealthController {
   constructor(private readonly health: SyncHealthService) {}

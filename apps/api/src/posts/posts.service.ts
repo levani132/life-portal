@@ -162,6 +162,15 @@ export class PostsService {
       ),
     );
   }
+  /**
+   * Spec 040: a page has followers, not friends, so its posts are public or not shared. The
+   * access mock in older tests answers without `page`, which reads as a person.
+   */
+  private async refuseFriendsAudienceForPages(userId: string, audience: string | undefined) {
+    if (audience !== 'friends') return;
+    const who = (await this.access.forUser(userId)) as { page?: boolean };
+    if (who.page) throw new BadRequestException({ code: 'PAGE_AUDIENCE', message: 'A page posts to everyone, or keeps a post unshared.' });
+  }
   async preview(userId: string, dto: PreviewPostDto): Promise<PostPreview> {
     await this.requireEnabled(userId);
     if (!dto.source) throw new BadRequestException('Choose what to share.');
@@ -249,6 +258,7 @@ export class PostsService {
   }
   async create(userId: string, dto: CreatePostDto): Promise<FoodPost> {
     await this.requireEnabled(userId);
+    await this.refuseFriendsAudienceForPages(userId, dto.audience);
     const mediaIds = dto.mediaIds ?? [];
     if (
       !postHasContent({
@@ -827,6 +837,7 @@ export class PostsService {
     audience: FoodPost['audience'],
   ) {
     await this.requireEnabled(userId);
+    await this.refuseFriendsAudienceForPages(userId, audience);
     this.id(id);
     const result = await this.posts.updateOne(
       { _id: id, userId, deleted: { $ne: true }, ...ORIGINAL },
@@ -839,6 +850,7 @@ export class PostsService {
   }
   async update(userId: string, id: string, dto: UpdatePostDto) {
     await this.requireEnabled(userId);
+    await this.refuseFriendsAudienceForPages(userId, dto.audience);
     this.id(id);
     if (!dto.title.trim() && !dto.caption.trim()) {
       const row = await this.posts

@@ -36,6 +36,7 @@ import {
   UnregisterDeviceDto,
   UpdateNotificationPreferencesDto,
 } from './notifications.dto';
+import { AsPerson, ForPages } from '../auth/acting';
 
 @Injectable()
 class NoStore implements NestInterceptor {
@@ -53,6 +54,7 @@ class NoStore implements NestInterceptor {
  * anything at all. Every other route needs `push`.
  */
 @UseInterceptors(NoStore)
+@AsPerson()
 @Controller('notifications')
 export class NotificationsController {
   constructor(private readonly notifications: NotificationsService) {}
@@ -116,6 +118,7 @@ export class NotificationsController {
   }
 
   @RequireModule('push')
+  @ForPages()
   @Get('activity')
   activity(
     @CurrentUser('userId') userId: string,
@@ -127,11 +130,13 @@ export class NotificationsController {
     );
   }
   @RequireModule('push')
+  @ForPages()
   @Get('activity/unseen')
   async unseen(@CurrentUser('userId') userId: string) {
     return { count: await this.notifications.badgeCount(userId) };
   }
   @RequireModule('push')
+  @ForPages()
   @Post('activity/seen')
   @HttpCode(200)
   seen(@CurrentUser('userId') userId: string) {

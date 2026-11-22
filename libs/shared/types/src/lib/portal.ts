@@ -27,6 +27,7 @@ export const FEATURE_IDS = [
   'trainingRanks',
   'tournaments',
   'trainingPosts',
+  'pages',
 ] as const;
 export type FeatureId = (typeof FEATURE_IDS)[number];
 export type FeatureAccess = Record<FeatureId, boolean>;
@@ -127,6 +128,8 @@ export interface PortalState {
   setupStep: number;
   setupCompleted: boolean;
   setupDismissed: boolean;
+  /** Spec 040: this state is a page's. It has no modules, no widgets and no setup. */
+  page?: true;
 }
 export interface PortalPreferences {
   completedSetupSteps?: SetupStep[];
@@ -167,4 +170,5 @@ export const FEATURES: { id: FeatureId; name: string }[] = [
   { id: 'trainingRanks', name: 'Strength ranks' },
   { id: 'tournaments', name: 'Strength tournaments' },
   { id: 'trainingPosts', name: 'Training posts and copying' },
+  { id: 'pages', name: 'Pages' },
 ];

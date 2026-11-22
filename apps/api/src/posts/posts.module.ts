@@ -65,8 +65,10 @@ import {
   FeedMetricsDailySchema,
   FeedMetricsService,
 } from './feed-metrics.service';
+import { ForPages } from '../auth/acting';
 @RequireModule('foodPosts')
 @UseInterceptors(SocialNoStore)
+@ForPages()
 @Controller('posts')
 class PostsController {
   constructor(

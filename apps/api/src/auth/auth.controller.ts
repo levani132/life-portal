@@ -22,7 +22,9 @@ import { deviceLabel } from './session-rules';
 import { SessionsService } from './sessions.service';
 import { SecurityService } from './security/security.service';
 import { AccessService } from '../access/access.module';
+import { AsPerson } from './acting';
 
+@AsPerson()
 @Controller('auth')
 export class AuthController {
   constructor(

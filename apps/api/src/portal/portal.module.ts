@@ -41,6 +41,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { NutritionModule } from '../nutrition/nutrition.module';
 import { NutritionService } from '../nutrition/nutrition.service';
 import { SettingsModule, SettingsService } from '../settings/settings.module';
+import { ForPages, NotForPages } from '../auth/acting';
 
 export class VisibilityDto {
   @ValidateIf((_, value: unknown) => value !== undefined)
@@ -116,6 +117,22 @@ export class PortalService {
     private readonly nutrition: NutritionService,
   ) {}
   async get(userId: string): Promise<PortalState> {
+    // Spec 040: a page has no modules, widgets or setup, and nothing is stored for it here.
+    const who = await this.access.forUser(userId);
+    if (who.page) {
+      return {
+        cohort: who.cohort,
+        access: who.access,
+        selectedModules: [],
+        moduleVisibility: privateModuleVisibility(),
+        widgetOrder: [],
+        completedSetupSteps: [],
+        setupStep: 0,
+        setupCompleted: true,
+        setupDismissed: true,
+        page: true,
+      };
+    }
     // Owned, idempotent field migration; no history or nutrition facts are rewritten.
     await this.nutrition.ensurePrivateSharing(userId);
     const [settings, identity] = await Promise.all([
@@ -203,12 +220,14 @@ export class PortalService {
     return this.get(userId);
   }
 }
+@ForPages()
 @Controller('portal')
 class PortalController {
   constructor(private readonly portal: PortalService) {}
   @Get() get(@CurrentUser('userId') userId: string) {
     return this.portal.get(userId);
   }
+  @NotForPages()
   @Put() update(
     @CurrentUser('userId') userId: string,
     @Body() dto: PortalPreferencesDto,

@@ -75,6 +75,7 @@ import { BoardsModule } from '../boards/boards.module';
 import { FxModule } from '../fx/fx.module';
 import { MediaService } from '../media/media.service';
 import { SharedWidgetsService } from './shared-widgets.service';
+import { ForPages, NotForPages } from '../auth/acting';
 
 @Schema({ ...baseSchemaOptions, collection: 'social_profiles' })
 class SocialProfile {
@@ -86,6 +87,8 @@ class SocialProfile {
   @Prop({ default: false, index: true }) discoverable!: boolean;
   /** The profile photo's storage key. Never leaves the API: responses carry a signed `avatarUrl`. */
   @Prop() avatarKey?: string;
+  /** Spec 040: copied from the account, so naming an author needs no second lookup. */
+  @Prop({ type: String, enum: ['page'] }) kind?: 'page';
 }
 const ProfileSchema = SchemaFactory.createForClass(SocialProfile);
 export class ProfileUpdateDto implements SocialProfileUpdate {
@@ -210,7 +213,35 @@ export class SocialService implements OnModuleInit {
       displayName: profile.displayName,
       username: profile.username,
       ...(avatarUrl ? { avatarUrl } : {}),
+      ...(profile.kind === 'page' ? { isPage: true as const } : {}),
     };
+  }
+  /**
+   * Spec 040: a page's profile, made with the page. The username comes from the same pool as
+   * people's. A page exists to be found, so it is discoverable from the start.
+   */
+  async createPageProfile(pageId: string, input: { displayName: string; username: string; bio: string }): Promise<void> {
+    try {
+      await this.profiles.create({ userId: pageId, kind: 'page', discoverable: true, ...input });
+    } catch (error) {
+      if ((error as { code?: number }).code === 11000) throw usernameTaken();
+      throw error;
+    }
+  }
+  /** Whether a username is free, for a page being created. */
+  async usernameFree(username: string): Promise<boolean> {
+    return !(await this.profiles.exists({ username: username.toLowerCase() }));
+  }
+  /** Profiles of these accounts, as their managers see them. */
+  async summaries(userIds: string[]): Promise<Map<string, { displayName: string; username: string; bio: string; avatarUrl?: string }>> {
+    if (!userIds.length) return new Map();
+    const rows = await this.profiles.find({ userId: { $in: userIds } }).lean();
+    const out = new Map<string, { displayName: string; username: string; bio: string; avatarUrl?: string }>();
+    for (const row of rows) {
+      const avatarUrl = await this.avatarUrl(row);
+      out.set(row.userId, { displayName: row.displayName, username: row.username, bio: row.bio, ...(avatarUrl ? { avatarUrl } : {}) });
+    }
+    return out;
   }
   private async avatarUrl(profile: SocialProfile) {
     return profile.avatarKey ? this.media.signKey(profile.avatarKey) : undefined;
@@ -523,6 +554,7 @@ export class SocialService implements OnModuleInit {
 }
 @RequireModule('social')
 @UseInterceptors(SocialNoStore)
+@ForPages()
 @Controller('social')
 export class SocialController {
   constructor(private readonly social: SocialService) {}
@@ -565,6 +597,7 @@ export class SocialController {
     );
     return { count: page.people.length, more: page.hasMore };
   }
+  @NotForPages()
   @Get('connections') connections(
     @CurrentUser('userId') userId: string,
     @Query() query: ListDto,
@@ -587,6 +620,7 @@ export class SocialController {
   ) {
     return this.social.foodDiary(userId, id, today, query);
   }
+  @NotForPages()
   @Put('connections/:id') act(
     @CurrentUser('userId') userId: string,
     @Param('id') id: string,
@@ -616,3 +650,8 @@ export class SocialController {
   exports: [SocialService, SocialNoStore],
 })
 export class SocialModule {}
+
+/** The one answer for a username someone else has, whether a person or a page. */
+export function usernameTaken(): ConflictException {
+  return new ConflictException({ code: 'USERNAME_TAKEN', message: 'That username is already taken.' });
+}

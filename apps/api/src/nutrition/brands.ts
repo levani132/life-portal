@@ -27,6 +27,7 @@ import { AccessService, RequireModule } from '../access/access.module';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { MediaService } from '../media/media.service';
 import { Food } from './nutrition.schemas';
+import { ForPages } from '../auth/acting';
 
 /**
  * A food brand: a name and an optional logo. A row with no `userId` is public (everyone sees
@@ -240,6 +241,7 @@ export class BrandsService {
 }
 
 @RequireModule('nutrition')
+@ForPages()
 @Controller('nutrition/brands')
 export class BrandsController {
   constructor(private readonly brands: BrandsService) {}

@@ -21,6 +21,7 @@ import { ERROR_RANGES, type ErrorGroup, type ErrorRange, type ErrorReport, type 
 import { addDays, errorFingerprint, isServerFault, pagePattern, scrubErrorText, scrubStack } from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { AsPerson } from '../auth/acting';
 
 /** Records are kept this long, then Mongo deletes them. */
 export const ERROR_RETENTION_DAYS = 30;
@@ -184,6 +185,7 @@ export class ErrorReportDto {
   @Type(() => Number) @IsIn(ERROR_RANGES) range = 7;
 }
 
+@AsPerson()
 @Controller('errors')
 export class ErrorsController {
   /** Reports per account per minute: a page stuck in an error loop must not flood the log. */

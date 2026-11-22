@@ -12,6 +12,11 @@ export interface AuthenticatedUser {
   roles: string[];
   /** The `auth_sessions` row the access token belongs to (issue #27). */
   sessionId: string;
+  /**
+   * The signed-in person. The same as `userId`, except while acting as a page (spec 040), when
+   * `userId` is the page and this is the person behind it. Absent on token-authenticated routes.
+   */
+  actorId?: string;
 }
 
 @Injectable()
@@ -39,6 +44,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!payload.sid || !(await this.sessions.isLive(payload.sub, payload.sid))) {
       throw new UnauthorizedException('Your session has been signed out.');
     }
-    return { userId: payload.sub, email: payload.email, roles: payload.roles ?? [], sessionId: payload.sid };
+    return { userId: payload.sub, email: payload.email, roles: payload.roles ?? [], sessionId: payload.sid, actorId: payload.sub };
   }
 }

@@ -77,6 +77,7 @@ import {
   WorkoutSet,
   WorkoutSetSchema,
 } from './training.schemas';
+import { ForPages } from '../auth/acting';
 
 /** Training data is one person's; nothing in between may keep a copy. */
 @Injectable()
@@ -138,6 +139,7 @@ export class TrainingController {
 
   // ---------------------------------------------------------------- catalogue
 
+  @ForPages()
   @Get('exercises')
   exercises(
     @CurrentUser('userId') userId: string,
@@ -154,11 +156,13 @@ export class TrainingController {
    * Spec 028: the exercises a device keeps for offline use — the caller's own, those used in the
    * last 90 days, and those in plans they can start. Not the whole catalogue.
    */
+  @ForPages()
   @Get('exercises/offline')
   offlineExercises(@CurrentUser('userId') userId: string) {
     return this.catalogue.offlineList(userId);
   }
 
+  @ForPages()
   @Get('exercises/:id')
   exercise(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     return this.catalogue.get(userId, id);
@@ -200,12 +204,14 @@ export class TrainingController {
     return this.ranks.badges(userId, today);
   }
 
+  @ForPages()
   @Post('exercises')
   createExercise(@CurrentUser('userId') userId: string, @Body() dto: CreateExerciseDto) {
     return this.catalogue.create(userId, dto);
   }
 
   /** Own exercises only: a shared row answers 404. */
+  @ForPages()
   @Patch('exercises/:id')
   updateExercise(
     @CurrentUser('userId') userId: string,
@@ -215,6 +221,7 @@ export class TrainingController {
     return this.catalogue.update(userId, id, dto);
   }
 
+  @ForPages()
   @Delete('exercises/:id')
   deleteExercise(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     return this.catalogue.remove(userId, id);
@@ -222,37 +229,44 @@ export class TrainingController {
 
   // ---------------------------------------------------------------- plans (spec 023)
 
+  @ForPages()
   @Get('plans')
   listPlans(@CurrentUser('userId') userId: string) {
     return this.plans.list(userId);
   }
 
   /** Before `plans/:id`, or "suggested" would be read as an id. */
+  @ForPages()
   @Get('plans/suggested')
   suggestedPlans(@CurrentUser('userId') userId: string, @Today() today: string) {
     return this.plans.suggested(userId, today);
   }
 
+  @ForPages()
   @Get('plans/:id')
   plan(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     return this.plans.detail(userId, id);
   }
 
+  @ForPages()
   @Post('plans')
   createPlan(@CurrentUser('userId') userId: string, @Body() dto: CreatePlanDto) {
     return this.plans.create(userId, dto);
   }
 
+  @ForPages()
   @Put('plans/:id')
   replacePlan(@CurrentUser('userId') userId: string, @Param('id') id: string, @Body() dto: ReplacePlanDto) {
     return this.plans.replace(userId, id, dto);
   }
 
+  @ForPages()
   @Post('plans/:id/copy')
   copyPlan(@CurrentUser('userId') userId: string, @Param('id') id: string, @Body() dto: CopyPlanDto) {
     return this.plans.copy(userId, id, dto.requestId);
   }
 
+  @ForPages()
   @Delete('plans/:id')
   removePlan(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     return this.plans.remove(userId, id);

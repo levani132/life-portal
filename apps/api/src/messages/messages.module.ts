@@ -30,6 +30,7 @@ import {
   MessageSchema,
 } from './messages.schemas';
 import { MessagesService } from './messages.service';
+import { ForPages } from '../auth/acting';
 
 /** Every route needs `messages`; every response is private and uncached (spec FR-025). */
 @RequireModule('messages')
@@ -41,6 +42,7 @@ export class MessagesController {
   @Get('conversations') inbox(@CurrentUser('userId') userId: string) {
     return this.messages.inbox(userId);
   }
+  @ForPages()
   @Get('unread') async unread(@CurrentUser('userId') userId: string) {
     return { count: await this.messages.unreadCount(userId) };
   }

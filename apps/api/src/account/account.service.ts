@@ -117,6 +117,28 @@ export class AccountService {
     const name = String(user['name'] ?? '');
     await this.confirm(user, dto, email);
 
+    // Spec 040: the pages only this person manages go first, each erased like an account.
+    const pages = await this.store.find('users', { kind: 'page', managers: userId });
+    for (const page of pages) {
+      if ((page['managers'] as unknown[] | undefined)?.length === 1) await this.erase(String(page['_id']));
+      else await this.store.updateMany('users', { _id: page['_id'] }, { $pull: { managers: userId } });
+    }
+    await this.erase(userId);
+
+    await this.security.record('account_deleted', ctx);
+    if (this.mailer && email) {
+      void this.mailer.send(accountDeletedEmail(email, name, this.config.webBaseUrl)).catch((error: unknown) => {
+        this.log.warn(`Could not send the account-deleted email: ${(error as Error).name}`);
+      });
+    }
+    return { success: true };
+  }
+
+  /**
+   * Removes one account, a person's or a page's, and everything it owns, with no confirmation:
+   * the caller has already decided. Files first, the account row last, so it can be run again.
+   */
+  async erase(userId: string): Promise<void> {
     // 1. Files.
     const keys = new Set<string>();
     for (const collection of FILE_COLLECTIONS) storageKeysIn(await this.store.find(collection, { userId }), keys);
@@ -174,14 +196,6 @@ export class AccountService {
 
     // 5. The account.
     await this.store.deleteMany('users', { _id: new Types.ObjectId(userId) });
-
-    await this.security.record('account_deleted', ctx);
-    if (this.mailer && email) {
-      void this.mailer.send(accountDeletedEmail(email, name, this.config.webBaseUrl)).catch((error: unknown) => {
-        this.log.warn(`Could not send the account-deleted email: ${(error as Error).name}`);
-      });
-    }
-    return { success: true };
   }
 
   /** A password when the account has one; otherwise the email address typed out. */

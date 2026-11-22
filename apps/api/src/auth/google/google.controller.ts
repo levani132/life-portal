@@ -7,8 +7,10 @@ import { CurrentUser, Public } from '../current-user.decorator';
 import { GoogleExchangeDto, GoogleLinkPasswordDto, GoogleSignupDto } from '../dto/auth.dto';
 import { deviceLabel } from '../session-rules';
 import { GoogleAuthService } from './google-auth.service';
+import { AsPerson } from '../acting';
 
 /** Continue with Google (issue #28). See docs/modules/auth-and-dashboard.md. */
+@AsPerson()
 @Controller('auth')
 export class GoogleController {
   /** Issue #29: a session from Google reaches the web app the same way as any other. */

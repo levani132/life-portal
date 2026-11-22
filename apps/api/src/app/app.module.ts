@@ -7,6 +7,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AccountModule } from '../account/account.module';
 import { UsageModule } from '../usage/usage.module';
+import { ActingGuard, PagesModule } from '../pages/pages.module';
 import { ImageCheckModule } from '../moderation/image-checker';
 import { ErrorsModule } from '../errors/errors.module';
 import { RoadmapModule } from '../roadmap/roadmap.module';
@@ -81,11 +82,14 @@ import { IdempotencyModule } from '../idempotency/idempotency.module';
     ErrorsModule,
     AccountModule,
     UsageModule,
+    PagesModule,
   ],
   providers: [
     // Guarding globally means a new controller ships authenticated unless it opts out with
     // `@Public()`, rather than the other way round.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // After authentication, before the feature check: the feature check then sees the page.
+    { provide: APP_GUARD, useExisting: ActingGuard },
     { provide: APP_GUARD, useClass: ModuleAccessGuard },
   ],
 })

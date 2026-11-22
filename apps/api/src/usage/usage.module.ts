@@ -7,6 +7,7 @@ import { USAGE_RANGES, USAGE_RETENTION_WINDOW_DAYS, type UsageKind, type UsageRa
 import { addDays, usageReport, type UsageEvent } from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { AsPerson } from '../auth/acting';
 
 /** The zone a timestamp's day is read in. The app's people are in Georgia; a day string is used as it is. */
 export const USAGE_TIMEZONE = 'Asia/Tbilisi';
@@ -125,6 +126,7 @@ export class UsageQueryDto {
   @Matches(DAY_PATTERN) today!: string;
 }
 
+@AsPerson()
 @Controller('usage')
 export class UsageController {
   constructor(private readonly usage: UsageService) {}

@@ -205,6 +205,24 @@ describe('AccountService', () => {
     expect(sent[0]).toMatchObject({ to: 'a@example.com', subject: 'Your LifePortal account was deleted' });
   });
 
+  it('deletes the pages only this person manages, and steps out of pages others also manage (spec 040)', async () => {
+    const { service, store } = await world();
+    const own = new Types.ObjectId();
+    const shared = new Types.ObjectId();
+    store.rows('users').push(
+      { _id: own, kind: 'page', name: 'Own page', managers: [A], createdBy: A, email: 'own@pages.invalid' },
+      { _id: shared, kind: 'page', name: 'Shared page', managers: [A, B], createdBy: A, email: 'shared@pages.invalid' },
+    );
+    store.rows('food_posts').push({ _id: new Types.ObjectId(), userId: String(own), title: 'From the page' }, { _id: new Types.ObjectId(), userId: String(shared), title: 'Stays' });
+    store.rows('social_profiles').push({ userId: String(own), username: 'own-page' });
+    await service.delete(A, { confirmEmail: 'a@example.com' });
+    expect(store.rows('users').map((row) => row['name']).sort()).toEqual(['Beka', 'Shared page']);
+    expect(store.rows('users').find((row) => row['name'] === 'Shared page')?.['managers']).toEqual([B]);
+    expect(store.rows('food_posts').some((row) => row['title'] === 'From the page')).toBe(false);
+    expect(store.rows('food_posts').some((row) => row['title'] === 'Stays')).toBe(true);
+    expect(store.rows('social_profiles').some((row) => row['username'] === 'own-page')).toBe(false);
+  });
+
   it('deletes nothing when a file could not be deleted, so it can be run again', async () => {
     const { service, store, sent } = await world({ storageFails: true });
     await expect(service.delete(A, { confirmEmail: 'a@example.com' })).rejects.toMatchObject({ response: { code: 'FILES_NOT_DELETED' } });

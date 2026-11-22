@@ -41,10 +41,11 @@ import {
   type FeatureId,
   type UserCohort,
 } from '@life-portal/shared-types';
-import { resolveFeatureAccess } from '@life-portal/shared-domain';
+import { pageAccess, resolveFeatureAccess } from '@life-portal/shared-domain';
 import { User, UserSchema } from '../auth/schemas/user.schema';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { CONFIG, type AppConfig } from '../config/configuration';
+import { AsPerson } from '../auth/acting';
 
 const REQUIRED_MODULE = 'portal:module';
 export const RequireModule = (id: FeatureId) => SetMetadata(REQUIRED_MODULE, id);
@@ -67,6 +68,7 @@ class FeatureOverridesDto {
   @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() trainingRanks?: boolean;
   @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() tournaments?: boolean;
   @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() trainingPosts?: boolean;
+  @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() pages?: boolean;
   @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() training?: boolean;
   @ValidateIf((_, value: unknown) => value !== undefined) @IsBoolean() social?: boolean;
   @ValidateIf((_, value: unknown) => value !== undefined)
@@ -110,7 +112,7 @@ export class AccessService {
   async forUser(userId: string) {
     const user = await this.users
       .findById(userId)
-      .select('cohort featureOverrides suspendedAt')
+      .select('cohort featureOverrides suspendedAt kind')
       .lean();
     if (!user) throw new UnauthorizedException('Account not found.');
     const cohort: UserCohort | 'developer' =
@@ -128,10 +130,11 @@ export class AccessService {
             DEFAULT_OFF_FEATURES.map((id) => [id, policy?.overrides?.[id]]),
           )
         : { ...policy?.overrides, ...user.featureOverrides };
-    const access = resolveFeatureAccess(cohort, overrides);
+    // Spec 040: a page's features are fixed. The owner's switches are for people.
+    const access = user.kind === 'page' ? pageAccess() : resolveFeatureAccess(cohort, overrides);
     // Spec 039: a suspended account has nothing switched on, so nothing of it is shown.
     if (user.suspendedAt) for (const id of Object.keys(access) as FeatureId[]) access[id] = false;
-    return { cohort, access };
+    return { cohort, access, ...(user.kind === 'page' ? { page: true as const } : {}) };
   }
   async require(userId: string, module: FeatureId) {
     if (!(await this.forUser(userId)).access[module])
@@ -238,6 +241,7 @@ export class ModuleAccessGuard implements CanActivate {
     return true;
   }
 }
+@AsPerson()
 @Controller('access/users')
 class AccessController {
   constructor(private readonly access: AccessService) {}

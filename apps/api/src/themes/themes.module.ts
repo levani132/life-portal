@@ -32,6 +32,7 @@ import {
 import { completeValues, themeProblems, valuesProblem } from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { AsPerson } from '../auth/acting';
 
 /** The most themes kept. An admin's list, not a feed; the cap keeps the list one small read. */
 export const THEMES_MAX = 50;
@@ -229,6 +230,7 @@ export class ThemesService {
   }
 }
 
+@AsPerson()
 @Controller('themes')
 export class ThemesController {
   constructor(private readonly themes: ThemesService) {}
