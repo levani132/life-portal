@@ -28,3 +28,12 @@ export function mayCreatePage(input: { pageLimit?: number; developer: boolean; c
   const remaining = pagesRemaining(input);
   return remaining === null || remaining > 0;
 }
+
+/**
+ * Whose posts the Following feed holds (spec 040): your own, your friends' and the pages you
+ * follow, each once. Which of their posts you may read is still decided post by post: a friend's
+ * by its audience, a page's only when public.
+ */
+export function followingAuthors(input: { self: string; friends: readonly string[]; followedPages: readonly string[] }): string[] {
+  return [...new Set([input.self, ...input.friends, ...input.followedPages])];
+}

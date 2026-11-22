@@ -10,11 +10,12 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { PostsList } from './posts';
+import { SuggestedPages } from './follow';
 
 /**
  * Home's feed with the `forYou` flag (issue #1): For You (public discovery, spec 018) and
- * Friends (the existing Wall, unchanged). "Friends", not "Following": friendship is mutual and
- * there is no one-way follow yet.
+ * Following (the Wall: your own posts, your friends' and, since spec 040, the public posts of the
+ * pages you follow). The tab's id stays `friends`: it is what a session remembers.
  *
  * Both lists stay mounted once opened, so each keeps its own page, paging history and loaded
  * posts. The window scrolls the page; once the feed is scrolled into, switching restores the
@@ -27,7 +28,7 @@ import { PostsList } from './posts';
  */
 export const FEED_TABS = [
   { id: 'forYou', label: 'For You' },
-  { id: 'friends', label: 'Friends' },
+  { id: 'friends', label: 'Following' },
 ] as const;
 export type FeedTab = (typeof FEED_TABS)[number]['id'];
 const STORAGE_KEY = 'home-feed-tab';
@@ -172,13 +173,23 @@ export function HomeFeed() {
                       className="btn-ghost"
                       onClick={() => select('friends')}
                     >
-                      See posts from your friends
+                      See who you follow
                     </button>
                   </div>
                 }
               />
             ) : (
-              <PostsList />
+              <div className="space-y-3">
+                <SuggestedPages />
+                <PostsList
+                  empty={
+                    <div className="card p-6 text-sm text-ink-muted">
+                      Nothing here yet. Posts from your friends and from the pages you follow
+                      show up here.
+                    </div>
+                  }
+                />
+              </div>
             ))}
         </div>
       ))}

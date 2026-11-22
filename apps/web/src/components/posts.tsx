@@ -43,6 +43,7 @@ import { MacroRings } from './macro-rings';
 import { CopyTrainingButton, TrainingAttachmentView } from './training/training-post';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { PageMark } from './identity-switcher';
+import { OfficialMark } from './follow';
 import { SOCIAL_REFRESH } from '../lib/social-hooks';
 import {
   FeedMetricsContext,
@@ -190,7 +191,7 @@ export function PostsList({
         <div className="card p-6 text-sm text-ink-muted">
           {authorId
             ? 'No posts shared with this audience yet.'
-            : 'No posts here yet. Share something from Food or find friends who want to share with you.'}
+            : 'No posts here yet. Share something, find friends, or follow a page.'}
         </div>
       )}
       <div className="flex items-center justify-between gap-3">
@@ -415,6 +416,7 @@ export function PostCard({
           >
             {post.author.displayName}
           </Link>
+          {post.author.official && <OfficialMark className="ml-1" />}
           {post.author.isPage && <PageMark className="ml-1.5" />}
           <div className="flex items-center gap-1 text-[11px] leading-tight text-ink-faint">
             <PostDateLink id={post.id} date={post.createdAt} />

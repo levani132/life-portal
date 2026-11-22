@@ -15,6 +15,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { InjectModel, MongooseModule } from '@nestjs/mongoose';
@@ -28,10 +29,12 @@ import {
   type Identity,
   type MyPages,
   type PageSummary,
+  type SuggestedPage,
   type UpdatePageRequest,
 } from '@life-portal/shared-types';
 import { mayCreatePage, pagesRemaining } from '@life-portal/shared-domain';
-import { AccessService } from '../access/access.module';
+import { AccessService, RequireModule } from '../access/access.module';
+import { FollowsService } from '../follows/follows.module';
 import { AccountModule } from '../account/account.module';
 import { AccountService } from '../account/account.service';
 import { ACT_MODE, AsPerson, ForPages, type ActMode } from '../auth/acting';
@@ -172,6 +175,16 @@ export class PagesService {
     return summary;
   }
 
+  /** The owner marks any page as the app's own. Nobody else can, their own pages included. */
+  async setOfficial(personId: string, pageId: string, official: boolean): Promise<{ official: boolean }> {
+    this.access.requireDeveloper(personId);
+    if (!isValidObjectId(pageId)) throw notManager();
+    const changed = await this.users.updateOne({ _id: pageId, kind: 'page' }, official ? { $set: { official: true } } : { $unset: { official: '' } });
+    if (!changed.matchedCount) throw notManager();
+    await this.social.setOfficial(pageId, official);
+    return { official };
+  }
+
   /** Deletes the page and everything it holds, the way an account is deleted. */
   async remove(personId: string, pageId: string): Promise<{ success: true }> {
     const row = await this.managed(personId, pageId);
@@ -258,6 +271,58 @@ export class PagesController {
   }
 }
 
+export class OfficialDto {
+  @IsBoolean() official!: boolean;
+}
+
+@AsPerson()
+@Controller('pages')
+export class PageOfficialController {
+  constructor(private readonly pages: PagesService) {}
+
+  @Put(':id/official')
+  official(@CurrentUser('userId') personId: string, @Param('id') id: string, @Body() dto: OfficialDto) {
+    return this.pages.setOfficial(personId, id, dto.official);
+  }
+}
+
+/**
+ * Following (spec 040): a person or a page follows a page. One way, no approval, and a page's
+ * public posts then show in the follower's Following feed.
+ */
+@RequireModule('social')
+@ForPages()
+@Controller('follows')
+export class FollowsController {
+  constructor(
+    private readonly follows: FollowsService,
+    private readonly social: SocialService,
+  ) {}
+
+  @Get('suggested')
+  async suggested(@CurrentUser('userId') userId: string): Promise<SuggestedPage[]> {
+    const ids = await this.follows.suggested(userId);
+    const profiles = await this.social.pageCards(ids);
+    const out: SuggestedPage[] = [];
+    for (const id of ids) {
+      const profile = profiles.get(id);
+      if (profile) out.push({ ...profile, followerCount: await this.follows.followerCount(id) });
+    }
+    return out;
+  }
+
+  @Put(':pageId')
+  follow(@CurrentUser('userId') userId: string, @Param('pageId') pageId: string) {
+    return this.follows.follow(userId, pageId);
+  }
+
+  @Delete(':pageId')
+  @HttpCode(200)
+  unfollow(@CurrentUser('userId') userId: string, @Param('pageId') pageId: string) {
+    return this.follows.unfollow(userId, pageId);
+  }
+}
+
 @ForPages()
 @Controller('identity')
 export class IdentityController {
@@ -272,7 +337,7 @@ export class IdentityController {
 @Global()
 @Module({
   imports: [MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]), SocialModule, AccountModule],
-  controllers: [PagesController, IdentityController],
+  controllers: [PagesController, PageOfficialController, IdentityController, FollowsController],
   providers: [PagesService, ActingGuard],
   exports: [PagesService, ActingGuard],
 })

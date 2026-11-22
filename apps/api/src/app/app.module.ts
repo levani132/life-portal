@@ -8,6 +8,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { AccountModule } from '../account/account.module';
 import { UsageModule } from '../usage/usage.module';
 import { ActingGuard, PagesModule } from '../pages/pages.module';
+import { FollowsModule } from '../follows/follows.module';
 import { ImageCheckModule } from '../moderation/image-checker';
 import { ErrorsModule } from '../errors/errors.module';
 import { RoadmapModule } from '../roadmap/roadmap.module';
@@ -57,6 +58,7 @@ import { IdempotencyModule } from '../idempotency/idempotency.module';
     IdempotencyModule,
     AccessModule,
     SocialGraphModule,
+    FollowsModule,
     NotificationsModule,
     SocialModule,
     PostsModule,

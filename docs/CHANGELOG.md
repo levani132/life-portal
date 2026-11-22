@@ -2,6 +2,16 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-22: Pages, part two: Follow
+
+- **Follow a page** from its profile. No approval; the page shows how many follow it, never who.
+- **Home's second tab is now Following**: your friends' posts and the public posts of the pages
+  you follow, together.
+- **Pages to follow** are offered above Following until you follow five: LifePortal's own pages
+  first, then the most followed.
+- LifePortal's own pages carry a check mark beside the name.
+- Blocking a page ends the follow. Deleting your account removes your follows.
+
 ## 2026-11-22: Pages, part one
 
 - **Create a page** (Menu → Create a page): an account that is not a person, for publishing

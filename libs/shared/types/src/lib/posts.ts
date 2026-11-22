@@ -63,6 +63,8 @@ export interface PostAuthor {
   avatarUrl?: string;
   /** Spec 040: the author is a page, not a person. Shown beside the name wherever it appears. */
   isPage?: true;
+  /** Spec 040: the app's own page. */
+  official?: true;
 }
 /** Diet topics a post can carry (issue #8). Computed from published facts, never stored. */
 export const DIET_TOPICS = [

@@ -39,7 +39,7 @@ beforeEach(() => {
   window.scrollTo = jest.fn();
 });
 
-it('opens on For You and loads Friends only when chosen, keeping both mounted', () => {
+it('opens on For You and loads Following only when chosen, keeping both mounted', () => {
   pages['/posts/for-you'] = { data: { posts: [post('1', 'Public oats')] } };
   pages['/posts?preview=normal'] = { data: { posts: [post('2', 'Friend soup')] } };
   render(<HomeFeed />);
@@ -48,8 +48,8 @@ it('opens on For You and loads Friends only when chosen, keeping both mounted', 
   expect(screen.getByText('Public oats')).toBeTruthy();
   expect(requested).not.toContain('/posts?preview=normal');
 
-  fireEvent.click(screen.getByRole('tab', { name: 'Friends' }));
-  expect(screen.getByRole('tab', { name: 'Friends' }).getAttribute('aria-selected')).toBe('true');
+  fireEvent.click(screen.getByRole('tab', { name: 'Following' }));
+  expect(screen.getByRole('tab', { name: 'Following' }).getAttribute('aria-selected')).toBe('true');
   expect(screen.getByText('Friend soup')).toBeTruthy();
   // For You is hidden, not unmounted, so its page survives the switch.
   expect(screen.getByText('Public oats').closest('[role="tabpanel"]')?.hasAttribute('hidden')).toBe(true);
@@ -63,19 +63,19 @@ it('keeps each tab’s own page when switching back and forth', () => {
   render(<HomeFeed />);
   fireEvent.click(screen.getByRole('button', { name: 'Older posts' }));
   expect(screen.getByText('Discover 2')).toBeTruthy();
-  fireEvent.click(screen.getByRole('tab', { name: 'Friends' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'Following' }));
   fireEvent.click(screen.getByRole('tab', { name: 'For You' }));
   expect(screen.getByText('Discover 2')).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Newer posts' })).toBeTruthy();
 });
 
-it('points an empty For You at Friends', () => {
+it('points an empty For You at Following', () => {
   pages['/posts/for-you'] = { data: { posts: [] } };
   pages['/posts?preview=normal'] = { data: { posts: [post('2', 'Friend 1')] } };
   render(<HomeFeed />);
   expect(screen.getByText(/Nothing to discover yet/)).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: 'See posts from your friends' }));
-  expect(screen.getByRole('tab', { name: 'Friends' }).getAttribute('aria-selected')).toBe('true');
+  fireEvent.click(screen.getByRole('button', { name: 'See who you follow' }));
+  expect(screen.getByRole('tab', { name: 'Following' }).getAttribute('aria-selected')).toBe('true');
   expect(screen.getByText('Friend 1')).toBeTruthy();
 });
 
@@ -83,7 +83,7 @@ it('shows loading and error states per tab', () => {
   pages['/posts?preview=normal'] = { error: new Error('Friends failed') };
   render(<HomeFeed />);
   expect(screen.getByText('Loading posts…')).toBeTruthy();
-  fireEvent.click(screen.getByRole('tab', { name: 'Friends' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'Following' }));
   expect(screen.getByText('Friends failed')).toBeTruthy();
 });
 
@@ -91,12 +91,12 @@ it('moves between tabs with the arrow, Home and End keys', () => {
   render(<HomeFeed />);
   const list = screen.getByRole('tablist');
   fireEvent.keyDown(list, { key: 'ArrowRight' });
-  expect(screen.getByRole('tab', { name: 'Friends' }).getAttribute('aria-selected')).toBe('true');
-  expect(document.activeElement?.textContent).toBe('Friends');
+  expect(screen.getByRole('tab', { name: 'Following' }).getAttribute('aria-selected')).toBe('true');
+  expect(document.activeElement?.textContent).toBe('Following');
   fireEvent.keyDown(list, { key: 'Home' });
   expect(screen.getByRole('tab', { name: 'For You' }).getAttribute('aria-selected')).toBe('true');
   fireEvent.keyDown(list, { key: 'End' });
-  expect(screen.getByRole('tab', { name: 'Friends' }).getAttribute('aria-selected')).toBe('true');
+  expect(screen.getByRole('tab', { name: 'Following' }).getAttribute('aria-selected')).toBe('true');
   expect(list.hasAttribute('data-no-tab-swipe')).toBe(true);
 });
 
@@ -106,5 +106,5 @@ it('restores the session’s last tab', async () => {
   await act(async () => {
     render(<HomeFeed />);
   });
-  expect(screen.getByRole('tab', { name: 'Friends' }).getAttribute('aria-selected')).toBe('true');
+  expect(screen.getByRole('tab', { name: 'Following' }).getAttribute('aria-selected')).toBe('true');
 });

@@ -37,11 +37,13 @@ import {
   publicationCalories,
   publicationMacros,
   postTopics,
+  followingAuthors,
 } from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
 import { NutritionPublicationService } from '../nutrition/nutrition-publication.service';
 import { SocialService } from '../social/social.module';
 import { SocialGraphService } from '../social-graph/social-graph.module';
+import { FollowsService } from '../follows/follows.module';
 import { MediaService } from '../media/media.service';
 import { TrainingPublicationService } from '../training/training-publication.service';
 import {
@@ -102,6 +104,7 @@ export class PostsService {
     private readonly feedback: Model<FeedFeedbackRecord>,
     @Optional() private readonly trainingPublications?: TrainingPublicationService,
     @Optional() private readonly moderation?: PostModerationService,
+    @Optional() private readonly follows?: FollowsService,
   ) {}
 
   /** Spec 036: Training builds and reads its own snapshots; posts only stores them. */
@@ -538,7 +541,11 @@ export class PostsService {
     await this.requireEnabled(userId);
     const authors = query.authorId
       ? [query.authorId]
-      : [userId, ...(await this.graph.wallAuthorIds(userId))];
+      : followingAuthors({
+          self: userId,
+          friends: await this.graph.wallAuthorIds(userId),
+          followedPages: (await this.follows?.followedPageIds(userId)) ?? [],
+        });
     let cursor = this.cursor(query.cursor);
     let scanned = 0;
     const visible: FoodPost[] = [];

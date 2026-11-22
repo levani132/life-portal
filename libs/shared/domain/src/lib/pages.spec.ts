@@ -1,4 +1,4 @@
-import { mayCreatePage, pageAccess, pageLimitFor, pagesRemaining } from './pages';
+import { followingAuthors, mayCreatePage, pageAccess, pageLimitFor, pagesRemaining } from './pages';
 
 describe('pages rules (spec 040)', () => {
   it('gives a page everything social and the two libraries, and nothing personal', () => {
@@ -22,5 +22,15 @@ describe('pages rules (spec 040)', () => {
     // A limit lowered below what someone already has leaves them at zero, not negative.
     expect(pagesRemaining({ developer: false, created: 5, pageLimit: 2 })).toBe(0);
     expect(pagesRemaining({ developer: false, created: 1, pageLimit: -1 })).toBeNull();
+  });
+});
+
+describe('followingAuthors', () => {
+  it('holds yourself, your friends and the pages you follow', () => {
+    expect(followingAuthors({ self: 'me', friends: ['f1', 'f2'], followedPages: ['p1'] })).toEqual(['me', 'f1', 'f2', 'p1']);
+  });
+  it('names nobody twice, and is just you when you follow nobody', () => {
+    expect(followingAuthors({ self: 'me', friends: ['f1'], followedPages: ['f1', 'me'] })).toEqual(['me', 'f1']);
+    expect(followingAuthors({ self: 'me', friends: [], followedPages: [] })).toEqual(['me']);
   });
 });

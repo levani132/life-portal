@@ -73,6 +73,7 @@ export class AccountService {
     }
     put('food_posts', await this.store.find('food_posts', { userId }, EXPORT_ROW_LIMIT));
     put('social_connections', await this.store.find('social_connections', { $or: [{ lowId: userId }, { highId: userId }] }, EXPORT_ROW_LIMIT));
+    put('follows', await this.store.find('follows', { followerId: userId }, EXPORT_ROW_LIMIT));
     put('messages', await this.store.find('messages', { senderId: userId }, EXPORT_ROW_LIMIT));
 
     const files: AccountExport['files'] = [];
@@ -184,6 +185,7 @@ export class AccountService {
     await this.store.updateMany('food_posts', { linkViewers: userId }, { $pull: { linkViewers: userId } });
     await this.store.deleteMany('food_posts', { userId });
     await this.store.deleteMany('social_connections', { $or: [{ lowId: userId }, { highId: userId }] });
+    await this.store.deleteMany('follows', { $or: [{ followerId: userId }, { pageId: userId }] });
     const conversationIds = (await this.store.find('conversations', { memberIds: userId })).map((row) => String(row['_id']));
     if (conversationIds.length) {
       await this.store.deleteMany('messages', { conversationId: { $in: conversationIds } });

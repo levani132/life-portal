@@ -4,9 +4,10 @@ Spec 040 (`specs/040-pages`). `apps/api/src/pages`, `apps/api/src/auth/acting.ts
 `libs/shared/domain/src/lib/pages.ts`, web `lib/identity.ts` and
 `components/identity-switcher.tsx`. Behind the `pages` feature.
 
-**Built so far: slice 1** (create a page, act as it, post as it, the page mark). Following and
-the Following feed are slice 2; messages, notifications to managers, the AI mark, the People
-screen and the page limit's admin side are slice 3.
+**Built so far: slices 1 and 2** (create a page, act as it, post as it, the page mark; follow a
+page, the Following feed, pages to follow, the official mark). Messages, notifications to
+managers, the AI mark, a page blocking someone, the People screen and the page limit's admin
+side are slice 3.
 
 ## What a page is
 
@@ -66,6 +67,41 @@ unshared: the `friends` audience is refused (`PAGE_AUDIENCE`). A page cannot be 
 
 `NOT_A_MANAGER` is the one answer for "not yours" and "does not exist".
 
+## Following
+
+`apps/api/src/follows` (a `@Global` module, so posts and social can read it without a cycle).
+
+| Collection `follows` | |
+|---|---|
+| `followerId` | A person or a page |
+| `pageId` | Always a page: nobody follows a person |
+| `createdAt` | |
+
+Unique on the pair. Nothing else is stored: a follower count is counted on read, and there is no
+list of followers anywhere in the API.
+
+| Route (as person or page) | What |
+|---|---|
+| `PUT /follows/:pageId` | Follow. No approval. 404 for a person, a missing or suspended page, or a block either way; 409 for a page following itself. Repeating it changes nothing |
+| `DELETE /follows/:pageId` | Stop following. Always succeeds |
+| `GET /follows/suggested` | Up to 8 pages to follow: official first, then most followed; never one already followed, managed by the viewer, suspended or blocked. Empty once someone follows 5 |
+| `PUT /pages/:id/official` (person) | `{official}`. The developer only, for any page. Written to `users.official` and copied to `social_profiles.official` |
+
+- **The Following feed** is the wall (`GET /posts` with no author): `followingAuthors()` in
+  `libs/shared/domain` joins yourself, your friends and the pages you follow. Each post still
+  passes `readable()`, so of a page's posts only the public ones show. A page acting follows as
+  itself: its follows are not its manager's.
+- A page's profile (`GET /social/profiles/:id`) carries `followerCount`, and `following` for
+  anyone but the page itself. Authors carry `official` beside `isPage`.
+- A block between two accounts deletes any follow between them (`FollowsService.endBetween`).
+  A person can block a page; a page blocking a person is slice 3.
+- Account deletion removes every row naming the account as follower or page (`ACCOUNT_PLAN`:
+  custom). The export holds the pages the person follows.
+
+Web: `components/follow.tsx` (`PageFollow` on a page's profile, `SuggestedPages`,
+`OfficialMark`). Home's second tab is **Following**; pages to follow sit above it until five are
+followed. The owner sees an "Official" switch on any page's profile.
+
 ## Limits and deletion
 
 `mayCreatePage()`: three pages per person by default, counted by `createdBy`; `pageLimit` on the
@@ -90,4 +126,4 @@ manage.
 `pages.module.spec.ts` (create, limits, usernames, managers, the guard, what Food and Training
 open), `libs/shared/domain/src/lib/pages.spec.ts`, `access.module.spec.ts`,
 `account.service.spec.ts` (pages go with their manager), and `integration/pages.integration.ts`
-against a real database.
+and `integration/follows.integration.ts` against a real database.

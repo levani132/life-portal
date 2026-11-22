@@ -62,6 +62,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { User, UserSchema } from '../auth/schemas/user.schema';
 import { baseSchemaOptions } from '../common/mongoose';
 import { Today } from '../common/today';
+import { FollowsService } from '../follows/follows.module';
 import { SocialGraphService } from '../social-graph/social-graph.module';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NutritionModule } from '../nutrition/nutrition.module';
@@ -89,6 +90,8 @@ class SocialProfile {
   @Prop() avatarKey?: string;
   /** Spec 040: copied from the account, so naming an author needs no second lookup. */
   @Prop({ type: String, enum: ['page'] }) kind?: 'page';
+  /** Spec 040: the app's own page; a copy of `users.official`, set only by the owner. */
+  @Prop() official?: boolean;
 }
 const ProfileSchema = SchemaFactory.createForClass(SocialProfile);
 export class ProfileUpdateDto implements SocialProfileUpdate {
@@ -153,6 +156,7 @@ export class SocialService implements OnModuleInit {
     private readonly notifications: NotificationsService,
     private readonly media: MediaService,
     @Optional() @Inject(IMAGE_CHECKER) private readonly imageChecker: ImageChecker | null = null,
+    @Optional() private readonly follows?: FollowsService,
   ) {}
   /** Friend notifications and their Activity rows (docs/modules/notifications.md). */
   onModuleInit() {
@@ -194,7 +198,7 @@ export class SocialService implements OnModuleInit {
     if (!userIds.length) return new Map();
     const rows = await this.profiles
       .find({ userId: { $in: [...new Set(userIds)] } })
-      .select('userId displayName username avatarKey')
+      .select('userId displayName username avatarKey kind official')
       .lean();
     return new Map(
       await Promise.all(
@@ -214,6 +218,7 @@ export class SocialService implements OnModuleInit {
       username: profile.username,
       ...(avatarUrl ? { avatarUrl } : {}),
       ...(profile.kind === 'page' ? { isPage: true as const } : {}),
+      ...(profile.kind === 'page' && profile.official ? { official: true as const } : {}),
     };
   }
   /**
@@ -227,6 +232,21 @@ export class SocialService implements OnModuleInit {
       if ((error as { code?: number }).code === 11000) throw usernameTaken();
       throw error;
     }
+  }
+  /** Spec 040: the owner marks a page as the app's own. */
+  async setOfficial(pageId: string, official: boolean): Promise<void> {
+    await this.profiles.updateOne({ userId: pageId, kind: 'page' }, official ? { $set: { official: true } } : { $unset: { official: '' } });
+  }
+  /** Pages as a card to follow: name, bio, photo and the official mark. */
+  async pageCards(pageIds: string[]): Promise<Map<string, { userId: string; displayName: string; username: string; bio: string; avatarUrl?: string; official?: true }>> {
+    if (!pageIds.length) return new Map();
+    const rows = await this.profiles.find({ userId: { $in: pageIds }, kind: 'page' }).lean();
+    const out = new Map<string, { userId: string; displayName: string; username: string; bio: string; avatarUrl?: string; official?: true }>();
+    for (const row of rows) {
+      const { isPage: _isPage, ...identity } = await this.identity(row);
+      out.set(row.userId, { ...identity, bio: row.bio });
+    }
+    return out;
   }
   /** Whether a username is free, for a page being created. */
   async usernameFree(username: string): Promise<boolean> {
@@ -408,6 +428,13 @@ export class SocialService implements OnModuleInit {
             friendCount: await this.graph.friendCount(viewerId),
           }
         : {}),
+      // Spec 040: a page shows how many follow it, and whether you do.
+      ...(profile.kind === 'page' && this.follows
+        ? {
+            followerCount: await this.follows.followerCount(targetId),
+            ...(self ? {} : { following: await this.follows.isFollowing(viewerId, targetId) }),
+          }
+        : {}),
       widgets: await this.shared.forViewer(
         targetId,
         viewer.access,
@@ -543,6 +570,8 @@ export class SocialService implements OnModuleInit {
     }
     const actor = await this.own(userId);
     const changed = await this.graph.act(userId, targetId, dto.action);
+    // Spec 040: a block ends any follow between the two, in either direction.
+    if (dto.action === 'block') await this.follows?.endBetween(userId, targetId);
     // Not awaited: a failing push service must never fail the request itself.
     if (changed && (dto.action === 'request' || dto.action === 'accept'))
       void this.notifications.notify({

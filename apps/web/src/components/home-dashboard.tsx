@@ -24,6 +24,7 @@ import { WidgetCarousel } from './widget-carousel';
 import { LogFoodModal } from './log-food-modal';
 import { PostsList } from './posts';
 import { HomeFeed } from './home-feed';
+import { SuggestedPages } from './follow';
 import {
   EmptyState,
   ErrorNote,
@@ -233,12 +234,15 @@ export function Dashboard() {
         <section
           id="wall"
           className="mt-5 scroll-mt-20"
-          aria-label="Friends feed"
+          aria-label="Following feed"
         >
           <div className="mb-3 flex items-center justify-between text-xs text-ink-muted">
-            <h2 className="font-medium">From your friends</h2>
+            <h2 className="font-medium">Following</h2>
           </div>
-          <PostsList />
+          <div className="space-y-3">
+            <SuggestedPages />
+            <PostsList />
+          </div>
         </section>
       )}
 

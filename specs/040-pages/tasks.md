@@ -22,18 +22,19 @@ device check before the `pages` switch is turned on for anyone but the owner.
 
 ## Slice 2: follow and Following
 
-- [ ] T020 Domain: `followingAuthors()`, with tests.
-- [ ] T021 `follows` module and collection; in `ACCOUNT_PLAN`; block ends a follow.
-- [ ] T022 The wall becomes Following: friends plus followed pages' public posts; tests.
+- [x] T020 Domain: `followingAuthors()`, with tests.
+- [x] T021 `follows` module and collection; in `ACCOUNT_PLAN`; block ends a follow.
+- [x] T022 The wall becomes Following: friends plus followed pages' public posts; tests.
 - [x] T023 Page posts are public or not shared; pages are always discoverable for For You. (Done with slice 1.)
-- [ ] T024 `GET /follows/suggested`; follower count and `following` on a page's profile.
-- [ ] T025 Web: Follow on a page's profile; Home tabs For You and Following; pages to follow when Following is empty.
-- [ ] T026 `official` mark: field, owner's switch, shown beside the name.
-- [ ] T027 Integration test: follow, see the post in Following, unfollow.
-- [ ] T028 Docs: `posts.md`, `pages.md`, changelog.
+- [x] T024 `GET /follows/suggested`; follower count and `following` on a page's profile.
+- [x] T025 Web: Follow on a page's profile; Home tabs For You and Following; pages to follow when Following is empty.
+- [x] T026 `official` mark: field, owner's switch, shown beside the name.
+- [x] T027 Integration test: follow, see the post in Following, unfollow.
+- [x] T028 Docs: `posts.md`, `pages.md`, changelog.
 
 ## Slice 3: the rest
 
+- [ ] T029 A page can block a person (and see its blocked list); today only a person can block a page.
 - [ ] T030 Domain: `canMessage` page cases, with tests. Messages service uses them.
 - [ ] T031 Notifications for a page reach its managers' devices, named and linking with `?as=`.
 - [ ] T032 `aiManaged` on the profile; `byPerson` on posts and comments.

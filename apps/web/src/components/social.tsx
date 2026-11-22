@@ -45,8 +45,10 @@ import { checkBadges } from '../lib/badges';
 import { PostsList } from './posts';
 import { badgeDefinition, type PortalState } from '@life-portal/shared-types';
 import { api } from '../lib/api';
+import { actingPageId } from '../lib/identity';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { PageMark } from './identity-switcher';
+import { OfficialMark, PageFollow } from './follow';
 import { ErrorNote, Input, Spinner } from './ui';
 import { Avatar } from './avatar';
 import { DropdownMenu, type DropdownItem } from './dropdown-menu';
@@ -445,6 +447,7 @@ export function ProfileView({ userId }: { userId?: string }) {
           </div>
           <h1 className="mt-3 break-words text-2xl font-semibold leading-tight">
             {person.displayName}
+            {person.official && <OfficialMark className="ml-1.5" />}
             {person.isPage && <PageMark className="ml-2" />}
           </h1>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-ink-faint">
@@ -456,6 +459,13 @@ export function ProfileView({ userId }: { userId?: string }) {
             <p className="mt-3 whitespace-pre-wrap break-words text-ink-muted">
               {person.bio}
             </p>
+          )}
+          {person.isPage && (
+            <PageFollow
+              page={person}
+              own={own}
+              canMarkOfficial={!actingPageId() && portal.data?.cohort === 'developer'}
+            />
           )}
           {own ? (
             person.isPage ? null : <OwnStats person={person} />

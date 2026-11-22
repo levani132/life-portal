@@ -43,9 +43,14 @@ export interface SocialPerson {
   widgets?: SharedWidget[];
   /** Spec 040: a page, not a person. A page has no friends and shares no tracking. */
   isPage?: true;
+  /** Spec 040: the app's own page. */
+  official?: true;
 }
 export interface SocialProfile extends SocialPerson {
   widgets: SharedWidget[];
+  /** A page only: how many follow it, and whether the viewer does (absent on its own profile). */
+  followerCount?: number;
+  following?: boolean;
   discoverable?: boolean;
   /** Accepted friends. Only on your own profile: other people's counts are not shown. */
   friendCount?: number;

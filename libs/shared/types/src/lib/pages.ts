@@ -28,6 +28,17 @@ export interface PageSummary {
   suspended: boolean;
 }
 
+/** A page offered to follow. */
+export interface SuggestedPage {
+  userId: string;
+  displayName: string;
+  username: string;
+  bio: string;
+  avatarUrl?: string;
+  official?: true;
+  followerCount: number;
+}
+
 export interface MyPages {
   pages: PageSummary[];
   /** How many more this person may create; `null` when there is no limit. */
