@@ -137,7 +137,9 @@ describe('the web app proxy proof', () => {
         body: JSON.stringify({ email: `nobody-${randomUUID().slice(0, 8)}@int.test`, password: 'x'.repeat(12) }),
       });
     let throttled = 0;
-    for (let i = 0; i < 32; i++) if ((await attempt('198.51.100.1')).status === 429) throttled++;
+    // The window is aligned to the clock, so a run that crosses a quarter hour splits the
+    // attempts between two windows: 62 leaves at least 31 in one of them.
+    for (let i = 0; i < 62; i++) if ((await attempt('198.51.100.1')).status === 429) throttled++;
     expect(throttled).toBeGreaterThan(0);
     // Another visitor through the same proxy address is not throttled with them.
     expect((await attempt('198.51.100.2')).status).not.toBe(429);
