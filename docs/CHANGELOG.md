@@ -2,6 +2,11 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-22: You are told when a post is removed
+
+- **If a reviewer removes your post, you get an email** saying which post, that it broke the
+  Community Rules, and how to object. A suspended account gets one too.
+
 ## 2026-11-22: An upload that cannot get through says so
 
 - **A photo upload that makes no progress for 25 seconds stops with a reason** ("this network

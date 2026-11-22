@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -19,6 +20,8 @@ import { EmailVerificationService } from './email-verification.service';
 import { tokenHash } from './session-rules';
 import type { ChangePasswordDto, LoginDto, RegisterDto } from './dto/auth.dto';
 import { RATE_RULES } from './security/rate-limit-rules';
+import { MAILER, type Mailer } from '../mail/mailer';
+import { accountSuspendedEmail, supportAddress } from './emails';
 import { PASSWORD_MESSAGES, passwordProblem } from './security/password-policy';
 import { SecurityService, type RequestContext } from './security/security.service';
 
@@ -50,6 +53,7 @@ export class AuthService {
     private readonly sessions: SessionsService,
     private readonly security: SecurityService,
     private readonly verification: EmailVerificationService,
+    @Optional() @Inject(MAILER) private readonly mailer: Mailer | null = null,
   ) {
     void timingDummy();
   }
@@ -213,6 +217,11 @@ export class AuthService {
     if (!result.matchedCount) throw new BadRequestException('Unknown account.');
     await this.sessions.revokeAll(userId, 'suspended');
     await this.security.record('account_suspended', ctx, userId);
+    const user = await this.userModel.findById(userId).select('email name').lean();
+    if (this.mailer && user) {
+      const rules = this.config.webBaseUrl ? `${this.config.webBaseUrl}/rules` : undefined;
+      void this.mailer.send(accountSuspendedEmail(user.email, user.name, rules, supportAddress(this.config.mail?.from))).catch(() => undefined);
+    }
     return { success: true };
   }
 

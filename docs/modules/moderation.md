@@ -67,6 +67,8 @@ Reasons: `nudity`, `violence`, `child_safety`, `spam`, `harassment`, `privacy`, 
 - `DELETE /posts/moderation/:postId`: erase content and files like an author's delete, close its
   reports as `removed`.
 - The older `GET /posts/reports` and `DELETE /posts/reports/:id/post` still answer.
+- The author gets an email when the reviewer removes their post (their own title, the date, a
+  link to the rules and how to object), and a person gets one when their account is suspended.
 - The developer gets an email when a post is flagged, hidden by reports, or first reported. It
   names no post and no person.
 

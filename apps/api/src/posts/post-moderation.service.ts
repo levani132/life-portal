@@ -5,7 +5,7 @@ import { Model, Types, isValidObjectId } from 'mongoose';
 import type { ModerationCheck, ModerationItem, ModerationQueue, ReportReason } from '@life-portal/shared-types';
 import { imageHoldCategories, reportsHoldPost } from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
-import { reviewNeededEmail } from '../auth/emails';
+import { postRemovedEmail, reviewNeededEmail, supportAddress } from '../auth/emails';
 import { CONFIG, type AppConfig } from '../config/configuration';
 import { MAILER, type Mailer } from '../mail/mailer';
 import { MediaService } from '../media/media.service';
@@ -251,7 +251,23 @@ export class PostModerationService {
     void this.media.removeForPost(postId);
     if (before.training) void this.trainingPublications?.removePhotos(before.training);
     await this.reports.updateMany({ postId, resolvedAt: { $exists: false } }, { $set: { resolvedAt: new Date(), resolution: 'removed' } });
+    if (!before.deleted) this.tellAuthor(before as PostRow);
     return { success: true };
+  }
+
+  /** An email to the author that their post was removed, and how to object. Never throws. */
+  private tellAuthor(post: PostRow): void {
+    if (!this.mailer || !this.config.webBaseUrl) return;
+    const rules = `${this.config.webBaseUrl}/rules`;
+    const support = supportAddress(this.config.mail?.from);
+    void this.access
+      .contactOf(post.userId)
+      .then((author) =>
+        author
+          ? this.mailer?.send(postRemovedEmail(author.email, author.name, { title: post.title, day: post.createdAt.toISOString().slice(0, 10) }, rules, support))
+          : undefined,
+      )
+      .catch((error: unknown) => this.log.warn(`Could not tell an author their post was removed: ${(error as Error).name}`));
   }
 
   /** An email to the developer that something waits in the queue. It names no post and no person. */

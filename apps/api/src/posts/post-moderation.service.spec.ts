@@ -18,6 +18,7 @@ function world(options: { checker?: ImageChecker | null } = {}) {
     requireDeveloper: (id: string) => { if (id !== DEV) throw new ForbiddenException(); },
     suspendedAmong: async () => new Set<string>(['bad']),
     developerEmail: async () => 'dev@example.com',
+    contactOf: async (id: string) => ({ email: `${id}@example.com`, name: `Name ${id}` }),
   };
   const social = { postAuthor: async (userId: string) => ({ userId, displayName: `Name ${userId}`, username: userId }) };
   const media = {
@@ -32,7 +33,7 @@ function world(options: { checker?: ImageChecker | null } = {}) {
     access as never,
     social as never,
     media as never,
-    { disableSchedules: false, webBaseUrl: 'https://lifeportal.one' } as AppConfig,
+    { disableSchedules: false, webBaseUrl: 'https://lifeportal.one', mail: { provider: 'resend', apiKey: 'k', from: 'LifePortal <no-reply@lifeportal.one>' } } as AppConfig,
     checker,
     { provider: 'dev', send: async (message) => { sent.push(message); } },
   );
@@ -191,6 +192,16 @@ describe('PostModerationService', () => {
     expect(w.post(drop)).toMatchObject({ deleted: true, title: 'Removed post', caption: '' });
     for (const field of ['media', 'heldAt', 'linkKey']) expect(w.post(drop)[field]).toBeUndefined();
     expect(w.removed).toEqual([drop]);
+    await flush();
+    // The author is told, with their own title and how to object; keeping a post sends nothing.
+    expect(w.sent).toHaveLength(1);
+    expect(w.sent[0]).toMatchObject({ to: 'author@example.com', subject: 'LifePortal: your post was removed' });
+    expect(w.sent[0].text).toContain('"T"');
+    expect(w.sent[0].text).toContain('support@lifeportal.one');
+    expect(w.sent[0].text).toContain('https://lifeportal.one/rules');
+    await w.service.remove(DEV, drop);
+    await flush();
+    expect(w.sent).toHaveLength(1);
     expect(w.reports.docs.map((doc) => doc['resolution'])).toEqual(['kept', 'removed']);
     expect((await w.service.queue(DEV)).items).toEqual([]);
   });

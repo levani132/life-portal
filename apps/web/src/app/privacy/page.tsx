@@ -43,7 +43,7 @@ export default function PrivacyPage() {
           <li><strong>To run the app for you</strong> (your account, your records, what you share): this is the service you asked for when you created an account.</li>
           <li><strong>Health information</strong> (food, weight, training, Apple Health activity): on your explicit consent, which you give when you create your account and can withdraw at any time by deleting what you entered or your account.</li>
           <li><strong>Keeping accounts and people safe</strong> (sign-in records, limits on repeated attempts, checking photos, reviewing reports): our legitimate interest in a safe service, and our legal duties.</li>
-          <li><strong>Emails about your account</strong> (confirming your address, resetting a password, a notice that your account was deleted): part of running the account. We send no marketing email.</li>
+          <li><strong>Emails about your account</strong> (confirming your address, resetting a password, a notice that your account was deleted or suspended, or that a post of yours was removed): part of running the account. We send no marketing email.</li>
         </ul>
       </LegalSection>
 

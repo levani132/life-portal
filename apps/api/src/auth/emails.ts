@@ -87,3 +87,39 @@ export function reviewNeededEmail(to: string, link: string): MailMessage {
     html: layout(lines, { href: link, label: 'Open the review queue' }),
   };
 }
+
+/** `support@` on the domain mail is sent from, for the "write to us" line. */
+export function supportAddress(from: string | undefined): string | undefined {
+  const domain = /@([^@\s>]+)>?\s*$/.exec(from ?? '')?.[1];
+  return domain ? `support@${domain}` : undefined;
+}
+
+const appeal = (support?: string) =>
+  support ? `If you think this is a mistake, write to ${support} from this address.` : 'If you think this is a mistake, reply to this email.';
+
+/** Tells an author the reviewer removed their post (spec 039). Only their own title is quoted. */
+export function postRemovedEmail(to: string, name: string, post: { title: string; day: string }, rulesLink: string, support?: string): MailMessage {
+  const which = post.title.trim() ? `Your post "${post.title.trim().slice(0, 80)}" from ${post.day}` : `Your post from ${post.day}`;
+  const lines = [`Hi ${name},`, `${which} was removed because it breaks the Community Rules. Its text and photos have been deleted.`, appeal(support)];
+  return {
+    to,
+    subject: 'LifePortal: your post was removed',
+    text: `${lines.join('\n\n')}\n\n${rulesLink}\n`,
+    html: layout(lines, { href: rulesLink, label: 'Read the Community Rules' }),
+  };
+}
+
+/** Tells a person their account was suspended (spec 039). */
+export function accountSuspendedEmail(to: string, name: string, rulesLink: string | undefined, support?: string): MailMessage {
+  const lines = [
+    `Hi ${name},`,
+    'Your LifePortal account has been suspended for breaking the Community Rules. You are signed out on every device and cannot sign in, and what you posted is not shown to anyone. Nothing has been deleted.',
+    appeal(support),
+  ];
+  return {
+    to,
+    subject: 'LifePortal: your account was suspended',
+    text: `${lines.join('\n\n')}\n${rulesLink ? `\n${rulesLink}\n` : ''}`,
+    html: layout(lines, rulesLink ? { href: rulesLink, label: 'Read the Community Rules' } : undefined),
+  };
+}

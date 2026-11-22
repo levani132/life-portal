@@ -146,6 +146,12 @@ export class AccessService {
     const rows = await this.users.find({ _id: { $in: ids }, suspendedAt: { $exists: true } }).select('_id').lean();
     return new Set(rows.map((row) => String(row._id)));
   }
+  /** Where to write to an account's owner about the account itself (a removed post, a suspension). */
+  async contactOf(userId: string): Promise<{ email: string; name: string } | undefined> {
+    if (!isValidObjectId(userId)) return undefined;
+    const user = await this.users.findById(userId).select('email name').lean();
+    return user ? { email: user.email, name: user.name } : undefined;
+  }
   /** The address the developer's account signs in with, for notices about the app itself. */
   async developerEmail(): Promise<string | undefined> {
     const id = this.config.developerUserId;
