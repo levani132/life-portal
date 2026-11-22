@@ -1434,3 +1434,6 @@ Fixed an invalid field tag in the reference batching generator: `WFItemType=1` d
   `life-portal-tan.vercel.app` address still answers. Password reset and email verification are
   switched on in production: mail is sent through Resend from `lifeportal.one`, and mail to any
   address on the domain is forwarded by ImprovMX. No code changed; runbooks name the new address.
+- Password-reset and confirmation emails now open with the app icon and the LifePortal wordmark,
+  on a white card. The icon is loaded from the web app; a mail app that blocks images still shows
+  the name.
