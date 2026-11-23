@@ -38,7 +38,7 @@ import { PlansService } from '../training/plans.service';
 export class PageAssistantAction {
   @Prop({ required: true }) pageId!: string;
   @Prop({ required: true }) personId!: string;
-  @Prop({ required: true, enum: ASSISTANT_ACTION_KINDS }) kind!: AssistantActionKind;
+  @Prop({ type: String, required: true, enum: ASSISTANT_ACTION_KINDS }) kind!: AssistantActionKind;
   @Prop({ required: true }) tool!: string;
   @Prop() targetId?: string;
   /** The UTC day, for the daily count. */
