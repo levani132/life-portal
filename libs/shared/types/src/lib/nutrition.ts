@@ -561,3 +561,60 @@ export interface PublicFoodsResponse {
 
 /** How much text a recipe may carry (spec 042). */
 export const RECIPE_LIMITS = { ingredients: 40, ingredientLength: 200, steps: 30, stepLength: 600 } as const;
+
+// ------------------------------------------------------------------ meal plans (spec 042)
+
+/** How large a meal plan may be. */
+export const MEAL_PLAN_LIMITS = { days: 14, entriesPerDay: 20, name: 80, dayName: 40, description: 500 } as const;
+
+/**
+ * One line of a plan's day: a recipe (a saved meal), or one food with an amount in the food's own
+ * unit. Stored as ids and amounts; names and totals are worked out on read.
+ */
+export interface MealPlanEntry {
+  id: Id;
+  slot: MealSlot;
+  savedMealId?: Id;
+  foodId?: Id;
+  amount?: number;
+}
+
+export interface MealPlanDay {
+  id: Id;
+  name: string;
+  entries: MealPlanEntry[];
+}
+
+/** What is stored, and what a save sends. */
+export interface MealPlanInput {
+  name: string;
+  description?: string;
+  days: { id?: Id; name: string; entries: { id?: Id; slot: MealSlot; savedMealId?: Id; foodId?: Id; amount?: number }[] }[];
+}
+
+/** An entry with today's facts resolved. `missing`: its food or recipe is gone, or the recipe has no numbers. */
+export interface MealPlanEntryView extends MealPlanEntry {
+  name: string;
+  unit?: FoodUnit;
+  totals: EntryTotals;
+  missing: boolean;
+}
+
+export interface MealPlanDayView {
+  id: Id;
+  name: string;
+  entries: MealPlanEntryView[];
+  totals: EntryTotals;
+}
+
+export interface MealPlan extends Timestamped {
+  id: Id;
+  userId: Id;
+  name: string;
+  description?: string;
+  days: MealPlanDayView[];
+  /** The average of the days that have anything in them. */
+  dailyAverage: EntryTotals;
+  /** Whether every entry still resolves to foods with numbers, so a day can be logged or shared. */
+  complete: boolean;
+}

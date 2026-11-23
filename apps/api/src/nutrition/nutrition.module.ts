@@ -1,3 +1,4 @@
+import { MealPlanRecord, MealPlanSchema, MealPlansController, MealPlansService } from './meal-plans';
 import {
   HealthShortcutSettings,
   HealthShortcutSettingsSchema,
@@ -383,6 +384,7 @@ export class NutritionController {
       { name: FoodBrandRow.name, schema: FoodBrandSchema },
       { name: MealEntry.name, schema: MealEntrySchema },
       { name: SavedMeal.name, schema: SavedMealSchema },
+      { name: MealPlanRecord.name, schema: MealPlanSchema },
       { name: NutritionProfile.name, schema: NutritionProfileSchema },
       { name: WeighIn.name, schema: WeighInSchema },
       { name: CheatMeal.name, schema: CheatMealSchema },
@@ -392,6 +394,8 @@ export class NutritionController {
   controllers: [
     // Before the main controller, so `nutrition/brands` is never read as one of its `:id` routes.
     BrandsController,
+    // Before the main controller for the same reason.
+    MealPlansController,
     NutritionController,
     HealthController,
     HealthShortcutSettingsController,
@@ -404,7 +408,8 @@ export class NutritionController {
     BrandsService,
     OpenFoodFactsProvider,
     NutritionPublicationService,
+    MealPlansService,
   ],
-  exports: [NutritionService, NutritionPublicationService],
+  exports: [NutritionService, NutritionPublicationService, MealPlansService],
 })
 export class NutritionModule {}

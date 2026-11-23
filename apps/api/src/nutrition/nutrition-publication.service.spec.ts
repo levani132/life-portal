@@ -76,6 +76,7 @@ function fixture() {
           fatTargetG: 60,
         })),
       } as never,
+      { row: jest.fn(async () => null), saveImported: jest.fn() } as never,
     ),
   };
 }

@@ -120,6 +120,8 @@ B. Library. A page needs things to attach. Keep at least 12 foods and 6 recipes 
      (20 g protein = 20000). Use values you are confident are correct for the food as normally
      sold or cooked. If you are not sure, do not create it.
    - Recipes: create_page_recipe from the page's own foods, with real amounts.
+   - Meal plans: create_page_meal_plan from the page's recipes and foods, with named days. A
+     page about eating plans keeps at least two.
    - Plans: list_page_exercises to find exercises, then create_page_plan. Weights in grams
      (60 kg = 60000), or leave weight out for bodyweight and beginner plans.
    - Before creating, list what exists (list_page_foods, list_page_recipes, list_page_plans) and
@@ -128,7 +130,7 @@ B. Library. A page needs things to attach. Keep at least 12 foods and 6 recipes 
 C. Today's posts. Each page posts exactly twice a day:
    - Post 1, between 08:00 and 14:00: a hook WITH something attached to save (foodId, recipeId,
      planId or exerciseId). A page about eating and training together attaches one of each: a
-     recipe with the plan it goes with.
+     recipe or a meal plan (mealPlanId) with the training plan it goes with.
    - Post 2, between 16:00 and 22:30: lighter. A question, a guess, a tip or a short take. No
      attachment needed.
    Create each with create_page_post and `at`. If today's two are already queued or posted for

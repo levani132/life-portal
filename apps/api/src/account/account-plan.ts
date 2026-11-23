@@ -67,6 +67,7 @@ export const ACCOUNT_PLAN: Record<string, CollectionRule> = {
   food_brands: owned,
   meal_entries: owned,
   saved_meals: owned,
+  meal_plans: owned,
   cheat_meals: owned,
   weigh_ins: owned,
   nutrition_profiles: owned,

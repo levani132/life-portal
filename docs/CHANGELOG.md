@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Meal plans
+
+- **Food → Meal plans**: build days of meals from your recipes and foods ("Training day",
+  "Rest day"), see each day's numbers and the average day, and **log a day in one tap**.
+- **Share a meal plan** in a post, on its own or with a training plan. Readers see it day by
+  day and can save it as their own plan.
+- Pages keep and post meal plans from their Library.
+
 ## 2026-11-23: Recipes with a method, with or without numbers
 
 - **A recipe has a method** (steps) and can list ingredients in plain words.

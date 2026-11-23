@@ -50,3 +50,4 @@ export * from './lib/usage';
 export * from './lib/pages';
 export * from './lib/assistant';
 export * from './lib/jpeg';
+export * from './lib/meal-plans';

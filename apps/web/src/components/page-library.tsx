@@ -13,6 +13,7 @@ import { BrandsManager } from './brands-manager';
 import { FoodCard } from './food-card';
 import { FoodCombobox } from './food-combobox';
 import { FoodForm } from './food-form';
+import { MealPlans } from './meal-plans';
 import { PageHeader } from './page-header';
 import { ExerciseLibrary } from './training/exercise-library';
 import { Plans } from './training/plans';
@@ -24,6 +25,7 @@ const MEALS_KEY = '/nutrition/meals';
 const SECTIONS = [
   { id: 'foods', label: 'Foods' },
   { id: 'recipes', label: 'Recipes' },
+  { id: 'mealPlans', label: 'Meal plans' },
   { id: 'plans', label: 'Training plans' },
   { id: 'exercises', label: 'Exercises' },
 ] as const;
@@ -58,6 +60,7 @@ export function PageLibrary() {
       </div>
       {section === 'foods' && <Foods />}
       {section === 'recipes' && <Recipes />}
+      {section === 'mealPlans' && <MealPlans canLog={false} />}
       {section === 'plans' && <Plans onStarted={() => undefined} />}
       {section === 'exercises' && <ExerciseLibrary />}
     </div>

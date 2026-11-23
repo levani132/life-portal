@@ -64,6 +64,7 @@ export function validPostSelection(selection: PostSelection): boolean {
     food: ['foodId'],
     database: [],
     combination: selection.savedMealId ? ['savedMealId'] : ['components'],
+    mealPlan: ['mealPlanId'],
   };
   const keys = allowed[selection.kind];
   if (!keys) return false;

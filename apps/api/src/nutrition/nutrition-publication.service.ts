@@ -1,3 +1,4 @@
+import { MealPlansService } from './meal-plans';
 import {
   BadRequestException,
   Injectable,
@@ -44,6 +45,7 @@ export class NutritionPublicationService {
     @InjectModel(MealEntry.name) private readonly entries: Model<MealEntry>,
     @InjectModel(SavedMeal.name) private readonly meals: Model<SavedMeal>,
     private readonly nutrition: NutritionService,
+    private readonly mealPlans: MealPlansService,
   ) {}
   private attribution(food: Food): FoodAttribution | undefined {
     if (food.attribution)
@@ -154,6 +156,29 @@ export class NutritionPublicationService {
           : {}),
         items,
       };
+    } else if (source.kind === 'mealPlan') {
+      // Spec 042: a meal plan as its foods, day by day. A recipe in the plan is published as the
+      // foods it is made of, named for the recipe. Only foods, amounts, slots and day names leave.
+      const plan = await this.mealPlans.row(userId, source.mealPlanId as string);
+      if (!plan) throw new NotFoundException('Meal plan not found.');
+      const recipeIds = plan.days.flatMap((day) => day.entries.flatMap((entry) => (entry.savedMealId ? [entry.savedMealId] : [])));
+      const recipes = recipeIds.length ? await this.meals.find({ userId, _id: { $in: recipeIds }, archived: false }).lean() : [];
+      const lines = plan.days.flatMap((day, dayIndex) =>
+        day.entries.flatMap((entry) => {
+          if (!entry.savedMealId) return [{ dayIndex, slot: entry.slot, foodId: entry.foodId as string, amount: entry.amount as number, group: undefined as string | undefined }];
+          const recipe = recipes.find((meal) => String(meal._id) === entry.savedMealId);
+          if (!recipe || !recipe.components.length)
+            throw new BadRequestException({ code: 'PLAN_INCOMPLETE', message: 'A recipe in this plan has no foods with numbers. Edit the plan before sharing it.' });
+          return recipe.components.map((component) => ({ dayIndex, slot: entry.slot, foodId: component.foodId, amount: component.amount, group: recipe.name as string | undefined }));
+        }),
+      );
+      const rows = await this.foods.find({ userId, archived: false, _id: { $in: lines.map((line) => line.foodId) } }).lean();
+      const items = lines.map((line, index) => {
+        const food = rows.find((row) => String(row._id) === line.foodId);
+        if (!food) throw new BadRequestException({ code: 'PLAN_INCOMPLETE', message: 'A food in this plan is no longer available. Edit the plan before sharing it.' });
+        return { ...this.fromFood(food, String(index), line.amount), slot: line.slot, dayIndex: line.dayIndex, ...(line.group ? { group: line.group } : {}) };
+      });
+      publication = { kind: 'mealPlan', label: plan.name, items, days: plan.days.map((day) => day.name) };
     } else if (source.kind === 'food' || source.kind === 'database') {
       const rows = await this.foods
         .find({
@@ -276,6 +301,7 @@ export class NutritionPublicationService {
     duplicatePolicy: 'skip' | 'copy',
     saveAsMeal: boolean,
     mealName?: string,
+    savePlan = false,
   ): Promise<PostImportResult> {
     if (keys.some((key) => !publication.items.some((item) => item.key === key)))
       throw new BadRequestException('Choose foods from this post.');
@@ -297,6 +323,9 @@ export class NutritionPublicationService {
       throw new BadRequestException(
         'To save this meal, select every food and choose Copy for matching food names.',
       );
+    // Spec 042: a plan is copied whole or not at all, like a saved meal.
+    if (savePlan && (publication.kind !== 'mealPlan' || selected.length !== publication.items.length || skipped.length))
+      throw new BadRequestException('To save this plan, select every food and choose Copy for matching food names.');
     const eligible = rows.filter((r) => !skipped.includes(r));
     const unique = [
       ...new Map(
@@ -320,7 +349,7 @@ export class NutritionPublicationService {
     let createdCount = 0;
     // Upserts are independent/idempotent. A retry resumes an interrupted collection import.
     for (const [key, { item }] of unique) {
-      const { key: _key, amount: _amount, slot: _slot, ...facts } = item;
+      const { key: _key, amount: _amount, slot: _slot, dayIndex: _dayIndex, group: _group, ...facts } = item;
       try {
         const result = await this.foods.updateOne(
           { userId, postImportKey: key },
@@ -384,11 +413,25 @@ export class NutritionPublicationService {
         .lean();
       savedMealId = String(meal!._id);
     }
+    let mealPlanId: string | undefined;
+    if (savePlan) {
+      // The reader's plan is built from their own copies of the foods; recipes arrive as their foods.
+      const copies = await this.foods.find({ userId, postImportKey: { $in: unique.map(([key]) => key) } }).lean();
+      const idOf = (item: PublishedFood) => String(copies.find((food) => food.postImportKey === this.importKey(postId, item))!._id);
+      const days = (publication.days ?? ['Day 1']).map((name, dayIndex) => ({
+        name,
+        entries: selected
+          .filter((item) => (item.dayIndex ?? 0) === dayIndex)
+          .map((item) => ({ slot: item.slot ?? ('uncategorized' as const), foodId: idOf(item), amount: item.amount ?? item.servingSize })),
+      }));
+      mealPlanId = await this.mealPlans.saveImported(userId, postId, mealName?.trim() || publication.label, days);
+    }
     return {
       createdCount,
       reusedCount: unique.length - createdCount,
       skippedCount: skipped.length,
       ...(savedMealId ? { savedMealId } : {}),
+      ...(mealPlanId ? { mealPlanId } : {}),
     };
   }
 }

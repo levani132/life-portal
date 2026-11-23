@@ -61,6 +61,7 @@ export class PostSelectionDto implements PostSelection {
   @ValidateNested({ each: true })
   @Type(() => ComponentDto)
   components?: ComponentDto[];
+  @ValidateIf((_, v: unknown) => v !== undefined) @IsMongoId() mealPlanId?: string;
 }
 /**
  * Spec 036: what to share from Training. Only the shape is checked here; which fields belong to
@@ -197,6 +198,8 @@ export class ImportPostDto {
   itemKeys!: string[];
   @IsIn(['skip', 'copy']) duplicatePolicy: 'skip' | 'copy' = 'skip';
   @IsBoolean() saveAsMeal = false;
+  /** Spec 042: also make the reader their own copy of a published meal plan. */
+  @ValidateIf((_, v: unknown) => v !== undefined) @IsBoolean() savePlan?: boolean;
   @ValidateIf((_, v: unknown) => v !== undefined)
   @IsString()
   @MaxLength(120)

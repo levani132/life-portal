@@ -417,6 +417,42 @@ A refused meal (`FOOD_GONE`, `MEAL_CHANGED`) stays on
 the day with its reason and Discard. Banked calories, the cheat countdown and suggestions stay the
 server's until it answers.
 
+## Meal plans (spec 042)
+
+`apps/api/src/nutrition/meal-plans.ts`, pure rules in `libs/shared/domain/src/lib/meal-plans.ts`,
+web `components/meal-plans.tsx`. For people and pages.
+
+| Collection `meal_plans` | |
+|---|---|
+| `userId`, `name`, `description?` | |
+| `days[]` | 1 to 14, each `{id, name, entries[]}`; names are free ("Training day", "Day 1") |
+| `days[].entries[]` | Up to 20, each `{id, slot, savedMealId}` (a recipe) or `{id, slot, foodId, amount}` (one food, amount in its own unit) |
+| `postImportKey?` | A copy saved from a post: one per reader and post |
+
+**Nothing derived is stored.** `mealPlanView()` works out each line's name and totals, each day's
+totals, the average day (over days that hold anything) and `complete` from the foods and recipes
+as they are now. A line whose food or recipe is gone, or whose recipe has no foods, is `missing`
+and counts for nothing. `mealPlanProblem()` is the one validity rule, shared by API and editor.
+
+| Route | Who | What |
+|---|---|---|
+| `GET /nutrition/meal-plans` | person, page | The owner's plans, resolved |
+| `POST /nutrition/meal-plans`, `PUT /:id` | person, page | Create, replace. Only the owner's own foods and recipes |
+| `DELETE /nutrition/meal-plans/:id` | person, page | |
+| `POST /nutrition/meal-plans/:id/days/:dayId/log` | **person only** | `{day, entryIds?}`: logs the day, or those lines, into the diary day the device chose, through `createEntry`, so facts are frozen then. 400 `PLAN_INCOMPLETE` when a line has no numbers. A page gets 403 `NOT_FOR_PAGES` |
+
+**Sharing.** `{kind: 'mealPlan', mealPlanId}` publishes the plan as its foods, in order, each
+with `dayIndex`, `slot`, `amount` and, when it came from a recipe, `group` (the recipe's name);
+`publication.days` holds the day names. Recipes are flattened: only foods, amounts, meals and day
+names leave. A plan with a line that has no numbers cannot be shared (`PLAN_INCOMPLETE`).
+`POST /posts/:id/import` with `savePlan: true` (every food selected, policy `copy`) saves the
+foods and builds the reader's own plan from them (`MealPlansService.saveImported`), once per
+post. Nothing is logged.
+
+Web: Food → Meal plans (with "Log this day today"); a page's Library → Meal plans (no logging).
+The post card heads each day, shows numbers per day rather than summed, and the save dialog
+offers "Also save it as my own meal plan".
+
 ## Recipes (spec 042)
 
 A saved meal is also a recipe. `saved_meals` gained `ingredients: string[]` (written by hand, up

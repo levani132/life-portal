@@ -14,6 +14,8 @@ import {
   ASSISTANT_SCHEDULE_MEDIA_MAX_HOURS,
   type AssistantScheduledAction,
   MAX_POST_MEDIA,
+  MEAL_SLOTS,
+  type MealSlot,
   MEDIA_LIMITS,
   EQUIPMENT_TYPES,
   MEASURES,
@@ -30,6 +32,7 @@ import { AccessService } from '../access/access.module';
 import { FollowsService } from '../follows/follows.module';
 import { MediaService } from '../media/media.service';
 import { MessagesService } from '../messages/messages.service';
+import { MealPlansService } from '../nutrition/meal-plans';
 import { NutritionService } from '../nutrition/nutrition.service';
 import { PagesService } from '../pages/pages.module';
 import { ForYouService } from '../posts/for-you.service';
@@ -160,6 +163,7 @@ export class PageAssistantService {
     private readonly follows: FollowsService,
     private readonly messages: MessagesService,
     private readonly media: MediaService,
+    private readonly mealPlans: MealPlansService,
     @InjectModel(PageScheduledAction.name) private readonly scheduledActions: Model<PageScheduledAction>,
     @Inject(CONFIG) private readonly config: AppConfig,
   ) {}
@@ -620,6 +624,64 @@ export class PageAssistantService {
           })),
       },
 
+      // ---- library: meal plans
+      {
+        name: 'list_page_meal_plans',
+        description: 'The meal plans in a page’s library: days of meals, with each day’s totals and the average day.',
+        shape: { pageId },
+        run: async (personId, args) => {
+          const plans = await this.mealPlans.list(await this.acting(personId, args));
+          return plans.map((plan) => ({
+            id: plan.id,
+            name: plan.name,
+            description: plan.description,
+            complete: plan.complete,
+            dailyAverage: plan.dailyAverage,
+            days: plan.days.map((day) => ({ name: day.name, totals: day.totals, lines: day.entries.map((entry) => ({ meal: entry.slot, name: entry.name, amount: entry.amount })) })),
+          }));
+        },
+      },
+      {
+        name: 'create_page_meal_plan',
+        description:
+          'Create a meal plan in a page’s library: one to fourteen named days ("Training day", "Rest day", or "Day 1"), each a list of lines. A line is a meal (breakfast, lunch, dinner, snack) with either a recipe from the library (recipeId) or one food with an amount in its own unit (foodId and amount). Use recipes and foods that have numbers.',
+        shape: {
+          pageId,
+          name: z.string().min(1).max(80),
+          description: z.string().max(500).optional(),
+          days: z
+            .array(
+              z.object({
+                name: z.string().min(1).max(40),
+                lines: z
+                  .array(z.object({ meal: z.enum(MEAL_SLOTS), recipeId: id.optional(), foodId: id.optional(), amount: z.number().int().min(1).max(20_000).optional() }))
+                  .max(20),
+              }),
+            )
+            .min(1)
+            .max(14),
+        },
+        run: (personId, args) =>
+          this.counted(personId, args, 'library', 'create_page_meal_plan', async (page) => {
+            const days = (args['days'] as { name: string; lines: { meal: MealSlot; recipeId?: string; foodId?: string; amount?: number }[] }[]).map((day) => ({
+              name: day.name,
+              entries: day.lines.map((line) => ({ slot: line.meal, ...(line.recipeId ? { savedMealId: line.recipeId } : { foodId: line.foodId, amount: line.amount }) })),
+            }));
+            const created = await this.mealPlans.create(page, { name: String(args['name']), description: args['description'] as string | undefined, days });
+            return { result: { id: created.id, name: created.name, dailyAverage: created.dailyAverage, complete: created.complete }, targetId: created.id };
+          }),
+      },
+      {
+        name: 'delete_page_meal_plan',
+        description: 'Remove a meal plan from a page’s library.',
+        shape: { pageId, mealPlanId: id },
+        run: (personId, args) =>
+          this.counted(personId, args, 'library', 'delete_page_meal_plan', async (page) => ({
+            result: await this.mealPlans.remove(page, String(args['mealPlanId'])),
+            targetId: String(args['mealPlanId']),
+          })),
+      },
+
       // ---- library: training
       {
         name: 'list_page_exercises',
@@ -746,7 +808,7 @@ export class PageAssistantService {
       {
         name: 'create_page_post',
         description:
-          'Publish a post as a page, or save it as a draft (draft: true) that only the page’s managers see until it is published. A post is text, and may carry items from the page’s library for people to save or copy: a food or a recipe, a training plan or an exercise, or one of each together (a recipe with the plan it goes with). Present library content as something to save, never as something the page ate or did.',
+          'Publish a post as a page, or save it as a draft (draft: true) that only the page’s managers see until it is published. A post is text, and may carry items from the page’s library for people to save or copy: a food or a recipe, a training plan or an exercise, or a meal plan; and with any of those, a training plan or an exercise too (a meal plan with the training plan it goes with is a full programme). Present library content as something to save, never as something the page ate or did.',
         shape: {
           pageId,
           caption: z.string().max(1000),
@@ -754,6 +816,7 @@ export class PageAssistantService {
           draft: z.boolean().optional(),
           foodId: id.optional(),
           recipeId: id.optional(),
+          mealPlanId: id.optional().describe('A meal plan from the library, shown day by day; readers can save it as their own.'),
           planId: id.optional(),
           exerciseId: id.optional(),
           mediaIds: z.array(id).max(MAX_POST_MEDIA).optional().describe('Photos to show on the post: ids from finish_page_media_upload, in order.'),
@@ -762,7 +825,7 @@ export class PageAssistantService {
         run: (personId, args) =>
           this.counted(personId, args, 'post', 'create_page_post', async (page) => {
             // Spec 042: one food item and one training item may go together.
-            if (args['foodId'] !== undefined && args['recipeId'] !== undefined) throw new BadRequestException('Attach a food or a recipe, not both.');
+            if (['foodId', 'recipeId', 'mealPlanId'].filter((field) => args[field] !== undefined).length > 1) throw new BadRequestException('Attach one of a food, a recipe or a meal plan.');
             if (args['planId'] !== undefined && args['exerciseId'] !== undefined) throw new BadRequestException('Attach a plan or an exercise, not both.');
             const base = {
               requestId: (args['requestId'] as string | undefined) ?? randomUUID(),
@@ -773,8 +836,12 @@ export class PageAssistantService {
             const mediaIds = (args['mediaIds'] as string[] | undefined) ?? [];
             await this.media.requireAssistantChecked(page, mediaIds);
             let dto: Record<string, unknown> = mediaIds.length ? { ...base, mediaIds } : base;
-            if (args['foodId'] || args['recipeId']) {
-              const source = args['foodId'] ? { kind: 'food', foodId: args['foodId'] } : { kind: 'combination', savedMealId: args['recipeId'] };
+            if (args['foodId'] || args['recipeId'] || args['mealPlanId']) {
+              const source = args['foodId']
+                ? { kind: 'food', foodId: args['foodId'] }
+                : args['recipeId']
+                  ? { kind: 'combination', savedMealId: args['recipeId'] }
+                  : { kind: 'mealPlan', mealPlanId: args['mealPlanId'] };
               const preview = await this.posts.preview(page, { source } as never);
               dto = { ...dto, source, previewHash: preview.previewHash };
             }

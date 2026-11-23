@@ -478,7 +478,15 @@ export function PostCard({
       icon: Library,
       tint: 'bg-success-solid/10 text-success',
     },
+    mealPlan: {
+      label: 'Meal plan',
+      icon: Utensils,
+      tint: 'bg-info-solid/10 text-info',
+    },
   }[post.kind ?? 'food'];
+  // Spec 042: a meal plan's numbers are per day, not for all its days added up.
+  const planDays = post.kind === 'mealPlan' ? Math.max(1, post.days?.length ?? 1) : 1;
+  const perDay = (value: number) => Math.round(value / planDays);
   const hasFood = !!post.kind;
   const PreviewIcon = presentation.icon;
   return (
@@ -619,17 +627,19 @@ export function PostCard({
               {post.day ? `${post.day} · ` : ''}
               {post.itemCount === 0
                 ? 'Recipe · no nutrition numbers'
-                : `${post.itemCount} food${post.itemCount === 1 ? '' : 's'}${post.totalKcal === undefined ? '' : ` · ${post.totalKcal} kcal`}`}
+                : post.kind === 'mealPlan'
+                  ? `${planDays} ${planDays === 1 ? 'day' : 'days'}${post.totalKcal === undefined ? '' : ` · about ${perDay(post.totalKcal)} kcal a day`}`
+                  : `${post.itemCount} food${post.itemCount === 1 ? '' : 's'}${post.totalKcal === undefined ? '' : ` · ${post.totalKcal} kcal`}`}
             </p>
           </div>
         </div>
         {post.itemCount === 0 ? null : post.kind !== 'day' && post.totalMacros ? (
           <MacroRings
             className="mt-3"
-            kcal={post.totalMacros.energyKcal}
-            proteinMg={post.totalMacros.proteinG * 1000}
-            carbMg={post.totalMacros.carbG * 1000}
-            fatMg={post.totalMacros.fatG * 1000}
+            kcal={perDay(post.totalMacros.energyKcal)}
+            proteinMg={perDay(post.totalMacros.proteinG * 1000)}
+            carbMg={perDay(post.totalMacros.carbG * 1000)}
+            fatMg={perDay(post.totalMacros.fatG * 1000)}
           />
         ) : (
           <PublishedNutritionSummary
@@ -642,8 +652,11 @@ export function PostCard({
         <ul
           className={`mt-3 divide-y divide-border/70 ${detail ? 'max-h-[32rem] overflow-y-auto' : ''}`}
         >
-          {post.items.map((food) => (
+          {post.items.map((food, index) => (
             <li key={food.key} className="py-3 text-sm">
+              {post.days && food.dayIndex !== undefined && food.dayIndex !== post.items[index - 1]?.dayIndex && (
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">{post.days[food.dayIndex] ?? `Day ${food.dayIndex + 1}`}</p>
+              )}
               <div className="flex flex-wrap justify-between gap-2">
                 <span className="font-medium">
                   {food.name}
@@ -656,6 +669,7 @@ export function PostCard({
                     ? `Per 100 ${food.unit}`
                     : `${food.amount} ${food.unit}`}
                   {food.slot ? ` · ${food.slot}` : ''}
+                  {food.group ? ` · ${food.group}` : ''}
                 </span>
               </div>
               <PublishedFoodMacros food={food} />
@@ -869,6 +883,8 @@ function ImportPost({
     'skip',
   );
   const [saveAsMeal, setSaveAsMeal] = useState(false);
+  // Spec 042: a published meal plan can be kept as the reader's own plan.
+  const [savePlan, setSavePlan] = useState(false);
   const [mealName, setMealName] = useState('');
   const [result, setResult] = useState<PostImportResult | null>(null);
   const keys =
@@ -994,6 +1010,27 @@ function ImportPost({
               )}
             </>
           )}
+          {post.data.kind === 'mealPlan' && (
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-5 w-5 shrink-0 accent-[rgb(var(--accent))]"
+                checked={savePlan}
+                onChange={(e) => {
+                  setSavePlan(e.target.checked);
+                  if (e.target.checked) {
+                    // A plan is copied whole: every food, each as a new copy.
+                    setSelected(post.data!.items.map((item) => item.key));
+                    setDuplicatePolicy('copy');
+                  }
+                }}
+              />
+              <span>
+                Also save it as my own meal plan
+                <span className="block text-xs text-ink-muted">Every food is saved, and the plan appears in Food → Meal plans. Nothing is logged.</span>
+              </span>
+            </label>
+          )}
           {action.error && <ErrorNote message={action.error} />}
           <button
             type="button"
@@ -1009,6 +1046,7 @@ function ImportPost({
                         itemKeys: keys,
                         duplicatePolicy,
                         saveAsMeal,
+                        ...(savePlan ? { savePlan: true } : {}),
                         mealName: mealName || post.data!.title,
                       },
                     ),

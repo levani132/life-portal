@@ -8,6 +8,7 @@ export const POST_KINDS = [
   'food',
   'combination',
   'database',
+  'mealPlan',
 ] as const;
 export type FoodPostKind = (typeof POST_KINDS)[number];
 export const MAX_POST_ITEMS = 1000;
@@ -19,6 +20,8 @@ export interface PostSelection {
   foodId?: string;
   savedMealId?: string;
   components?: { foodId: string; amount: number }[];
+  /** Spec 042: a meal plan of the author's. */
+  mealPlanId?: string;
 }
 export interface FoodAttribution {
   label: string;
@@ -35,6 +38,9 @@ export interface PublishedFood extends NutritionFacts {
   amount?: number;
   slot?: MealSlot;
   attribution?: FoodAttribution;
+  /** Spec 042, in a published meal plan: which day (an index into `days`), and the recipe this food came from. */
+  dayIndex?: number;
+  group?: string;
 }
 export interface PublishedMacros {
   energyKcal: number;
@@ -50,6 +56,8 @@ export interface FoodPublication {
   day?: string;
   slot?: MealSlot;
   items: PublishedFood[];
+  /** Spec 042, a meal plan: its days' names, in order. Items point at them with `dayIndex`. */
+  days?: string[];
   /**
    * Spec 042: a published recipe's own words. A recipe may be published with these and no foods:
    * its author gave no nutrition numbers, and the post says so.
@@ -143,6 +151,8 @@ export interface FoodPost {
   items: PublishedFood[];
   /** Spec 042: the recipe's written ingredients and method, when the post carries a recipe. */
   recipe?: PublishedRecipe;
+  /** Spec 042: a meal plan's day names. */
+  days?: string[];
   totalKcal?: number;
   totalMacros?: PublishedMacros;
   targets?: Partial<PublishedMacros>;
@@ -193,6 +203,8 @@ export interface PostImportResult {
   reusedCount: number;
   skippedCount: number;
   savedMealId?: string;
+  /** Spec 042: the reader's own copy of a published meal plan. */
+  mealPlanId?: string;
 }
 export const REPORT_REASONS = [
   'nudity',

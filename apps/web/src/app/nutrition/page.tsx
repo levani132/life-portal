@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { Apple, BookmarkPlus, Bot, ChevronDown, Info, Pencil, Plus, Search, Share2, Sparkles, Tags, Trash2, UserRound, Utensils, X, Zap, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { RecipeEditor } from '../../components/page-library';
+import { MealPlans } from '../../components/meal-plans';
 import type {
   PortalState,
   PostSelection,
@@ -1251,6 +1252,11 @@ function FoodsTab({
         onChanged={onChanged}
         onShare={onShare}
       />
+
+      {/* Spec 042: days of meals, built from the recipes and foods above. */}
+      <Panel title="Meal plans" description="Plan days of eating, log a day in one tap, and share a plan.">
+        <MealPlans canLog />
+      </Panel>
 
       <PublicFoodsPanel
         hasPublicFoods={overview.hasPublicFoodsToImport}

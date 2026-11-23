@@ -11,16 +11,23 @@
 - [x] T006 Recipes: steps, written ingredients, foods optional; create a food from inside; publish with or without numbers; assistant tool.
 
 ## Slice 2: meal plans
-- [ ] T010 Types and domain: meal plan shape, `mealPlanTotals()` (per meal, per day, daily average), tests.
-- [ ] T011 `meal_plans` collection and CRUD in Nutrition, open to pages for the library; in ACCOUNT_PLAN.
-- [ ] T012 Log a plan's day or meal into the diary (people only), with device ids for offline.
-- [ ] T013 Web: meal plans in Food (people) and Library (pages): list, editor, day view, log.
-- [ ] T014 Publication kind `mealPlan`: snapshot with days and slots; import gives the reader the foods and their own plan.
-- [ ] T015 Composer and post card: attach and show a meal plan by day.
-- [ ] T016 Assistant tools: list, create, delete meal plans; attach to a post.
-- [ ] T017 Integration tests; nutrition.md, posts.md, changelog.
+- [x] T010 Types and domain: meal plan shape, `mealPlanTotals()` (per meal, per day, daily average), tests.
+- [x] T011 `meal_plans` collection and CRUD in Nutrition, open to pages for the library; in ACCOUNT_PLAN.
+- [x] T012 Log a plan's day or lines into the diary (people only). Online only: device ids for offline logging are not done.
+- [x] T013 Web: meal plans in Food (people) and Library (pages): list, editor, day view, log.
+- [x] T014 Publication kind `mealPlan`: snapshot with days and slots; import gives the reader the foods and their own plan.
+- [x] T015 Composer and post card: attach and show a meal plan by day.
+- [x] T016 Assistant tools: list, create, delete meal plans; attach to a post.
+- [x] T017 Integration tests; nutrition.md, posts.md, changelog.
 
 ## Slice 3: programmes
 - [ ] T020 A programme: a meal plan and a training plan under one name.
 - [ ] T021 Publish and copy as one; the reader's copies are linked.
 - [ ] T022 Web and assistant; docs.
+
+## Open after slice 2
+
+- Logging a plan's day needs a connection (it is not queued offline like other food logging).
+- "Log this day today" logs into today; choosing another diary day is not offered yet.
+- The composer attaches a meal plan from the plan's own Post button, not from "Add from Food".
+- A recipe inside a published plan arrives as its foods: the reader's copy has no recipe objects.
