@@ -466,16 +466,11 @@ export function MealPlanEditor({ plan, onClose, onSaved }: { plan?: MealPlan; on
               </div>
               <ul className="space-y-2">
                 {day.lines.map((line) => (
-                  <li key={line.key} className="flex flex-wrap items-end gap-2">
-                    <Select aria-label="Meal" className="w-32" value={line.slot} onChange={(event) => setLine(day.key, line.key, { slot: event.target.value as MealSlot })}>
-                      {MEAL_SLOTS.map((slot) => (
-                        <option key={slot} value={slot}>
-                          {slotLabel(slot)}
-                        </option>
-                      ))}
-                    </Select>
+                  <li key={line.key} className="space-y-2 rounded-lg border border-border/70 p-2">
+                    {/* What is eaten takes the whole row: squeezed beside the other controls, the
+                        food picker has no room for its search box or its list. */}
                     {line.kind === 'recipe' ? (
-                      <Select aria-label="Recipe" className="flex-1" value={line.savedMealId} onChange={(event) => setLine(day.key, line.key, { savedMealId: event.target.value })}>
+                      <Select aria-label="Recipe" value={line.savedMealId} onChange={(event) => setLine(day.key, line.key, { savedMealId: event.target.value })}>
                         <option value="">Choose a recipe…</option>
                         {usable.map((meal) => (
                           <option key={meal.id} value={meal.id}>
@@ -484,23 +479,30 @@ export function MealPlanEditor({ plan, onClose, onSaved }: { plan?: MealPlan; on
                         ))}
                       </Select>
                     ) : (
-                      <>
-                        <div className="flex-1">
-                          <FoodCombobox foods={live} selected={line.food} onSelect={(food) => setLine(day.key, line.key, { food, amount: line.amount || String(food.servingSize) })} />
-                        </div>
+                      <FoodCombobox foods={live} selected={line.food} onSelect={(food) => setLine(day.key, line.key, { food, amount: line.amount || String(food.servingSize) })} />
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Select aria-label="Meal" className="min-w-[7rem] flex-1" value={line.slot} onChange={(event) => setLine(day.key, line.key, { slot: event.target.value as MealSlot })}>
+                        {MEAL_SLOTS.map((slot) => (
+                          <option key={slot} value={slot}>
+                            {slotLabel(slot)}
+                          </option>
+                        ))}
+                      </Select>
+                      {line.kind === 'food' && (
                         <Input
                           inputMode="numeric"
                           aria-label={`Amount${line.food ? ` of ${line.food.name}` : ''}`}
-                          className="w-24"
+                          className="w-24 shrink-0"
                           placeholder={line.food?.unit ?? 'g'}
                           value={line.amount}
                           onChange={(event) => setLine(day.key, line.key, { amount: event.target.value.replace(/\D/g, '') })}
                         />
-                      </>
-                    )}
-                    <button type="button" className="btn-ghost" aria-label="Remove this line" onClick={() => setDay(day.key, { lines: day.lines.filter((item) => item.key !== line.key) })}>
-                      <Trash2 size={16} />
-                    </button>
+                      )}
+                      <button type="button" className="btn-ghost shrink-0" aria-label="Remove this line" onClick={() => setDay(day.key, { lines: day.lines.filter((item) => item.key !== line.key) })}>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
