@@ -142,12 +142,16 @@ export class PagesService {
   async mine(personId: string): Promise<MyPages> {
     const { access } = await this.access.forUser(personId);
     if (!access.pages) return { pages: [], remaining: 0, assistant: false };
-    const [rows, person, created] = await Promise.all([
+    const [rows, person, created, own] = await Promise.all([
       this.users.find({ kind: 'page', managers: personId }).sort({ createdAt: 1 }).lean<PageRow[]>(),
       this.users.findById(personId).select('pageLimit assistantPages').lean(),
       this.users.countDocuments({ kind: 'page', createdBy: personId }),
+      // The person's own photo: while acting as a page, "my profile" is the page's.
+      this.social.summaries([personId]),
     ]);
+    const personAvatarUrl = own.get(personId)?.avatarUrl;
     return {
+      ...(personAvatarUrl ? { personAvatarUrl } : {}),
       pages: await this.summaries(rows),
       remaining: pagesRemaining({ pageLimit: person?.pageLimit, developer: personId === this.config.developerUserId, created }),
       assistant: person?.assistantPages === true,

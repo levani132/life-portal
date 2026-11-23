@@ -47,6 +47,8 @@ export interface MyPages {
   remaining: number | null;
   /** Spec 041: whether a linked AI assistant may act as the pages marked "run with AI". */
   assistant: boolean;
+  /** The person's own profile photo, for their row in "Using the app as" while acting as a page. */
+  personAvatarUrl?: string;
 }
 
 export interface CreatePageRequest {

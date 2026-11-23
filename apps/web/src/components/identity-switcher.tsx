@@ -74,7 +74,7 @@ export function IdentitySwitcher() {
     <section className="card mb-4" aria-label="Who you are using the app as">
       <p className="px-5 pt-4 text-xs font-semibold uppercase tracking-wide text-ink-faint">Using the app as</p>
       <ul className="mt-2 divide-y divide-border">
-        <Row name={user.name} note="You" active={!acting} onChoose={() => choose(null)} />
+        <Row name={user.name} note="You" avatarUrl={pages.data.personAvatarUrl} active={!acting} onChoose={() => choose(null)} />
         {pages.data.pages.map((page) => (
           <Row
             key={page.id}
