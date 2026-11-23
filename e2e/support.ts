@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
+import { join } from 'node:path';
 import { MongoClient } from 'mongodb';
 import { test as base, expect, type Page } from '@playwright/test';
 
@@ -76,7 +77,7 @@ export function today(): string {
 /** A phone screenshot of the page as it is, saved for review under e2e/screenshots. */
 export async function snap(page: Page, name: string): Promise<void> {
   await page.waitForTimeout(400);
-  await page.screenshot({ path: `screenshots/${name}.png` });
+  await page.screenshot({ path: join(__dirname, 'screenshots', `${name}.png`) });
 }
 
 export const test = base;

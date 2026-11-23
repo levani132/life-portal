@@ -328,4 +328,27 @@ describe('the assistant for pages', () => {
     expect((await api.call(beka, 'POST', `/posts/${postId}/comments`, { text: 'Again', requestId: randomUUID() })).status).toBeGreaterThanOrEqual(400);
     expect((await call('unblock_account', { pageId, accountId: beka.id })).status).toBeLessThan(300);
   });
+
+  it('serves the workers their instructions, to the owner only, and says which pages have a photo', async () => {
+    const owner = await api.account('owner');
+    const other = await api.account('other');
+    const { CONFIG } = await import('../apps/api/src/config/configuration');
+    api.app.get<{ developerUserId?: string }>(CONFIG).developerUserId = owner.id;
+    await allow(owner);
+    await allow(other);
+    const asOwner = await connector(owner);
+    const loaded = await asOwner('get_worker_instructions', { worker: 'C' });
+    expect(loaded.status).toBeLessThan(300);
+    const result = loaded.body.result as unknown as { worker: string; version: string; instructions: string };
+    expect(result.worker).toBe('C');
+    expect(result.instructions).toContain('WORKER: C');
+    expect(result.instructions).toContain('get_page_notifications');
+    expect(result.version).toMatch(/^[a-f0-9]{12}$/);
+    const refused = await (await connector(other))('get_worker_instructions', { worker: 'C' });
+    expect([refused.status, refused.body.code]).toEqual([403, 'NOT_THE_OWNER']);
+
+    await asOwner('create_page', { name: 'Photo check', username: name('photo') });
+    const pages = (await asOwner('list_my_pages')).body.result?.['pages'] as { name: string; hasPhoto: boolean }[];
+    expect(pages.find((page) => page.name === 'Photo check')?.hasPhoto).toBe(false);
+  });
 });

@@ -10,11 +10,13 @@ test('a post, a comment and a reply written under it', async ({ page }) => {
   await signIn(page, ana);
   await page.goto(`/posts/${post.id}`);
   await expect(page.getByText('E2E: what is your go-to breakfast?')).toBeVisible();
+  // Comments are folded until asked for.
+  await page.getByText('1 comment').click();
   await expect(page.getByText('Oats with yoghurt')).toBeVisible();
-  await page.getByRole('button', { name: /^reply/i }).first().click();
-  const box = page.getByPlaceholder(/reply/i).first();
+  await page.getByRole('button', { name: 'Reply', exact: true }).first().click();
+  const box = page.getByPlaceholder('Write a reply…');
   await box.fill('Good one, with berries?');
-  await box.press('Enter');
+  await page.getByRole('button', { name: 'Post reply' }).click();
   await expect(page.getByText('Good one, with berries?')).toBeVisible();
   await snap(page, '05-post-thread');
 });

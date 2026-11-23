@@ -2859,3 +2859,11 @@ Owner's decision. Precedence for each daily target is: a followed plan's daily r
 person's own override ("Override the targets by hand"), then the app's calculation. Following a
 plan is the newer, more deliberate choice; the overrides section says when a plan is setting the
 numbers, and stopping the plan brings the override back.
+
+## 2026-11-23: Workers load their instructions from the app
+
+Pasting new instructions into five ChatGPT tasks after every change was error-prone. Each task now
+holds a short block that calls `get_worker_instructions`, and the full text is generated into the
+API from the playbook. Only the owner's account can read it (it holds the plan for the pages).
+The instructions are trusted because they come from the owner's own app; the tool's result is
+the one place where the connector hands an assistant instructions rather than data.

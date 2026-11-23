@@ -212,7 +212,7 @@ export const ROADMAP: Roadmap = {
   gaps: [
     { title: 'Sign-up reveals registered emails', detail: 'It says when an address already has an account. Make that answer generic now that anyone can register.' },
     { title: 'Known abuse images', detail: 'The photo check judges what a picture shows. Matching known child-abuse images needs a separate service.' },
-    { title: 'Tests of the screens', detail: 'Every push runs the checks and the API against a real database; nothing yet drives the screens in a browser, so every UI change waits for a phone check.' },
+    { title: 'Screen tests are few', detail: 'Every push runs the checks, the API against a real database, and screen tests of the key flows at phone size with screenshots. They cover sign-in, food, recipes, plans, training, posts and pages; most screens are still checked by hand.' },
     { title: 'Real-device checks', detail: 'Push, messages and swiping on an iPhone.' },
     { title: 'Free hosting until 1 January', detail: '512 MB database and a web host whose free plan does not allow commercial use. Paid plans from 1 January, within about $30 a month; 100 pages fit in the free database until then.' },
     { title: 'A food database for strangers', detail: 'Today a person finds only their own foods, public foods and barcodes. See the world food database step.' },

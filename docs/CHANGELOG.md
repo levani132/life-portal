@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Screen tests, and workers that update themselves
+
+- Every push now also opens the app in a phone-sized browser and goes through sign-in, the food
+  day, logging a recipe in portions, a followed plan, the plan editor, a workout, a post with a
+  reply and pages, keeping a screenshot of each.
+- Page workers load their instructions from the app at the start of every run: an update
+  reaches all five on their next run. Every page now needs a profile photo before it posts.
+
 ## 2026-11-23: Logging a recipe
 
 - A recipe says **how many servings it makes**. Logging asks how many you had (¼ steps, quick

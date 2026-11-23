@@ -71,9 +71,10 @@ three have moved into the numbered steps, because friends already use the app.
   The operator is named as the owner's individual-entrepreneur registration
   (`apps/web/src/lib/brand.ts`); change it when a company takes over. A lawyer read the three pages on
   2026-11-22; have them read again before payments or a company change.
-- **Nothing drives the screens.** CI runs `npm run check` and the integration tests (the real API
-  against a real Mongo) on every push since 2026-11-23's work; `apps/api-e2e` is still the
-  generated stub, and every UI change waits for a phone check.
+- **Screen tests are few.** CI runs `npm run check`, the integration tests (the real API against
+  a real Mongo) and, since 2026-11-23, screen tests (`e2e/`, Playwright at phone size, with
+  screenshots kept as an artifact) of sign-in, food, recipes, plans, training, posts and pages.
+  Most screens are still checked by hand; `apps/api-e2e` is the unused generated stub.
 - **No general food database:** see step 10a.
 - **Real-device checks** of push, messages and swiping on an iPhone.
 - **Tier 0 limits:** Atlas M0 has 512 MB; Vercel Hobby does not allow commercial use, and Render

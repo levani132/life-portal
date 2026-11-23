@@ -8,10 +8,13 @@ test('training opens, and a workout started today shows its exercises', async ({
   await expect(page.locator('main').first()).toBeVisible();
   await snap(page, '04-training');
 
-  const exercises = await call<{ items?: { id: string; name: string }[] } | { id: string; name: string }[]>(ana, 'GET', '/training/exercises');
-  const list = Array.isArray(exercises) ? exercises : (exercises.items ?? []);
+  // A fresh database has no catalogue: the account makes its own exercises.
+  const names = ['E2E bench press', 'E2E row'];
+  const list: { id: string; name: string }[] = [];
+  for (const name of names)
+    list.push(await call<{ id: string; name: string }>(ana, 'POST', '/training/exercises', { name, primaryMuscles: ['chest'], equipmentType: 'barbell', measure: 'weight_reps' }));
   const session = await call<{ id: string }>(ana, 'POST', '/training/sessions', { requestId: randomUUID(), day: today() });
-  for (const exercise of list.slice(0, 2)) await call(ana, 'POST', `/training/sessions/${session.id}/exercises`, { exerciseId: exercise.id });
+  for (const exercise of list) await call(ana, 'POST', `/training/sessions/${session.id}/exercises`, { requestId: randomUUID(), exerciseId: exercise.id });
   await page.reload();
   await expect(page.getByText(list[0].name).first()).toBeVisible();
   await snap(page, '04-workout');

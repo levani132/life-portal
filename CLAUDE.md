@@ -58,6 +58,7 @@ npm run seed         # Idempotent. Seeds the owner, the loan, the ESPP plan, the
 npm run check        # typecheck + lint + test across the workspace — the quality gate
 npm test
 npm run test:integration   # real API + Mongo; needs INTEGRATION_MONGODB_URI (docs/runbooks/offline-sync.md)
+npm run test:e2e     # screen tests at phone size; build first, needs E2E_MONGODB_URI (e2e/playwright.config.ts)
 npm run build        # builds both apps
 ```
 
@@ -287,7 +288,12 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
 - **Assistants can do what pages can** (owner, 2026-11-23). A feature a page can use in the app
   gets its page-assistant tool in the same change (`apps/api/src/mcp/page-assistant.ts`, with an
   integration test), and `docs/playbooks/pages-assistant.md` says how workers should use it; then
-  run `python3 docs/playbooks/build-workers.py` and tell the owner to paste the new worker files.
+  run `python3 docs/playbooks/build-workers.py`. That regenerates `apps/api/src/mcp/worker-instructions.ts`,
+  which the workers load every run (`get_worker_instructions`), so a push updates them: nothing to
+  paste.
+- **Screen tests (`e2e/`) run on every push** (`.github/workflows/e2e.yml`) and keep phone
+  screenshots as an artifact. A flow people use every day gets a test there; tests make their own
+  data through the API, and setup is skipped in `e2e/support.ts`.
 - **A route is closed to pages unless it says otherwise** (spec 040). A person acts as a page
   with the `x-lp-act-as` header; `ActingGuard` then needs a marker from `auth/acting.ts`:
   `@AsPerson()` (ignore the header: sign-in, account, admin), `@ForPages()` (run as the page) or

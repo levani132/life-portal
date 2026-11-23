@@ -22,7 +22,18 @@ test('a followed plan of rules shows on the tiles and in each meal', async ({ pa
     days: [{ name: 'Every day', entries: [{ slot: 'lunch', foodId: egg.id, amount: 200, options: [{ foodId: egg.id, amount: 150 }] }] }],
   });
   await call(ana, 'PUT', `/nutrition/meal-plans/${plan.id}/follow`, { today: today() });
-  await call(ana, 'POST', '/nutrition/entries', { day: today(), slot: 'breakfast', foodId: egg.id, amount: 100 });
+  // Breakfast is something else: eggs eaten anywhere would already count for the lunch line.
+  const yoghurt = await call<{ id: string }>(ana, 'POST', '/nutrition/foods', {
+    name: 'E2E yoghurt',
+    unit: 'g',
+    servingSize: 100,
+    entryMode: 'per_100',
+    energyKcal: 60,
+    proteinMg: 10_000,
+    fatMg: 1_000,
+    carbMg: 4_000,
+  });
+  await call(ana, 'POST', '/nutrition/entries', { day: today(), slot: 'breakfast', foodId: yoghurt.id, amount: 200 });
 
   await signIn(page, ana);
   await page.goto('/nutrition');
@@ -41,7 +52,7 @@ test('a followed plan of rules shows on the tiles and in each meal', async ({ pa
   await snap(page, '03-plan-planned-lines');
 
   // Food → You lists where the targets come from.
-  await page.getByRole('tab', { name: 'You' }).click();
+  await page.getByRole('button', { name: 'You', exact: true }).click();
   await expect(page.getByText('From plans you follow')).toBeVisible();
   await snap(page, '03-plan-you');
 });
@@ -50,8 +61,10 @@ test('the plan editor writes rules as sentences', async ({ page }) => {
   const ana = await account('Ana');
   await signIn(page, ana);
   await page.goto('/nutrition');
-  await page.getByRole('tab', { name: 'Foods' }).click();
-  await page.getByRole('button', { name: /new meal plan/i }).click();
+  await page.getByRole('button', { name: 'Foods', exact: true }).click();
+  const create = page.getByRole('button', { name: /new meal plan/i });
+  await create.scrollIntoViewIfNeeded();
+  await create.click();
   await page.getByRole('button', { name: '+ Protein per kg' }).click();
   await expect(page.getByText('At least 1.8 g protein per kg a day')).toBeVisible();
   await snap(page, '03-plan-editor');

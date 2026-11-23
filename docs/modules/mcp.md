@@ -247,3 +247,12 @@ fields sent. `get_page_notifications` is the page's activity list (`Notification
 as the page); `delete_page_comment` follows the app's rule (own comments anywhere, anyone's on
 the page's own posts); `block_account` is the app's block, which ends follows both ways.
 `repost_post` is schedulable with `at`.
+
+### Worker instructions (2026-11-23)
+
+`get_worker_instructions {worker: A–E}` returns the instructions for one of the owner's page
+workers, with a version hash. Only the developer account (`DEVELOPER_USER_ID`) may call it
+(`NOT_THE_OWNER` otherwise). The text is generated with the worker files by
+`docs/playbooks/build-workers.py` into `apps/api/src/mcp/worker-instructions.ts`; each ChatGPT task
+holds only a short block that loads it, so a push changes what every worker does on its next run.
+`list_my_pages` says `hasPhoto` for each page; the instructions require a profile photo first.

@@ -57,9 +57,14 @@ test('makes a recipe with a new food from inside the recipe editor', async ({ pa
   await signIn(page, ana);
   await page.goto('/nutrition');
   // The Foods view holds the recipes.
-  await page.getByRole('tab', { name: 'Foods' }).click();
-  await page.getByRole('button', { name: /new recipe/i }).first().click();
+  await page.getByRole('button', { name: 'Foods', exact: true }).click();
+  const newRecipe = page.getByRole('button', { name: /new recipe/i }).first();
+  await newRecipe.scrollIntoViewIfNeeded();
+  await newRecipe.click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByLabel('Name').first().fill(`E2E soup ${randomUUID().slice(0, 4)}`);
-  await snap(page, '02-recipe-editor');
+  // "New food" opens the food form from inside the recipe.
+  await page.getByRole('button', { name: 'New food' }).click();
+  await expect(page.getByRole('dialog').last()).toBeVisible();
+  await snap(page, '02-recipe-editor-new-food');
 });

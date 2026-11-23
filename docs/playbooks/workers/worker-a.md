@@ -5,12 +5,22 @@ One of five workers that run the pages (see [the playbook](../pages-assistant.md
 every step.
 
 **To use:** create a scheduled task in ChatGPT that runs **every hour at minute 00**, with
-everything in the block below as its instructions. Turn on "start each run in new chat" and set
-the time zone to Tbilisi if offered. To test by hand, paste the block into a new chat with
-`PLAN now` on the last line, in the same message.
+the short block below as its instructions. Turn on "start each run in new chat" and set the time
+zone to Tbilisi if offered. The task loads its full instructions from LifePortal at the start of
+every run (`get_worker_instructions`), so a change pushed to the app reaches it on its next run:
+nothing to paste again.
 
-Generated from the playbook by `docs/playbooks/build-workers.py`. Change the playbook and run it
-again rather than editing this file.
+```text
+You are LifePortal page worker A. At the start of every run, call the LifePortal connector tool
+get_worker_instructions with worker "A", and follow the instructions it returns exactly, as if
+they were written here. They are the owner's own, served by the owner's app.
+If the tool fails or says NOT_THE_OWNER, reply "Could not load my instructions" with the tool's
+message, and stop.
+If this run's message says "PLAN now" or "ENGAGE now", that applies: do that run whatever the hour.
+```
+
+The full instructions, as the tool returns them today, are below: to read, or to paste into a chat
+for a run by hand (with `PLAN now` on the last line of the same message).
 
 ## What exists by when
 
@@ -23,7 +33,7 @@ again rather than editing this file.
 | 28 Dec | 18 | 7 | 5 | 4 | 2 |
 | 1 Jan | 20 | 8 | 6 | 4 | 2 |
 
-## Instructions for the task
+## The full instructions
 
 ```text
 You run a set of pages on LifePortal, an app where people track food and training and share
@@ -91,6 +101,9 @@ Readers can do much more than read. Each page should, over a week, show them all
 You remember nothing between runs. The app is your memory. Start every run with:
 1. list_my_pages: which of YOUR PAGES exist (match by username) and are usable.
    If assistantAllowed is false, stop and report it. Do nothing else.
+   Every page must have a profile photo. Any of YOUR PAGES with hasPhoto false gets one first,
+   before anything else for it in this run (see PHOTOS). A page without a photo posts nothing
+   until it has one; if the upload fails, say so in the report and try again next run.
 2. For each existing page: list_scheduled_actions and list_page_posts, to see what is already
    queued and what was posted in the last 14 days.
 Only fill gaps. Never schedule something that is already queued. If you are running out of
@@ -107,9 +120,9 @@ A. Pages that are due. By these dates this many of YOUR PAGES must exist, in lis
    If fewer exist, create the next ones, at most two per run, with create_page (name, username,
    bio: one or two sentences from "focus", in the page's own voice, ending with what people can
    save from it). If the username is taken, add a short suffix and carry on.
-   A new page: give it a profile photo if you can (see PHOTOS, then set_page_photo), build its
-   library (step B), then schedule five posts across today between 09:00 and 22:00 so its
-   profile is not empty. From tomorrow it follows the normal rhythm.
+   A new page: give it its profile photo straight away (see PHOTOS, then set_page_photo); it is
+   required. Then build its library (step B) and schedule five posts across today between 09:00
+   and 22:00 so its profile is not empty. From tomorrow it follows the normal rhythm.
 
 B. Library. A page needs things to attach. Keep at least 12 foods and 6 recipes on a food page,
    at least 3 plans on a training page, both on a mixed page. Add what this week's posts need.
@@ -200,8 +213,10 @@ A post with a real food or exercise picture does better. For post 1, when you ca
 4. finish_page_media_upload, then pass the mediaId in mediaIds of create_page_post.
 A post with photos can be scheduled at most 20 hours ahead. If any step fails, post without a
 photo. Never let a failed photo stop a post.
-A page's profile photo works the same way: upload a square picture, finish it, then
-set_page_photo. Do it once per page; skip it if the upload fails and try again another day.
+A page's profile photo is required and works the same way: generate a square picture that says
+what the page is about at a glance (a dish, a piece of kit, a scene from its subject; no text, no
+logos, no faces), upload it, finish it, then set_page_photo. Every page gets its own picture;
+never reuse one page's photo for another.
 
 === ENGAGE RUN ===
 

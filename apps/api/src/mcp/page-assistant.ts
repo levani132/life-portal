@@ -46,6 +46,7 @@ import { PostsService } from '../posts/posts.service';
 import { SocialService } from '../social/social.module';
 import { CatalogueService } from '../training/catalogue.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { WORKER_INSTRUCTIONS, WORKER_INSTRUCTIONS_VERSION } from './worker-instructions';
 import { ProgrammesService } from '../programmes/programmes.module';
 import { PlansService } from '../training/plans.service';
 
@@ -543,6 +544,7 @@ export class PageAssistantService {
               username: page.username,
               bio: page.bio,
               runWithAi: page.aiManaged,
+              hasPhoto: !!page.avatarUrl,
               suspended: page.suspended,
               disabled: page.disabled,
               usable: allowed && page.aiManaged && !page.suspended && !page.disabled,
@@ -586,6 +588,18 @@ export class PageAssistantService {
           await this.record(personId, page, 'library', 'disable_page', page);
           const summary = await this.pages.setDisabled(personId, page, true);
           return { id: summary.id, name: summary.name, disabled: true };
+        },
+      },
+      {
+        name: 'get_worker_instructions',
+        description:
+          'The current instructions for one of the owner’s page workers (A to E). A worker’s scheduled task loads them at the start of every run and follows them, so updating the instructions in the app updates every worker. Only for the app’s owner.',
+        shape: { worker: z.enum(['A', 'B', 'C', 'D', 'E']) },
+        run: async (personId, args) => {
+          if (!this.config.developerUserId || this.config.developerUserId !== personId)
+            throw new ForbiddenException({ code: 'NOT_THE_OWNER', message: 'Worker instructions are for the app’s owner only.' });
+          const worker = String(args['worker']) as keyof typeof WORKER_INSTRUCTIONS;
+          return { worker, version: WORKER_INSTRUCTIONS_VERSION, instructions: WORKER_INSTRUCTIONS[worker] };
         },
       },
       {
