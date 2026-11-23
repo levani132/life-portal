@@ -38,6 +38,8 @@ what was logged. Plans are advice laid over it.
    app's calculated targets wherever targets show. Food → You says the targets come from a plan
    and names it. Choosing one of the app's goals there while such a plan is followed warns that
    it stops following it. With no rule-bearing plan followed, the app's targets apply as before.
+   A plan's number also beats a hand-typed override (owner, 2026-11-23): plan, then override,
+   then the app.
 8. **Target weight.** The profile gains a target weight. Rules per kg of target weight use it;
    later the app's own recommendation will use it too (lower than now: losing; higher: gaining;
    the same: maintaining or recomposition, which the goal still says).
