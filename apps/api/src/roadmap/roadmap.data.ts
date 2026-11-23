@@ -151,6 +151,16 @@ export const ROADMAP: Roadmap = {
       ],
     },
     {
+      title: 'A barcode scanner',
+      status: 'next',
+      summary: 'Point the camera at a packet and the food is found. Today a barcode can only be typed in.',
+      points: [
+        'Scans in the browser with the camera the app already uses for posts; iPhone Safari has no built-in barcode reader, so a small open-source reader does it',
+        'Looks the code up in the person’s foods, then the food database, then Open Food Facts',
+        'A code that is not found offers to make the food, with the code saved on it for next time',
+      ],
+    },
+    {
       title: 'AI meal guess from a photo',
       status: 'next',
       summary: 'The main paid feature: a photo becomes a labelled estimate you confirm.',
@@ -160,7 +170,11 @@ export const ROADMAP: Roadmap = {
       title: 'Groups and challenges',
       status: 'next',
       summary: 'Streaks and targets among friends; a challenge sees a score, never the diary. Plans make this easy: “follow this plan for 30 days”.',
-      points: ['Protein-target days, logging streaks, staying within calories, keeping to a plan', 'Group chat reuses messages', 'Pages can run a challenge'],
+      points: [
+        'Protein-target days, logging streaks, staying within calories, keeping to a plan',
+        'Groups are people’s own (friends, family, a team) with chat that reuses messages; a page never joins one',
+        'Challenges can be started by people and by pages, AI pages included, with their tools in the same change; an AI page hosts, it never takes part or posts a score',
+      ],
     },
     {
       title: 'The desktop version',

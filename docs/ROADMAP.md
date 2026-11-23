@@ -55,7 +55,7 @@ gap a stranger meets is now in Food: there is no general food database, only the
 public foods and barcodes.
 
 **Next, in order (recommended 2026-11-23):** check on a phone what was built this week; start
-the five page workers; a world food database; the AI meal guess; groups and challenges (with
+the five page workers; a world food database; a barcode scanner; the AI meal guess; groups and challenges (with
 "keep to this plan for 30 days"); what a plan's creator sees; your portal; paid hosting on
 1 January.
 
@@ -212,7 +212,10 @@ three have moved into the numbered steps, because friends already use the app.
 9. **Groups and challenges.** Streaks, protein-target days, logging streaks, staying within
    calories. A challenge sees only a computed score, never the diary. Group chat reuses the
    messages module (conversations already have a members shape). Ahead of search (2026-11-20):
-   a small group of friends will use a challenge before it needs search.
+   a small group of friends will use a challenge before it needs search. Groups are people's own
+   and a page never joins one; challenges can be started by people and by pages, AI pages
+   included (with assistant tools in the same change), and an AI page hosts but never takes part
+   or posts a score (2026-11-23).
 10. ~~**Plans.**~~ Done 2026-11-23 (specs 042–044, `docs/modules/nutrition.md`,
    `docs/modules/programmes.md`): meal plans of days and of rules, "or" options, rules on totals
    and on each food, following several, their rules as targets everywhere, conflicts warned,
@@ -224,6 +227,11 @@ three have moved into the numbered steps, because friends already use the app.
    barcodes) for packaged food, searched beside the person's own foods; saving one makes it
    theirs. Licences and attribution checked before importing. Ahead of the AI meal guess, which
    is better with it.
+   **10b. A barcode scanner.** Point the camera at a packet. Today a code can only be typed in
+   (Open Food Facts lookup). In the browser, with the camera the post page already uses; iPhone
+   Safari has no built-in barcode reader, so a small open-source reader does it. The code is
+   looked up in the person's foods, then the food database, then Open Food Facts; one that is
+   not found offers to make the food, keeping the code for next time.
 11. **The desktop version.** The app is designed for a phone and merely works on a wide screen.
     Making it good there is a long piece of work, done in parts (asked for 2026-11-22):
     - **Navigation in the header** instead of the bottom tabs, which belong to a thumb.

@@ -284,6 +284,10 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   for posts other people can reach, and never with an account or text; a failed check leaves
   the post held (fail closed). The email to the reviewer names no post and no person. See
   `docs/modules/moderation.md`.
+- **Assistants can do what pages can** (owner, 2026-11-23). A feature a page can use in the app
+  gets its page-assistant tool in the same change (`apps/api/src/mcp/page-assistant.ts`, with an
+  integration test), and `docs/playbooks/pages-assistant.md` says how workers should use it; then
+  run `python3 docs/playbooks/build-workers.py` and tell the owner to paste the new worker files.
 - **A route is closed to pages unless it says otherwise** (spec 040). A person acts as a page
   with the `x-lp-act-as` header; `ActingGuard` then needs a marker from `auth/acting.ts`:
   `@AsPerson()` (ignore the header: sign-in, account, admin), `@ForPages()` (run as the page) or
