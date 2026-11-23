@@ -649,10 +649,12 @@ function SlotSection({
                   {entry.facts.name}
                   {entry.facts.brand && <span className="ml-1 text-xs font-normal text-ink-faint">{entry.facts.brand}</span>}
                 </p>
+                {/* Amount on one line, the macros on their own: side by side, fat was cut off at phone width. */}
                 <p className="truncate text-[13px] text-ink-muted">
                   {entry.amount} {entry.unit}
                   {entry.servings > 0 && ` · ${entry.servings} serving${entry.servings === 1 ? '' : 's'}`}
-                  {' · '}
+                </p>
+                <p className="text-[13px] text-ink-muted">
                   <MacroLine totals={entry.totals} />
                 </p>
                 {planned?.marks.has(entry.id) && (
@@ -749,7 +751,10 @@ function SlotSection({
                 <span className="block truncate font-semibold">{name}</span>
                 <span className="block truncate text-[13px] text-ink-muted">
                   {amount}
-                  {group.entries.length} {group.entries.length === 1 ? 'food' : 'foods'} · <MacroLine totals={totals} />
+                  {group.entries.length} {group.entries.length === 1 ? 'food' : 'foods'}
+                </span>
+                <span className="block text-[13px] text-ink-muted">
+                  <MacroLine totals={totals} />
                 </span>
                 {group.entries.some((each) => planned?.marks.has(each.id)) && (
                   <span className="flex items-center gap-1 text-[11px] font-medium text-success">
@@ -810,7 +815,7 @@ function SlotSection({
               <span className="block text-xs text-ink-faint">{planned?.count ? `Planned · ${planned.kcal.toLocaleString()} kcal` : 'Nothing yet'}</span>
             ) : (
               <>
-                <span className="block truncate text-[13px] text-ink-muted">
+                <span className="block text-[13px] leading-snug text-ink-muted">
                   <span className={clsx('font-semibold tabular', style.text)}>{slot.totals.energyKcal.toLocaleString()} kcal</span>
                   {' · '}
                   <MacroLine totals={slot.totals} />

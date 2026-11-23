@@ -397,7 +397,7 @@ export function PlannedLines({ items, slot, day, onChanged }: { items: PlannedIt
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium text-ink-muted">{line.name}</p>
-                <p className="truncate text-[13px] text-ink-faint">
+                <p className="text-[13px] leading-snug text-ink-faint">
                   Planned{slots.length > 1 ? ` · ${planSlotsLabel(slots).toLowerCase()}` : ''} · {amountText(line)}
                   {line.totals.energyKcal} kcal · P {mgToG(line.totals.proteinMg)} g
                 </p>
@@ -410,7 +410,7 @@ export function PlannedLines({ items, slot, day, onChanged }: { items: PlannedIt
                 <span className="w-[38px] shrink-0 text-center text-[11px] font-semibold uppercase text-accent">or</span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium text-ink-muted">{option.name}</p>
-                  <p className="truncate text-[13px] text-ink-faint">
+                  <p className="text-[13px] leading-snug text-ink-faint">
                     {amountText(option)}
                     {option.missing ? 'no numbers' : `${option.totals.energyKcal} kcal · P ${mgToG(option.totals.proteinMg)} g`}
                   </p>

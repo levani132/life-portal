@@ -53,7 +53,9 @@ test('a followed plan of rules shows on the tiles and in each meal', async ({ pa
 
   // Food → You lists where the targets come from.
   await page.getByRole('button', { name: 'You', exact: true }).click();
-  await expect(page.getByText('From plans you follow')).toBeVisible();
+  const fromPlans = page.getByText('From plans you follow');
+  await fromPlans.scrollIntoViewIfNeeded();
+  await expect(fromPlans).toBeVisible();
   await snap(page, '03-plan-you');
 });
 

@@ -79,7 +79,8 @@ export function LogRecipeSheet({
             <span className="text-sm text-ink-muted">{makes > 1 ? (servings === 1 ? 'serving' : 'servings') : servings === 1 ? 'the whole recipe' : '× the recipe'}</span>
           </div>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {QUICK.map((value) => (
+            {/* "All N" stands for the whole recipe; a quick chip with the same number would repeat it. */}
+            {QUICK.filter((value) => value !== makes || makes === 1).map((value) => (
               <button
                 key={value}
                 type="button"
