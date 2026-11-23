@@ -14,6 +14,7 @@ import { FoodCard } from './food-card';
 import { FoodCombobox } from './food-combobox';
 import { FoodForm } from './food-form';
 import { MealPlans } from './meal-plans';
+import { Programmes } from './programmes';
 import { PageHeader } from './page-header';
 import { ExerciseLibrary } from './training/exercise-library';
 import { Plans } from './training/plans';
@@ -27,6 +28,7 @@ const SECTIONS = [
   { id: 'recipes', label: 'Recipes' },
   { id: 'mealPlans', label: 'Meal plans' },
   { id: 'plans', label: 'Training plans' },
+  { id: 'programmes', label: 'Programmes' },
   { id: 'exercises', label: 'Exercises' },
 ] as const;
 type Section = (typeof SECTIONS)[number]['id'];
@@ -61,6 +63,7 @@ export function PageLibrary() {
       {section === 'foods' && <Foods />}
       {section === 'recipes' && <Recipes />}
       {section === 'mealPlans' && <MealPlans canLog={false} />}
+      {section === 'programmes' && <Programmes canUse={false} />}
       {section === 'plans' && <Plans onStarted={() => undefined} />}
       {section === 'exercises' && <ExerciseLibrary />}
     </div>

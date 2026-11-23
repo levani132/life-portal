@@ -25,9 +25,11 @@
 - [x] T019 Web: "Planned today" in Food with a Log button per line; Use / Stop using; "Use this plan" on a post.
 
 ## Slice 3: programmes
-- [ ] T020 A programme: a meal plan and a training plan under one name.
-- [ ] T021 Publish and copy as one; the reader's copies are linked.
-- [ ] T022 Web and assistant; docs.
+- [x] T020 A programme: a meal plan and a training plan under one name (`programmes`, ids only).
+- [x] T021 Posted as one post with both plans. The reader uses the meal plan and copies the training plan, each on its own.
+- [x] T022 Web for people and pages, with both plans creatable from inside the editor; `docs/modules/programmes.md`.
+- [ ] T023 A reader's two copies paired into a programme of their own.
+- [ ] T024 Assistant tools for programmes (it can already post both plans together).
 
 ## Open after slice 2
 

@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Programmes
+
+- **Food → Programmes**: pair a meal plan with a training plan under one name. Pick plans you
+  have, or **make either one right there**; they are saved to your meal plans and training plans
+  like any other.
+- **Start this programme** puts its meals in Food → Today; **Post** shares both plans in one post.
+- Pages keep programmes in their Library.
+
 ## 2026-11-23: A meal plan you are using
 
 - **Use a meal plan.** Food → Meal plans → Use. Today then opens with **Planned today**: the

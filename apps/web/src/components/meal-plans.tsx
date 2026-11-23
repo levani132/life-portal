@@ -382,7 +382,7 @@ interface DayDraft {
 let seq = 0;
 const key = () => `k${seq++}`;
 
-function MealPlanEditor({ plan, onClose }: { plan?: MealPlan; onClose: () => void }) {
+export function MealPlanEditor({ plan, onClose, onSaved }: { plan?: MealPlan; onClose: () => void; /** Told about the saved plan, e.g. to pair it in a programme. */ onSaved?: (plan: MealPlan) => void }) {
   const foods = useApi<FoodWithUsage[]>('/nutrition/foods');
   const recipes = useApi<SavedMeal[]>('/nutrition/meals');
   const action = useAction();
@@ -432,8 +432,9 @@ function MealPlanEditor({ plan, onClose }: { plan?: MealPlan; onClose: () => voi
     action
       .run(
         async () => {
-          await (plan ? api.put(`${PLANS_KEY}/${plan.id}`, input) : api.post(PLANS_KEY, input));
+          const saved = await (plan ? api.put<MealPlan>(`${PLANS_KEY}/${plan.id}`, input) : api.post<MealPlan>(PLANS_KEY, input));
           await revalidate(PLANS_KEY);
+          onSaved?.(saved);
         },
         { revalidate: false },
       )

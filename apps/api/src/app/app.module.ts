@@ -30,6 +30,7 @@ import { LoansModule } from '../loans/loans.module';
 import { McpModule } from '../mcp/mcp.module';
 import { NutritionModule } from '../nutrition/nutrition.module';
 import { TrainingModule } from '../training/training.module';
+import { ProgrammesModule } from '../programmes/programmes.module';
 import { BadgesModule } from '../badges/badges.module';
 import { TournamentsModule } from '../tournaments/tournaments.module';
 import { PersonalModule } from '../personal/personal.module';
@@ -74,6 +75,7 @@ import { IdempotencyModule } from '../idempotency/idempotency.module';
     PersonalModule,
     NutritionModule,
     TrainingModule,
+    ProgrammesModule,
     BadgesModule,
     TournamentsModule,
     SpendingModule,

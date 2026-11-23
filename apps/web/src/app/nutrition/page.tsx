@@ -9,6 +9,7 @@ import { Apple, BookmarkPlus, Bot, ChevronDown, Info, Pencil, Plus, Search, Shar
 import { useEffect, useMemo, useState } from 'react';
 import { RecipeEditor } from '../../components/page-library';
 import { ActivePlanCard, MealPlans } from '../../components/meal-plans';
+import { Programmes } from '../../components/programmes';
 import type {
   PortalState,
   PostSelection,
@@ -1261,6 +1262,11 @@ function FoodsTab({
       {/* Spec 042: days of meals, built from the recipes and foods above. */}
       <Panel title="Meal plans" description="Plan days of eating, log a day in one tap, and share a plan.">
         <MealPlans canLog />
+      </Panel>
+
+      {/* Spec 042: a meal plan paired with a training plan. */}
+      <Panel title="Programmes" description="A meal plan and a training plan that go together: start both, or share them as one post.">
+        <Programmes canUse />
       </Panel>
 
       <PublicFoodsPanel
