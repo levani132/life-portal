@@ -2,6 +2,21 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Plans made of rules
+
+- **A plan can be numbers**, not only foods: at least, at most, between or about so much
+  calories, protein, carbs or fat, for the day or for one meal. Write it in grams or kcal, **per
+  kg of your weight or of your target weight**, or as **a share of calories** ("30% from
+  protein", "breakfast is 25% of the day"). Presets add the common ones in one tap. A plan can be
+  only rules, and a day of a rotating plan can have its own.
+- **Follow several plans at once.** Each has Follow and Stop following; plans stay in your list.
+  If two plans say opposite things you are asked first, and both show.
+- **Rules show where they apply**: a daily rule replaces the app's target on that macro's tile
+  and shows its limit; a meal's rules sit under that meal as bars in the macro's colour.
+- **Who recommended it**: a plan saved from a post links back to its author.
+- **Target weight** in Food → You.
+- Pages and their assistants can create plans with rules.
+
 ## 2026-11-23: Your set rows are the plan
 
 - An exercise's sets are the rows you see. Add a row and it is planned; an exercise you add during

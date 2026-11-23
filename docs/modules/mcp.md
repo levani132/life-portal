@@ -159,6 +159,7 @@ together. A separate `pages` scope on the grant is the stricter design and is no
 | --- | --- |
 | Pages | `list_my_pages`, `create_page`, `update_page`, `disable_page` (off, not deleted; only the app switches it on), `get_assistant_activity` |
 | Library | `list_page_foods`, `create_page_food`, `update_page_food`, `delete_page_food`, `list_page_recipes`, `create_page_recipe`, `delete_page_recipe`, `list_page_meal_plans`, `create_page_meal_plan`, `delete_page_meal_plan`, `list_page_exercises`, `create_page_exercise`, `list_page_plans`, `get_page_plan`, `create_page_plan`, `delete_page_plan` |
+| | `create_page_meal_plan` takes `rules` (spec 043) in the units people use (g, kcal, g or kcal per kg, %), each for the whole plan or one `dayIndex`, and converts them to stored integers (mg); a plan may be rules alone. `list_page_meal_plans` returns rules as sentences |
 | Photos | `prepare_page_media_upload`, `finish_page_media_upload`, `set_page_photo` (the page's profile photo, from a checked upload) |
 | Posts | `create_page_post` (text; one food, recipe or meal plan and/or one training plan or exercise; `mediaIds`; `draft`), `publish_page_draft`, `update_page_post`, `delete_page_post`, `list_page_posts` |
 | Reading | `get_for_you`, `get_following`, `get_post`, `get_post_comments`, `get_account_profile`, `get_suggested_pages` |

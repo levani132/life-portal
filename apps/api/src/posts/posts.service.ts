@@ -227,6 +227,7 @@ export class PostsService {
       ...(p.kind === 'day' && p.targets ? { targets: p.targets } : {}),
       ...(p.recipe ? { recipe: p.recipe } : {}),
       ...(p.days ? { days: p.days } : {}),
+      ...(p.planRules ? { planRules: p.planRules } : {}),
     };
   }
   /**
@@ -933,6 +934,7 @@ export class PostsService {
       dto.saveAsMeal,
       dto.mealName?.trim() || row.title || row.publication.label,
       dto.savePlan === true,
+      row.userId,
     );
   }
   /**

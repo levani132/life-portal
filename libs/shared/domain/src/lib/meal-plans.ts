@@ -1,5 +1,6 @@
 import {
   MEAL_PLAN_LIMITS,
+  PLAN_RULE_LIMITS,
   MEAL_SLOTS,
   type EntryTotals,
   type FoodUnit,
@@ -11,6 +12,7 @@ import {
   type NutritionFacts,
 } from '@life-portal/shared-types';
 import { diffDays } from './dates';
+import { planRuleProblem } from './plan-rules';
 import { emptyTotals, entryTotals, sumTotals } from './nutrition';
 
 /** A food as a meal plan needs it: its name, unit and facts per 100. */
@@ -59,14 +61,15 @@ export function mealPlanView(
         missing,
       };
     });
-    return { id: day.id, name: day.name, entries, totals: sumTotals(entries.map((entry) => entry.totals)) };
+    return { id: day.id, name: day.name, entries, totals: sumTotals(entries.map((entry) => entry.totals)), ...(day.rules?.length ? { rules: day.rules } : {}) };
   });
   const filled = view.filter((day) => day.entries.length > 0);
   const sum = sumTotals(filled.map((day) => day.totals));
   const dailyAverage = filled.length
     ? (Object.fromEntries(Object.entries(sum).map(([key, value]) => [key, Math.round((value as number) / filled.length)])) as unknown as EntryTotals)
     : emptyTotals();
-  return { days: view, dailyAverage, complete: filled.length > 0 && view.every((day) => day.entries.every((entry) => !entry.missing)) };
+  // Spec 043: a plan of rules alone is complete; one with foods is complete when every food resolves.
+  return { days: view, dailyAverage, complete: view.every((day) => day.entries.every((entry) => !entry.missing)) };
 }
 
 /** Why a meal plan cannot be saved as sent, or nothing when it can. */
@@ -74,12 +77,24 @@ export function mealPlanProblem(input: MealPlanInput): string | undefined {
   if (!input.name.trim()) return 'Give the plan a name.';
   if (input.name.trim().length > MEAL_PLAN_LIMITS.name) return `A plan's name can be ${MEAL_PLAN_LIMITS.name} characters at most.`;
   if ((input.description ?? '').length > MEAL_PLAN_LIMITS.description) return 'The description is too long.';
-  if (!input.days.length) return 'A plan needs at least one day.';
+  const rules = input.rules ?? [];
+  if (rules.length > PLAN_RULE_LIMITS.perPlan) return `A plan can have ${PLAN_RULE_LIMITS.perPlan} rules at most.`;
+  for (const rule of rules) {
+    const problem = planRuleProblem(rule);
+    if (problem) return problem;
+  }
+  // Spec 043: a plan of rules alone has no days.
+  if (!input.days.length && !rules.length) return 'Add a rule or a day of meals.';
   if (input.days.length > MEAL_PLAN_LIMITS.days) return `A plan can have ${MEAL_PLAN_LIMITS.days} days at most.`;
   for (const day of input.days) {
     if (!day.name.trim()) return 'Name every day.';
     if (day.name.trim().length > MEAL_PLAN_LIMITS.dayName) return `A day's name can be ${MEAL_PLAN_LIMITS.dayName} characters at most.`;
     if (day.entries.length > MEAL_PLAN_LIMITS.entriesPerDay) return `A day can hold ${MEAL_PLAN_LIMITS.entriesPerDay} meals and foods at most.`;
+    if ((day.rules ?? []).length > PLAN_RULE_LIMITS.perDay) return `A day can have ${PLAN_RULE_LIMITS.perDay} rules at most.`;
+    for (const rule of day.rules ?? []) {
+      const problem = planRuleProblem(rule);
+      if (problem) return problem;
+    }
     for (const entry of day.entries) {
       if (!(MEAL_SLOTS as readonly string[]).includes(entry.slot)) return 'Choose a meal for every line.';
       if (entry.slots && (entry.slots.some((slot) => !(MEAL_SLOTS as readonly string[]).includes(slot)) || new Set(entry.slots).size !== entry.slots.length))
@@ -90,7 +105,7 @@ export function mealPlanProblem(input: MealPlanInput): string | undefined {
       if (food && !(Number.isInteger(entry.amount) && (entry.amount as number) >= 1 && (entry.amount as number) <= 20_000)) return 'Give every food an amount.';
     }
   }
-  if (!input.days.some((day) => day.entries.length)) return 'Add at least one meal or food.';
+  if (!rules.length && !input.days.some((day) => day.entries.length || day.rules?.length)) return 'Add a rule or a meal.';
   return undefined;
 }
 

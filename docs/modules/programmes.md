@@ -27,7 +27,7 @@ every programme that pairs it. A plan that was deleted is reported in `gone`, ne
 | `DELETE /programmes/:id` | person, page | Removes the pairing only |
 
 There is no "start" route. Starting a programme is using its meal plan
-(`PUT /nutrition/meal-plans/active`, person only); its workouts are started from Training as
+(`PUT /nutrition/meal-plans/:id/follow`, person only, with the same conflict check); its workouts are started from Training as
 always. There is no programme publication either: a programme is posted as one post that carries
 the meal plan (`source: {kind: 'mealPlan'}`) and the training plan (`training: {kind: 'plan'}`),
 which posts already support. A reader uses the meal plan and copies the training plan from that

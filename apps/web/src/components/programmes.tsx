@@ -8,7 +8,7 @@ import { programmeProblem } from '@life-portal/shared-domain';
 import { api } from '../lib/api';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { mealContextNow } from '../lib/local-day';
-import { MealPlanEditor, okToReplacePlan } from './meal-plans';
+import { MealPlanEditor, followPlan } from './meal-plans';
 import { PlanEditor } from './training/plan-editor';
 import { ErrorNote, Field, Input, Modal, Select, Spinner, Textarea } from './ui';
 
@@ -104,7 +104,7 @@ export function Programmes({ canUse }: { canUse: boolean }) {
                           {programme.mealPlan.dayCount} {programme.mealPlan.dayCount === 1 ? 'day' : 'days'} · about {programme.mealPlan.dailyKcal} kcal a day
                         </span>
                       </span>
-                      {programme.mealPlan.activeSince && <span className="shrink-0 rounded-full bg-accent-solid/15 px-2 py-0.5 text-[11px] font-medium text-accent">In use</span>}
+                      {programme.mealPlan.activeSince && <span className="shrink-0 rounded-full bg-accent-solid/15 px-2 py-0.5 text-[11px] font-medium text-accent">Following</span>}
                     </li>
                   )}
                   {programme.trainingPlan && (
@@ -134,9 +134,10 @@ export function Programmes({ canUse }: { canUse: boolean }) {
                         onClick={() =>
                           void run(async () => {
                             setNote(null);
-                            if (!(await okToReplacePlan(programme.name, programme.mealPlan?.id))) return;
-                            await api.put(`${MEAL_PLANS_KEY}/active`, { planId: programme.mealPlan?.id, today: mealContextNow().day });
-                            setNote(`You are using ${programme.name}. Its meals are in Food → Today${programme.trainingPlan ? ', and its workouts are in Training → Plans' : ''}.`);
+                            // Starting a programme is following its meal plan, with the same conflict check.
+                            const plan = (await api.get<MealPlan[]>(MEAL_PLANS_KEY)).find((each) => each.id === programme.mealPlan?.id);
+                            if (!plan || !(await followPlan(plan))) return;
+                            setNote(`You are following ${programme.name}. Its meals are in Food → Today${programme.trainingPlan ? ', and its workouts are in Training → Plans' : ''}.`);
                           })
                         }
                       >

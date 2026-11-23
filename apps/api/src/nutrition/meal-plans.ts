@@ -3,7 +3,23 @@ import { InjectModel, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsIn, IsInt, IsMongoId, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Model, Types, isValidObjectId } from 'mongoose';
-import { MEAL_PLAN_LIMITS, MEAL_SLOTS, type ActiveMealPlan, type MealPlan, type MealPlanDay, type MealPlanInput, type MealSlot, type PlanDayAdherence } from '@life-portal/shared-types';
+import {
+  MEAL_PLAN_LIMITS,
+  MEAL_SLOTS,
+  PLAN_RULE_BASES,
+  PLAN_RULE_KINDS,
+  PLAN_RULE_LIMITS,
+  PLAN_RULE_METRICS,
+  PLAN_RULE_SCOPES,
+  type ActiveMealPlan,
+  type MealPlan,
+  type MealPlanDay,
+  type MealPlanInput,
+  type MealSlot,
+  type PlanDayAdherence,
+  type PlanRule,
+  type PlanRuleInput,
+} from '@life-portal/shared-types';
 import {
   activePlanDayIndex,
   addDays,
@@ -40,11 +56,34 @@ class MealPlanEntrySub {
 }
 const MealPlanEntrySchema = SchemaFactory.createForClass(MealPlanEntrySub);
 
+/** Spec 043: a rule, stored as written. What it comes to is worked out on read (`plan-rules.ts`). */
+@Schema({ _id: false })
+class PlanRuleSub {
+  @Prop({ type: String, required: true }) id!: string;
+  @Prop({ type: String, required: true, enum: PLAN_RULE_METRICS }) metric!: string;
+  @Prop({ type: String, required: true, enum: PLAN_RULE_SCOPES }) scope!: string;
+  @Prop({ type: String, required: true, enum: PLAN_RULE_KINDS }) kind!: string;
+  @Prop({ type: String, required: true, enum: PLAN_RULE_BASES }) basis!: string;
+  @Prop({ type: Number }) value?: number;
+  @Prop({ type: Number }) low?: number;
+  @Prop({ type: Number }) high?: number;
+  @Prop({ type: Number }) tolerancePct?: number;
+}
+const PlanRuleSchema = SchemaFactory.createForClass(PlanRuleSub);
+
+@Schema({ _id: false })
+class PlanSourceSub {
+  @Prop({ type: String, required: true }) postId!: string;
+  @Prop({ type: String, required: true }) authorId!: string;
+}
+const PlanSourceSchema = SchemaFactory.createForClass(PlanSourceSub);
+
 @Schema({ _id: false })
 class MealPlanDaySub {
   @Prop({ required: true }) id!: string;
   @Prop({ required: true, trim: true, maxlength: MEAL_PLAN_LIMITS.dayName }) name!: string;
   @Prop({ type: [MealPlanEntrySchema], default: [] }) entries!: MealPlanEntrySub[];
+  @Prop({ type: [PlanRuleSchema], default: undefined }) rules?: PlanRuleSub[];
 }
 const MealPlanDaySchema = SchemaFactory.createForClass(MealPlanDaySub);
 
@@ -61,6 +100,10 @@ export class MealPlanRecord {
   @Prop({ required: true, trim: true, maxlength: MEAL_PLAN_LIMITS.name }) name!: string;
   @Prop({ maxlength: MEAL_PLAN_LIMITS.description }) description?: string;
   @Prop({ type: [MealPlanDaySchema], default: [] }) days!: MealPlanDaySub[];
+  /** Spec 043: rules for every day. */
+  @Prop({ type: [PlanRuleSchema], default: [] }) rules!: PlanRuleSub[];
+  /** Spec 043: the post and author a copy came from (ids only; the name is read through the post). */
+  @Prop({ type: PlanSourceSchema }) source?: PlanSourceSub;
   /** A copy saved from a post: one per reader and post, so saving twice makes one plan. */
   @Prop() postImportKey?: string;
   /**
@@ -91,14 +134,27 @@ class MealPlanEntryDto {
   @IsOptional() @IsInt() @Min(1) @Max(20_000) amount?: number;
   @IsOptional() @IsArray() @ArrayMaxSize(MEAL_SLOTS.length) @IsIn(MEAL_SLOTS, { each: true }) slots?: MealSlot[];
 }
+class PlanRuleDto implements PlanRuleInput {
+  @IsOptional() @IsString() @MaxLength(40) id?: string;
+  @IsIn(PLAN_RULE_METRICS) metric!: PlanRule['metric'];
+  @IsIn(PLAN_RULE_SCOPES) scope!: PlanRule['scope'];
+  @IsIn(PLAN_RULE_KINDS) kind!: PlanRule['kind'];
+  @IsIn(PLAN_RULE_BASES) basis!: PlanRule['basis'];
+  @IsOptional() @IsInt() @Min(1) @Max(2_000_000) value?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(2_000_000) low?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(2_000_000) high?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(PLAN_RULE_LIMITS.toleranceMax) tolerancePct?: number;
+}
 class MealPlanDayDto {
   @IsOptional() @IsString() @MaxLength(40) id?: string;
   @IsString() @MaxLength(MEAL_PLAN_LIMITS.dayName) name!: string;
   @IsArray() @ArrayMaxSize(MEAL_PLAN_LIMITS.entriesPerDay) @ValidateNested({ each: true }) @Type(() => MealPlanEntryDto) entries!: MealPlanEntryDto[];
+  @IsOptional() @IsArray() @ArrayMaxSize(PLAN_RULE_LIMITS.perDay) @ValidateNested({ each: true }) @Type(() => PlanRuleDto) rules?: PlanRuleDto[];
 }
 export class MealPlanDto implements MealPlanInput {
   @IsString() @MaxLength(MEAL_PLAN_LIMITS.name) name!: string;
   @IsOptional() @IsString() @MaxLength(MEAL_PLAN_LIMITS.description) description?: string;
+  @IsOptional() @IsArray() @ArrayMaxSize(PLAN_RULE_LIMITS.perPlan) @ValidateNested({ each: true }) @Type(() => PlanRuleDto) rules?: PlanRuleDto[];
   @IsArray() @ArrayMaxSize(MEAL_PLAN_LIMITS.days) @ValidateNested({ each: true }) @Type(() => MealPlanDayDto) days!: MealPlanDayDto[];
 }
 export class LogPlanDayDto {
@@ -110,9 +166,8 @@ export class LogPlanDayDto {
   @IsOptional() @IsIn(MEAL_SLOTS) slot?: MealSlot;
 }
 
-export class UsePlanDto {
-  /** The plan to use from today, or null to stop using one. */
-  @IsOptional() @IsMongoId() planId?: string | null;
+export class FollowPlanDto {
+  /** The device's today: the day following starts. */
   @Matches(DAY) today!: string;
 }
 export class ChoosePlanDayDto {
@@ -125,6 +180,16 @@ export class ChoosePlanDayDto {
 
 type Row = MealPlanRecord & { _id: Types.ObjectId };
 const newId = () => String(new Types.ObjectId());
+/** A rule as stored: its id, and only the fields its limit uses. */
+const withRuleId = (rule: PlanRuleInput): PlanRule => ({
+  id: rule.id || newId(),
+  metric: rule.metric,
+  scope: rule.scope,
+  kind: rule.kind,
+  basis: rule.basis,
+  ...(rule.kind === 'between' ? { low: rule.low, high: rule.high } : { value: rule.value }),
+  ...(rule.kind === 'about' && rule.tolerancePct ? { tolerancePct: rule.tolerancePct } : {}),
+});
 
 @Injectable()
 export class MealPlansService {
@@ -151,6 +216,8 @@ export class MealPlansService {
       name: row.name,
       ...(row.description ? { description: row.description } : {}),
       ...(row.activeSince ? { activeSince: row.activeSince } : {}),
+      rules: (row.rules ?? []) as PlanRule[],
+      ...(row.source ? { source: { postId: row.source.postId, authorId: row.source.authorId } } : {}),
       ...view,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -182,12 +249,15 @@ export class MealPlansService {
       if (entry.foodId && !library.foods.has(entry.foodId)) throw new BadRequestException('One of those foods no longer exists.');
       if (entry.savedMealId && !library.recipes.has(entry.savedMealId)) throw new BadRequestException('One of those recipes no longer exists.');
     }
+    const rules = (list: PlanRuleInput[] | undefined) => (list ?? []).map((rule) => withRuleId(rule));
     return {
       name: input.name.trim(),
       description: (input.description ?? '').trim(),
+      rules: rules(input.rules),
       days: input.days.map((day) => ({
         id: day.id || newId(),
         name: day.name.trim(),
+        ...(day.rules?.length ? { rules: rules(day.rules) } : {}),
         entries: day.entries.map((entry) => ({
           id: entry.id || newId(),
           // `slot` is the first allowed meal; `slots` is kept only when there is a choice.
@@ -270,71 +340,88 @@ export class MealPlansService {
   }
 
   /**
-   * The plan in use as it applies to one calendar day (spec 042), and how closely the seven days
-   * up to today followed it. Which plan day a calendar day is follows the plan's order from the
-   * day it was started, re-anchored by any day the person picked. What was eaten is read from
-   * the diary and matched on read, so a meal logged before the plan was in use counts too.
+   * The plans followed, each as it applies to one calendar day (specs 042, 043), and how closely
+   * the seven days up to today followed each. A plan's day follows its order from the day it was
+   * started, re-anchored by any day the person picked. What was eaten is read from the diary and
+   * matched on read, so a meal logged before the plan was followed counts too. A plan of rules
+   * alone has no day: its rules apply every day.
    */
-  async active(userId: string, today: string, calendarDay = today): Promise<ActiveMealPlan | null> {
-    const row = await this.plans.findOne({ userId, activeSince: { $type: 'string' } }).lean<Row>();
-    if (!row || !row.days.length) return null;
-    const plan = this.dto(row, await this.library(userId));
-    const since = row.activeSince as string;
-    const dayIds = plan.days.map((day) => day.id);
-    const dayOf = (day: string) => plan.days[activePlanDayIndex({ dayIds, since, day, choices: row.dayChoices })];
+  async following(userId: string, today: string, calendarDay = today): Promise<ActiveMealPlan[]> {
+    const rows = await this.plans.find({ userId, activeSince: { $type: 'string' } }).sort({ activeSince: 1, _id: 1 }).lean<Row[]>();
+    if (!rows.length) return [];
+    const library = await this.library(userId);
     const recentDays = Array.from({ length: 7 }, (_, index) => addDays(today, index - 6));
     const diary = await this.diary(userId, ...new Set([calendarDay, ...recentDays]));
     const on = (day: string) => diary.filter((entry) => entry.day === day);
-    const day = dayOf(calendarDay);
-    const done = matchPlanDay(day.entries, on(calendarDay));
-    const recent: PlanDayAdherence[] = recentDays.map((each) => {
-      const planDay = dayOf(each);
-      return { day: each, dayName: planDay.name, ...planDayAdherence(planDay.entries, on(each)) };
+    return rows.map((row) => {
+      const plan = this.dto(row, library);
+      const since = row.activeSince as string;
+      const dayIds = plan.days.map((day) => day.id);
+      const dayOf = (day: string) => (plan.days.length ? plan.days[activePlanDayIndex({ dayIds, since, day, choices: row.dayChoices })] : undefined);
+      const day = dayOf(calendarDay);
+      const lines = day?.entries ?? [];
+      const done = matchPlanDay(lines, on(calendarDay));
+      const recent: PlanDayAdherence[] = recentDays.map((each) => {
+        const planDay = dayOf(each);
+        return { day: each, dayName: planDay?.name ?? '', ...planDayAdherence(planDay?.entries ?? [], on(each)) };
+      });
+      return {
+        planId: plan.id,
+        name: plan.name,
+        since,
+        days: plan.days.map((each) => ({ id: each.id, name: each.name })),
+        calendarDay,
+        day: {
+          id: day?.id ?? '',
+          name: day?.name ?? '',
+          lines: lines.map((entry) => ({ ...entry, logged: done.has(entry.id) })),
+          totals: day?.totals ?? { energyKcal: 0, proteinMg: 0, fatMg: 0, carbMg: 0 },
+        },
+        rules: [...plan.rules, ...(day?.rules ?? [])],
+        ...(plan.source ? { source: plan.source } : {}),
+        chosen: !!day && (row.dayChoices ?? []).some((choice) => choice.day === calendarDay && choice.dayId === day.id),
+        recent,
+      } as ActiveMealPlan;
     });
-    return {
-      planId: plan.id,
-      name: plan.name,
-      since,
-      days: plan.days.map((each) => ({ id: each.id, name: each.name })),
-      calendarDay,
-      day: { id: day.id, name: day.name, lines: day.entries.map((entry) => ({ ...entry, logged: done.has(entry.id) })), totals: day.totals },
-      chosen: (row.dayChoices ?? []).some((choice) => choice.day === calendarDay && choice.dayId === day.id),
-      recent,
-    };
   }
 
-  /** Starts using a plan from today, or stops using one. Only one is in use at a time. */
-  async use(userId: string, dto: UsePlanDto): Promise<{ active: ActiveMealPlan | null }> {
-    if (dto.planId) {
-      const row = await this.row(userId, dto.planId);
-      if (!row) throw new NotFoundException('Meal plan not found.');
-      if (!row.days.length) throw new BadRequestException('This plan has no days yet.');
-    }
-    await this.plans.updateMany(
-      { userId, activeSince: { $type: 'string' }, ...(dto.planId ? { _id: { $ne: dto.planId } } : {}) },
-      { $unset: { activeSince: 1, dayChoices: 1 } },
-    );
-    // Using the plan already in use keeps its place: the start day is only set when it starts.
-    if (dto.planId) await this.plans.updateOne({ _id: dto.planId, userId, activeSince: { $exists: false } }, { $set: { activeSince: dto.today }, $unset: { dayChoices: 1 } });
-    return { active: await this.active(userId, dto.today) };
+  /** Starts following a plan from today. Plans already followed stay followed. */
+  async follow(userId: string, id: string, dto: FollowPlanDto): Promise<{ following: ActiveMealPlan[] }> {
+    const row = await this.row(userId, id);
+    if (!row) throw new NotFoundException('Meal plan not found.');
+    // Following the plan already followed keeps its place: the start day is only set when it starts.
+    await this.plans.updateOne({ _id: id, userId, activeSince: { $exists: false } }, { $set: { activeSince: dto.today }, $unset: { dayChoices: 1 } });
+    return { following: await this.following(userId, dto.today) };
   }
 
-  /** Picks which of the plan's days a calendar day is. The days after it follow on from there. */
-  async chooseDay(userId: string, dto: ChoosePlanDayDto): Promise<{ active: ActiveMealPlan | null }> {
+  /** Stops following a plan. It stays in the list, to follow again. */
+  async unfollow(userId: string, id: string, today: string): Promise<{ following: ActiveMealPlan[] }> {
+    if (isValidObjectId(id)) await this.plans.updateOne({ _id: id, userId }, { $unset: { activeSince: 1, dayChoices: 1 } });
+    return { following: await this.following(userId, today) };
+  }
+
+  /** Picks which of a followed plan's days a calendar day is. The days after it follow on from there. */
+  async chooseDay(userId: string, id: string, dto: ChoosePlanDayDto): Promise<{ following: ActiveMealPlan[] }> {
     const calendarDay = dto.day ?? dto.today;
     if (!calendarDay) throw new BadRequestException('Say which day.');
-    const row = await this.plans.findOne({ userId, activeSince: { $type: 'string' } }).lean<Row>();
-    if (!row) throw new NotFoundException('You are not using a meal plan.');
+    const row = isValidObjectId(id) ? await this.plans.findOne({ _id: id, userId, activeSince: { $type: 'string' } }).lean<Row>() : null;
+    if (!row) throw new NotFoundException('You are not following that plan.');
     if (!row.days.some((day) => day.id === dto.dayId)) throw new NotFoundException('That day is not in this plan.');
     const choices = [...(row.dayChoices ?? []).filter((choice) => choice.day !== calendarDay), { day: calendarDay, dayId: dto.dayId }]
       .sort((a, b) => a.day.localeCompare(b.day))
       .slice(-60);
     await this.plans.updateOne({ _id: row._id, userId }, { $set: { dayChoices: choices } });
-    return { active: await this.active(userId, calendarDay, calendarDay) };
+    return { following: await this.following(userId, calendarDay, calendarDay) };
   }
 
   /** Spec 042: the reader's own copy of a published plan, built from the foods they just saved. */
-  async saveImported(userId: string, postId: string, name: string, days: { name: string; entries: { slot: MealSlot; slots?: MealSlot[]; foodId: string; amount: number }[] }[]): Promise<string> {
+  async saveImported(
+    userId: string,
+    postId: string,
+    name: string,
+    days: { name: string; entries: { slot: MealSlot; slots?: MealSlot[]; foodId: string; amount: number }[]; rules?: PlanRule[] }[],
+    extra: { authorId?: string; rules?: PlanRule[] } = {},
+  ): Promise<string> {
     try {
       await this.plans.updateOne(
         { userId, postImportKey: postId },
@@ -343,10 +430,14 @@ export class MealPlansService {
             userId,
             postImportKey: postId,
             name: name.trim().slice(0, MEAL_PLAN_LIMITS.name) || 'Meal plan',
+            // Rules arrive checked from the publication; they get ids of the reader's own.
+            rules: (extra.rules ?? []).slice(0, PLAN_RULE_LIMITS.perPlan).map((rule) => withRuleId({ ...rule, id: undefined })),
+            ...(extra.authorId ? { source: { postId, authorId: extra.authorId } } : {}),
             days: days.slice(0, MEAL_PLAN_LIMITS.days).map((day) => ({
               id: newId(),
               name: day.name.slice(0, MEAL_PLAN_LIMITS.dayName),
               entries: day.entries.slice(0, MEAL_PLAN_LIMITS.entriesPerDay).map((entry) => ({ id: newId(), ...entry })),
+              ...(day.rules?.length ? { rules: day.rules.slice(0, PLAN_RULE_LIMITS.perDay).map((rule) => withRuleId({ ...rule, id: undefined })) } : {}),
             })),
           },
         },
@@ -381,21 +472,28 @@ export class MealPlansController {
     return this.plans.create(userId, dto);
   }
 
-  /** The plan in use. A person's own diary: no marker, so a page is refused. */
-  @Get('active')
-  async active(@CurrentUser('userId') userId: string, @Query('today') today: string, @Query('day') day?: string) {
+  /** The plans followed. A person's own diary: no marker, so a page is refused. */
+  @Get('following')
+  async following(@CurrentUser('userId') userId: string, @Query('today') today: string, @Query('day') day?: string) {
     if (!DAY.test(today ?? '') || (day !== undefined && !DAY.test(day))) throw new BadRequestException('today and day must be days.');
-    return { active: await this.plans.active(userId, today, day ?? today) };
+    return { following: await this.plans.following(userId, today, day ?? today) };
   }
 
-  @Put('active')
-  use(@CurrentUser('userId') userId: string, @Body() dto: UsePlanDto) {
-    return this.plans.use(userId, dto);
+  @Put(':id/follow')
+  follow(@CurrentUser('userId') userId: string, @Param('id') id: string, @Body() dto: FollowPlanDto) {
+    return this.plans.follow(userId, id, dto);
   }
 
-  @Put('active/day')
-  chooseDay(@CurrentUser('userId') userId: string, @Body() dto: ChoosePlanDayDto) {
-    return this.plans.chooseDay(userId, dto);
+  @Delete(':id/follow')
+  @HttpCode(200)
+  unfollow(@CurrentUser('userId') userId: string, @Param('id') id: string, @Query('today') today: string) {
+    if (!DAY.test(today ?? '')) throw new BadRequestException('today must be a day.');
+    return this.plans.unfollow(userId, id, today);
+  }
+
+  @Put(':id/day')
+  chooseDay(@CurrentUser('userId') userId: string, @Param('id') id: string, @Body() dto: ChoosePlanDayDto) {
+    return this.plans.chooseDay(userId, id, dto);
   }
 
   @ForPages()

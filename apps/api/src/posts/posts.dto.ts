@@ -190,8 +190,8 @@ export class TrainingCopyDto {
   @ValidateIf((_, v: unknown) => v !== undefined) @IsString() @MaxLength(80) planName?: string;
 }
 export class ImportPostDto {
+  /** Empty only for a meal plan of rules alone; the service refuses it otherwise. */
   @IsArray()
-  @ArrayMinSize(1)
   @ArrayMaxSize(MAX_POST_ITEMS)
   @ArrayUnique()
   @Matches(/^\d{1,4}$/, { each: true })

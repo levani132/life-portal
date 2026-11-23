@@ -11,6 +11,7 @@ import {
   MAX_POST_ITEMS,
   type FoodAttribution,
   type FoodPublication,
+  type PlanRule,
   type PostImportPreview,
   type PostImportResult,
   type PostSelection,
@@ -179,7 +180,11 @@ export class NutritionPublicationService {
         if (!food) throw new BadRequestException({ code: 'PLAN_INCOMPLETE', message: 'A food in this plan is no longer available. Edit the plan before sharing it.' });
         return { ...this.fromFood(food, String(index), line.amount), slot: line.slot, ...(line.slots ? { slots: line.slots } : {}), dayIndex: line.dayIndex, ...(line.group ? { group: line.group } : {}) };
       });
-      publication = { kind: 'mealPlan', label: plan.name, items, days: plan.days.map((day) => day.name) };
+      // Spec 043: the rules travel as written, which holds nothing but numbers and limits.
+      const strip = (rules: PlanRule[] | undefined) => (rules ?? []).map(({ id: _id, ...rule }) => ({ ...rule, id: '' }) as PlanRule);
+      const planRules = { plan: strip(plan.rules as PlanRule[]), days: plan.days.map((day) => strip(day.rules as PlanRule[] | undefined)) };
+      const hasRules = planRules.plan.length > 0 || planRules.days.some((rules) => rules.length > 0);
+      publication = { kind: 'mealPlan', label: plan.name, items, days: plan.days.map((day) => day.name), ...(hasRules ? { planRules } : {}) };
     } else if (source.kind === 'food' || source.kind === 'database') {
       const rows = await this.foods
         .find({
@@ -248,7 +253,8 @@ export class NutritionPublicationService {
     }
     // A recipe with written ingredients or steps may be shared without foods: no numbers, and
     // the post says so. Everything else needs at least one food.
-    if ((!publication.items.length && !publication.recipe) || publication.items.length > MAX_POST_ITEMS)
+    // A meal plan of rules alone has no foods either.
+    if ((!publication.items.length && !publication.recipe && !publication.planRules) || publication.items.length > MAX_POST_ITEMS)
       throw new BadRequestException(
         `Share between 1 and ${MAX_POST_ITEMS} foods at a time.`,
       );
@@ -305,13 +311,16 @@ export class NutritionPublicationService {
     saveAsMeal: boolean,
     mealName?: string,
     savePlan = false,
+    /** Spec 043: the post's author, kept on a saved plan as who recommended it. */
+    authorId?: string,
   ): Promise<PostImportResult> {
     if (keys.some((key) => !publication.items.some((item) => item.key === key)))
       throw new BadRequestException('Choose foods from this post.');
     const selected = publication.items.filter((item) =>
       keys.includes(item.key),
     );
-    if (!selected.length)
+    // A plan of rules alone is saved with no foods.
+    if (!selected.length && !(savePlan && !publication.items.length))
       throw new BadRequestException('Select at least one food.');
     const rows = await this.matches(userId, postId, selected);
     const skipped = rows.filter(
@@ -428,8 +437,11 @@ export class NutritionPublicationService {
         entries: selected
           .filter((item) => (item.dayIndex ?? 0) === dayIndex)
           .map((item) => ({ slot: item.slot ?? ('uncategorized' as const), ...(item.slots ? { slots: item.slots } : {}), foodId: idOf(item), amount: item.amount ?? item.servingSize })),
+        ...(publication.planRules?.days[dayIndex]?.length ? { rules: publication.planRules.days[dayIndex] } : {}),
       }));
-      mealPlanId = await this.mealPlans.saveImported(userId, postId, mealName?.trim() || publication.label, days);
+      // A plan of rules alone has no days.
+      const kept = publication.items.length || (publication.days ?? []).length ? days : [];
+      mealPlanId = await this.mealPlans.saveImported(userId, postId, mealName?.trim() || publication.label, kept, { authorId, rules: publication.planRules?.plan });
     }
     return {
       createdCount,

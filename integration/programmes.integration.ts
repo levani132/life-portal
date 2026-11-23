@@ -54,8 +54,8 @@ describe('programmes', () => {
     expect((await api.call(beka, 'POST', '/programmes', { name: 'Not mine', trainingPlanId: ids.trainingPlanId })).status).toBe(400);
     expect((await api.call<Programme[]>(beka, 'GET', '/programmes')).body).toEqual([]);
 
-    // Starting it is using its meal plan; the programme shows that.
-    await api.call(ana, 'PUT', '/nutrition/meal-plans/active', { planId: ids.mealPlanId, today: '2026-03-02' });
+    // Starting it is following its meal plan; the programme shows that.
+    await api.call(ana, 'PUT', `/nutrition/meal-plans/${ids.mealPlanId}/follow`, { today: '2026-03-02' });
     expect((await api.call<Programme[]>(ana, 'GET', '/programmes')).body[0].mealPlan).toMatchObject({ activeSince: '2026-03-02' });
 
     // One half only; then a deleted plan is reported, not hidden.

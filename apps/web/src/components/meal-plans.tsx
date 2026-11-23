@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import {
   MEAL_PLAN_LIMITS,
   MEAL_SLOTS,
+  PLAN_RULE_LIMITS,
   type ActiveMealPlan,
   type ActivePlanLine,
   type FoodPost,
@@ -14,74 +15,208 @@ import {
   type MealEntry,
   type MealPlanInput,
   type MealSlot,
+  type EntryTotals,
+  type PlanRule,
+  type PlanRuleMetric,
   type PostImportPreview,
   type PostImportResult,
   type SavedMeal,
 } from '@life-portal/shared-types';
-import { PLAN_ANY_TIME, matchPlanDay, mealPlanProblem, mgToG, planLineSlots, planSlotsLabel } from '@life-portal/shared-domain';
+import {
+  PLAN_ANY_TIME,
+  combinePlanRules,
+  describePlanRule,
+  eatenFor,
+  matchPlanDay,
+  mealPlanProblem,
+  mgToG,
+  planLineSlots,
+  planRuleConflicts,
+  planRuleStatus,
+  planSlotsLabel,
+  referenceOf,
+  type CombinedRule,
+  type RuleContext,
+  type RuleStatus,
+} from '@life-portal/shared-domain';
+import { MACRO_COLORS } from '../lib/macro-colors';
 import { api } from '../lib/api';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { actingPageId } from '../lib/identity';
 import { mealContextNow } from '../lib/local-day';
 import { newPostHref } from '../lib/new-post';
 import { FoodCombobox } from './food-combobox';
+import { PlanRulesEditor, ruleDraft, toRuleInput, type RuleDraft } from './plan-rules-editor';
 import { ErrorNote, Field, Input, Modal, Select, Spinner, Textarea } from './ui';
 
 const PLANS_KEY = '/nutrition/meal-plans';
-const ACTIVE_KEY = `${PLANS_KEY}/active`;
+const FOLLOWING_KEY = `${PLANS_KEY}/following`;
 const slotLabel = (slot: MealSlot) => slot.charAt(0).toUpperCase() + slot.slice(1);
 /** A line's meals as a save sends them: the first as `slot`, all of them only when there is a choice. */
 const lineSlotsInput = (slots: MealSlot[]) => ({ slot: slots[0] ?? 'breakfast', ...(slots.length > 1 ? { slots } : {}) });
 /** Everything a change to plans or to what is logged from one can alter. */
 const refreshPlans = () => Promise.all([revalidate(PLANS_KEY), revalidate('/nutrition?'), revalidate('/dashboard')]);
 
+/** Every rule a plan has: its own and each day's. */
+export const allPlanRules = (plan: Pick<MealPlan, 'rules' | 'days'>): PlanRule[] => [...(plan.rules ?? []), ...plan.days.flatMap((day) => day.rules ?? [])];
+
 /**
- * Before another meal plan is put in use (from the list, a programme or a post): when one is in
- * use already, say which and ask. True to go ahead. Only one plan is in use at a time, and the
- * one replaced keeps everything: it stays in Meal plans and nothing logged changes.
+ * Before following a plan (spec 043): rules of it that cannot be met together with those of plans
+ * already followed are named, and the person chooses. Following several plans is the normal case;
+ * this only speaks up when two say opposite things.
  */
-export async function okToReplacePlan(nextName: string, nextId?: string): Promise<boolean> {
-  const { active } = await api.get<{ active: ActiveMealPlan | null }>(`${ACTIVE_KEY}?today=${mealContextNow().day}`);
-  if (!active || active.planId === nextId) return true;
+export async function okToFollow(name: string, rules: readonly PlanRule[], planId?: string): Promise<boolean> {
+  if (!rules.length) return true;
+  const { following } = await api.get<{ following: ActiveMealPlan[] }>(`${FOLLOWING_KEY}?today=${mealContextNow().day}`);
+  const followed = following.filter((plan) => plan.planId !== planId).flatMap((plan) => plan.rules.map((rule) => ({ rule, planId: plan.planId, planName: plan.name })));
+  const clashes = planRuleConflicts(followed, rules.map((rule) => ({ rule, planId: planId ?? 'new', planName: name })), {});
+  if (!clashes.length) return true;
   return window.confirm(
-    `You are using ${active.name}. Start ${nextName} instead?\n\nOnly one meal plan is used at a time. ${active.name} stays in your meal plans, and nothing you logged changes.`,
+    `${name} cannot be met together with a plan you follow:\n\n${clashes.map((clash) => `• ${clash.ours}, but ${clash.theirPlan} says: ${clash.theirs.toLowerCase()}`).join('\n')}\n\nFollow it anyway? Both will show, and the one not met will say so.`,
   );
 }
 
-/** The plan in use as it applies to the calendar day on screen. A page has no diary, so none. */
-export function useActivePlan(today: string | null, day: string | null): ActiveMealPlan | null {
-  const key = today && day && !actingPageId() ? `${ACTIVE_KEY}?today=${today}&day=${day}` : null;
-  return useApi<{ active: ActiveMealPlan | null }>(key).data?.active ?? null;
+/** Starts following a plan, after the conflict check. False when the person said no. */
+export async function followPlan(plan: { id: string; name: string; rules: PlanRule[]; days: MealPlan['days'] }): Promise<boolean> {
+  if (!(await okToFollow(plan.name, allPlanRules(plan), plan.id))) return false;
+  await api.put(`${PLANS_KEY}/${plan.id}/follow`, { today: mealContextNow().day });
+  return true;
+}
+export const unfollowPlan = (planId: string) => api.delete(`${PLANS_KEY}/${planId}/follow?today=${mealContextNow().day}`);
+
+/** The plans followed, as they apply to the calendar day on screen. A page has no diary, so none. */
+export function useFollowedPlans(today: string | null, day: string | null): ActiveMealPlan[] {
+  const key = today && day && !actingPageId() ? `${FOLLOWING_KEY}?today=${today}&day=${day}` : null;
+  return useApi<{ following: ActiveMealPlan[] }>(key).data?.following ?? [];
 }
 
-/** What the diary on screen says about the plan day: which meals stand for which lines. */
-export function planOnDay(plan: ActiveMealPlan | null, entries: readonly MealEntry[]) {
-  const match = plan ? matchPlanDay(plan.day.lines, entries.map((entry) => ({ ...entry, name: entry.facts.name }))) : new Map<string, string[]>();
-  const marks = new Set([...match.values()].flat());
-  const counted = plan ? plan.day.lines.filter((line) => !line.missing) : [];
+export interface PlannedItem {
+  plan: ActiveMealPlan;
+  line: ActivePlanLine;
+}
+
+/**
+ * What the diary on screen says about the followed plans: which meals stand for which lines (each
+ * plan on its own, so two plans asking for the same food are both met by it), the lines still open
+ * at each meal, and every rule combined.
+ */
+export function plansOnDay(plans: readonly ActiveMealPlan[], entries: readonly MealEntry[], ctx: RuleContext, totals: { day: EntryTotals; slot: (slot: MealSlot) => EntryTotals }) {
+  const named = entries.map((entry) => ({ ...entry, name: entry.facts.name }));
+  const states = plans.map((plan) => ({ plan, match: matchPlanDay(plan.day.lines, named) }));
+  const marks = new Set(states.flatMap((state) => [...state.match.values()].flat()));
+  const rules = combinePlanRules(
+    plans.flatMap((plan) => plan.rules.map((rule) => ({ rule, planId: plan.planId, planName: plan.name }))),
+    ctx,
+    { dayKcal: totals.day.energyKcal, scopeKcal: (scope) => (scope === 'day' ? totals.day : totals.slot(scope)).energyKcal },
+  );
   return {
-    match,
+    states,
     marks,
     /** Lines not eaten yet, each listed at every meal it may be eaten at. */
-    openAt: (slot: MealSlot) => (plan ? plan.day.lines.filter((line) => !match.has(line.id) && !line.missing && planLineSlots(line).includes(slot)) : []),
-    followed: counted.filter((line) => match.has(line.id)).length,
-    planned: counted.length,
-    eatenKcal: entries.filter((entry) => marks.has(entry.id)).reduce((sum, entry) => sum + entry.totals.energyKcal, 0),
+    openAt: (slot: MealSlot): PlannedItem[] =>
+      states.flatMap(({ plan, match }) => plan.day.lines.filter((line) => !match.has(line.id) && !line.missing && planLineSlots(line).includes(slot)).map((line) => ({ plan, line }))),
+    /** Combined rules for the whole day, and for one meal. */
+    dayRules: rules.filter((rule) => rule.scope === 'day'),
+    rulesAt: (slot: MealSlot) => rules.filter((rule) => rule.scope === slot),
   };
 }
 
 const logPlanned = (plan: ActiveMealPlan, day: string, lines: ActivePlanLine[], slot?: MealSlot) =>
   api.post(`${PLANS_KEY}/${plan.planId}/days/${plan.day.id}/log`, { day, entryIds: lines.map((line) => line.id), ...(slot ? { slot } : {}) });
 
+/** A combined rule's number in display units: kcal, or g for a macro. */
+const shown = (metric: PlanRuleMetric, n: number) => (metric === 'energy' ? Math.round(n) : mgToG(n));
+/** The limit, short: "≥ 150", "≤ 2,000", "120–150", "≈ 500". */
+export function limitText(rule: CombinedRule): string {
+  const f = (n: number) => shown(rule.metric, n).toLocaleString('en-GB');
+  if (rule.target !== undefined) return `≈ ${f(rule.target)}`;
+  if (rule.low !== undefined && rule.high !== undefined) return rule.conflict ? `≥ ${f(rule.low)} and ≤ ${f(rule.high)}` : `${f(rule.low)}–${f(rule.high)}`;
+  if (rule.low !== undefined) return `≥ ${f(rule.low)}`;
+  if (rule.high !== undefined) return `≤ ${f(rule.high)}`;
+  return '';
+}
+/** Which plans a combined rule's numbers come from. */
+export const ruleSources = (rule: CombinedRule) => [...new Set([rule.lowFrom, rule.highFrom].filter(Boolean))].join(' and ') || rule.rules[0]?.planName || '';
+
+const METRIC_COLOR: Record<PlanRuleMetric, string> = { energy: MACRO_COLORS.kcal, protein: MACRO_COLORS.protein, carb: MACRO_COLORS.carbs, fat: MACRO_COLORS.fat };
+const METRIC_LABEL: Record<PlanRuleMetric, string> = { energy: 'Calories', protein: 'Protein', carb: 'Carbs', fat: 'Fat' };
+const METRIC_UNIT: Record<PlanRuleMetric, string> = { energy: 'kcal', protein: 'g', carb: 'g', fat: 'g' };
+
+/** A rule's status in words and colour, for the eaten amount. */
+export function ruleState(rule: CombinedRule, eaten: number): { status: RuleStatus | 'conflict' | 'unknown'; tone: string } {
+  if (rule.conflict) return { status: 'conflict', tone: 'text-danger' };
+  if (rule.low === undefined && rule.high === undefined) return { status: 'unknown', tone: 'text-ink-faint' };
+  const status = planRuleStatus(rule, eaten);
+  return { status, tone: status === 'met' ? 'text-success' : status === 'over' ? 'text-danger' : 'text-ink-muted' };
+}
+
 /**
- * The plan in use, above the day's meals (spec 042): which plan day this is (and a picker), how
- * much of it is eaten, and the last seven days. The planned lines themselves sit inside each
- * meal, beside what was eaten (`PlannedLines`).
+ * A meal's rules, under its header (spec 043): each as a small bar in its macro's colour, filled
+ * by what this meal has, with the limit and where it stands.
  */
-export function PlanStrip({ plan, entries, day, onChanged }: { plan: ActiveMealPlan; entries: readonly MealEntry[]; day: string; onChanged: () => void }) {
+export function MealRules({ rules, totals }: { rules: readonly CombinedRule[]; totals: EntryTotals }) {
+  if (!rules.length) return null;
+  return (
+    <ul className="flex flex-wrap gap-1.5 px-2.5 pb-2 sm:px-4" aria-label="Plan rules for this meal">
+      {rules.map((rule) => {
+        const eaten = eatenFor(rule.metric, totals);
+        const { status, tone } = ruleState(rule, eaten);
+        const goal = referenceOf(rule) ?? 0;
+        const fill = goal > 0 ? Math.min(100, Math.round((eaten / goal) * 100)) : 0;
+        return (
+          <li
+            key={`${rule.metric}`}
+            className="min-w-[8.5rem] flex-1 rounded-lg border border-border/70 bg-surface px-2 py-1.5"
+            title={rule.rules.map((each) => `${each.text} (${each.planName})`).join('\n')}
+          >
+            <div className="flex items-baseline justify-between gap-2 text-[11px]">
+              <span className="font-semibold" style={{ color: METRIC_COLOR[rule.metric] }}>
+                {METRIC_LABEL[rule.metric]} {limitText(rule)}
+                {rule.missing ? '' : ` ${METRIC_UNIT[rule.metric]}`}
+              </span>
+              <span className={`tabular font-medium ${tone}`}>
+                {status === 'met' ? '✓ ' : ''}
+                {shown(rule.metric, eaten).toLocaleString('en-GB')}
+              </span>
+            </div>
+            <div className="mt-1 h-1 overflow-hidden rounded-full bg-border/60">
+              <div className="h-full rounded-full" style={{ width: `${fill}%`, background: METRIC_COLOR[rule.metric], opacity: status === 'over' ? 0.6 : 1 }} />
+            </div>
+            {rule.missing && <p className="mt-0.5 text-[10px] text-ink-faint">Needs your {rule.missing === 'weight' ? 'weight' : 'target weight'} (Food → You)</p>}
+            {rule.conflict && <p className="mt-0.5 text-[10px] text-danger">Your plans disagree here</p>}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Who recommended a plan saved from a post, read through the post (so its audience still applies). */
+function PlanSourceLine({ postId }: { postId: string }) {
+  const post = useApi<FoodPost>(`/posts/${postId}`, { shouldRetryOnError: false });
+  if (post.error) return <p className="text-xs text-ink-faint">Saved from a post that is no longer available.</p>;
+  if (!post.data) return null;
+  const author = post.data.author;
+  return (
+    <p className="text-xs text-ink-muted">
+      Recommended by{' '}
+      <Link href={`/posts/${postId}`} className="font-medium text-accent">
+        {author.displayName}
+      </Link>
+      {author.isPage ? ' (page)' : ''}
+    </p>
+  );
+}
+
+/**
+ * The plans followed, above the day's meals (spec 043): one chip each, opening its details: who
+ * recommended it, which plan day this is (with a picker), its rules, how much of its food is eaten,
+ * the last seven days, and Stop following. The rules themselves show on the tiles and in the meals.
+ */
+export function FollowingStrip({ plans, entries, day, onChanged }: { plans: readonly ActiveMealPlan[]; entries: readonly MealEntry[]; day: string; onChanged: () => void }) {
   const action = useAction();
-  const state = planOnDay(plan, entries);
-  const left = plan.day.lines.filter((line) => !line.missing && !state.match.has(line.id));
+  const [open, setOpen] = useState<string | null>(null);
+  if (!plans.length) return null;
   const run = (work: () => Promise<unknown>) =>
     action.run(
       async () => {
@@ -91,68 +226,107 @@ export function PlanStrip({ plan, entries, day, onChanged }: { plan: ActiveMealP
       },
       { revalidate: false },
     );
+  const named = entries.map((entry) => ({ ...entry, name: entry.facts.name }));
+  const current = plans.find((plan) => plan.planId === open);
   return (
-    <section className="card p-3" aria-label="Meal plan">
-      <div className="flex items-center gap-2">
-        <CalendarCheck size={18} className="shrink-0 text-accent" aria-hidden />
-        <p className="min-w-0 flex-1 truncate text-sm font-semibold">{plan.name}</p>
-        {left.length > 0 && (
-          <button type="button" className="shrink-0 text-xs font-medium text-accent" disabled={action.pending} onClick={() => void run(() => logPlanned(plan, day, left))}>
-            Log the rest
-          </button>
-        )}
-      </div>
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-        {plan.days.length > 1 ? (
-          <Select
-            aria-label="Which day of the plan this is"
-            className="w-auto max-w-[12rem]"
-            value={plan.day.id}
-            disabled={action.pending}
-            onChange={(event) => void run(() => api.put(`${ACTIVE_KEY}/day`, { day, dayId: event.target.value }))}
-          >
-            {plan.days.map((each) => (
-              <option key={each.id} value={each.id}>
-                {each.name}
-              </option>
-            ))}
-          </Select>
-        ) : (
-          <span className="text-sm text-ink-muted">{plan.day.name}</span>
-        )}
-        <span className="text-xs text-ink-muted">
-          {state.followed} of {state.planned} eaten · {state.eatenKcal.toLocaleString()} of {plan.day.totals.energyKcal.toLocaleString()} kcal
+    <section className="card p-3" aria-label="Plans you follow">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="mr-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+          <CalendarCheck size={13} aria-hidden /> Following
         </span>
+        {plans.map((plan) => (
+          <button
+            key={plan.planId}
+            type="button"
+            aria-expanded={open === plan.planId}
+            onClick={() => setOpen(open === plan.planId ? null : plan.planId)}
+            className={`max-w-full truncate rounded-full border px-2.5 py-1 text-xs font-medium ${open === plan.planId ? 'border-transparent bg-accent-solid text-on-accent' : 'border-border text-ink'}`}
+          >
+            {plan.name}
+          </button>
+        ))}
       </div>
-      {/* The last seven days, each as how much of its plan day was eaten. */}
-      <ol className="mt-3 flex items-end gap-1.5" aria-label="The last seven days">
-        {plan.recent.map((each) => {
-          const share = each.planned ? each.followed / each.planned : 0;
-          return (
-            <li key={each.day} className="flex flex-1 flex-col items-center gap-1" title={`${each.day} · ${each.dayName}: ${each.followed} of ${each.planned} eaten`}>
-              <span className="flex h-7 w-full items-end overflow-hidden rounded bg-border/60">
-                <span className={`w-full rounded ${share >= 0.8 ? 'bg-success-solid' : share > 0 ? 'bg-accent-solid' : ''}`} style={{ height: `${Math.round(share * 100)}%` }} />
-              </span>
-              <span className={`text-[10px] ${each.day === day ? 'font-bold text-ink' : 'text-ink-faint'}`}>
-                {new Date(`${each.day}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'narrow' })}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-      {action.error && <ErrorNote message={action.error} />}
-      <div className="mt-2 flex justify-end">
-        <button
-          type="button"
-          className="text-[11px] text-ink-faint underline"
-          disabled={action.pending}
-          onClick={() => {
-            if (window.confirm(`Stop using ${plan.name}? The plan stays in your meal plans.`)) void run(() => api.put(ACTIVE_KEY, { planId: null, today: mealContextNow().day }));
-          }}
-        >
-          Stop using this plan
-        </button>
-      </div>
+      {current && (() => {
+        const match = matchPlanDay(current.day.lines, named);
+        const counted = current.day.lines.filter((line) => !line.missing);
+        const left = counted.filter((line) => !match.has(line.id));
+        return (
+          <div className="mt-3 space-y-2 border-t border-border pt-3">
+            {current.source && <PlanSourceLine postId={current.source.postId} />}
+            {current.days.length > 1 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-ink-muted">Today is</span>
+                <Select
+                  aria-label={`Which day of ${current.name} this is`}
+                  className="w-auto max-w-[12rem]"
+                  value={current.day.id}
+                  disabled={action.pending}
+                  onChange={(event) => void run(() => api.put(`${PLANS_KEY}/${current.planId}/day`, { day, dayId: event.target.value }))}
+                >
+                  {current.days.map((each) => (
+                    <option key={each.id} value={each.id}>
+                      {each.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
+            {current.rules.length > 0 && (
+              <ul className="space-y-0.5 text-xs text-ink-muted">
+                {current.rules.map((rule) => (
+                  <li key={rule.id}>• {describePlanRule(rule)}</li>
+                ))}
+              </ul>
+            )}
+            {counted.length > 0 && (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs text-ink-muted">
+                    {counted.length - left.length} of {counted.length} planned foods eaten
+                  </span>
+                  {left.length > 0 && (
+                    <button type="button" className="text-xs font-medium text-accent" disabled={action.pending} onClick={() => void run(() => logPlanned(current, day, left))}>
+                      Log the rest
+                    </button>
+                  )}
+                </div>
+                {/* The last seven days, each as how much of its plan day was eaten. */}
+                <ol className="flex items-end gap-1.5" aria-label="The last seven days">
+                  {current.recent.map((each) => {
+                    const share = each.planned ? each.followed / each.planned : 0;
+                    return (
+                      <li key={each.day} className="flex flex-1 flex-col items-center gap-1" title={`${each.day} · ${each.dayName}: ${each.followed} of ${each.planned} eaten`}>
+                        <span className="flex h-6 w-full items-end overflow-hidden rounded bg-border/60">
+                          <span className={`w-full rounded ${share >= 0.8 ? 'bg-success-solid' : share > 0 ? 'bg-accent-solid' : ''}`} style={{ height: `${Math.round(share * 100)}%` }} />
+                        </span>
+                        <span className={`text-[10px] ${each.day === day ? 'font-bold text-ink' : 'text-ink-faint'}`}>
+                          {new Date(`${each.day}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'narrow' })}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </>
+            )}
+            {action.error && <ErrorNote message={action.error} />}
+            <div className="flex justify-end">
+              <button
+                type="button"
+                className="text-[11px] text-ink-faint underline"
+                disabled={action.pending}
+                onClick={() => {
+                  if (window.confirm(`Stop following ${current.name}? It stays in your meal plans, to follow again.`)) {
+                    setOpen(null);
+                    void run(() => unfollowPlan(current.planId));
+                  }
+                }}
+              >
+                Stop following
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </section>
   );
 }
@@ -161,11 +335,11 @@ export function PlanStrip({ plan, entries, day, onChanged }: { plan: ActiveMealP
  * A meal's planned lines that are not eaten yet, under what was eaten (spec 042). Log puts the
  * line into this meal of the day on screen, frozen at today's numbers like any meal.
  */
-export function PlannedLines({ plan, lines, slot, day, onChanged }: { plan: ActiveMealPlan; lines: ActivePlanLine[]; slot: MealSlot; day: string; onChanged: () => void }) {
+export function PlannedLines({ items, slot, day, onChanged }: { items: PlannedItem[]; slot: MealSlot; day: string; onChanged: () => void }) {
   const action = useAction();
   const [busy, setBusy] = useState<string | null>(null);
-  if (!lines.length) return null;
-  const log = (line: ActivePlanLine) => {
+  if (!items.length) return null;
+  const log = ({ plan, line }: PlannedItem) => {
     setBusy(line.id);
     void action
       .run(
@@ -180,10 +354,11 @@ export function PlannedLines({ plan, lines, slot, day, onChanged }: { plan: Acti
   };
   return (
     <ul className="space-y-1 px-1.5 pb-1.5 sm:px-4 sm:pb-3" aria-label="Planned">
-      {lines.map((line) => {
+      {items.map((item) => {
+        const { line } = item;
         const slots = planLineSlots(line);
         return (
-          <li key={line.id} className="flex items-center gap-2 rounded-xl border border-dashed border-border px-2.5 py-2 text-[15px] leading-snug">
+          <li key={`${item.plan.planId}:${line.id}`} className="flex items-center gap-2 rounded-xl border border-dashed border-border px-2.5 py-2 text-[15px] leading-snug">
             <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg text-ink-faint">
               <CalendarCheck size={18} aria-hidden />
             </span>
@@ -194,7 +369,7 @@ export function PlannedLines({ plan, lines, slot, day, onChanged }: { plan: Acti
                 {line.totals.energyKcal} kcal · P {mgToG(line.totals.proteinMg)} g
               </p>
             </div>
-            <button type="button" className="btn-ghost shrink-0 border border-border px-3" disabled={action.pending} aria-label={`Log ${line.name}`} onClick={() => log(line)}>
+            <button type="button" className="btn-ghost shrink-0 border border-border px-3" disabled={action.pending} aria-label={`Log ${line.name}`} onClick={() => log(item)}>
               {busy === line.id ? '…' : 'Log'}
             </button>
           </li>
@@ -223,7 +398,7 @@ export function UsePlanFromPost({ postId, title }: { postId: string; title: stri
   if (done)
     return (
       <p role="status" className="mt-3 rounded-lg bg-success-solid/10 px-3 py-2 text-sm text-success">
-        You are using this plan now.{' '}
+        You are following this plan now.{' '}
         <Link href="/nutrition" className="font-medium underline">
           See today in Food
         </Link>
@@ -240,7 +415,8 @@ export function UsePlanFromPost({ postId, title }: { postId: string; title: stri
       mealName: title,
     });
     if (!saved.mealPlanId) throw new Error('This plan could not be saved.');
-    await api.put(ACTIVE_KEY, { planId: saved.mealPlanId, today: mealContextNow().day });
+    // The conflict check was made before saving; now only follow it.
+    await api.put(`${PLANS_KEY}/${saved.mealPlanId}/follow`, { today: mealContextNow().day });
     await refreshPlans();
     setAsking(null);
     setDone(true);
@@ -249,7 +425,9 @@ export function UsePlanFromPost({ postId, title }: { postId: string; title: stri
   const begin = () =>
     void action.run(
       async () => {
-        if (!(await okToReplacePlan(title))) return;
+        const post = await api.get<FoodPost>(`/posts/${postId}`);
+        const rules = post.planRules ? [...post.planRules.plan, ...post.planRules.days.flat()] : [];
+        if (!(await okToFollow(title, rules))) return;
         const preview = await api.get<PostImportPreview>(`/posts/${postId}/import`);
         const mine = [...new Set(preview.items.flatMap((item) => (item.duplicateName ? [item.duplicateName] : [])))];
         if (mine.length) setAsking(mine);
@@ -283,7 +461,7 @@ export function UsePlanFromPost({ postId, title }: { postId: string; title: stri
       ) : (
         <>
           <button type="button" className="btn-primary w-full justify-center" disabled={action.pending} onClick={begin}>
-            <CalendarCheck size={16} /> {action.pending ? 'Saving the plan…' : 'Use this plan'}
+            <CalendarCheck size={16} /> {action.pending ? 'Saving the plan…' : 'Follow this plan'}
           </button>
           <p className="mt-1 text-center text-xs text-ink-faint">Saves the plan to your Food and shows its meals there each day. Nothing is logged.</p>
         </>
@@ -340,10 +518,17 @@ export function MealPlans({ canLog }: { canLog: boolean }) {
                 <button type="button" className="min-w-0 flex-1 text-left" aria-expanded={open === plan.id} onClick={() => setOpen(open === plan.id ? null : plan.id)}>
                   <p className="font-medium">
                     {plan.name}
-                    {plan.activeSince && <span className="ml-2 rounded-full bg-accent-solid/15 px-2 py-0.5 text-[11px] font-medium text-accent">In use</span>}
+                    {plan.activeSince && <span className="ml-2 rounded-full bg-accent-solid/15 px-2 py-0.5 text-[11px] font-medium text-accent">Following</span>}
                   </p>
                   <p className="text-xs text-ink-faint">
-                    {plan.days.length} {plan.days.length === 1 ? 'day' : 'days'} · about {plan.dailyAverage.energyKcal} kcal and {mgToG(plan.dailyAverage.proteinMg)} g protein a day
+                    {[
+                      allPlanRules(plan).length ? `${allPlanRules(plan).length} ${allPlanRules(plan).length === 1 ? 'rule' : 'rules'}` : '',
+                      plan.days.some((day) => day.entries.length)
+                        ? `${plan.days.length} ${plan.days.length === 1 ? 'day' : 'days'} of meals, about ${plan.dailyAverage.energyKcal} kcal and ${mgToG(plan.dailyAverage.proteinMg)} g protein a day`
+                        : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                     {plan.complete ? '' : ' · something in it has no numbers'}
                   </p>
                 </button>
@@ -355,12 +540,12 @@ export function MealPlans({ canLog }: { canLog: boolean }) {
                       disabled={action.pending}
                       onClick={() =>
                         void run(async () => {
-                          if (!plan.activeSince && !(await okToReplacePlan(plan.name, plan.id))) return;
-                          await api.put(ACTIVE_KEY, { planId: plan.activeSince ? null : plan.id, today: mealContextNow().day });
+                          if (plan.activeSince) await unfollowPlan(plan.id);
+                          else await followPlan(plan);
                         })
                       }
                     >
-                      {plan.activeSince ? 'Stop using' : 'Use'}
+                      {plan.activeSince ? 'Stop following' : 'Follow'}
                     </button>
                   )}
                   {plan.complete && (
@@ -385,6 +570,13 @@ export function MealPlans({ canLog }: { canLog: boolean }) {
                 </div>
               </div>
               {plan.description && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-ink-muted">{plan.description}</p>}
+              {plan.rules.length > 0 && (
+                <ul className="mt-2 space-y-0.5 text-xs text-ink-muted">
+                  {plan.rules.map((rule) => (
+                    <li key={rule.id}>• {describePlanRule(rule)}</li>
+                  ))}
+                </ul>
+              )}
               {open === plan.id && (
                 <ul className="mt-3 space-y-3 border-t border-border pt-3">
                   {plan.days.map((day) => (
@@ -414,8 +606,13 @@ export function MealPlans({ canLog }: { canLog: boolean }) {
                           </button>
                         )}
                       </div>
+                      {day.rules?.map((rule) => (
+                        <p key={rule.id} className="mt-0.5 text-xs text-ink-muted">
+                          • {describePlanRule(rule)}
+                        </p>
+                      ))}
                       {day.entries.length === 0 ? (
-                        <p className="mt-1 text-xs text-ink-faint">Nothing planned.</p>
+                        <p className="mt-1 text-xs text-ink-faint">{day.rules?.length ? 'No meals planned.' : 'Nothing planned.'}</p>
                       ) : (
                         <ul className="mt-1 space-y-0.5 text-sm">
                           {day.entries.map((entry) => (
@@ -458,6 +655,8 @@ interface DayDraft {
   id?: string;
   name: string;
   lines: Line[];
+  /** Spec 043: rules for this day only. */
+  rules: RuleDraft[];
 }
 let seq = 0;
 const key = () => `k${seq++}`;
@@ -472,6 +671,8 @@ export function MealPlanEditor({ plan, onClose, onSaved }: { plan?: MealPlan; on
   const [name, setName] = useState(plan?.name ?? '');
   const [description, setDescription] = useState(plan?.description ?? '');
   const [days, setDays] = useState<DayDraft[] | null>(null);
+  // Spec 043: rules for every day.
+  const [rules, setRules] = useState<RuleDraft[]>(() => (plan?.rules ?? []).map(ruleDraft));
   const ready = !!foods.data && !!recipes.data;
   // Built once the foods are here, so each stored line finds its food.
   const current: DayDraft[] =
@@ -481,6 +682,7 @@ export function MealPlanEditor({ plan, onClose, onSaved }: { plan?: MealPlan; on
           key: key(),
           id: day.id,
           name: day.name,
+          rules: (day.rules ?? []).map(ruleDraft),
           lines: day.entries.map((entry) => ({
             key: key(),
             slots: planLineSlots(entry),
@@ -490,18 +692,22 @@ export function MealPlanEditor({ plan, onClose, onSaved }: { plan?: MealPlan; on
             amount: entry.amount ? String(entry.amount) : '',
           })),
         }))
-      : [{ key: key(), name: 'Day 1', lines: [] }]);
+      : [{ key: key(), name: 'Day 1', lines: [], rules: [] }]);
   const change = (next: DayDraft[]) => setDays(next);
   const setDay = (dayKey: string, patch: Partial<DayDraft>) => change(current.map((day) => (day.key === dayKey ? { ...day, ...patch } : day)));
   const setLine = (dayKey: string, lineKey: string, patch: Partial<Line>) =>
     change(current.map((day) => (day.key === dayKey ? { ...day, lines: day.lines.map((line) => (line.key === lineKey ? { ...line, ...patch } : line)) } : day)));
 
+  // A plan of rules alone keeps no empty days.
+  const keptDays = rules.length && current.every((day) => !day.lines.length && !day.rules.length) ? [] : current;
   const input: MealPlanInput = {
     name,
     description,
-    days: current.map((day) => ({
+    rules: rules.map(toRuleInput),
+    days: keptDays.map((day) => ({
       ...(day.id ? { id: day.id } : {}),
       name: day.name,
+      ...(day.rules.length ? { rules: day.rules.map(toRuleInput) } : {}),
       entries: day.lines.map((line) =>
         ({
           ...lineSlotsInput(line.slots),
@@ -535,6 +741,14 @@ export function MealPlanEditor({ plan, onClose, onSaved }: { plan?: MealPlan; on
           <Field label="What it is for" hint="Optional.">
             <Textarea rows={2} maxLength={MEAL_PLAN_LIMITS.description} value={description} onChange={(event) => setDescription(event.target.value)} />
           </Field>
+          <section className="space-y-2 rounded-xl border border-border p-3">
+            <div>
+              <p className="text-sm font-semibold">Rules</p>
+              <p className="text-xs text-ink-muted">Numbers to aim for, every day: calories and macros for the day or a meal. A plan can be only rules.</p>
+            </div>
+            <PlanRulesEditor rules={rules} onChange={setRules} max={PLAN_RULE_LIMITS.perPlan} />
+          </section>
+          <p className="pt-1 text-sm font-semibold">Days of meals {rules.length ? <span className="font-normal text-ink-faint">(optional)</span> : null}</p>
           {current.map((day) => (
             <section key={day.key} className="space-y-2 rounded-xl border border-border p-3">
               <div className="flex items-end gap-2">
@@ -602,6 +816,13 @@ export function MealPlanEditor({ plan, onClose, onSaved }: { plan?: MealPlan; on
                   </li>
                 ))}
               </ul>
+              {/* Rules that only this day has, e.g. more carbs on a training day. */}
+              {(day.rules.length > 0 || current.length > 1) && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-ink-muted">Rules for this day only</p>
+                  <PlanRulesEditor rules={day.rules} onChange={(next) => setDay(day.key, { rules: next })} max={PLAN_RULE_LIMITS.perDay} presets={false} />
+                </div>
+              )}
               {day.lines.length < MEAL_PLAN_LIMITS.entriesPerDay && (
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -627,12 +848,12 @@ export function MealPlanEditor({ plan, onClose, onSaved }: { plan?: MealPlan; on
             </section>
           ))}
           {current.length < MEAL_PLAN_LIMITS.days && (
-            <button type="button" className="btn-ghost" onClick={() => change([...current, { key: key(), name: `Day ${current.length + 1}`, lines: [] }])}>
+            <button type="button" className="btn-ghost" onClick={() => change([...current, { key: key(), name: `Day ${current.length + 1}`, lines: [], rules: [] }])}>
               <Plus size={16} /> Add a day
             </button>
           )}
-          {!live.length && !usable.length && <p className="text-xs text-warning">A plan is built from your foods and recipes, and you have none yet. Add a food first.</p>}
-          {problem && (name || current.some((day) => day.lines.length)) && <p className="text-xs text-ink-muted">{problem}</p>}
+          {!live.length && !usable.length && !rules.length && <p className="text-xs text-ink-muted">Days of meals are built from your foods and recipes, and you have none yet. Rules need none.</p>}
+          {problem && (name || rules.length || current.some((day) => day.lines.length)) && <p className="text-xs text-ink-muted">{problem}</p>}
           {action.error && <ErrorNote message={action.error} />}
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={onClose}>

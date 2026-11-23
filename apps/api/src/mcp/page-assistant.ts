@@ -21,13 +21,18 @@ import {
   MEASURES,
   MUSCLES,
   PLAN_TARGET_TYPES,
+  PLAN_RULE_BASES,
+  PLAN_RULE_KINDS,
+  PLAN_RULE_METRICS,
+  PLAN_RULE_SCOPES,
+  type PlanRuleInput,
   type AssistantActionKind,
   type AssistantActivity,
   type AssistantOverview,
   type AssistantCaps,
   type FoodPost,
 } from '@life-portal/shared-types';
-import { assistantCap, assistantDefaults, underAssistantCap } from '@life-portal/shared-domain';
+import { assistantCap, assistantDefaults, describePlanRule, underAssistantCap } from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
 import { FollowsService } from '../follows/follows.module';
 import { MediaService } from '../media/media.service';
@@ -637,18 +642,35 @@ export class PageAssistantService {
             description: plan.description,
             complete: plan.complete,
             dailyAverage: plan.dailyAverage,
-            days: plan.days.map((day) => ({ name: day.name, totals: day.totals, lines: day.entries.map((entry) => ({ meal: entry.slot, ...(entry.slots ? { alsoAt: entry.slots.slice(1) } : {}), name: entry.name, amount: entry.amount })) })),
+            rules: plan.rules.map((rule) => describePlanRule(rule)),
+            days: plan.days.map((day) => ({ name: day.name, totals: day.totals, rules: (day.rules ?? []).map((rule) => describePlanRule(rule)), lines: day.entries.map((entry) => ({ meal: entry.slot, ...(entry.slots ? { alsoAt: entry.slots.slice(1) } : {}), name: entry.name, amount: entry.amount })) })),
           }));
         },
       },
       {
         name: 'create_page_meal_plan',
         description:
-          'Create a meal plan in a page’s library: one to fourteen named days ("Training day", "Rest day", or "Day 1"), each a list of lines. A line is a meal (breakfast, lunch, dinner, snack), or several in `alsoAt` when it may be eaten at any of them (lunch or dinner; all four for any time), with either a recipe from the library (recipeId) or one food with an amount in its own unit (foodId and amount). Use recipes and foods that have numbers.',
+          'Create a meal plan in a page’s library: one to fourteen named days ("Training day", "Rest day", or "Day 1"), each a list of lines. A plan may also have rules (numbers to aim for), and may be rules only with no days. A line is a meal (breakfast, lunch, dinner, snack), or several in `alsoAt` when it may be eaten at any of them (lunch or dinner; all four for any time), with either a recipe from the library (recipeId) or one food with an amount in its own unit (foodId and amount). Use recipes and foods that have numbers.',
         shape: {
           pageId,
           name: z.string().min(1).max(80),
           description: z.string().max(500).optional(),
+          rules: z
+            .array(
+              z.object({
+                metric: z.enum(PLAN_RULE_METRICS).describe('energy is calories'),
+                scope: z.enum(PLAN_RULE_SCOPES).describe('day, or one meal'),
+                kind: z.enum(PLAN_RULE_KINDS),
+                basis: z.enum(PLAN_RULE_BASES).describe('amount; perKg of current weight; perKgTarget of target weight; share: percent of calories (a macro), or of the day (calories at a meal)'),
+                value: z.number().positive().optional().describe('For atLeast, atMost, about. Grams for a macro (150 = 150 g), kcal for calories, g or kcal per kg, or percent.'),
+                low: z.number().positive().optional().describe('For between, in the same unit.'),
+                high: z.number().positive().optional(),
+                tolerancePct: z.number().int().min(1).max(50).optional().describe('For about; default 10.'),
+                dayIndex: z.number().int().min(0).max(13).optional().describe('Only for that day of the plan; absent: every day.'),
+              }),
+            )
+            .max(20)
+            .optional(),
           days: z
             .array(
               z.object({
@@ -658,7 +680,6 @@ export class PageAssistantService {
                   .max(20),
               }),
             )
-            .min(1)
             .max(14),
         },
         run: (personId, args) =>
@@ -670,7 +691,22 @@ export class PageAssistantService {
                 ...(line.alsoAt?.length ? { slots: [...new Set([line.meal, ...line.alsoAt])] } : {}),
                 ...(line.recipeId ? { savedMealId: line.recipeId } : { foodId: line.foodId, amount: line.amount }) })),
             }));
-            const created = await this.mealPlans.create(page, { name: String(args['name']), description: args['description'] as string | undefined, days });
+            // Rules come in the units people use (g, kcal, g per kg, %) and are stored as integers (mg).
+            type RuleArg = Omit<PlanRuleInput, 'id'> & { dayIndex?: number };
+            const toStored = (rule: RuleArg): PlanRuleInput => {
+              const mg = rule.metric !== 'energy' && rule.basis !== 'share';
+              const n = (x: number | undefined) => (x === undefined ? undefined : Math.round(mg ? x * 1000 : x));
+              const { dayIndex: _dayIndex, ...rest } = rule;
+              return { ...rest, value: n(rule.value), low: n(rule.low), high: n(rule.high) };
+            };
+            const ruleArgs = (args['rules'] as RuleArg[] | undefined) ?? [];
+            const planDays = days.map((day, index) => ({ ...day, rules: ruleArgs.filter((rule) => rule.dayIndex === index).map(toStored) }));
+            const created = await this.mealPlans.create(page, {
+              name: String(args['name']),
+              description: args['description'] as string | undefined,
+              rules: ruleArgs.filter((rule) => rule.dayIndex === undefined).map(toStored),
+              days: planDays,
+            });
             return { result: { id: created.id, name: created.name, dailyAverage: created.dailyAverage, complete: created.complete }, targetId: created.id };
           }),
       },

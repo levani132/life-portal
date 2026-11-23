@@ -2840,3 +2840,15 @@ chicken from search or a suggestion, or log before starting the plan. Matching b
 derived (principle 3), lets deleting a meal reopen its line, and lets any past day be compared
 with the plan. The cost is that a food eaten for other reasons can count for the plan; that is the
 more honest error for a plan the person chose.
+
+## 2026-11-23: Plans are followed, several at once, as rules plus foods (spec 043)
+
+A meal plan was one list of foods, used one at a time. The owner wants plans to be any advice,
+mostly numbers, and to combine ("30 g protein at breakfast" and "5 eggs at breakfast" help each
+other). So a plan holds rules as written (metric, place, limit, basis) and foods, and any number
+of plans are followed. Rules combine per metric and place: the highest floor and the lowest
+ceiling, naming the plan. Conflicts warn and the person chooses; both then show. There is no
+partial following: changing a plan is saving it as one's own. Resolving a rule (per kg, shares)
+happens on read with the weights and the day's calorie target passed in, so nothing derived is
+stored. The single-plan routes (`/meal-plans/active`) were replaced by `/following` and
+`/:id/follow`, the same day they shipped.

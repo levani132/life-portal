@@ -429,7 +429,9 @@ web `components/meal-plans.tsx`. For people and pages.
 | `days[].entries[]` | Up to 20, each `{id, slot, savedMealId}` (a recipe) or `{id, slot, foodId, amount}` (one food, amount in its own unit) |
 | `days[].entries[].slots?` | Every meal the line may be eaten at, when more than one ("lunch or dinner"); `slot` is the first. `planLineSlots()` reads a line's meals, with `uncategorized` meaning any time |
 | `postImportKey?` | A copy saved from a post: one per reader and post |
-| `activeSince?` | The calendar day the person started using this plan. At most one plan per person has it. A choice, not a derived value |
+| `activeSince?` | The calendar day the person started following this plan. Any number of plans may have it (spec 043). A choice, not a derived value |
+| `rules[]` | Spec 043: rules for every day (below). `days[].rules?` adds rules for that day only |
+| `source?` | Spec 043: `{postId, authorId}` of a plan saved from a post. Ids only: the author's name is read through the post, so its audience still applies |
 | `dayChoices?` | `[{day, dayId}]`: plan days the person picked for calendar days, the latest 60 |
 
 `meal_entries.planEntryId?` is the plan line a meal was logged from. The server sets it in
@@ -446,11 +448,12 @@ and counts for nothing. `mealPlanProblem()` is the one validity rule, shared by 
 | `POST /nutrition/meal-plans`, `PUT /:id` | person, page | Create, replace. Only the owner's own foods and recipes |
 | `DELETE /nutrition/meal-plans/:id` | person, page | |
 | `POST /nutrition/meal-plans/:id/days/:dayId/log` | **person only** | `{day, entryIds?, slot?}`: logs the day, or those lines, into `slot` (which each line must allow; else each line's first meal), into the diary day the device chose, through `createEntry`, so facts are frozen then. A line the diary already has that day (by `matchPlanDay`) is skipped, so nothing is eaten twice. 400 `PLAN_INCOMPLETE` when a line has no numbers. A page gets 403 `NOT_FOR_PAGES` |
-| `GET /nutrition/meal-plans/active?today=&day=` | **person only** | `{active}`: the plan in use as it applies to calendar day `day` (default `today`): that plan day with each line's `logged`, and `recent`, how closely each of the seven days up to `today` followed its plan day; `null` when none |
-| `PUT /nutrition/meal-plans/active` | **person only** | `{planId \| null, today}`: start using a plan from today (stopping any other), or stop. Using the plan already in use keeps its start day |
-| `PUT /nutrition/meal-plans/active/day` | **person only** | `{day, dayId}`: that calendar day is this plan day, and the days after follow on from it (`today` is read as `day` for the first version of the route) |
+| `GET /nutrition/meal-plans/following?today=&day=` | **person only** | `{following}`: every followed plan as it applies to calendar day `day` (default `today`): its plan day with each line's `logged`, the `rules` that apply that day (the plan's and the day's), `source`, and `recent`, how closely each of the seven days up to `today` followed it |
+| `PUT /nutrition/meal-plans/:id/follow` | **person only** | `{today}`: follow from today; others stay followed. Following one already followed keeps its start day |
+| `DELETE /nutrition/meal-plans/:id/follow?today=` | **person only** | Stop following; the plan stays in the list |
+| `PUT /nutrition/meal-plans/:id/day` | **person only** | `{day, dayId}`: that calendar day is this plan day, and the days after follow on from it |
 
-**The plan in use.** `activePlanDayIndex()` (pure, tested) decides which plan day a calendar day
+**Following.** `activePlanDayIndex()` (pure, tested) decides which plan day a calendar day
 is: the plan's days in order, one per day from `activeSince`, round and round, and backwards
 before it so earlier days can be compared. A picked day re-anchors the order: that calendar day is
 the plan day picked and later days follow on from it; earlier days keep theirs.
@@ -475,14 +478,29 @@ brand and unit, not archived) stands in for the post's in the plan, so nothing i
 with `copy` every food is copied (`MealPlansService.saveImported`), once per
 post. Nothing is logged.
 
-Web: on any day in Food, the plan's lines not eaten yet sit inside each meal they may be eaten at,
-dashed, with a Log button that logs into that meal (`PlannedLines`); a meal that counts for the
-plan says "In your plan". Above the meals, `PlanStrip` has the plan day (a picker), how much of
-it is eaten, the last seven days and Stop. Putting another plan in use (Use, Start this programme, Use this plan)
-first asks when one is in use already (`okToReplacePlan`). Food → Meal
-plans has Use / Stop using; a meal plan post has **Use this plan** (`UsePlanFromPost`: saves the
-foods and the plan, then starts it). A page's Library → Meal plans has no logging and no use.
-Also: Food → Meal plans (with "Log this day today"); a page's Library → Meal plans (no logging).
+**Rules (spec 043).** A rule is `{metric, scope, kind, basis, value | low+high, tolerancePct?}`:
+calories, protein, carbs or fat; the day or one meal; at least, at most, between or about (±%,
+default 10); an amount (kcal, mg), per kg of current weight, per kg of target weight
+(`profile.targetWeightGrams`), or a share (whole percent: of the calories in that place from a
+macro, or of the day's calories at a meal). All pure, in `libs/shared/domain/src/lib/plan-rules.ts`:
+`planRuleProblem` (validity), `describePlanRule` (the sentence everywhere), `resolvePlanRule`
+(numbers for a day, from the weights and the day's calorie target, estimated when a weigh-in or an
+estimated target was used, and "of what was eaten" for a share with no target), `planRuleStatus`
+(under, met, over), `combinePlanRules` (all followed plans: the highest floor and lowest ceiling
+per metric and place, each naming its plan; daily calories first, since shares of the day are
+taken of them, else of the app's target) and `planRuleConflicts` (asked about when following).
+A plan may be rules alone (`days: []`); its rules apply every day. Nothing resolved is stored.
+
+Web: on any day in Food, a followed plan's daily rule replaces the app's target on that macro's
+tile and shows its limit there (`MacroTiles`); a meal's rules sit under that meal's header as bars
+in the macro's colour (`MealRules`). Lines not eaten yet sit inside each meal they may be eaten
+at, dashed, with a Log button that logs into that meal (`PlannedLines`); a meal that counts says
+"In your plan". `FollowingStrip` has one chip per followed plan, opening who recommended it, the
+plan day (a picker), its rules, the food eaten, the last seven days and Stop following. Following
+(Follow in Meal plans, Start this programme, Follow this plan on a post) first asks when a rule
+cannot be met together with one already followed (`okToFollow`). The editor writes rules as
+sentences with presets (`plan-rules-editor.tsx`). A page's Library → Meal plans has no logging and
+no following. Also: Food → Meal plans (with "Log this day today").
 The post card heads each day, shows numbers per day rather than summed, and the save dialog
 offers "Also save it as my own meal plan".
 

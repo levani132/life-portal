@@ -1,5 +1,5 @@
 import type { Audience } from './portal';
-import type { FoodUnit, MealSlot, NutritionFacts } from './nutrition';
+import type { FoodUnit, MealSlot, NutritionFacts, PlanRule } from './nutrition';
 import type { TrainingAttachment } from './training-posts';
 export const POST_KINDS = [
   'entry',
@@ -60,11 +60,18 @@ export interface FoodPublication {
   items: PublishedFood[];
   /** Spec 042, a meal plan: its days' names, in order. Items point at them with `dayIndex`. */
   days?: string[];
+  /** Spec 043, a meal plan: its rules, and each day's own (by day index). */
+  planRules?: PublishedPlanRules;
   /**
    * Spec 042: a published recipe's own words. A recipe may be published with these and no foods:
    * its author gave no nutrition numbers, and the post says so.
    */
   recipe?: PublishedRecipe;
+}
+/** Spec 043: a plan's rules as published: numbers and limits only. */
+export interface PublishedPlanRules {
+  plan: PlanRule[];
+  days: PlanRule[][];
 }
 export interface PublishedRecipe {
   ingredients: string[];
@@ -155,6 +162,8 @@ export interface FoodPost {
   recipe?: PublishedRecipe;
   /** Spec 042: a meal plan's day names. */
   days?: string[];
+  /** Spec 043: a meal plan's rules. */
+  planRules?: PublishedPlanRules;
   totalKcal?: number;
   totalMacros?: PublishedMacros;
   targets?: Partial<PublishedMacros>;

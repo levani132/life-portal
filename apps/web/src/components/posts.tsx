@@ -30,7 +30,7 @@ import {
   PublishedNutritionSummary,
 } from './published-nutrition';
 import { api } from '../lib/api';
-import { planSlotsLabel } from '@life-portal/shared-domain';
+import { describePlanRule, planSlotsLabel } from '@life-portal/shared-domain';
 import {
   PostAudienceControl,
   PostDateLink,
@@ -627,7 +627,9 @@ export function PostCard({
                 ? `${post.slot.charAt(0).toUpperCase() + post.slot.slice(1)} · `
                 : ''}
               {post.day ? `${post.day} · ` : ''}
-              {post.itemCount === 0
+              {post.itemCount === 0 && post.kind === 'mealPlan'
+                ? `A plan of ${post.planRules?.plan.length ?? 0} ${post.planRules?.plan.length === 1 ? 'rule' : 'rules'}`
+                : post.itemCount === 0
                 ? 'Recipe · no nutrition numbers'
                 : post.kind === 'mealPlan'
                   ? `${planDays} ${planDays === 1 ? 'day' : 'days'}${post.totalKcal === undefined ? '' : ` · about ${perDay(post.totalKcal)} kcal a day`}`
@@ -651,6 +653,21 @@ export function PostCard({
           />
         )}
         <DietTopicChips topics={post.topics} />
+        {/* Spec 043: a plan's rules, as sentences. */}
+        {post.planRules && (post.planRules.plan.length > 0 || post.planRules.days.some((rules) => rules.length > 0)) && (
+          <ul className="mt-3 space-y-1 rounded-xl bg-surface px-3 py-2 text-sm">
+            {post.planRules.plan.map((rule, index) => (
+              <li key={`p${index}`}>• {describePlanRule(rule)}</li>
+            ))}
+            {post.planRules.days.flatMap((rules, dayIndex) =>
+              rules.map((rule, index) => (
+                <li key={`d${dayIndex}-${index}`}>
+                  • {describePlanRule(rule)} <span className="text-ink-faint">({post.days?.[dayIndex] ?? `day ${dayIndex + 1}`})</span>
+                </li>
+              )),
+            )}
+          </ul>
+        )}
         <ul
           className={`mt-3 divide-y divide-border/70 ${detail ? 'max-h-[32rem] overflow-y-auto' : ''}`}
         >
@@ -694,7 +711,7 @@ export function PostCard({
             </li>
           ))}
         </ul>
-        {post.kind === 'mealPlan' && !post.isOwner && post.itemCount > 0 && <UsePlanFromPost postId={post.id} title={post.title || post.contentLabel || 'Meal plan'} />}
+        {post.kind === 'mealPlan' && !post.isOwner && (post.itemCount > 0 || !!post.planRules) && <UsePlanFromPost postId={post.id} title={post.title || post.contentLabel || 'Meal plan'} />}
         {!detail && post.itemCount > post.items.length && (
           <Link
             href={`/posts/${post.id}`}

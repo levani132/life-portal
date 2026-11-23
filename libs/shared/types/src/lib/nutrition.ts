@@ -326,6 +326,8 @@ export interface NutritionProfile extends Timestamped {
   /** A meal logged before this hour belongs to the previous day. Default 4. */
   dayStartHour: number;
   energyOverrideKcal?: number;
+  /** Spec 043: the weight the person is aiming for, in grams. */
+  targetWeightGrams?: number;
   proteinOverrideG?: number;
   fatOverrideG?: number;
   carbOverrideG?: number;
@@ -588,13 +590,22 @@ export interface MealPlanDay {
   id: Id;
   name: string;
   entries: MealPlanEntry[];
+  /** Spec 043: rules for this day only, on top of the plan's own. */
+  rules?: PlanRule[];
 }
 
 /** What is stored, and what a save sends. */
 export interface MealPlanInput {
   name: string;
   description?: string;
-  days: { id?: Id; name: string; entries: { id?: Id; slot: MealSlot; slots?: MealSlot[]; savedMealId?: Id; foodId?: Id; amount?: number }[] }[];
+  /** Spec 043: rules for every day. */
+  rules?: PlanRuleInput[];
+  days: {
+    id?: Id;
+    name: string;
+    entries: { id?: Id; slot: MealSlot; slots?: MealSlot[]; savedMealId?: Id; foodId?: Id; amount?: number }[];
+    rules?: PlanRuleInput[];
+  }[];
 }
 
 /** An entry with today's facts resolved. `missing`: its food or recipe is gone, or the recipe has no numbers. */
@@ -610,6 +621,7 @@ export interface MealPlanDayView {
   name: string;
   entries: MealPlanEntryView[];
   totals: EntryTotals;
+  rules?: PlanRule[];
 }
 
 export interface MealPlan extends Timestamped {
@@ -622,8 +634,21 @@ export interface MealPlan extends Timestamped {
   dailyAverage: EntryTotals;
   /** Whether every entry still resolves to foods with numbers, so a day can be logged or shared. */
   complete: boolean;
-  /** Spec 042: the day the person started using this plan, while they are using it. */
+  /** Spec 042: the day the person started following this plan, while they follow it. */
   activeSince?: IsoDate;
+  /** Spec 043: rules for every day. */
+  rules: PlanRule[];
+  /** Spec 043: who recommended it, for a plan saved from a post. */
+  source?: PlanSource;
+}
+
+/** Who a plan saved from a post came from. The name is read on each request, never stored. */
+export interface PlanSource {
+  postId: Id;
+  authorId: Id;
+  name?: string;
+  username?: string;
+  isPage?: boolean;
 }
 
 /** A line of the plan day, with whether the diary already has it on that calendar day. */
@@ -655,10 +680,54 @@ export interface ActiveMealPlan {
   days: { id: Id; name: string }[];
   /** The calendar day this answer is for. */
   calendarDay: IsoDate;
-  /** The plan day for that calendar day. */
+  /** The plan day for that calendar day. Empty id and name for a plan of rules alone (no days). */
   day: { id: Id; name: string; lines: ActivePlanLine[]; totals: EntryTotals };
+  /** Spec 043: the rules that apply that day: the plan's own and that day's. */
+  rules: PlanRule[];
+  /** Spec 043: who recommended it, for a plan saved from a post. */
+  source?: PlanSource;
   /** Whether that plan day was picked by hand for this calendar day. */
   chosen: boolean;
   /** The seven calendar days ending at the device's today, oldest first. */
   recent: PlanDayAdherence[];
 }
+
+// ------------------------------------------------------------------ plan rules (spec 043)
+
+/** What a plan rule measures. */
+export const PLAN_RULE_METRICS = ['energy', 'protein', 'carb', 'fat'] as const;
+export type PlanRuleMetric = (typeof PLAN_RULE_METRICS)[number];
+/** Where it applies: the whole day, or one meal. */
+export const PLAN_RULE_SCOPES = ['day', 'breakfast', 'lunch', 'dinner', 'snack'] as const;
+export type PlanRuleScope = (typeof PLAN_RULE_SCOPES)[number];
+/** The limit. `about` is a target with a tolerance either side. */
+export const PLAN_RULE_KINDS = ['atLeast', 'atMost', 'between', 'about'] as const;
+export type PlanRuleKind = (typeof PLAN_RULE_KINDS)[number];
+/**
+ * What the number is. `amount`: kcal for calories, mg for a macro. `perKg` and `perKgTarget`:
+ * the same per kg of current weight (latest weigh-in) or of target weight. `share`: whole
+ * percent, of the calories in the rule's place that come from the macro, or, for calories at a
+ * meal, of the day's calories.
+ */
+export const PLAN_RULE_BASES = ['amount', 'perKg', 'perKgTarget', 'share'] as const;
+export type PlanRuleBasis = (typeof PLAN_RULE_BASES)[number];
+
+export interface PlanRule {
+  id: Id;
+  metric: PlanRuleMetric;
+  scope: PlanRuleScope;
+  kind: PlanRuleKind;
+  basis: PlanRuleBasis;
+  /** At least, at most, about: the number, in the basis's unit. */
+  value?: number;
+  /** Between: both ends. */
+  low?: number;
+  high?: number;
+  /** About: how far either side still counts, in whole percent. Default 10. */
+  tolerancePct?: number;
+}
+
+/** A rule as a save sends it: the id is given by the server when absent. */
+export type PlanRuleInput = Omit<PlanRule, 'id'> & { id?: Id };
+
+export const PLAN_RULE_LIMITS = { perPlan: 20, perDay: 10, toleranceMax: 50 } as const;

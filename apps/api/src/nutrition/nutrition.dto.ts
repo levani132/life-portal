@@ -180,6 +180,7 @@ export class UpdateProfileDto {
   cheatDays?: number[];
   @IsOptional() @IsInt() @Min(0) @Max(12) dayStartHour?: number;
   @IsOptional() @IsInt() @Min(800) @Max(8000) energyOverrideKcal?: number;
+  @IsOptional() @IsInt() @Min(20_000) @Max(400_000) targetWeightGrams?: number;
   @IsOptional() @IsInt() @Min(0) @Max(500) proteinOverrideG?: number;
   @IsOptional() @IsInt() @Min(0) @Max(500) fatOverrideG?: number;
   @IsOptional() @IsInt() @Min(0) @Max(1000) carbOverrideG?: number;

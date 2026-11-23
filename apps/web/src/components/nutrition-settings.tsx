@@ -66,6 +66,8 @@ export function NutritionSettings({
     profile.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
   );
   const [goal, setGoal] = useState<NutritionGoal>(profile.goal);
+  // Spec 043: kg as typed; stored as grams.
+  const [targetWeight, setTargetWeight] = useState(profile.targetWeightGrams ? String(profile.targetWeightGrams / 1000) : '');
   const [basalRateKcal, setBasalRateKcal] = useState(
     profile.basalRateKcal ? String(profile.basalRateKcal) : '',
   );
@@ -129,6 +131,7 @@ export function NutritionSettings({
         nutritionPreferences: preferences,
         timeZone,
         goal,
+        targetWeightGrams: targetWeight.trim() && Number.isFinite(Number(targetWeight)) ? Math.round(Number(targetWeight) * 1000) : null,
         basalRateKcal: int(basalRateKcal),
         cheatDays,
         dayStartHour: int(dayStartHour) ?? 4,
@@ -266,6 +269,9 @@ export function NutritionSettings({
                 </option>
               ))}
             </Select>
+          </Field>
+          <Field label="Target weight (kg)" hint="Optional. Plans can set amounts per kg of it.">
+            <Input inputMode="decimal" value={targetWeight} placeholder="e.g. 75" onChange={(event) => setTargetWeight(event.target.value)} />
           </Field>
         </div>
 

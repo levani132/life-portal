@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { Apple, BookmarkPlus, Bot, CalendarCheck, ChevronDown, Info, Pencil, Plus, Search, Share2, Sparkles, Tags, Trash2, UserRound, Utensils, X, Zap, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { RecipeEditor } from '../../components/page-library';
-import { MealPlans, PlanStrip, PlannedLines, planOnDay, useActivePlan } from '../../components/meal-plans';
+import { FollowingStrip, MealPlans, MealRules, PlannedLines, limitText, plansOnDay, ruleSources, ruleState, useFollowedPlans } from '../../components/meal-plans';
 import { Programmes } from '../../components/programmes';
 import type {
   PortalState,
@@ -26,6 +26,8 @@ import type {
   TargetFigure,
 } from '@life-portal/shared-types';
 import {
+  referenceOf,
+  type CombinedRule,
   figureValue,
   formatDay,
   GOAL_PLAN,
@@ -155,7 +157,7 @@ function Nutrition() {
 
   const key = today && day ? `/nutrition?today=${today}&day=${day}` : null;
   // Spec 042: the meal plan in use, as it applies to the day on screen.
-  const plan = useActivePlan(today, day);
+  const plans = useFollowedPlans(today, day);
   // Spec 029: the day kept on this device, with meals still waiting to be sent applied.
   const { data, error, isLoading, mutate } = useNutritionDay(key);
 
@@ -171,7 +173,19 @@ function Nutrition() {
 
   const { targets, dayTotals, profile } = data;
   const allEntries = dayTotals.slots.flatMap((slot) => slot.entries);
-  const planState = planOnDay(plan, allEntries);
+  // Spec 043: what the followed plans' rules come to on this day, from the weights and the app's
+  // own calorie target (which a plan's daily calorie rule replaces).
+  const planState = plansOnDay(
+    plans,
+    allEntries,
+    {
+      weightGrams: targets.weightGrams,
+      targetWeightGrams: profile.targetWeightGrams,
+      dayEnergyKcal: figureValue(targets.energyKcal),
+      dayEnergyEstimated: !!targets.energyKcal && !isRecorded(targets.energyKcal),
+    },
+    { day: dayTotals.totals, slot: (slot) => dayTotals.slots.find((each) => each.slot === slot)?.totals ?? dayTotals.totals },
+  );
   const viewingToday = day === today;
   const refresh = () => {
     void mutate();
@@ -260,8 +274,8 @@ function Nutrition() {
           />
 
           <FoodSyncNotes overview={data} />
-          <MacroTiles totals={dayTotals.totals} targets={targets} />
-          {plan && <PlanStrip plan={plan} entries={allEntries} day={day} onChanged={refresh} />}
+          <MacroTiles totals={dayTotals.totals} targets={targets} rules={planState.dayRules} />
+          <FollowingStrip plans={plans} entries={allEntries} day={day} onChanged={refresh} />
           {targets.available && (
             <p className="text-xs text-ink-faint">
               Goal: {GOAL_PLAN[profile.goal].label}
@@ -288,14 +302,13 @@ function Nutrition() {
                   onChanged={refresh}
                   onShare={canPost ? setSharing : undefined}
                   planned={
-                    plan
+                    plans.length
                       ? {
                           marks: planState.marks,
-                          lines: (
-                            <PlannedLines plan={plan} lines={planState.openAt(slot.slot)} slot={slot.slot} day={day} onChanged={refresh} />
-                          ),
+                          lines: <PlannedLines items={planState.openAt(slot.slot)} slot={slot.slot} day={day} onChanged={refresh} />,
+                          rules: <MealRules rules={planState.rulesAt(slot.slot)} totals={slot.totals} />,
                           count: planState.openAt(slot.slot).length,
-                          kcal: planState.openAt(slot.slot).reduce((sum, line) => sum + line.totals.energyKcal, 0),
+                          kcal: planState.openAt(slot.slot).reduce((sum, item) => sum + item.line.totals.energyKcal, 0),
                         }
                       : undefined
                   }
@@ -377,9 +390,12 @@ function Nutrition() {
 function MacroTiles({
   totals,
   targets,
+  rules = [],
 }: {
   totals: SlotTotals['totals'];
   targets: NutritionTargets;
+  /** Spec 043: daily rules from followed plans. One replaces the app's target on its tile. */
+  rules?: CombinedRule[];
 }) {
   const [healthOpen, setHealthOpen] = useState(false);
   const ios = useIsIOS();
@@ -421,6 +437,8 @@ function MacroTiles({
   ];
 
   const colors = [MACRO_COLORS.kcal, MACRO_COLORS.protein, MACRO_COLORS.carbs, MACRO_COLORS.fat];
+  const metrics = ['energy', 'protein', 'carb', 'fat'] as const;
+  const ruleFor = (index: number) => rules.find((rule) => rule.metric === metrics[index] && !rule.missing && (rule.low !== undefined || rule.high !== undefined));
   return (
     <div className="space-y-3">
       {/* Four across, as on Home's Food card: glass tiles, each lit from above in its own
@@ -435,19 +453,39 @@ function MacroTiles({
               borderColor: withAlpha(colors[i], 0.3),
             }}
           >
-            <NutritionRing
-              metric={{
-                label: tile.label,
-                value: tile.eaten,
-                target: tile.target,
-                unit: tile.unit,
-                color: colors[i],
-                basis:
-                  tile.figure && !isRecorded(tile.figure)
-                    ? (tile.figure as Estimate<number>).basis
-                    : undefined,
-              }}
-            />
+            {(() => {
+              const rule = ruleFor(i);
+              const reference = rule ? referenceOf(rule) : undefined;
+              const target = rule && reference !== undefined ? (i === 0 ? reference : mgToG(reference)) : tile.target;
+              const state = rule ? ruleState(rule, i === 0 ? totals.energyKcal : [totals.proteinMg, totals.carbMg, totals.fatMg][i - 1]) : undefined;
+              return (
+                <>
+                  <NutritionRing
+                    metric={{
+                      label: tile.label,
+                      value: tile.eaten,
+                      target,
+                      unit: tile.unit,
+                      color: colors[i],
+                      basis: rule
+                        ? rule.estimated
+                          ? 'From a plan you follow, using your latest weigh-in or calorie estimate.'
+                          : undefined
+                        : tile.figure && !isRecorded(tile.figure)
+                          ? (tile.figure as Estimate<number>).basis
+                          : undefined,
+                    }}
+                  />
+                  {/* A plan's daily rule replaces the app's target here, and says whose it is. */}
+                  {rule && (
+                    <p className={clsx('mt-1 truncate text-center text-[10px] font-semibold leading-tight', state?.tone)} title={`${ruleSources(rule)}: ${rule.rules.map((each) => each.text).join('; ')}`}>
+                      {state?.status === 'met' ? '✓ ' : ''}
+                      {limitText(rule)}
+                    </p>
+                  )}
+                </>
+              );
+            })()}
           </div>
         ))}
       </div>
@@ -535,7 +573,7 @@ function SlotSection({
   onChanged: () => void;
   onShare?: (source: PostSelection) => void;
   /** Spec 042: the plan in use: meals that count for it, and its lines not eaten yet here. */
-  planned?: { marks: Set<string>; lines: ReactNode; count: number; kcal: number };
+  planned?: { marks: Set<string>; lines: ReactNode; rules: ReactNode; count: number; kcal: number };
 }) {
   const { run, pending } = useAction();
   const [saving, setSaving] = useState(false);
@@ -649,6 +687,9 @@ function SlotSection({
           </button>
         </div>
       </header>
+
+      {/* Spec 043: this meal's rules from the plans followed, shown even when folded. */}
+      {planned?.rules}
 
       {!collapsed && slot.entries.length > 0 && (
         <ul className="space-y-1 px-1.5 pb-1.5 sm:px-4 sm:pb-3">

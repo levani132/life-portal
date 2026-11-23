@@ -240,6 +240,8 @@ export class NutritionProfile {
   /** A meal logged before this hour belongs to the previous day. */
   @Prop({ required: true, default: 4, min: 0, max: 12 }) dayStartHour!: number;
   @Prop({ min: 800, max: 8000 }) energyOverrideKcal?: number;
+  /** Spec 043: the weight the person is aiming for, in grams. No default: absent means not set. */
+  @Prop({ type: Number, min: 20_000, max: 400_000 }) targetWeightGrams?: number;
   @Prop({ min: 0, max: 500 }) proteinOverrideG?: number;
   @Prop({ min: 0, max: 500 }) fatOverrideG?: number;
   @Prop({ min: 0, max: 1000 }) carbOverrideG?: number;
