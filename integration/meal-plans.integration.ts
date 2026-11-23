@@ -176,7 +176,7 @@ describe('meal plans', () => {
     });
     expect(plan.status).toBeLessThan(300);
     const [rice, oats] = plan.body.days[0].entries;
-    expect([rice.slot, rice.slots, oats.slot]).toEqual(['lunch', ['lunch', 'dinner'], 'snack']);
+    expect([rice.slot, rice.slots, oats.slot]).toEqual(['lunch', ['lunch', 'dinner'], 'breakfast']);
     const log = (body: Record<string, unknown>) => api.call<{ logged: number }>(ana, 'POST', `/nutrition/meal-plans/${plan.body.id}/days/${plan.body.days[0].id}/log`, { day: '2026-04-01', ...body });
     // Not a meal it is planned for.
     expect((await log({ entryIds: [rice.id], slot: 'breakfast' })).status).toBe(400);
