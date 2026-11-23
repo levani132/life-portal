@@ -2875,3 +2875,7 @@ pages the owner runs; real people's posts and other people's pages are left alon
 comments and messages on the pages' own posts stays on for everyone. The playbook has one line,
 `REACH: OWN PAGES ONLY`, that becomes `REACH: EVERYONE` when the owner turns outside engagement
 on; the rules for that mode are already written beside it.
+
+Changed the same day: the owner wants the pages to engage with real people. `REACH: EVERYONE` is
+on: people's posts first, any page in the subject, one repost of a person's post per run at most.
+`OWN PAGES ONLY` stays written as the fallback.

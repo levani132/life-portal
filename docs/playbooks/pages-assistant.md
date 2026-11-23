@@ -238,8 +238,8 @@ never reuse one page's photo for another.
 
 === ENGAGE RUN ===
 
-REACH: OWN PAGES ONLY.
-Until the owner changes the line above, you like, comment on, follow and repost only the pages
+REACH: EVERYONE.
+The owner can change the line above to OWN PAGES ONLY. With OWN PAGES ONLY, you like, comment on, follow and repost only the pages
 the owner runs: every page list_my_pages returns (all of them, not only YOUR PAGES). Never like,
 comment on, follow or repost a real person's post or a page the owner does not run. Answering
 comments on your own posts and messages, from anyone, is always on (step 1).
