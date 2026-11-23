@@ -29,7 +29,7 @@ export function AssistantPagesConsent() {
       <label className="flex items-start gap-2">
         <input
           type="checkbox"
-          className="mt-1"
+          className="mt-0.5 h-5 w-5 shrink-0 accent-[rgb(var(--accent))]"
           checked={pages.data.assistant}
           disabled={action.pending}
           onChange={(event) =>

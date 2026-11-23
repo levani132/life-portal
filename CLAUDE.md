@@ -95,7 +95,9 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   each day's quote. It starts the day you start using the app.
 - **`min-width: 0` is the global default** (`apps/web/src/app/global.css`), because grid and flex
   items otherwise refuse to shrink and one long label makes the whole page wider than a phone. If
-  something must not shrink, use `shrink-0` (which still works) or an explicit `min-w-*`.
+  something must not shrink, use `shrink-0` (which still works) or an explicit `min-w-*`. A bare
+  `<input type="checkbox">` in a flex row is the usual victim: it collapses to nothing and stays
+  clickable. Give every checkbox `h-5 w-5 shrink-0` and an `accent-*` role.
 - **The service worker (`apps/web/public/sw.js`) must never cache `/api`.** It holds one person's
   financial and health data; the cache outlives the tab. Shell and hashed assets only.
 - **Never put `default: 0` on an optional money field.** Mongo then returns `0` where the type

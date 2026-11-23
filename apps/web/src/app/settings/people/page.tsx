@@ -169,6 +169,7 @@ function Row({ account, pending, act }: { account: AdminAccount; pending: boolea
         <label className="flex items-center gap-2 text-xs text-ink-muted">
           <input
             type="checkbox"
+            className="h-5 w-5 shrink-0 accent-[rgb(var(--accent))]"
             checked={!!account.official}
             disabled={pending}
             onChange={(event) => void act(() => api.put(`/pages/${account.id}/official`, { official: event.target.checked }))}

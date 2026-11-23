@@ -78,6 +78,7 @@ export function PageFollow({ page, own, canMarkOfficial, canMessage }: { page: S
         <label className="flex items-center gap-2 text-xs text-ink-muted">
           <input
             type="checkbox"
+            className="h-5 w-5 shrink-0 accent-[rgb(var(--accent))]"
             checked={!!page.aiManaged}
             disabled={official.pending}
             onChange={(event) =>
@@ -98,6 +99,7 @@ export function PageFollow({ page, own, canMarkOfficial, canMessage }: { page: S
         <label className="flex items-center gap-2 text-xs text-ink-muted">
           <input
             type="checkbox"
+            className="h-5 w-5 shrink-0 accent-[rgb(var(--accent))]"
             checked={!!page.official}
             disabled={official.pending}
             onChange={(event) =>
