@@ -46,6 +46,11 @@ export const FOR_YOU_CONFIG = {
   authorReasonMin: 2,
   popularMembers: 5,
   freshHours: 48,
+  /**
+   * Spec 041: a post by a person (not a page) this recent comes before every page's post.
+   * Pages publish on a schedule and would otherwise bury the few posts people write.
+   */
+  peopleFirstHours: 7 * 24,
 } as const;
 
 export type ForYouConfig = typeof FOR_YOU_CONFIG;
@@ -68,6 +73,8 @@ export interface RankCandidate {
   topicIds: readonly string[];
   /** Distinct other members who liked, commented on or reposted it. */
   engagedMembers: number;
+  /** Written by a person, not a page. Absent counts as a page's, so nothing is promoted by mistake. */
+  fromPerson?: boolean;
 }
 
 export interface RankedReason {
@@ -246,6 +253,17 @@ function assemble(
   return result;
 }
 
+/**
+ * People's recent posts first, each group keeping the order it had (spec 041). The per-author
+ * and per-topic limits are applied afterwards by `assemble`, so one person still cannot fill a
+ * page.
+ */
+function peopleFirst<T extends RankCandidate>(ordered: readonly T[], now: string, config: ForYouConfig): T[] {
+  const cutoff = new Date(now).getTime() - config.peopleFirstHours * 60 * 60 * 1000;
+  const first = (candidate: T) => candidate.fromPerson === true && new Date(candidate.createdAt).getTime() >= cutoff;
+  return [...ordered.filter(first), ...ordered.filter((candidate) => !first(candidate))];
+}
+
 export function rankForYou(input: ForYouRankInput): ForYouRanking {
   const config = input.config ?? FOR_YOU_CONFIG;
   const seen = new Set<string>();
@@ -256,12 +274,16 @@ export function rankForYou(input: ForYouRankInput): ForYouRanking {
   const affinity = viewerAffinity(input);
 
   if (affinity.signals < config.minSignals && !interests.size) {
-    const chronological = assemble([...candidates].sort(newestFirst), [], config, true);
+    const chronological = assemble(peopleFirst([...candidates].sort(newestFirst), input.now, config), [], config, true);
     return { mode: 'chronological', entries: chronological.map(({ candidate }) => ({ postId: candidate.id, reasons: [] })) };
   }
 
   const scores = new Map(candidates.map((c) => [c.id, scoreCandidate(c, affinity, interests, input.now, config).total]));
-  const ordered = [...candidates].sort((a, b) => (scores.get(b.id) ?? 0) - (scores.get(a.id) ?? 0) || newestFirst(a, b));
+  const ordered = peopleFirst(
+    [...candidates].sort((a, b) => (scores.get(b.id) ?? 0) - (scores.get(a.id) ?? 0) || newestFirst(a, b)),
+    input.now,
+    config,
+  );
   const unfamiliar = (c: RankCandidate) =>
     !affinity.authors.has(c.authorId) &&
     c.topicIds.every((topic) => !affinity.topics.has(topic) && !interests.has(topic)) &&

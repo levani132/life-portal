@@ -261,6 +261,11 @@ export class SocialService implements OnModuleInit {
     const rows = await this.profiles.find({ username: { $regex: `^${prefix}` } }).select('userId').limit(200).lean();
     return rows.map((row) => row.userId);
   }
+  /** Every page's id. Pages are few (hundreds), so this is one small read. */
+  async allPageIds(): Promise<string[]> {
+    const rows = await this.profiles.find({ kind: 'page' }).select('userId').limit(5000).lean();
+    return rows.map((row) => row.userId);
+  }
   /** Which of these accounts are pages. */
   async pagesAmong(userIds: string[]): Promise<Set<string>> {
     const rows = await this.profiles.find({ userId: { $in: userIds }, kind: 'page' }).select('userId').lean();

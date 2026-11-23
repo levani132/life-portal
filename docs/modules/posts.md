@@ -331,6 +331,15 @@ Domain tests cover source selection, canonicalisation, duplicates, calorie calcu
 
 Related: [social](social.md), [nutrition](nutrition.md), [portal](portal.md), [007 specification](../../specs/007-food-posts/spec.md).
 
+## People before pages in For You (spec 041)
+
+With `forYouRanking`, a post by a person (not a page) from the last 7 days
+(`FOR_YOU_CONFIG.peopleFirstHours`) is ordered before every page's post, in both the ranked and
+the chronological order; `assemble()` still applies the per-author and per-topic limits after.
+`ForYouService.build()` also reads people's posts of that week on their own (`PEOPLE_SCAN`), so
+pages posting on a schedule cannot push them out of the candidate pool. The unranked feed
+(`forYouRanking` off) is still newest first.
+
 ## Replies to comments
 
 One level deep. `post_comments.parentId` is the **top-level** comment a reply sits under;

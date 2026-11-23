@@ -38,6 +38,11 @@
 - [ ] T062 Video through the same flow.
 - [ ] T061 Insights: followers over time, saves and copies per item.
 
+## Added 2026-11-23
+- [x] T070 People's posts before pages' in For You.
+- [x] T071 Scheduled actions (`at`) for the assistant.
+- [x] T072 Replies to comments, one level.
+
 ## Later (on the roadmap)
 - Co-managers. Verification of real businesses. Challenges. Images from a web address.
 

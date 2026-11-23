@@ -40,7 +40,26 @@ export interface AssistantActivity {
   actions: AssistantAction[];
   /** Today's use against today's cap, per kind. `cap: null` means no cap. */
   today: { kind: AssistantActionKind; used: number; cap: number | null }[];
+  /** What the assistant has queued for later as this page, soonest first. */
+  scheduled: AssistantScheduledAction[];
 }
+
+/** Something the assistant asked to be done later as a page (spec 041). */
+export interface AssistantScheduledAction {
+  id: string;
+  tool: string;
+  /** When it is due, as an ISO timestamp. */
+  at: string;
+  status: 'pending' | 'running' | 'done' | 'failed' | 'cancelled';
+  /** Why it failed, in the words the tool would have answered. */
+  error?: string;
+}
+
+/** How far ahead an action may be scheduled, and how far when it carries photos. */
+export const ASSISTANT_SCHEDULE_MAX_DAYS = 7;
+export const ASSISTANT_SCHEDULE_MEDIA_MAX_HOURS = 20;
+/** How many actions may wait for one page at a time. */
+export const ASSISTANT_SCHEDULE_MAX_PENDING = 500;
 
 /** The owner's settings: the defaults, and one person's overrides (absent kinds use the default). */
 export interface AssistantCapSettings {

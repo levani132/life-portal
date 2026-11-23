@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { BadRequestException, ForbiddenException, HttpException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, Inject, Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { CONFIG, type AppConfig } from '../config/configuration';
 import { InjectModel, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Model, Types, isValidObjectId } from 'mongoose';
 import { z } from 'zod';
@@ -7,6 +9,10 @@ import {
   ASSISTANT_ACTION_KINDS,
   ASSISTANT_CAP_MAX,
   ASSISTANT_CAP_NONE,
+  ASSISTANT_SCHEDULE_MAX_DAYS,
+  ASSISTANT_SCHEDULE_MAX_PENDING,
+  ASSISTANT_SCHEDULE_MEDIA_MAX_HOURS,
+  type AssistantScheduledAction,
   MAX_POST_MEDIA,
   MEDIA_LIMITS,
   EQUIPMENT_TYPES,
@@ -51,6 +57,38 @@ export class PageAssistantAction {
 export const PageAssistantActionSchema = SchemaFactory.createForClass(PageAssistantAction);
 PageAssistantActionSchema.index({ pageId: 1, kind: 1, day: 1 });
 PageAssistantActionSchema.index({ pageId: 1, createdAt: -1 });
+
+/**
+ * Something an assistant asked to be done later as a page (spec 041). An assistant runs on its
+ * own timetable (an hourly job, say), so it hands over what to do and when, and the server does
+ * it at that minute. `args` is what the tool was called with: for a post or a comment that is
+ * its text, kept until the action has run and for a week after.
+ */
+@Schema({ collection: 'page_scheduled_actions', timestamps: { createdAt: true, updatedAt: false }, versionKey: false })
+export class PageScheduledAction {
+  @Prop({ required: true }) pageId!: string;
+  @Prop({ required: true }) personId!: string;
+  @Prop({ required: true }) tool!: string;
+  @Prop({ type: Object, required: true }) args!: Record<string, unknown>;
+  @Prop({ required: true }) runAt!: Date;
+  @Prop({ type: String, required: true, enum: ['pending', 'running', 'done', 'failed', 'cancelled'] }) status!: AssistantScheduledAction['status'];
+  @Prop() error?: string;
+  @Prop() startedAt?: Date;
+  @Prop() doneAt?: Date;
+  createdAt!: Date;
+}
+export const PageScheduledActionSchema = SchemaFactory.createForClass(PageScheduledAction);
+PageScheduledActionSchema.index({ status: 1, runAt: 1 });
+PageScheduledActionSchema.index({ pageId: 1, runAt: 1 });
+// Finished rows are kept a week, for the managers' list, then removed with their text.
+PageScheduledActionSchema.index({ doneAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60, sparse: true });
+
+/** The tools that take `at`: done at that time instead of now. */
+const SCHEDULABLE = new Set(['create_page_post', 'publish_page_draft', 'comment_on_post', 'like_post', 'follow_page', 'reply_in_conversation']);
+/** How many due actions one run of the clock takes. */
+const DUE_PER_RUN = 100;
+/** A row left "running" this long was cut off by a restart; it is failed, never run twice. */
+const STUCK_MS = 10 * 60 * 1000;
 
 /** The owner's defaults for the assistant's caps: one row, no person. */
 @Schema({ collection: 'assistant_settings', versionKey: false })
@@ -102,6 +140,8 @@ function brief(post: FoodPost) {
 
 @Injectable()
 export class PageAssistantService {
+  private readonly log = new Logger(PageAssistantService.name);
+
   constructor(
     @InjectModel(PageAssistantAction.name) private readonly actions: Model<PageAssistantAction>,
     @InjectModel(AssistantSettings.name) private readonly settings: Model<AssistantSettings>,
@@ -117,6 +157,8 @@ export class PageAssistantService {
     private readonly follows: FollowsService,
     private readonly messages: MessagesService,
     private readonly media: MediaService,
+    @InjectModel(PageScheduledAction.name) private readonly scheduledActions: Model<PageScheduledAction>,
+    @Inject(CONFIG) private readonly config: AppConfig,
   ) {}
 
   // ------------------------------------------------------------------ caps and the log
@@ -180,6 +222,7 @@ export class PageAssistantService {
     if (!(await this.pages.managersOf(page)).includes(personId)) {
       throw new ForbiddenException({ code: 'NOT_A_MANAGER', message: 'You do not manage that page.' });
     }
+    const waiting = await this.scheduledActions.find({ pageId: page, status: { $in: ['pending', 'running'] } }).sort({ runAt: 1 }).limit(100).lean<(PageScheduledAction & { _id: Types.ObjectId })[]>();
     const [rows, counts, defaults, own] = await Promise.all([
       this.actions.find({ pageId: page }).sort({ createdAt: -1 }).limit(Math.min(limit, 200)).lean<(PageAssistantAction & { _id: Types.ObjectId })[]>(),
       this.actions.aggregate<{ _id: AssistantActionKind; n: number }>([{ $match: { pageId: page, day: utcDay() } }, { $group: { _id: '$kind', n: { $sum: 1 } } }]),
@@ -200,12 +243,107 @@ export class PageAssistantService {
         used: used.get(kind) ?? 0,
         cap: assistantCap({ kind, defaults, override: own.override, developer: own.developer }),
       })),
+      scheduled: waiting.map((row) => this.scheduledDto(row)),
     };
+  }
+
+  // ------------------------------------------------------------------ doing things later
+
+  private scheduledDto(row: PageScheduledAction & { _id: Types.ObjectId }): AssistantScheduledAction {
+    return { id: String(row._id), tool: row.tool, at: row.runAt.toISOString(), status: row.status, ...(row.error ? { error: row.error } : {}) };
+  }
+
+  /**
+   * Queues a tool call for later. Everything is checked now that can be (the page, the time, the
+   * photos); the caps and the page's state are checked again when it runs, on that day.
+   */
+  private async schedule(personId: string, tool: string, args: Record<string, unknown>): Promise<unknown> {
+    const page = await this.acting(personId, args);
+    const runAt = new Date(String(args['at']));
+    const now = Date.now();
+    if (Number.isNaN(runAt.getTime())) throw new BadRequestException('"at" must be a date and time, like 2026-12-01T09:30:00Z.');
+    if (runAt.getTime() < now + 30_000) throw new BadRequestException('"at" must be in the future. Leave it out to do this now.');
+    if (runAt.getTime() > now + ASSISTANT_SCHEDULE_MAX_DAYS * 24 * 60 * 60 * 1000)
+      throw new BadRequestException(`"at" can be at most ${ASSISTANT_SCHEDULE_MAX_DAYS} days ahead.`);
+    const mediaIds = (args['mediaIds'] as string[] | undefined) ?? [];
+    if (mediaIds.length) {
+      // An upload nobody attached is deleted after a day, so a post with photos cannot wait longer.
+      if (runAt.getTime() > now + ASSISTANT_SCHEDULE_MEDIA_MAX_HOURS * 60 * 60 * 1000)
+        throw new BadRequestException(`A post with photos can be scheduled at most ${ASSISTANT_SCHEDULE_MEDIA_MAX_HOURS} hours ahead.`);
+      await this.media.requireAssistantChecked(page, mediaIds);
+    }
+    const pending = await this.scheduledActions.countDocuments({ pageId: page, status: 'pending' });
+    if (pending >= ASSISTANT_SCHEDULE_MAX_PENDING) throw new HttpException({ code: 'CAP_REACHED', message: 'This page already has as many actions waiting as it may. Let some run or cancel some.' }, 429);
+    const { at: _at, ...rest } = args;
+    // A fixed request id, so running it can never post or comment twice.
+    const stored = { ...rest, pageId: page, ...(tool === 'create_page_post' || tool === 'comment_on_post' || tool === 'reply_in_conversation' ? { requestId: (rest['requestId'] as string | undefined) ?? randomUUID() } : {}) };
+    const row = await this.scheduledActions.create({ pageId: page, personId, tool, args: stored, runAt, status: 'pending' });
+    return { scheduled: true, actionId: String(row._id), tool, at: runAt.toISOString(), note: 'It will be done at that time, if the page is still usable and under its daily limits then. See list_scheduled_actions.' };
+  }
+
+  /** Every minute: does what is due. One at a time, each claimed first so two servers never both run it. */
+  @Cron(CronExpression.EVERY_MINUTE, { name: 'page-scheduled-actions' })
+  async tick(): Promise<void> {
+    if (this.config.disableSchedules) return;
+    await this.runDue();
+  }
+
+  /** Does everything due at `now`; answers how many it took. */
+  async runDue(now = new Date()): Promise<number> {
+    await this.scheduledActions.updateMany(
+      { status: 'running', startedAt: { $lt: new Date(now.getTime() - STUCK_MS) } },
+      { $set: { status: 'failed', error: 'Interrupted by a restart; not run again, in case it had already happened.', doneAt: now } },
+    );
+    const tools = new Map(this.baseTools().map((tool) => [tool.name, tool]));
+    let ran = 0;
+    for (; ran < DUE_PER_RUN; ran++) {
+      const row = await this.scheduledActions
+        .findOneAndUpdate({ status: 'pending', runAt: { $lte: now } }, { $set: { status: 'running', startedAt: new Date() } }, { sort: { runAt: 1 } })
+        .lean<PageScheduledAction & { _id: Types.ObjectId }>();
+      if (!row) break;
+      let error: string | undefined;
+      try {
+        const tool = tools.get(row.tool);
+        if (!tool) throw new BadRequestException('That action can no longer be done.');
+        await tool.run(row.personId, row.args);
+      } catch (caught) {
+        const response = (caught as { getResponse?: () => unknown }).getResponse?.();
+        const body = response && typeof response === 'object' ? (response as { message?: unknown; code?: unknown }) : undefined;
+        const message = body ? (Array.isArray(body.message) ? body.message.join('; ') : String(body.message ?? 'Refused.')) : typeof response === 'string' ? response : 'Something went wrong.';
+        error = body && typeof body.code === 'string' ? `${body.code}: ${message}` : message;
+        if (!response) this.log.warn(`Scheduled ${row.tool} failed: ${(caught as Error).name}`);
+      }
+      await this.scheduledActions.updateOne({ _id: row._id }, { $set: { status: error ? 'failed' : 'done', doneAt: new Date(), ...(error ? { error: error.slice(0, 500) } : {}) } });
+    }
+    return ran;
   }
 
   // ------------------------------------------------------------------ the tools
 
+  /**
+   * The tools as an assistant gets them: those that can wait take an optional `at`, and with it
+   * the call is queued instead of done.
+   */
   tools(): AssistantTool[] {
+    const at = z
+      .string()
+      .max(40)
+      .optional()
+      .describe(
+        `Optional. When to do this instead of now: an ISO date and time with its offset, like 2026-12-01T09:30:00+04:00, up to ${ASSISTANT_SCHEDULE_MAX_DAYS} days ahead (a post with photos: ${ASSISTANT_SCHEDULE_MEDIA_MAX_HOURS} hours). The server does it at that minute; nothing else is needed from you.`,
+      );
+    return this.baseTools().map((tool) =>
+      SCHEDULABLE.has(tool.name)
+        ? {
+            ...tool,
+            shape: { ...tool.shape, at },
+            run: (personId: string, args: Record<string, unknown>) => (args['at'] ? this.schedule(personId, tool.name, args) : tool.run(personId, args)),
+          }
+        : tool,
+    );
+  }
+
+  private baseTools(): AssistantTool[] {
     const food = {
       name: z.string().min(1).max(160),
       brand: z.string().max(120).optional(),
@@ -317,6 +455,27 @@ export class PageAssistantService {
           await this.record(personId, page, 'library', 'disable_page', page);
           const summary = await this.pages.setDisabled(personId, page, true);
           return { id: summary.id, name: summary.name, disabled: true };
+        },
+      },
+      {
+        name: 'list_scheduled_actions',
+        description: 'What is queued to be done later as this page, soonest first, and what ran or failed in the last week.',
+        shape: { pageId },
+        run: async (personId, args) => {
+          const page = await this.acting(personId, args);
+          const rows = await this.scheduledActions.find({ pageId: page }).sort({ runAt: 1 }).limit(200).lean<(PageScheduledAction & { _id: Types.ObjectId })[]>();
+          return rows.map((row) => this.scheduledDto(row));
+        },
+      },
+      {
+        name: 'cancel_scheduled_action',
+        description: 'Cancel something queued for later that has not run yet.',
+        shape: { pageId, actionId: id },
+        run: async (personId, args) => {
+          const page = await this.acting(personId, args);
+          const result = await this.scheduledActions.updateOne({ _id: String(args['actionId']), pageId: page, status: 'pending' }, { $set: { status: 'cancelled', doneAt: new Date() } });
+          if (!result.matchedCount) throw new BadRequestException('That action is not waiting any more: it ran, failed or was cancelled.');
+          return { cancelled: true };
         },
       },
       {

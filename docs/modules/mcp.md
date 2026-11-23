@@ -206,3 +206,22 @@ message each other (owner's decision, 2026-11-23; a refusal was built first and 
 Everything else is the ordinary services run as the page, so moderation, blocks, audiences and
 the messaging rule (`page-first`) apply unchanged. Tested in
 `integration/page-assistant.integration.ts`.
+
+### Doing things later (`at`)
+
+An assistant usually runs on its own timetable (an hourly job), so it cannot post at 09:17
+itself. `create_page_post`, `publish_page_draft`, `comment_on_post`, `like_post`, `follow_page`
+and `reply_in_conversation` take an optional `at` (ISO date and time with offset). With it the
+call is stored in `page_scheduled_actions {pageId, personId, tool, args, runAt, status, error?,
+startedAt?, doneAt?}` and answered `{scheduled, actionId, at}`; a clock in `PageAssistantService`
+(`tick()`, every minute) claims each due row and runs the same tool.
+
+- Up to 7 days ahead; a post with photos 20 hours (an unattached upload is deleted after a day).
+  At most 500 waiting per page.
+- Checked when scheduled: the page, the time, the photos. Checked when it runs: the consent, the
+  page's state and that day's caps. A refusal is stored as `failed` with its code.
+- A post, comment or message carries a request id fixed at scheduling, and a row is claimed
+  before it runs, so nothing happens twice. A row cut off by a restart is failed, not retried.
+- `list_scheduled_actions`, `cancel_scheduled_action`; the page's managers see what is waiting
+  in the same panel as the log. Finished rows, with their text, are removed after a week
+  (TTL on `doneAt`); deleting the page removes them at once (`ACCOUNT_PLAN`).

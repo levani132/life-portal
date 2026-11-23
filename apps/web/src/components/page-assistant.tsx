@@ -80,6 +80,18 @@ export function AssistantActivityPanel({ pageId }: { pageId: string }) {
             Today:{' '}
             {activity.data.today.map((row) => `${ASSISTANT_ACTION_LABELS[row.kind].toLowerCase()} ${row.used}/${capText(row.cap)}`).join(' · ')}
           </p>
+          {activity.data.scheduled.length > 0 && (
+            <div>
+              <p className="font-semibold text-ink">Waiting to be done</p>
+              <ul className="space-y-0.5">
+                {activity.data.scheduled.map((row) => (
+                  <li key={row.id}>
+                    {new Date(row.at).toLocaleString()} · {row.tool.replace(/_/g, ' ')}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {activity.data.actions.length === 0 ? (
             <p>Nothing yet.</p>
           ) : (

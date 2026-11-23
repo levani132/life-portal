@@ -38,7 +38,7 @@ import { MessagesModule } from '../messages/messages.module';
 import { PostsModule } from '../posts/posts.module';
 import { SocialModule } from '../social/social.module';
 import { TrainingModule } from '../training/training.module';
-import { AssistantSettings, AssistantSettingsSchema, PageAssistantAction, PageAssistantActionSchema, PageAssistantService, parseCaps } from './page-assistant';
+import { AssistantSettings, AssistantSettingsSchema, PageScheduledAction, PageScheduledActionSchema, PageAssistantAction, PageAssistantActionSchema, PageAssistantService, parseCaps } from './page-assistant';
 import { PagesService } from '../pages/pages.module';
 import type { AssistantActivity, AssistantCaps } from '@life-portal/shared-types';
 
@@ -211,6 +211,7 @@ export class PageAssistantController {
     MongooseModule.forFeature([
       { name: PageAssistantAction.name, schema: PageAssistantActionSchema },
       { name: AssistantSettings.name, schema: AssistantSettingsSchema },
+      { name: PageScheduledAction.name, schema: PageScheduledActionSchema },
       { name: McpOAuthClient.name, schema: McpOAuthClientSchema },
       { name: McpOAuthCredential.name, schema: McpOAuthCredentialSchema },
     ]),

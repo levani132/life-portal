@@ -140,3 +140,34 @@ describe('forYouReasonText', () => {
     expect(seededOrder('s', 'a')).not.toBe(seededOrder('t', 'a'));
   });
 });
+
+describe('people before pages (spec 041)', () => {
+  const person = (id: string, authorId: string, ageHours: number): RankCandidate => ({ ...post(id, authorId, [], ageHours), fromPerson: true });
+  const ids = (input: Partial<ForYouRankInput> & { candidates: RankCandidate[] }) =>
+    rankForYou({ viewerId: 'me', interactions: [], now: NOW, seed: 's', ...input }).entries.map((entry) => entry.postId);
+
+  it('puts a person’s recent post before newer posts by pages', () => {
+    expect(ids({ candidates: [post('page-new', 'p1', [], 1), post('page-newer', 'p2', [], 0.5), person('human', 'h1', 30)] })).toEqual(['human', 'page-newer', 'page-new']);
+  });
+
+  it('keeps each group in its own order, and still limits one person per page', () => {
+    const order = ids({
+      candidates: [person('h-a1', 'ha', 2), person('h-a2', 'ha', 3), person('h-a3', 'ha', 4), person('h-b1', 'hb', 5), post('p-1', 'p1', [], 1), post('p-2', 'p2', [], 6)],
+    });
+    expect(order.slice(0, 3)).toEqual(['h-a1', 'h-a2', 'h-b1']);
+    expect(order.indexOf('h-a3')).toBeGreaterThan(order.indexOf('p-2') - 3);
+    expect(order).toHaveLength(6);
+  });
+
+  it('stops promoting a person’s post once it is older than the window', () => {
+    const old = FOR_YOU_CONFIG.peopleFirstHours + 1;
+    expect(ids({ candidates: [post('page', 'p1', [], 1), person('old-human', 'h1', old)] })).toEqual(['page', 'old-human']);
+  });
+
+  it('applies in the ranked order too, and treats an unmarked post as a page’s', () => {
+    const interactions = [liked(['t1']), liked(['t1']), liked(['t1'])];
+    const order = ids({ interactions, candidates: [post('liked-topic', 'p1', ['t1'], 1), post('unmarked', 'u1', [], 1), person('human', 'h1', 20)] });
+    expect(order[0]).toBe('human');
+    expect(order.indexOf('liked-topic')).toBeLessThan(order.indexOf('unmarked'));
+  });
+});

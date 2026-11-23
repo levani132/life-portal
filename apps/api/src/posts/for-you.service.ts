@@ -1,5 +1,6 @@
 import { CONFIG, type AppConfig } from '../config/configuration';
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
+import { SocialService } from '../social/social.module';
 import { InjectModel } from '@nestjs/mongoose';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import { Model, Types } from 'mongoose';
@@ -30,6 +31,8 @@ const ORIGINAL = { repostOf: { $exists: false } };
 export const FOR_YOU_SESSION_MS = 30 * 60_000;
 /** Newest eligible posts read for one session, before the 300 the ranking keeps. */
 const POOL_SCAN = 400;
+/** People's posts from the last week that are always candidates, however many pages posted since. */
+const PEOPLE_SCAN = 100;
 /** At most this many of each kind of the viewer's own interactions are read. */
 const SIGNAL_LIMIT = 500;
 
@@ -61,6 +64,7 @@ export class ForYouService {
     private readonly feed: PostsService,
     private readonly access: AccessService,
     @Inject(CONFIG) private readonly config: AppConfig,
+    @Optional() private readonly social?: SocialService,
   ) {}
 
   async page(userId: string, query: ForYouDto, now = new Date()): Promise<PostPage> {
@@ -127,7 +131,22 @@ export class ForYouService {
       .sort({ createdAt: -1, _id: -1 })
       .limit(POOL_SCAN)
       .lean();
-    const pool = (await this.feed.forYouEligible(userId, rows, filter)).slice(0, FOR_YOU_CONFIG.sessionSize);
+    // Spec 041: pages publish on a schedule and would push people's posts out of the newest
+    // rows, so people's recent posts are read on their own and always belong to the pool.
+    const pageIds = new Set((await this.social?.allPageIds()) ?? []);
+    const peopleRows: PostRow[] = pageIds.size
+      ? await this.posts
+          .find({
+            ...this.feed.forYouQuery([...filter.excluded, ...pageIds]),
+            createdAt: { $gte: new Date(now.getTime() - FOR_YOU_CONFIG.peopleFirstHours * 60 * 60 * 1000) },
+          })
+          .sort({ createdAt: -1, _id: -1 })
+          .limit(PEOPLE_SCAN)
+          .lean()
+      : [];
+    const known = new Set(peopleRows.map((row) => String(row._id)));
+    const merged = [...peopleRows, ...rows.filter((row) => !known.has(String(row._id)))];
+    const pool = (await this.feed.forYouEligible(userId, merged, filter)).slice(0, FOR_YOU_CONFIG.sessionSize);
     const preferences = await this.preferences(userId);
     const [interactions, engaged] = await Promise.all([
       this.interactions(userId, signalSince(now.toISOString(), preferences.resetAt)),
@@ -139,6 +158,7 @@ export class ForYouService {
       createdAt: row.createdAt.toISOString(),
       topicIds: postTopics({ caption: row.caption, publication: row.publication }).map((topic) => topic.id),
       engagedMembers: engaged.get(String(row._id)) ?? 0,
+      fromPerson: !pageIds.has(row.userId),
     }));
     const seed = randomBytes(12).toString('base64url');
     const ranking = rankForYou({

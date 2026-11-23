@@ -17,7 +17,7 @@ describe('page tools over the MCP endpoint', () => {
     assistantAllowed: jest.fn(async () => false),
   };
   const assistant = new PageAssistantService(
-    {} as never, {} as never, {} as never, pages as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never,
+    {} as never, {} as never, {} as never, pages as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never,
   );
   beforeAll(async () => {
     const app = express();

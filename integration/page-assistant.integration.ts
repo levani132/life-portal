@@ -196,4 +196,58 @@ describe('the assistant for pages', () => {
     expect((await api.call(beka, 'GET', `/posts/${postId}`)).status).toBe(200);
     expect((await call('create_page_post', { pageId, caption: 'Back' })).status).toBeLessThan(300);
   });
+
+  it('does at the given time what it was asked to do later', async () => {
+    const ana = await api.account('ana');
+    const beka = await api.account('beka');
+    await allow(ana);
+    await allow(beka);
+    const call = await connector(ana);
+    const pageId = String((await call('create_page', { name: 'Robot later', username: name('later') })).body.result?.['id']);
+    const other = String((await (await connector(beka))('create_page', { name: 'Robot target', username: name('target') })).body.result?.['id']);
+    const theirs = String((await (await connector(beka))('create_page_post', { pageId: other, caption: 'To be liked later' })).body.result?.['id']);
+    const inMinutes = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
+
+    // Bad times are refused at once.
+    expect((await call('create_page_post', { pageId, caption: 'Past', at: inMinutes(-5) })).status).toBe(400);
+    expect((await call('create_page_post', { pageId, caption: 'Too far', at: inMinutes(60 * 24 * 30) })).status).toBe(400);
+    expect((await call('create_page_post', { pageId, caption: 'Not a time', at: 'tomorrow morning' })).status).toBe(400);
+
+    const post = await call('create_page_post', { pageId, caption: 'Published on time', at: inMinutes(30) });
+    expect(post.body.result).toMatchObject({ scheduled: true, tool: 'create_page_post' });
+    const like = await call('like_post', { pageId, postId: theirs, at: inMinutes(45) });
+    const comment = await call('comment_on_post', { pageId, postId: theirs, text: 'Later comment', at: inMinutes(50) });
+    const dropped = await call('follow_page', { pageId, targetPageId: other, at: inMinutes(55) });
+    for (const answer of [like, comment, dropped]) expect(answer.body.result).toMatchObject({ scheduled: true });
+    expect(await api.db.collection('food_posts').countDocuments({ userId: pageId })).toBe(0);
+    expect((await call('cancel_scheduled_action', { pageId, actionId: dropped.body.result?.['actionId'] })).status).toBeLessThan(300);
+
+    const { PageAssistantService } = await import('../apps/api/src/mcp/page-assistant');
+    const assistant = api.app.get(PageAssistantService);
+    // Nothing is due yet; half an hour on, only the post is.
+    expect(await assistant.runDue(new Date())).toBe(0);
+    expect(await assistant.runDue(new Date(Date.now() + 31 * 60_000))).toBe(1);
+    expect(await api.db.collection('food_posts').countDocuments({ userId: pageId, caption: 'Published on time', audience: 'public' })).toBe(1);
+    // An hour on: the like and the comment. The cancelled follow never runs, and nothing runs twice.
+    expect(await assistant.runDue(new Date(Date.now() + 61 * 60_000))).toBe(2);
+    expect(await assistant.runDue(new Date(Date.now() + 61 * 60_000))).toBe(0);
+    expect(await api.db.collection('post_likes').countDocuments({ userId: pageId, postId: theirs })).toBe(1);
+    expect(await api.db.collection('post_comments').countDocuments({ userId: pageId, text: 'Later comment' })).toBe(1);
+    expect(await api.db.collection('follows').countDocuments({ followerId: pageId })).toBe(0);
+
+    // What is done later still obeys the page's state at that moment.
+    const late = await call('create_page_post', { pageId, caption: 'After it was switched off', at: inMinutes(20) });
+    expect(late.body.result).toMatchObject({ scheduled: true });
+    await api.call(ana, 'PUT', `/pages/${pageId}/disabled`, { disabled: true });
+    expect(await assistant.runDue(new Date(Date.now() + 21 * 60_000))).toBe(1);
+    await api.call(ana, 'PUT', `/pages/${pageId}/disabled`, { disabled: false });
+    const listed = (await call('list_scheduled_actions', { pageId })).body.result as unknown as { tool: string; status: string; error?: string }[];
+    expect(listed.filter((row) => row.status === 'done')).toHaveLength(3);
+    expect(listed.find((row) => row.status === 'failed')?.error).toContain('PAGE_DISABLED');
+    expect(listed.find((row) => row.status === 'cancelled')?.tool).toBe('follow_page');
+    expect(await api.db.collection('food_posts').countDocuments({ userId: pageId })).toBe(1);
+
+    const activity = await api.call<AssistantActivity>(ana, 'GET', `/page-assistant/activity/${pageId}`);
+    expect(activity.body.scheduled).toEqual([]);
+  });
 });
