@@ -31,9 +31,10 @@ combine eating and training. And its manager should be able to run it through an
    plan was saved or copied.
 8. **Later, tracked on the roadmap:** co-managers, verification of real businesses.
 
-Carried over from spec 040 and the roadmap: **never fake people.** The assistant may not like,
-comment on, follow or message another page managed by the same person, so one person's pages
-cannot be made to look like a crowd.
+9. **One person's pages may engage with each other**, by hand or through the assistant: like,
+   follow, comment, message. (First built as a refusal, "never a crowd"; removed the same day on
+   the owner's decision.) What stays from spec 040: a page is always shown as a page, and as run
+   with AI when it is, so none of it is presented as a person.
 
 ## What a page can publish
 
@@ -97,8 +98,8 @@ in the order they will be built:
   assistant can relay.
 - **FR-014** Caps have defaults the owner can change, a per-person override (a number or none),
   and do not apply to the owner's own account.
-- **FR-015** The connector refuses to like, comment on, follow or message a page that shares a
-  manager with the acting page.
+- **FR-015** (withdrawn 2026-11-23) The connector does not treat pages of the same manager
+  differently from any other.
 - **FR-016** Posts and comments made through the connector go through the same moderation as
   any other.
 - **FR-020** A disabled page: cannot be acted as (in the app only to enable or delete it), is

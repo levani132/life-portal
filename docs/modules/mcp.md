@@ -178,9 +178,8 @@ no content. Written after a counted action succeeds; counted for the caps; read 
 managers (`GET /page-assistant/activity/:pageId`, and `get_assistant_activity`). Deleted with
 the page (`ACCOUNT_PLAN`: owned by `pageId`).
 
-**Never a crowd.** `sharesManager()`: following, liking, commenting on or messaging an account
-that shares a manager with the acting page is refused (`SAME_MANAGER`). A page may comment on
-its own posts.
+Pages of the same person are not treated differently: they may follow, like, comment on and
+message each other (owner's decision, 2026-11-23; a refusal was built first and removed).
 
 Everything else is the ordinary services run as the page, so moderation, blocks, audiences and
 the messaging rule (`page-first`) apply unchanged. Tested in

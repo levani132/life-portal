@@ -1,7 +1,7 @@
 /**
  * Spec 041: the assistant for pages, through the real API and Mongo, by the connector's
  * `/mcp/call` endpoint. The person must allow assistants; the page must be marked "run with
- * AI"; everything counted is capped and listed; one person's pages never engage with each other.
+ * AI"; everything counted is capped and listed.
  */
 import { randomUUID } from 'node:crypto';
 import type { AssistantActivity, MyPages, PageSummary } from '@life-portal/shared-types';
@@ -112,7 +112,7 @@ describe('the assistant for pages', () => {
     expect(JSON.stringify(activity.body)).not.toContain('A soup to save');
   });
 
-  it('engages with others, never with the same person’s pages, and stops at the cap', async () => {
+  it('engages with other pages and stops at the cap', async () => {
     const owner = await api.account('owner');
     const ana = await api.account('ana');
     const beka = await api.account('beka');
@@ -127,16 +127,9 @@ describe('the assistant for pages', () => {
     const sibling = await call('create_page_post', { pageId: second, caption: 'From the sibling' });
     const siblingPost = String(sibling.body.result?.['id']);
 
-    // One person's pages do not follow, like or comment on each other.
-    for (const [tool, args] of [
-      ['follow_page', { pageId: first, targetPageId: second }],
-      ['like_post', { pageId: first, postId: siblingPost }],
-      ['comment_on_post', { pageId: first, postId: siblingPost, text: 'Great!' }],
-    ] as const) {
-      const answer = await call(tool, args);
-      expect([tool, answer.status, answer.body.code]).toEqual([tool, 403, 'SAME_MANAGER']);
-    }
-    expect(await api.db.collection('follows').countDocuments({ followerId: first })).toBe(0);
+    // One person's pages may engage with each other; each action is the page's, marked as run with AI.
+    expect((await call('follow_page', { pageId: first, targetPageId: second })).status).toBeLessThan(300);
+    expect((await call('like_post', { pageId: first, postId: siblingPost })).status).toBeLessThan(300);
 
     expect((await call('follow_page', { pageId: first, targetPageId: other })).status).toBeLessThan(300);
     expect((await call('like_post', { pageId: first, postId: theirPost })).status).toBeLessThan(300);

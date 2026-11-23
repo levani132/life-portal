@@ -1,5 +1,5 @@
 import { ASSISTANT_CAP_DEFAULTS, ASSISTANT_CAP_NONE } from '@life-portal/shared-types';
-import { assistantCap, assistantDefaults, sharesManager, underAssistantCap } from './assistant';
+import { assistantCap, assistantDefaults, underAssistantCap } from './assistant';
 
 describe('assistant caps (spec 041)', () => {
   const defaults = ASSISTANT_CAP_DEFAULTS;
@@ -26,13 +26,5 @@ describe('assistant caps (spec 041)', () => {
   it('fills stored defaults with the code’s for anything missing or wrong', () => {
     expect(assistantDefaults({ post: 3, like: 'many' })).toEqual({ ...defaults, post: 3 });
     expect(assistantDefaults(null)).toEqual(defaults);
-  });
-});
-
-describe('sharesManager (spec 041)', () => {
-  it('is true when any manager is on both sides', () => {
-    expect(sharesManager(['ana'], ['beka', 'ana'])).toBe(true);
-    expect(sharesManager(['ana'], ['beka'])).toBe(false);
-    expect(sharesManager([], ['beka'])).toBe(false);
   });
 });

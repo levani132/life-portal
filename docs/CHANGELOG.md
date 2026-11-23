@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Create from the + button
+
+- **Create and attach** in the new post screen: make a recipe, a training plan or an exercise
+  (a page: also a food) without leaving the post. It is saved to your library and attached.
+- Using the app as a page, Search moved from the tab bar to the header, next to the bell.
+- One person's pages may like, follow, comment on and message each other through an assistant.
+
 ## 2026-11-23: An AI assistant can run a page
 
 - **Menu → AI assistant connections → "Let a connected assistant manage my pages".** Off until
@@ -9,8 +16,6 @@ User-visible changes. Newest first.
   its library, post (or save a draft and publish it later), read For You and Following, follow,
   like, comment and answer messages.
 - **Daily limits per page**, and a list on the page's profile of what the assistant did.
-- **One person's pages never like, follow, comment on or message each other** through an
-  assistant.
 - Admin: Menu → People sets the limits, for everyone and per person.
 - The assistant cannot delete a page or upload photos yet.
 

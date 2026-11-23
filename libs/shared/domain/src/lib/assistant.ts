@@ -39,12 +39,3 @@ export function assistantCap(input: {
 export function underAssistantCap(used: number, cap: number | null): boolean {
   return cap === null || used < cap;
 }
-
-/**
- * Whether two accounts share a manager (spec 041): the assistant never likes, comments on,
- * follows or messages a page run by the same person, so one person's pages cannot be made to
- * look like a crowd. A person counts as their own manager.
- */
-export function sharesManager(a: readonly string[], b: readonly string[]): boolean {
-  return a.some((id) => b.includes(id));
-}

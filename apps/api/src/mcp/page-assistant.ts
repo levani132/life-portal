@@ -16,7 +16,7 @@ import {
   type AssistantCaps,
   type FoodPost,
 } from '@life-portal/shared-types';
-import { assistantCap, assistantDefaults, sharesManager, underAssistantCap } from '@life-portal/shared-domain';
+import { assistantCap, assistantDefaults, underAssistantCap } from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
 import { FollowsService } from '../follows/follows.module';
 import { MessagesService } from '../messages/messages.service';
@@ -169,21 +169,6 @@ export class PageAssistantService {
     const { result, targetId } = await work(page);
     await this.record(personId, page, kind, tool, targetId);
     return result;
-  }
-
-  /**
-   * Never fake a crowd: the assistant does not like, comment on, follow or message an account
-   * that shares a manager with the page it acts as.
-   */
-  private async refuseSameManager(page: string, otherId: string): Promise<void> {
-    if (page === otherId) return;
-    const [mine, theirs] = await Promise.all([this.pages.managersOf(page), this.pages.managersOf(otherId)]);
-    if (sharesManager(mine, theirs)) {
-      throw new ForbiddenException({
-        code: 'SAME_MANAGER',
-        message: 'An assistant cannot engage with a page or person managed by the same person as this page.',
-      });
-    }
   }
 
   /** What the assistant did as a page, for its managers, with today's use against the caps. */
@@ -646,12 +631,11 @@ export class PageAssistantService {
       // ---- engaging
       {
         name: 'follow_page',
-        description: 'Follow a page as the acting page. Not allowed for a page managed by the same person.',
+        description: 'Follow a page as the acting page.',
         shape: { pageId, targetPageId: id },
         run: (personId, args) =>
           this.counted(personId, args, 'follow', 'follow_page', async (page) => {
             const targetId = String(args['targetPageId']);
-            await this.refuseSameManager(page, targetId);
             return { result: await this.follows.follow(page, targetId), targetId };
           }),
       },
@@ -663,12 +647,11 @@ export class PageAssistantService {
       },
       {
         name: 'like_post',
-        description: 'Like a post as the acting page. Not allowed on a post by an account managed by the same person.',
+        description: 'Like a post as the acting page.',
         shape: { pageId, postId: id },
         run: (personId, args) =>
           this.counted(personId, args, 'like', 'like_post', async (page) => {
             const post = await this.posts.detail(page, String(args['postId']));
-            await this.refuseSameManager(page, post.author.userId);
             return { result: await this.engagement.setLike(page, post.id, true), targetId: post.id };
           }),
       },
@@ -681,12 +664,11 @@ export class PageAssistantService {
       {
         name: 'comment_on_post',
         description:
-          'Comment on a post as the acting page. The comment is shown as the page’s, marked as run with AI. Not allowed on a post by an account managed by the same person, except the page’s own posts.',
+          'Comment on a post as the acting page. The comment is shown as the page’s, marked as run with AI.',
         shape: { pageId, postId: id, text: z.string().min(1).max(1000), requestId },
         run: (personId, args) =>
           this.counted(personId, args, 'comment', 'comment_on_post', async (page) => {
             const post = await this.posts.detail(page, String(args['postId']));
-            await this.refuseSameManager(page, post.author.userId);
             const comment = await this.engagement.add(page, post.id, String(args['text']), (args['requestId'] as string | undefined) ?? randomUUID());
             return { result: comment, targetId: post.id };
           }),
@@ -719,13 +701,12 @@ export class PageAssistantService {
       {
         name: 'reply_in_conversation',
         description:
-          'Send a message as the page in an existing conversation. A page answers people who wrote to it or follow it; it cannot write first to anyone else, and not to an account managed by the same person.',
+          'Send a message as the page in an existing conversation. A page answers people who wrote to it or follow it; it cannot write first to anyone else.',
         shape: { pageId, conversationId: id, text: z.string().min(1).max(2000), requestId },
         run: (personId, args) =>
           this.counted(personId, args, 'message', 'reply_in_conversation', async (page) => {
             const conversationId = String(args['conversationId']);
             const view = await this.messages.view(page, conversationId);
-            await this.refuseSameManager(page, view.other.userId);
             const sent = await this.messages.send(page, conversationId, { requestId: (args['requestId'] as string | undefined) ?? randomUUID(), text: String(args['text']) });
             return { result: { id: (sent as unknown as Record<string, unknown>)['id'] }, targetId: conversationId };
           }),

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   Food,
   FoodEntryMode,
@@ -68,7 +68,8 @@ export function FoodForm({
   lookupReason?: string;
   /** Pre-fills a new food's name, e.g. with what was typed into a search. */
   initialName?: string;
-  onSaved?: () => void;
+  /** Receives the food when one was created or edited by hand (not from a lookup import). */
+  onSaved?: (food?: Food) => void;
 }) {
   const editing = food != null;
   const { run, pending, error, clearError } = useAction();
@@ -158,14 +159,14 @@ export function FoodForm({
     return macroEnergyMismatch(factsFromInput(payload, entryMode, payload.servingSize));
   }, [payload, entryMode]);
 
+  const saved = useRef<Food | undefined>(undefined);
   const submit = () =>
     void run(async () => {
       const body = { ...payload, ...foodPhotoPayload(photo) };
-      if (editing) await api.patch(`/nutrition/foods/${food.id}`, body);
-      else await api.post('/nutrition/foods', body);
+      saved.current = editing ? await api.patch<Food>(`/nutrition/foods/${food.id}`, body) : await api.post<Food>('/nutrition/foods', body);
     }).then((ok) => {
       if (ok) {
-        onSaved?.();
+        onSaved?.(saved.current);
         onClose();
       }
     });

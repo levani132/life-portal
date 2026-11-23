@@ -82,7 +82,7 @@ export const ROADMAP: Roadmap = {
         'Content only: no food, workout or weight logging; out of ranks, tournaments and friend suggestions',
         'The app’s own pages first (kitchen, training, challenges), so a new person never lands on an empty feed',
         'A page can be marked as AI-managed; on such a page, what a human did is marked as human',
-        'Never fake people: no invented meals or records, no pages talking to each other to look like a crowd',
+        'Never fake people: no invented meals or records; a page is always shown as a page, and as run with AI when it is',
         'Later: restaurants, gyms, brands and coaches',
       ],
     },

@@ -11,6 +11,7 @@ import {
   Lock,
   Play,
   Plus,
+  PackagePlus,
   RotateCcw,
   Users,
   X,
@@ -42,6 +43,8 @@ import { keepPostDraft } from '../lib/post-drafts';
 import { useOffline } from '../lib/social-offline';
 import { CameraView } from './post-camera';
 import { PostFoodPicker, type PickedFood } from './post-food-picker';
+import { PostCreate } from './post-create';
+import { useCanShareTraining } from './training/share-training';
 import {
   EMPTY_FOOD,
   NewFoodCard,
@@ -128,6 +131,8 @@ export function PostComposer({
   const audienceTouched = useRef(!!defaultAudience);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [picking, setPicking] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const canCreateTraining = useCanShareTraining();
   const [camera, setCamera] = useState<CameraState>(initialSource || initialTraining ? 'hidden' : 'half');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -722,6 +727,9 @@ export function PostComposer({
           <ToolButton label={food ? 'Replace the food' : isPage ? 'Add from the library' : 'Add from Food'} onClick={() => setPicking(true)}>
             <Plus size={22} />
           </ToolButton>
+          <ToolButton label="Create a food, recipe, plan or exercise" onClick={() => setCreating(true)}>
+            <PackagePlus size={21} />
+          </ToolButton>
           {!isPage && (
             <>
               <ToolButton
@@ -845,6 +853,22 @@ export function PostComposer({
         }}
       />
 
+      {creating && <PostCreate
+        open
+        kinds={[...(isPage ? (['food'] as const) : []), 'recipe', ...(canCreateTraining ? (['plan', 'exercise'] as const) : [])]}
+        onClose={() => setCreating(false)}
+        onFood={(picked) => {
+          setNewFood(null);
+          setTraining(null);
+          setFood(picked);
+          setRetry(0);
+        }}
+        onTraining={(selection) => {
+          setNewFood(null);
+          setFood(null);
+          setTraining(selection);
+        }}
+      />}
       {picking && (
         <PostFoodPicker
           onPick={(picked) => {

@@ -125,7 +125,7 @@ followed. The owner sees an "Official" switch on any page's profile.
 
 ## Library (spec 041, slice 1)
 
-Acting as a page, the tab bar has **Library** (`/library`, `components/page-library.tsx`):
+Acting as a page, the tab bar has **Library** in place of Search (Search is an icon in the header, so the bar stays at four tabs and the + button): (`/library`, `components/page-library.tsx`):
 Foods (`GET/POST/PATCH/DELETE /nutrition/foods`, brands), Recipes (saved meals, built from the
 page's foods with `POST/PATCH /nutrition/meals`; this builder exists only here), Training plans
 and Exercises (the people's components, with Start, progress and history hidden). The reads a
@@ -135,6 +135,11 @@ in their hooks when acting, so a page sees defaults instead of errors.
 Posting from the library: "Post" on a food, recipe, plan or exercise opens the composer with it
 attached; the composer's **Add from the library** opens the food picker on the page's foods and
 recipes (no Diary tab). The snapshot, hash, saving and copying are the same services people use.
+**Create in the composer** (`components/post-create.tsx`, for people and pages): the composer's
+"Create" button makes a recipe, a training plan or an exercise (and, for a page, a food) with
+the same forms as elsewhere; it is saved to the library and comes back attached to the post.
+People keep the composer's own "New food" card, which can also log the food.
+
 A page's library is its own: its manager's foods and plans are separate rows under another id.
 Tested in `integration/page-library.integration.ts`.
 

@@ -148,7 +148,12 @@ function Portal({ children }: { children: ReactNode }) {
             <Link href="/" aria-label="Home">
               <Wordmark />
             </Link>
-            <div className="flex justify-end pr-2">
+            <div className="flex items-center justify-end gap-1 pr-2">
+              {isPage && portal.data.access.social && (
+                <Link href="/search" aria-label="Search" className="flex h-10 w-10 items-center justify-center rounded-full text-ink-muted hover:bg-ink/5 hover:text-ink">
+                  <Search size={20} />
+                </Link>
+              )}
               <ActivityBell access={portal.data.access} />
             </div>
           </div>
@@ -502,7 +507,8 @@ function tabsFor(
           ),
         ]
       : []),
-    ...(access.social
+    // Spec 041: a page has a Library tab, so its Search sits in the header instead.
+    ...(access.social && !isPage
       ? [
           tab(
             '/search',

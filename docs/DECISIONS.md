@@ -2801,3 +2801,10 @@ the other way round; a switch also waits for the outbox to empty.
 **Three pages per person, changeable per person, none for the owner** (owner's decision). It is
 a guard against flooding a feed that needs no approval to reach, not a ceiling on what someone
 may run.
+
+**One person's pages may engage with each other, also through an assistant** (owner's decision,
+2026-11-23, spec 041). The connector was first built to refuse a like, follow, comment or message
+between pages sharing a manager ("never a crowd", from the roadmap). The owner removed it: a page
+is always labelled as a page, and as run with AI when it is, so such engagement is not presented
+as coming from people. What still limits it is the daily caps per page. If a rule on fake
+engagement ever applies here, the place to bring a check back is `PageAssistantService`.

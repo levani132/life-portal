@@ -161,10 +161,12 @@ three have moved into the numbered steps, because friends already use the app.
      new person sees instead of an empty feed. Three to five, one or two posts a day each.
    - **A page can be marked as AI-managed** by whoever runs it. On such a page, something a
      human did is marked as human.
-   - **Never fake people.** No invented meals "eaten today", no invented records, no pages
-     talking to each other to look like a crowd. Undisclosed bot accounts deceive the people the
-     app is for, are noticed quickly in a small network, and can fall under consumer-protection
-     rules on fake engagement.
+   - **Never fake people.** No invented meals "eaten today", no invented records. Undisclosed
+     bot accounts deceive the people the app is for, are noticed quickly in a small network, and
+     can fall under consumer-protection rules on fake engagement. Pages are always shown as
+     pages, and as run with AI when they are. Pages of one person may follow, like, comment on
+     and message each other, by hand or through an assistant (owner's decision, 2026-11-23):
+     each such action carries the page mark, so nothing is presented as a person.
    - **Later uses of the same thing:** restaurants with verified menus, gyms and brands with
      challenges, coaches with plans (see the business model).
 7. **Assistant tools for pages, training and challenges.** The connector (MCP) handles food

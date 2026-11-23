@@ -230,7 +230,17 @@ let rowSeq = 0;
 const newRow = (food?: FoodWithUsage, amount = ''): Row => ({ key: `row-${rowSeq++}`, food, amount });
 
 /** Name a recipe and list its foods with amounts, in each food's own unit. */
-function RecipeEditor({ meal, foods, onClose }: { meal?: SavedMeal; foods: FoodWithUsage[]; onClose: () => void }) {
+export function RecipeEditor({
+  meal,
+  foods,
+  onClose,
+  onSaved,
+}: {
+  meal?: SavedMeal;
+  foods: FoodWithUsage[];
+  onClose: () => void;
+  onSaved?: (meal: SavedMeal) => void;
+}) {
   const action = useAction();
   const [name, setName] = useState(meal?.name ?? '');
   const [rows, setRows] = useState<Row[]>(() =>
@@ -249,12 +259,13 @@ function RecipeEditor({ meal, foods, onClose }: { meal?: SavedMeal; foods: FoodW
       .run(
         async () => {
           const body = { name: name.trim(), components };
-          await (meal ? api.patch(`/nutrition/meals/${meal.id}`, body) : api.post(MEALS_KEY, body));
+          const result = await (meal ? api.patch<SavedMeal>(`/nutrition/meals/${meal.id}`, body) : api.post<SavedMeal>(MEALS_KEY, body));
           await changed();
+          onSaved?.(result);
         },
         { revalidate: false },
       )
-      .then((ok) => ok && onClose());
+      .then((ok) => ok && !onSaved && onClose());
 
   return (
     <Modal open onClose={onClose} title={meal ? 'Edit recipe' : 'New recipe'}>
