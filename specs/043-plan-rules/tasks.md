@@ -25,3 +25,7 @@
 ## Slice 4 (built 2026-11-23)
 - [x] T030 Rules on each food (`each`: amount, per 100 g, share of its calories), fibre, sugar and saturated fat; shown while choosing a food and on meals that break them; never added up.
 - [x] T031 Target weight in the app's advice (`targetWeightOutlook`), and per-kg rules in the follow check.
+
+## Slice 5 (built 2026-11-23)
+- [x] T040 Follow this programme from a post: meal plan followed, training plan copied, paired as the reader's programme.
+- [x] T041 Assistant tools for programmes.

@@ -45,6 +45,7 @@ import { PostEngagementService } from '../posts/post-engagement.service';
 import { PostsService } from '../posts/posts.service';
 import { SocialService } from '../social/social.module';
 import { CatalogueService } from '../training/catalogue.service';
+import { ProgrammesService } from '../programmes/programmes.module';
 import { PlansService } from '../training/plans.service';
 
 /**
@@ -169,6 +170,7 @@ export class PageAssistantService {
     private readonly messages: MessagesService,
     private readonly media: MediaService,
     private readonly mealPlans: MealPlansService,
+    private readonly programmes: ProgrammesService,
     @InjectModel(PageScheduledAction.name) private readonly scheduledActions: Model<PageScheduledAction>,
     @Inject(CONFIG) private readonly config: AppConfig,
   ) {}
@@ -730,6 +732,40 @@ export class PageAssistantService {
           this.counted(personId, args, 'library', 'delete_page_meal_plan', async (page) => ({
             result: await this.mealPlans.remove(page, String(args['mealPlanId'])),
             targetId: String(args['mealPlanId']),
+          })),
+      },
+
+      // ---- library: programmes (spec 042/043)
+      {
+        name: 'list_page_programmes',
+        description: 'A page’s programmes: each pairs a meal plan and a training plan from its library under one name.',
+        shape: { pageId },
+        run: async (personId, args) => this.programmes.list(await this.acting(personId, args)),
+      },
+      {
+        name: 'create_page_programme',
+        description:
+          'Pair a meal plan and/or a training plan from a page’s library under one name. Make the plans first (create_page_meal_plan, create_page_plan). To share it, post with create_page_post with both mealPlanId and planId: readers can follow the whole programme in one tap.',
+        shape: { pageId, name: z.string().min(1).max(80), description: z.string().max(500).optional(), mealPlanId: id.optional(), planId: id.optional() },
+        run: (personId, args) =>
+          this.counted(personId, args, 'library', 'create_page_programme', async (page) => {
+            const created = await this.programmes.create(page, {
+              name: String(args['name']),
+              description: args['description'] as string | undefined,
+              mealPlanId: args['mealPlanId'] as string | undefined,
+              trainingPlanId: args['planId'] as string | undefined,
+            });
+            return { result: created, targetId: created.id };
+          }),
+      },
+      {
+        name: 'delete_page_programme',
+        description: 'Remove a programme from a page’s library. Its meal plan and training plan stay.',
+        shape: { pageId, programmeId: id },
+        run: (personId, args) =>
+          this.counted(personId, args, 'library', 'delete_page_programme', async (page) => ({
+            result: await this.programmes.remove(page, String(args['programmeId'])),
+            targetId: String(args['programmeId']),
           })),
       },
 

@@ -41,7 +41,16 @@ is saved to its library first and the programme then points at it. "Start this p
 offered to a person only. Post opens the new post page with both halves attached. A ready-made
 training plan can be paired but not posted.
 
-## Not done
+## Following a programme from a post (spec 043, slice 5)
 
-- A reader's two copies from a programme post are not paired into a programme of their own.
-- The assistant has no programme tools; it can already post a meal plan and a training plan together.
+A post carrying a meal plan and a copyable training plan shows **Follow this programme**
+(`UsePlanFromPost programme`): the reader's copy of the meal plan is saved and followed (with the
+usual conflict and "use my own foods" questions), the training plan is copied into Training
+(`POST /posts/:id/training-copy`, once per post), and the two are paired as the reader's own
+programme unless one of theirs already pairs that meal plan. One button: nothing is followed in
+part.
+
+## Assistant
+
+`list_page_programmes`, `create_page_programme` (`mealPlanId`, `planId`), `delete_page_programme`.
+Posting both plans with `create_page_post` is what lets readers follow the programme.

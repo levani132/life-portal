@@ -27,6 +27,7 @@ import { JwtModule } from '@nestjs/jwt';
 import type { Request, Response } from 'express';
 import { CurrentUser, Public, TokenAuth } from '../auth/current-user.decorator';
 import { loadConfig } from '../config/configuration';
+import { ProgrammesModule } from '../programmes/programmes.module';
 import { NutritionModule } from '../nutrition/nutrition.module';
 import { NutritionService } from '../nutrition/nutrition.service';
 import { McpService } from './mcp.service';
@@ -215,6 +216,7 @@ export class PageAssistantController {
 @Module({
   imports: [
     NutritionModule,
+    ProgrammesModule,
     AuthModule,
     PostsModule,
     MediaModule,

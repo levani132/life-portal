@@ -30,8 +30,8 @@
 - [x] T020 A programme: a meal plan and a training plan under one name (`programmes`, ids only).
 - [x] T021 Posted as one post with both plans. The reader uses the meal plan and copies the training plan, each on its own.
 - [x] T022 Web for people and pages, with both plans creatable from inside the editor; `docs/modules/programmes.md`.
-- [ ] T023 A reader's two copies paired into a programme of their own.
-- [ ] T024 Assistant tools for programmes (it can already post both plans together).
+- [x] T023 A reader's two copies paired into a programme of their own (spec 043, slice 5).
+- [x] T024 Assistant tools for programmes (spec 043, slice 5).
 
 ## Open after slice 2
 

@@ -23,11 +23,14 @@ import {
   type PlanRuleMetric,
   type PostImportPreview,
   type PostImportResult,
+  type Programme,
+  type TrainingCopyResult,
   type SavedMeal,
 } from '@life-portal/shared-types';
 import {
   PLAN_ANY_TIME,
   combinePlanRules,
+  copyNeedsPlanChoice,
   describePlanRule,
   eatenFor,
   matchPlanDay,
@@ -432,7 +435,20 @@ export function PlannedLines({ items, slot, day, onChanged }: { items: PlannedIt
  * tap. Every food is saved as your copy first, because your plan can only hold your own foods.
  * A page has no diary, so it is not offered one.
  */
-export function UsePlanFromPost({ postId, title }: { postId: string; title: string }) {
+export function UsePlanFromPost({
+  postId,
+  title,
+  programme = false,
+}: {
+  postId: string;
+  title: string;
+  /**
+   * Spec 043, slice 5: the post also carries a training plan that may be copied. Following then
+   * takes the whole programme: the meal plan followed, the training plan copied into Training, and
+   * both paired as the reader's own programme. One button; nothing to pick apart.
+   */
+  programme?: boolean;
+}) {
   const action = useAction();
   const [done, setDone] = useState(false);
   // Foods in the post the reader already has by the same name: they choose theirs or copies.
@@ -441,10 +457,18 @@ export function UsePlanFromPost({ postId, title }: { postId: string; title: stri
   if (done)
     return (
       <p role="status" className="mt-3 rounded-lg bg-success-solid/10 px-3 py-2 text-sm text-success">
-        You are following this plan now.{' '}
+        You are following this {programme ? 'programme' : 'plan'} now.{' '}
         <Link href="/nutrition" className="font-medium underline">
           See today in Food
         </Link>
+        {programme && (
+          <>
+            {' · '}
+            <Link href="/training" className="font-medium underline">
+              Its workouts in Training
+            </Link>
+          </>
+        )}
       </p>
     );
   const save = async (policy: 'skip' | 'copy') => {
@@ -460,6 +484,18 @@ export function UsePlanFromPost({ postId, title }: { postId: string; title: stri
     if (!saved.mealPlanId) throw new Error('This plan could not be saved.');
     // The conflict check was made before saving; now only follow it.
     await api.put(`${PLANS_KEY}/${saved.mealPlanId}/follow`, { today: mealContextNow().day });
+    if (programme && full.training) {
+      // The training plan joins Training as the reader's copy (once per post), and the two are
+      // paired as their programme, unless a programme of theirs already pairs this meal plan.
+      const copied = await api.post<TrainingCopyResult>(`/posts/${postId}/training-copy`, {
+        requestId: crypto.randomUUID(),
+        ...(copyNeedsPlanChoice(full.training) ? { planName: title } : {}),
+      });
+      const mine = await api.get<Programme[]>('/programmes');
+      if (copied.planId && !mine.some((each) => each.mealPlan?.id === saved.mealPlanId))
+        await api.post('/programmes', { name: title, mealPlanId: saved.mealPlanId, trainingPlanId: copied.planId });
+      await Promise.all([revalidate('/programmes'), revalidate('/training')]);
+    }
     await refreshPlans();
     setAsking(null);
     setDone(true);
@@ -504,9 +540,9 @@ export function UsePlanFromPost({ postId, title }: { postId: string; title: stri
       ) : (
         <>
           <button type="button" className="btn-primary w-full justify-center" disabled={action.pending} onClick={begin}>
-            <CalendarCheck size={16} /> {action.pending ? 'Saving the plan…' : 'Follow this plan'}
+            <CalendarCheck size={16} /> {action.pending ? 'Saving…' : programme ? 'Follow this programme' : 'Follow this plan'}
           </button>
-          <p className="mt-1 text-center text-xs text-ink-faint">Saves the plan to your Food and shows its meals there each day. Nothing is logged.</p>
+          <p className="mt-1 text-center text-xs text-ink-faint">{programme ? 'Follows its meal plan in Food and copies its training plan to Training, as one programme of yours. Nothing is logged.' : 'Saves the plan to your Food and shows its meals there each day. Nothing is logged.'}</p>
         </>
       )}
       {action.error && <ErrorNote message={action.error} />}

@@ -712,7 +712,7 @@ export function PostCard({
             </li>
           ))}
         </ul>
-        {post.kind === 'mealPlan' && !post.isOwner && (post.itemCount > 0 || !!post.planRules) && <UsePlanFromPost postId={post.id} title={post.title || post.contentLabel || 'Meal plan'} />}
+        {post.kind === 'mealPlan' && !post.isOwner && (post.itemCount > 0 || !!post.planRules) && <UsePlanFromPost postId={post.id} title={post.title || post.contentLabel || 'Meal plan'} programme={post.training?.kind === 'plan' && !!post.allowCopy} />}
         {!detail && post.itemCount > post.items.length && (
           <Link
             href={`/posts/${post.id}`}

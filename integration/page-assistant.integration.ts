@@ -261,4 +261,40 @@ describe('the assistant for pages', () => {
     // Marking every page official at once is the owner's alone.
     expect((await api.call(ana, 'PUT', '/page-assistant/official', {})).status).toBe(403);
   });
+
+  it('writes plans with rules, food options and programmes (spec 043)', async () => {
+    const ana = await api.account('ana');
+    const call = await connector(ana);
+    await allow(ana);
+    const pageId = String((await call('create_page', { name: 'Plan robot', username: name('planbot') })).body.result?.['id']);
+    const rice = String((await call('create_page_food', { pageId, name: 'Bot rice', servingSize: 100, energyKcal: 130, proteinMg: 3000, fatMg: 0, carbMg: 28_000 })).body.result?.['id']);
+    const pork = String((await call('create_page_food', { pageId, name: 'Bot pork', servingSize: 100, energyKcal: 200, proteinMg: 25_000, fatMg: 10_000, carbMg: 0 })).body.result?.['id']);
+    const plan = await call('create_page_meal_plan', {
+      pageId,
+      name: 'Bot plan',
+      rules: [
+        { metric: 'protein', scope: 'day', kind: 'atLeast', basis: 'perKgTarget', value: 1.8 },
+        { metric: 'sugar', scope: 'snack', kind: 'atMost', basis: 'per100', value: 10, each: true },
+        { metric: 'carb', scope: 'day', kind: 'atLeast', basis: 'amount', value: 250, dayIndex: 0 },
+      ],
+      days: [{ name: 'Training day', lines: [{ meal: 'lunch', foodId: rice, amount: 200, options: [{ foodId: pork, amount: 150 }] }] }],
+    });
+    expect(plan.status).toBeLessThan(300);
+    const stored = await api.db.collection('meal_plans').findOne({ userId: pageId, name: 'Bot plan' });
+    // Units as people write them, stored as integers.
+    expect(stored?.['rules']).toMatchObject([
+      { metric: 'protein', basis: 'perKgTarget', value: 1800 },
+      { metric: 'sugar', basis: 'per100', value: 10_000, each: true },
+    ]);
+    expect(stored?.['days'][0]).toMatchObject({ rules: [{ metric: 'carb', value: 250_000 }], entries: [{ foodId: rice, options: [{ foodId: pork, amount: 150 }] }] });
+
+    const listed = await call('list_page_meal_plans', { pageId });
+    expect(JSON.stringify(listed.body.result)).toContain('At least 1.8 g protein per kg of target weight a day');
+
+    const programme = await call('create_page_programme', { pageId, name: 'Bot programme', mealPlanId: String(stored?.['_id']) });
+    expect(programme.status).toBeLessThan(300);
+    expect((await call('list_page_programmes', { pageId })).body.result).toHaveLength(1);
+    expect((await call('delete_page_programme', { pageId, programmeId: String(programme.body.result?.['id']) })).status).toBeLessThan(300);
+    expect(await api.db.collection('programmes').countDocuments({ userId: pageId })).toBe(0);
+  });
 });

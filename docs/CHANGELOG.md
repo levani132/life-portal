@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Follow a whole programme
+
+- A post with a meal plan and a training plan has **Follow this programme**: one tap follows its
+  meal plan in Food, copies its training plan into Training, and keeps both as your programme.
+- Pages' assistants can create and remove programmes.
+
 ## 2026-11-23: Plan rules about each food
 
 - A rule can apply to **each food** instead of the total: "snacks under 10 g sugar per 100 g",
