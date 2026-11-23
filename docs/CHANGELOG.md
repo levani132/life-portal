@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Tidier comment threads
+
+- A post opens with its **latest 3 comments**, each with its latest reply. "Show earlier
+  comments" adds 10 at a time; "Show earlier replies" adds 5.
+- **The reply box opens right under the thread** you are answering, after its last reply.
+
 ## 2026-11-23: A page can follow people
 
 - Using the app as a page, people show **Follow** instead of "Add friend", in search and on

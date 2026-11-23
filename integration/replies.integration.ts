@@ -15,6 +15,8 @@ afterAll(() => api?.close());
 const say = (who: Account, postId: string, text: string, parentId?: string) =>
   api.call<PostComment & { code?: string }>(who, 'POST', `/posts/${postId}/comments`, { text, requestId: randomUUID(), ...(parentId ? { parentId } : {}) });
 const comments = async (who: Account, postId: string) => (await api.call<PostCommentsPage>(who, 'GET', `/posts/${postId}/comments`)).body.comments;
+const lots = (who: Account, postId: string, limit: number, before?: string) =>
+  api.call<PostCommentsPage>(who, 'GET', `/posts/${postId}/comments?limit=${limit}${before ? `&before=${before}` : ''}`);
 
 describe('replies to comments', () => {
   it('sit one level deep under the comment they answer', async () => {
@@ -36,9 +38,18 @@ describe('replies to comments', () => {
     const stored = await api.db.collection('post_comments').findOne({ text: 'Answering Gio' });
     expect(stored).toMatchObject({ parentId: top.body.id, parentUserId: gio.id });
 
+    // The list is the top-level comments, each with its reply count and its newest reply.
     const seen = await comments(ana, id);
-    expect(seen.map((row) => [row.text, row.parentId])).toEqual(expect.arrayContaining([['First', undefined], ['Answering Beka', top.body.id], ['Answering Gio', top.body.id]]));
-    expect(seen).toHaveLength(3);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({ text: 'First', replyCount: 2 });
+    expect(seen[0].replies?.map((row) => row.text)).toEqual(['Answering Gio']);
+    // Earlier replies are asked for a few at a time, newest first.
+    const firstPage = await api.call<PostCommentsPage>(ana, 'GET', `/posts/${id}/comments/${top.body.id}/replies?limit=1&before=${nested.body.id}`);
+    expect(firstPage.body.comments.map((row) => row.text)).toEqual(['Answering Beka']);
+    expect(firstPage.body.nextCursor).toBeUndefined();
+    const all = await api.call<PostCommentsPage>(ana, 'GET', `/posts/${id}/comments/${top.body.id}/replies?limit=1`);
+    expect(all.body.comments.map((row) => row.text)).toEqual(['Answering Gio']);
+    expect(all.body.nextCursor).toBe(nested.body.id);
 
     // A comment from another post, or one that does not exist, cannot be answered here.
     const other = await api.call<FoodPost>(ana, 'POST', '/posts', { requestId: randomUUID(), title: '', caption: 'Elsewhere', audience: 'public' });
@@ -60,7 +71,7 @@ describe('replies to comments', () => {
 
     // Removing a reply leaves the rest.
     expect((await api.call(gio, 'DELETE', `/posts/${id}/comments/${reply.body.id}`)).status).toBeLessThan(300);
-    expect((await comments(ana, id)).map((row) => row.text).sort()).toEqual(['On its own', 'To be removed']);
+    expect((await comments(ana, id)).map((row) => [row.text, row.replyCount])).toEqual([['On its own', 0], ['To be removed', 0]]);
 
     const second = await say(gio, id, 'Another reply', top.body.id);
     expect(second.status).toBeLessThan(300);
@@ -81,5 +92,23 @@ describe('replies to comments', () => {
     await api.call(gio, 'GET', '/social/me');
     expect((await api.call(beka, 'PUT', `/social/connections/${gio.id}`, { action: 'block' })).status).toBe(200);
     expect((await say(gio, post.body.id, 'Can you hear me', top.body.id)).status).toBe(404);
+  });
+
+  it('show the newest comments first and earlier ones a page at a time', async () => {
+    const ana = await api.account('ana');
+    const beka = await api.account('beka');
+    const post = await api.call<FoodPost>(ana, 'POST', '/posts', { requestId: randomUUID(), title: '', caption: 'Busy thread', audience: 'public' });
+    const id = post.body.id;
+    const made: string[] = [];
+    for (const n of [1, 2, 3, 4, 5]) made.push((await say(beka, id, `Comment ${n}`)).body.id);
+    const first = await lots(ana, id, 3);
+    expect(first.body.comments.map((row) => row.text)).toEqual(['Comment 5', 'Comment 4', 'Comment 3']);
+    expect(first.body.nextCursor).toBe(made[2]);
+    const rest = await lots(ana, id, 10, first.body.nextCursor);
+    expect(rest.body.comments.map((row) => row.text)).toEqual(['Comment 2', 'Comment 1']);
+    expect(rest.body.nextCursor).toBeUndefined();
+    // A reply never appears as a comment of its own.
+    await say(ana, id, 'A reply', made[4]);
+    expect((await lots(ana, id, 20)).body.comments).toHaveLength(5);
   });
 });

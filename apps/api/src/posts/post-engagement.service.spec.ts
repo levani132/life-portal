@@ -173,7 +173,11 @@ it('hides blocked commenters and returns bounded pages', async () => {
   const f = fixture();
   f.row.userId = 'blocked';
   f.graph.between.mockResolvedValue({ blockedBy: ['reader'] });
+  (f.comments as unknown as { aggregate: jest.Mock }).aggregate = jest.fn(async () => []);
   expect((await f.service.list('reader', 'post')).comments).toEqual([]);
+  // Ten comments a page by default, one more to know whether there are earlier ones.
+  expect(f.chain.limit).toHaveBeenCalledWith(11);
+  await f.service.list('reader', 'post', undefined, 500);
   expect(f.chain.limit).toHaveBeenCalledWith(21);
 });
 

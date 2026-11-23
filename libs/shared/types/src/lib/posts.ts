@@ -272,7 +272,16 @@ export interface PostComment {
   canDelete: boolean;
   /** A reply: the top-level comment it answers. Replies are one level deep. */
   parentId?: string;
+  /** On a top-level comment in a list: how many replies it has, and its newest ones (oldest first). */
+  replyCount?: number;
+  replies?: PostComment[];
 }
+/** How many comments and replies a list shows first, and how many each "show earlier" adds. */
+export const COMMENTS_FIRST = 3;
+export const COMMENTS_MORE = 10;
+export const REPLIES_FIRST = 1;
+export const REPLIES_MORE = 5;
+export const COMMENTS_PAGE_MAX = 20;
 export interface PostCommentsPage {
   comments: PostComment[];
   nextCursor?: string;

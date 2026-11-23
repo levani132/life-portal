@@ -6,11 +6,15 @@ import {
 } from '@nestjs/common';
 import { InjectModel, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Model, isValidObjectId } from 'mongoose';
-import type {
-  FoodPost,
-  PostComment,
-  PostCommentsPage,
-  PostEngagement,
+import {
+  COMMENTS_MORE,
+  COMMENTS_PAGE_MAX,
+  REPLIES_FIRST,
+  REPLIES_MORE,
+  type FoodPost,
+  type PostComment,
+  type PostCommentsPage,
+  type PostEngagement,
 } from '@life-portal/shared-types';
 import type { ActivityRow } from '@life-portal/shared-domain';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -234,36 +238,60 @@ export class PostEngagementService implements OnModuleInit {
       ...(row.parentId ? { parentId: row.parentId } : {}),
     };
   }
-  async list(
-    userId: string,
-    postId: string,
-    before?: string,
-  ): Promise<PostCommentsPage> {
-    const post = await this.posts.detail(userId, postId);
-    if (before && !isValidObjectId(before))
-      throw new BadRequestException('Invalid comment cursor.');
-    const rows = await this.comments
-      .find({
-        postId,
-        deleted: false,
-        ...(before ? { _id: { $lt: before } } : {}),
-      })
-      .sort({ _id: -1 })
-      .limit(21)
-      .lean();
-    const visible = await Promise.all(
-      rows.slice(0, 20).map(async (row) => {
-        if (
-          row.userId !== userId &&
-          (await this.graph.between(userId, row.userId))?.blockedBy.length
-        )
-          return null;
-        return this.commentDto(row, userId, post.isOwner);
+  /** Comments the viewer may see: not from someone blocked either way. */
+  private async visibleTo(rows: (PostCommentRecord & { _id: unknown })[], viewerId: string, owner: boolean): Promise<PostComment[]> {
+    const shown = await Promise.all(
+      rows.map(async (row) => {
+        if (row.userId !== viewerId && (await this.graph.between(viewerId, row.userId))?.blockedBy.length) return null;
+        return this.commentDto(row, viewerId, owner);
       }),
     );
+    return shown.filter((row): row is PostComment => row !== null);
+  }
+
+  /**
+   * A post's top-level comments, newest first, `limit` at a time. Each carries how many replies
+   * it has and its newest ones, so a thread can be shown without asking for every reply.
+   */
+  async list(userId: string, postId: string, before?: string, limit = COMMENTS_MORE): Promise<PostCommentsPage> {
+    const post = await this.posts.detail(userId, postId);
+    if (before && !isValidObjectId(before)) throw new BadRequestException('Invalid comment cursor.');
+    const size = Math.min(Math.max(1, Math.floor(limit) || COMMENTS_MORE), COMMENTS_PAGE_MAX);
+    const rows = await this.comments
+      .find({ postId, deleted: false, parentId: { $exists: false }, ...(before ? { _id: { $lt: before } } : {}) })
+      .sort({ _id: -1 })
+      .limit(size + 1)
+      .lean();
+    const page = rows.slice(0, size);
+    const ids = page.map((row) => String(row._id));
+    const [counts, newest] = await Promise.all([
+      this.comments.aggregate<{ _id: string; n: number }>([{ $match: { postId, deleted: false, parentId: { $in: ids } } }, { $group: { _id: '$parentId', n: { $sum: 1 } } }]),
+      Promise.all(ids.map((id) => this.comments.find({ postId, deleted: false, parentId: id }).sort({ _id: -1 }).limit(REPLIES_FIRST).lean())),
+    ]);
+    const countOf = new Map(counts.map((row) => [row._id, row.n]));
+    const comments = await this.visibleTo(page, userId, post.isOwner);
+    for (const comment of comments) {
+      const index = ids.indexOf(comment.id);
+      comment.replyCount = countOf.get(comment.id) ?? 0;
+      comment.replies = (await this.visibleTo(newest[index] ?? [], userId, post.isOwner)).reverse();
+    }
+    return { comments, ...(rows.length > size ? { nextCursor: String(page[page.length - 1]._id) } : {}) };
+  }
+
+  /** The replies under one comment, newest first, `limit` at a time. */
+  async replies(userId: string, postId: string, commentId: string, before?: string, limit = REPLIES_MORE): Promise<PostCommentsPage> {
+    const post = await this.posts.detail(userId, postId);
+    if (!isValidObjectId(commentId) || (before && !isValidObjectId(before))) throw new BadRequestException('Invalid comment cursor.');
+    const size = Math.min(Math.max(1, Math.floor(limit) || REPLIES_MORE), COMMENTS_PAGE_MAX);
+    const rows = await this.comments
+      .find({ postId, deleted: false, parentId: commentId, ...(before ? { _id: { $lt: before } } : {}) })
+      .sort({ _id: -1 })
+      .limit(size + 1)
+      .lean();
+    const page = rows.slice(0, size);
     return {
-      comments: visible.filter((row): row is PostComment => row !== null),
-      ...(rows.length > 20 ? { nextCursor: String(rows[19]._id) } : {}),
+      comments: await this.visibleTo(page, userId, post.isOwner),
+      ...(rows.length > size ? { nextCursor: String(page[page.length - 1]._id) } : {}),
     };
   }
   async add(userId: string, postId: string, text: string, requestId: string, id?: string, parentId?: string) {

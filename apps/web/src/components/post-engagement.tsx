@@ -3,12 +3,15 @@ import { Avatar } from './avatar';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Heart, MessageCircle, Send, Trash2 } from 'lucide-react';
-import type {
-  PortalState,
-  FoodPost,
-  PostComment,
-  PostCommentsPage,
-  PostEngagement as Engagement,
+import {
+  COMMENTS_FIRST,
+  COMMENTS_MORE,
+  REPLIES_MORE,
+  type PortalState,
+  type FoodPost,
+  type PostComment,
+  type PostCommentsPage,
+  type PostEngagement as Engagement,
 } from '@life-portal/shared-types';
 import { canRepost } from '@life-portal/shared-domain';
 import { api, NetworkError } from '../lib/api';
@@ -175,6 +178,83 @@ export function PostEngagement({
   );
 }
 
+/** A comment or reply box: grows with its text, sends on Enter, keeps its own draft. */
+function CommentBox({
+  label,
+  placeholder,
+  autoFocus = false,
+  onSend,
+}: {
+  label: string;
+  placeholder: string;
+  autoFocus?: boolean;
+  /** Resolves true when the text was taken, so the box clears. */
+  onSend: (text: string) => Promise<boolean>;
+}) {
+  const [text, setText] = useState('');
+  const [pending, setPending] = useState(false);
+  const input = useRef<HTMLTextAreaElement>(null);
+  const locked = useRef(false);
+  useEffect(() => {
+    const field = input.current;
+    if (!field) return;
+    field.style.height = '40px';
+    field.style.height = `${Math.min(118, Math.max(40, field.scrollHeight + 2))}px`;
+  }, [text]);
+  useEffect(() => {
+    if (autoFocus) input.current?.focus();
+  }, [autoFocus]);
+  async function submit() {
+    if (!text.trim() || locked.current) return;
+    locked.current = true;
+    setPending(true);
+    try {
+      if (await onSend(text.trim())) setText('');
+    } finally {
+      locked.current = false;
+      setPending(false);
+    }
+  }
+  return (
+    <form
+      className="flex items-end gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void submit();
+      }}
+    >
+      <textarea
+        aria-label={label}
+        placeholder={placeholder}
+        ref={input}
+        rows={1}
+        style={{ minHeight: 40, maxHeight: 118, lineHeight: '20px' }}
+        maxLength={1000}
+        value={text}
+        disabled={pending}
+        className="field min-w-0 flex-1 resize-none overflow-y-auto text-sm leading-5"
+        onChange={(event) => setText(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            void submit();
+          }
+        }}
+      />
+      <button type="submit" aria-label={`Post ${label.toLowerCase().includes('reply') ? 'reply' : 'comment'}`} title="Send" disabled={pending || !text.trim()} className="btn-primary h-10 px-3">
+        <Send size={17} />
+      </button>
+    </form>
+  );
+}
+
+const byId = (a: { id: string }, b: { id: string }) => a.id.localeCompare(b.id);
+
+/**
+ * A post's comments as threads: the latest few comments, each with its latest reply, and "show
+ * earlier" for both. Replies are one level deep; the box for a reply opens under the last reply
+ * of the thread being answered.
+ */
 function PostComments({
   postId,
   onChanged,
@@ -182,191 +262,226 @@ function PostComments({
   postId: string;
   onChanged: () => void;
 }) {
-  const result = useApi<PostCommentsPage>(`/posts/${postId}/comments`, {
+  const result = useApi<PostCommentsPage>(`/posts/${postId}/comments?limit=${COMMENTS_FIRST}`, {
     refreshInterval: 15000,
     revalidateOnFocus: true,
   });
+  /** Earlier comments, loaded on request. */
   const [older, setOlder] = useState<PostComment[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
-  const [text, setText] = useState('');
-  const [pending, setPending] = useState(false);
-  const [loadingOlder, setLoadingOlder] = useState(false);
+  /** Earlier replies, loaded on request, by the comment they answer. */
+  const [olderReplies, setOlderReplies] = useState<Record<string, PostComment[]>>({});
+  const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleted, setDeleted] = useState<string[]>([]);
   /** The comment being answered. A reply to a reply goes under the same top-level comment. */
   const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(null);
-  const input = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    const field = input.current;
-    if (!field) return;
-    field.style.height = '40px';
-    field.style.height = `${Math.min(118, Math.max(40, field.scrollHeight + 2))}px`;
-  }, [text]);
-  const locked = useRef(false);
   const recordMetric = usePostMetrics();
   const writes = useSocialWrites();
   const offline = useOffline();
   const { user } = useAuth();
   const me = { userId: user?.id ?? '', displayName: 'You', username: '' };
-  const comments: ShownComment[] = overlayComments(
-    [...new Map([...older, ...(result.data?.comments ?? [])].map((row) => [row.id, row])).values()],
-    postId,
-    writes,
-    me,
-  )
-    .filter((row) => !deleted.includes(row.id))
-    .sort((a, b) => a.id.localeCompare(b.id));
-  // One level of replies: each sits under its top-level comment. A reply whose parent is not
-  // loaded (an earlier page) is shown on its own rather than hidden.
-  const ids = new Set(comments.map((row) => row.id));
-  const threads = comments
+
+  // The first page is only the newest few. What it showed before stays on screen when newer
+  // comments or replies push it out of that page, so nothing disappears while reading.
+  const latest = result.data?.comments;
+  useEffect(() => {
+    if (!latest?.length) return;
+    setOlder((rows) => {
+      const known = new Set(rows.map((item) => item.id));
+      const added = latest.filter((item) => !known.has(item.id));
+      return added.length ? [...rows, ...added] : rows;
+    });
+    setOlderReplies((all) => {
+      let changed = false;
+      const merged = { ...all };
+      for (const top of latest) {
+        const known = new Set((merged[top.id] ?? []).map((item) => item.id));
+        const added = (top.replies ?? []).filter((item) => !known.has(item.id));
+        if (added.length) {
+          merged[top.id] = [...(merged[top.id] ?? []), ...added];
+          changed = true;
+        }
+      }
+      return changed ? merged : all;
+    });
+  }, [latest]);
+
+  // Everything known, flat: comments and replies from the server, plus this device's waiting ones.
+  const tops = [...new Map([...older, ...(result.data?.comments ?? [])].map((row) => [row.id, row])).values()];
+  const serverReplies = (top: PostComment) => [...new Map([...(olderReplies[top.id] ?? []), ...(top.replies ?? [])].map((row) => [row.id, row])).values()];
+  const flat = tops.flatMap((top) => [top, ...serverReplies(top)]);
+  const shown: ShownComment[] = overlayComments(flat, postId, writes, me).filter((row) => !deleted.includes(row.id));
+  const ids = new Set(shown.map((row) => row.id));
+  const threads = shown
     .filter((row) => !row.parentId || !ids.has(row.parentId))
-    .map((row) => ({ comment: row, replies: comments.filter((reply) => reply.parentId === row.id) }));
+    .sort(byId)
+    .map((top) => ({ top, replies: shown.filter((row) => row.parentId === top.id).sort(byId) }));
   const next = cursor === null ? result.data?.nextCursor : cursor || undefined;
-  async function submit() {
-    if (!text.trim() || locked.current) return;
-    locked.current = true;
-    setPending(true);
+
+  async function send(text: string, parentId?: string): Promise<boolean> {
     setError('');
     try {
       // Spec 031: kept on the device with its own id and shown at once, marked as not sent.
-      await socialWrites.comment(postId, text.trim(), replyTo?.id);
-      setText('');
-      setReplyTo(null);
+      await socialWrites.comment(postId, text, parentId);
       if (!offline) recordMetric?.('comment');
       onChanged();
       requestNotificationOffer('comment');
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not post your comment.');
-    } finally {
-      locked.current = false;
-      setPending(false);
+      return false;
     }
   }
-  return (
-    <section
-      id={`post-comments-${postId}`}
-      aria-label="Comments"
-      className="mt-3 space-y-3"
-    >
-      {next && (
+
+  async function load(key: string, work: () => Promise<void>, failure: string) {
+    setLoading(key);
+    setError('');
+    try {
+      await work();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : failure);
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  const row = (comment: ShownComment, topId: string) => (
+    <div className="flex items-start gap-2">
+      <Avatar name={comment.author.displayName} url={comment.author.avatarUrl} size={28} className="mt-1" />
+      <div className="min-w-0 flex-1 rounded-xl bg-special-solid/5 px-3 py-2">
+        {comment.author.userId ? (
+          <Link href={`/people/${comment.author.userId}`} className="text-xs font-semibold hover:underline">
+            {comment.author.displayName}
+          </Link>
+        ) : (
+          <span className="text-xs font-semibold">{comment.author.displayName}</span>
+        )}
+        <p className="whitespace-pre-wrap break-words text-sm">{comment.text}</p>
+        <span className="mt-1 flex items-center gap-3 text-[10px] text-ink-faint">
+          {comment.unsent ? <span className="text-warning">Not sent yet</span> : <PostRelativeTime date={comment.createdAt} />}
+          {!comment.unsent && (
+            <button type="button" className="font-semibold text-ink-muted hover:text-ink" onClick={() => setReplyTo({ id: topId, name: comment.author.displayName })}>
+              Reply
+            </button>
+          )}
+        </span>
+      </div>
+      {comment.canDelete && (
         <button
           type="button"
-          disabled={loadingOlder}
-          className="text-xs text-accent hover:underline"
+          aria-label="Delete comment"
+          disabled={deleting === comment.id}
+          className="rounded p-2 text-ink-faint hover:bg-danger-solid/10 hover:text-danger"
           onClick={async () => {
-            setLoadingOlder(true);
+            setDeleting(comment.id);
             setError('');
             try {
-              const page = await api.get<PostCommentsPage>(
-                `/posts/${postId}/comments?before=${encodeURIComponent(next)}`,
-              );
-              setOlder((rows) => [...rows, ...page.comments]);
-              setCursor(page.nextCursor ?? '');
+              // A comment not sent yet is withdrawn; a saved one is deleted once online.
+              await socialWrites.removeComment(postId, comment.id);
+              setDeleted((gone) => [...gone, comment.id]);
+              onChanged();
             } catch (e) {
-              setError(
-                e instanceof Error
-                  ? e.message
-                  : 'Could not load earlier comments.',
-              );
+              setError(e instanceof Error ? e.message : 'Could not delete comment.');
             } finally {
-              setLoadingOlder(false);
+              setDeleting(null);
             }
           }}
         >
-          {loadingOlder ? 'Loading…' : 'Load earlier comments'}
+          <Trash2 size={13} />
+        </button>
+      )}
+    </div>
+  );
+
+  return (
+    <section id={`post-comments-${postId}`} aria-label="Comments" className="mt-3 space-y-3">
+      {next && (
+        <button
+          type="button"
+          disabled={loading === 'comments'}
+          className="text-xs text-accent hover:underline"
+          onClick={() =>
+            void load(
+              'comments',
+              async () => {
+                const page = await api.get<PostCommentsPage>(`/posts/${postId}/comments?before=${encodeURIComponent(next)}&limit=${COMMENTS_MORE}`);
+                setOlder((rows) => [...rows, ...page.comments]);
+                setCursor(page.nextCursor ?? '');
+              },
+              'Could not load earlier comments.',
+            )
+          }
+        >
+          {loading === 'comments' ? 'Loading…' : 'Show earlier comments'}
         </button>
       )}
       {result.isLoading ? (
         <p className="text-xs text-ink-muted">Loading comments…</p>
       ) : (
-        !comments.length &&
-        !result.error && (
-          <p className="text-xs text-ink-muted">Start the conversation.</p>
-        )
+        !threads.length && !result.error && <p className="text-xs text-ink-muted">Start the conversation.</p>
       )}
       <ul className="space-y-3">
-        {threads.map(({ comment: top, replies }) => (
-          <li key={top.id} className="space-y-2">
-            {[top, ...replies].map((comment) => (
-              <div key={comment.id} className={comment.id === top.id ? undefined : 'ml-9'}>
-          <div className="flex items-start gap-2">
-                <Avatar
-                  name={comment.author.displayName}
-                  url={comment.author.avatarUrl}
-                  size={28}
-                  className="mt-1"
-                />
-                <div className="min-w-0 flex-1 rounded-xl bg-special-solid/5 px-3 py-2">
-                  {comment.author.userId ? (
-                    <Link
-                      href={`/people/${comment.author.userId}`}
-                      className="text-xs font-semibold hover:underline"
-                    >
-                      {comment.author.displayName}
-                    </Link>
-                  ) : (
-                    <span className="text-xs font-semibold">
-                      {comment.author.displayName}
-                    </span>
-                  )}
-                  <p className="whitespace-pre-wrap break-words text-sm">
-                    {comment.text}
-                  </p>
-                  <span className="mt-1 flex items-center gap-3 text-[10px] text-ink-faint">
-                    {comment.unsent ? (
-                      <span className="text-warning">Not sent yet</span>
-                    ) : (
-                      <PostRelativeTime date={comment.createdAt} />
-                    )}
-                    {!comment.unsent && (
-                      <button
-                        type="button"
-                        className="font-semibold text-ink-muted hover:text-ink"
-                        onClick={() => {
-                          setReplyTo({ id: comment.parentId ?? comment.id, name: comment.author.displayName });
-                          input.current?.focus();
-                        }}
-                      >
-                        Reply
-                      </button>
-                    )}
-                  </span>
-                </div>
-                {comment.canDelete && (
-                  <button
-                    type="button"
-                    aria-label="Delete comment"
-                    disabled={deleting === comment.id}
-                    className="rounded p-2 text-ink-faint hover:bg-danger-solid/10 hover:text-danger"
-                    onClick={async () => {
-                      setDeleting(comment.id);
-                      setError('');
-                      try {
-                        // A comment not sent yet is withdrawn; a saved one is deleted once online.
-                        await socialWrites.removeComment(postId, comment.id);
-                        setDeleted((ids) => [...ids, comment.id]);
-                        onChanged();
-                      } catch (e) {
-                        setError(
-                          e instanceof Error
-                            ? e.message
-                            : 'Could not delete comment.',
-                        );
-                      } finally {
-                        setDeleting(null);
+        {threads.map(({ top, replies }) => {
+          // Replies the server has that are not on screen yet.
+          const known = serverReplies(top).length;
+          const hidden = Math.max(0, (top.replyCount ?? 0) - known);
+          const oldest = serverReplies(top).sort(byId)[0]?.id;
+          return (
+            <li key={top.id} className="space-y-2">
+              {row(top, top.id)}
+              {(hidden > 0 || replies.length > 0 || replyTo?.id === top.id) && (
+                <div className="ml-9 space-y-2">
+                  {hidden > 0 && (
+                    <button
+                      type="button"
+                      disabled={loading === top.id}
+                      className="text-xs text-accent hover:underline"
+                      onClick={() =>
+                        void load(
+                          top.id,
+                          async () => {
+                            const page = await api.get<PostCommentsPage>(
+                              `/posts/${postId}/comments/${top.id}/replies?limit=${REPLIES_MORE}${oldest ? `&before=${oldest}` : ''}`,
+                            );
+                            setOlderReplies((all) => ({ ...all, [top.id]: [...(all[top.id] ?? []), ...page.comments] }));
+                          },
+                          'Could not load earlier replies.',
+                        )
                       }
-                    }}
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                )}
-              </div>
-              </div>
-            ))}
-          </li>
-        ))}
+                    >
+                      {loading === top.id ? 'Loading…' : `Show ${Math.min(hidden, REPLIES_MORE)} earlier ${Math.min(hidden, REPLIES_MORE) === 1 ? 'reply' : 'replies'}`}
+                    </button>
+                  )}
+                  {replies.map((reply) => (
+                    <div key={reply.id}>{row(reply, top.id)}</div>
+                  ))}
+                  {replyTo?.id === top.id && (
+                    <div className="space-y-1">
+                      <p className="flex items-center gap-2 text-xs text-ink-muted">
+                        Replying to <span className="font-semibold text-ink">{replyTo.name}</span>
+                        <button type="button" className="underline" onClick={() => setReplyTo(null)}>
+                          Cancel
+                        </button>
+                      </p>
+                      <CommentBox
+                        label="Write a reply"
+                        placeholder="Write a reply…"
+                        autoFocus
+                        onSend={async (text) => {
+                          const sent = await send(text, top.id);
+                          if (sent) setReplyTo(null);
+                          return sent;
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ul>
       {result.error instanceof NetworkError && !error ? (
         // Not a failure the person can act on: their own comments still post when it's back.
@@ -374,53 +489,7 @@ function PostComments({
       ) : (
         (error || result.error) && <ErrorNote message={error || (result.error as Error).message} />
       )}
-      {replyTo && (
-        <p className="flex items-center gap-2 text-xs text-ink-muted">
-          Replying to <span className="font-semibold text-ink">{replyTo.name}</span>
-          <button type="button" className="underline" onClick={() => setReplyTo(null)}>
-            Cancel
-          </button>
-        </p>
-      )}
-      <form
-        className="flex items-end gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void submit();
-        }}
-      >
-        <textarea
-          aria-label="Write a comment"
-          placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
-          ref={input}
-          rows={1}
-          style={{ minHeight: 40, maxHeight: 118, lineHeight: '20px' }}
-          maxLength={1000}
-          value={text}
-          disabled={pending}
-          className="field min-w-0 flex-1 resize-none overflow-y-auto text-sm leading-5"
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={(event) => {
-            if (
-              event.key === 'Enter' &&
-              !event.shiftKey &&
-              !event.nativeEvent.isComposing
-            ) {
-              event.preventDefault();
-              void submit();
-            }
-          }}
-        />
-        <button
-          type="submit"
-          aria-label="Post comment"
-          title="Post comment"
-          disabled={pending || !text.trim()}
-          className="btn-primary h-10 px-3"
-        >
-          <Send size={17} />
-        </button>
-      </form>
+      <CommentBox label="Write a comment" placeholder="Write a comment…" onSend={(text) => send(text, undefined)} />
     </section>
   );
 }

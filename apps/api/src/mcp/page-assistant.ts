@@ -863,17 +863,21 @@ export class PageAssistantService {
       },
       {
         name: 'get_post_comments',
-        description: 'The comments on a post.',
+        description: 'The comments on a post, newest first, 20 at a time. Each has replyCount and its latest reply; to answer one, use comment_on_post with replyTo.',
         shape: { pageId, postId: id, before: id.optional().describe('A comment id: answers the comments before it.') },
         run: async (personId, args) => {
-          const page = await this.engagement.list(await this.acting(personId, args), String(args['postId']), args['before'] as string | undefined);
+          const page = await this.engagement.list(await this.acting(personId, args), String(args['postId']), args['before'] as string | undefined, 20);
           return {
             comments: page.comments.map((comment) => ({
               id: comment.id,
               author: { id: comment.author.userId, name: comment.author.displayName, isPage: comment.author.isPage === true },
               text: comment.text,
               createdAt: comment.createdAt,
-              ...(comment.parentId ? { replyTo: comment.parentId } : {}),
+              replyCount: comment.replyCount ?? 0,
+              // The newest reply, so you can tell whether the page has already answered.
+              ...(comment.replies?.length
+                ? { latestReply: { author: { id: comment.replies[comment.replies.length - 1].author.userId, isPage: comment.replies[comment.replies.length - 1].author.isPage === true }, text: comment.replies[comment.replies.length - 1].text } }
+                : {}),
             })),
             nextCursor: page.nextCursor,
           };

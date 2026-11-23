@@ -365,9 +365,13 @@ One level deep. `post_comments.parentId` is the **top-level** comment a reply si
 `parentUserId` is the author of the comment that was actually answered. `POST /:id/comments`
 takes an optional `parentId`: answering a reply stores the new one under the same top-level
 comment (never a tree). 404 `COMMENT_GONE` when the comment is missing, deleted, on another
-post, or its author and the replier are blocked either way. The list stays flat and paged as
-before, each row carrying `parentId`; the web groups replies under their comment
-(`post-engagement.tsx`), and shows a reply on its own when its comment is on an earlier page.
+post, or its author and the replier are blocked either way. `GET /:id/comments?before=&limit=` lists **top-level comments only**, newest first (10 by
+default, 20 at most), each with `replyCount` and its newest reply in `replies`;
+`GET /:id/comments/:commentId/replies?before=&limit=` pages the replies under one comment the
+same way (5 by default). The web (`post-engagement.tsx`) shows the latest 3 comments with one
+reply each; "Show earlier comments" adds 10 and "Show N earlier replies" adds 5, until all are
+shown. What was on screen stays there when newer ones arrive. The box for a reply opens under
+the last reply of the thread being answered; the box at the bottom writes a new comment.
 Removing a comment removes its replies. A reply notifies the post's owner as any comment does,
 and the person answered with `commentReply` (push, a preference of its own, and an Activity row
 when the reply is under someone else's post). The assistant's `comment_on_post` takes `replyTo`.

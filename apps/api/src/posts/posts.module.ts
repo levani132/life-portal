@@ -208,8 +208,18 @@ class PostsController {
     @CurrentUser('userId') userId: string,
     @Param('id') id: string,
     @Query('before') before?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.engagement.list(userId, id, before);
+    return this.engagement.list(userId, id, before, limit ? Number(limit) : undefined);
+  }
+  @Get(':id/comments/:commentId/replies') replies(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Param('commentId') commentId: string,
+    @Query('before') before?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.engagement.replies(userId, id, commentId, before, limit ? Number(limit) : undefined);
   }
   @Post(':id/comments') addComment(
     @CurrentUser('userId') userId: string,
