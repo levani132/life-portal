@@ -87,12 +87,12 @@ export const socialWrites = {
   },
 
   /** A comment with the id chosen here; shown at once as not sent. */
-  async comment(postId: string, text: string): Promise<string> {
+  async comment(postId: string, text: string, parentId?: string): Promise<string> {
     const commentId = newObjectId();
     const requestId = crypto.randomUUID();
     await write(
-      { op: 'comment', postId, commentId, text, createdAt: new Date().toISOString() },
-      { method: 'POST', path: `/posts/${postId}/comments`, body: { text, requestId, id: commentId } },
+      { op: 'comment', postId, commentId, text, createdAt: new Date().toISOString(), ...(parentId ? { parentId } : {}) },
+      { method: 'POST', path: `/posts/${postId}/comments`, body: { text, requestId, id: commentId, ...(parentId ? { parentId } : {}) } },
       `Comment · ${short(text)}`,
       requestId,
     );

@@ -137,6 +137,10 @@ export function notificationText(
           : '';
       return { title, body: preview || base };
     }
+    case 'commentReply': {
+      const preview = options.showCommentPreviews && event.commentText ? clip(event.commentText, PREVIEW_LIMIT) : '';
+      return { title, body: preview ? `replied to your comment: ${preview}` : 'replied to your comment' };
+    }
     case 'postRepost':
       return { title, body: `reposted ${postName(event.postTitle)}` };
     case 'badgeEarned':

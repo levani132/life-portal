@@ -10,6 +10,7 @@ function fixture() {
     countDocuments: jest.fn(async () => 1),
     exists: jest.fn(async () => ({})),
     updateOne: jest.fn(async (..._args: unknown[]) => ({ upsertedCount: 0 })),
+    updateMany: jest.fn(async () => ({ modifiedCount: 0 })),
     deleteOne: jest.fn(),
   };
   const row = {
@@ -31,6 +32,7 @@ function fixture() {
   const comments = {
     countDocuments: jest.fn(async () => 1),
     updateOne: jest.fn(async (..._args: unknown[]) => ({ matchedCount: 1 })),
+    updateMany: jest.fn(async () => ({ modifiedCount: 0 })),
     findOne: jest.fn(() => ({ lean: async () => row })),
     find: jest.fn(() => chain),
     exists: jest.fn(async (..._args: unknown[]): Promise<unknown> => null),

@@ -194,6 +194,8 @@ function PostComments({
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleted, setDeleted] = useState<string[]>([]);
+  /** The comment being answered. A reply to a reply goes under the same top-level comment. */
+  const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     const field = input.current;
@@ -215,6 +217,12 @@ function PostComments({
   )
     .filter((row) => !deleted.includes(row.id))
     .sort((a, b) => a.id.localeCompare(b.id));
+  // One level of replies: each sits under its top-level comment. A reply whose parent is not
+  // loaded (an earlier page) is shown on its own rather than hidden.
+  const ids = new Set(comments.map((row) => row.id));
+  const threads = comments
+    .filter((row) => !row.parentId || !ids.has(row.parentId))
+    .map((row) => ({ comment: row, replies: comments.filter((reply) => reply.parentId === row.id) }));
   const next = cursor === null ? result.data?.nextCursor : cursor || undefined;
   async function submit() {
     if (!text.trim() || locked.current) return;
@@ -223,8 +231,9 @@ function PostComments({
     setError('');
     try {
       // Spec 031: kept on the device with its own id and shown at once, marked as not sent.
-      await socialWrites.comment(postId, text.trim());
+      await socialWrites.comment(postId, text.trim(), replyTo?.id);
       setText('');
+      setReplyTo(null);
       if (!offline) recordMetric?.('comment');
       onChanged();
       requestNotificationOffer('comment');
@@ -278,66 +287,84 @@ function PostComments({
         )
       )}
       <ul className="space-y-3">
-        {comments.map((comment) => (
-          <li key={comment.id} className="flex items-start gap-2">
-            <Avatar
-              name={comment.author.displayName}
-              url={comment.author.avatarUrl}
-              size={28}
-              className="mt-1"
-            />
-            <div className="min-w-0 flex-1 rounded-xl bg-special-solid/5 px-3 py-2">
-              {comment.author.userId ? (
-                <Link
-                  href={`/people/${comment.author.userId}`}
-                  className="text-xs font-semibold hover:underline"
-                >
-                  {comment.author.displayName}
-                </Link>
-              ) : (
-                <span className="text-xs font-semibold">
-                  {comment.author.displayName}
-                </span>
-              )}
-              <p className="whitespace-pre-wrap break-words text-sm">
-                {comment.text}
-              </p>
-              <span className="mt-1 block text-[10px] text-ink-faint">
-                {comment.unsent ? (
-                  <span className="text-warning">Not sent yet</span>
-                ) : (
-                  <PostRelativeTime date={comment.createdAt} />
+        {threads.map(({ comment: top, replies }) => (
+          <li key={top.id} className="space-y-2">
+            {[top, ...replies].map((comment) => (
+              <div key={comment.id} className={comment.id === top.id ? undefined : 'ml-9'}>
+          <div className="flex items-start gap-2">
+                <Avatar
+                  name={comment.author.displayName}
+                  url={comment.author.avatarUrl}
+                  size={28}
+                  className="mt-1"
+                />
+                <div className="min-w-0 flex-1 rounded-xl bg-special-solid/5 px-3 py-2">
+                  {comment.author.userId ? (
+                    <Link
+                      href={`/people/${comment.author.userId}`}
+                      className="text-xs font-semibold hover:underline"
+                    >
+                      {comment.author.displayName}
+                    </Link>
+                  ) : (
+                    <span className="text-xs font-semibold">
+                      {comment.author.displayName}
+                    </span>
+                  )}
+                  <p className="whitespace-pre-wrap break-words text-sm">
+                    {comment.text}
+                  </p>
+                  <span className="mt-1 flex items-center gap-3 text-[10px] text-ink-faint">
+                    {comment.unsent ? (
+                      <span className="text-warning">Not sent yet</span>
+                    ) : (
+                      <PostRelativeTime date={comment.createdAt} />
+                    )}
+                    {!comment.unsent && (
+                      <button
+                        type="button"
+                        className="font-semibold text-ink-muted hover:text-ink"
+                        onClick={() => {
+                          setReplyTo({ id: comment.parentId ?? comment.id, name: comment.author.displayName });
+                          input.current?.focus();
+                        }}
+                      >
+                        Reply
+                      </button>
+                    )}
+                  </span>
+                </div>
+                {comment.canDelete && (
+                  <button
+                    type="button"
+                    aria-label="Delete comment"
+                    disabled={deleting === comment.id}
+                    className="rounded p-2 text-ink-faint hover:bg-danger-solid/10 hover:text-danger"
+                    onClick={async () => {
+                      setDeleting(comment.id);
+                      setError('');
+                      try {
+                        // A comment not sent yet is withdrawn; a saved one is deleted once online.
+                        await socialWrites.removeComment(postId, comment.id);
+                        setDeleted((ids) => [...ids, comment.id]);
+                        onChanged();
+                      } catch (e) {
+                        setError(
+                          e instanceof Error
+                            ? e.message
+                            : 'Could not delete comment.',
+                        );
+                      } finally {
+                        setDeleting(null);
+                      }
+                    }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
                 )}
-              </span>
-            </div>
-            {comment.canDelete && (
-              <button
-                type="button"
-                aria-label="Delete comment"
-                disabled={deleting === comment.id}
-                className="rounded p-2 text-ink-faint hover:bg-danger-solid/10 hover:text-danger"
-                onClick={async () => {
-                  setDeleting(comment.id);
-                  setError('');
-                  try {
-                    // A comment not sent yet is withdrawn; a saved one is deleted once online.
-                    await socialWrites.removeComment(postId, comment.id);
-                    setDeleted((ids) => [...ids, comment.id]);
-                    onChanged();
-                  } catch (e) {
-                    setError(
-                      e instanceof Error
-                        ? e.message
-                        : 'Could not delete comment.',
-                    );
-                  } finally {
-                    setDeleting(null);
-                  }
-                }}
-              >
-                <Trash2 size={13} />
-              </button>
-            )}
+              </div>
+              </div>
+            ))}
           </li>
         ))}
       </ul>
@@ -346,6 +373,14 @@ function PostComments({
         <p className="text-xs text-ink-muted">Other comments load when you’re back online.</p>
       ) : (
         (error || result.error) && <ErrorNote message={error || (result.error as Error).message} />
+      )}
+      {replyTo && (
+        <p className="flex items-center gap-2 text-xs text-ink-muted">
+          Replying to <span className="font-semibold text-ink">{replyTo.name}</span>
+          <button type="button" className="underline" onClick={() => setReplyTo(null)}>
+            Cancel
+          </button>
+        </p>
       )}
       <form
         className="flex items-end gap-2"
@@ -356,7 +391,7 @@ function PostComments({
       >
         <textarea
           aria-label="Write a comment"
-          placeholder="Write a comment…"
+          placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
           ref={input}
           rows={1}
           style={{ minHeight: 40, maxHeight: 118, lineHeight: '20px' }}

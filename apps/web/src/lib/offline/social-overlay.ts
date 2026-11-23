@@ -10,7 +10,7 @@ import type { PostAuthor, PostComment, PostEngagement } from '@life-portal/share
 export type SocialWriteMeta =
   | { op: 'like'; postId: string; on: boolean }
   | { op: 'repost'; postId: string; on: boolean }
-  | { op: 'comment'; postId: string; commentId: string; text: string; createdAt: string }
+  | { op: 'comment'; postId: string; commentId: string; text: string; createdAt: string; parentId?: string }
   | { op: 'comment.remove'; postId: string; commentId: string };
 
 export interface SocialWrite {
@@ -75,6 +75,7 @@ export function overlayComments(
         text: meta.text,
         createdAt: meta.createdAt,
         canDelete: true,
+        ...(meta.parentId ? { parentId: meta.parentId } : {}),
         ...(settled ? {} : { unsent: true }),
       });
     }

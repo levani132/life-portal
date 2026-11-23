@@ -270,6 +270,8 @@ export interface PostComment {
   text: string;
   createdAt: string;
   canDelete: boolean;
+  /** A reply: the top-level comment it answers. Replies are one level deep. */
+  parentId?: string;
 }
 export interface PostCommentsPage {
   comments: PostComment[];

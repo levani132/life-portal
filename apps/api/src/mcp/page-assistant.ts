@@ -650,6 +650,7 @@ export class PageAssistantService {
               author: { id: comment.author.userId, name: comment.author.displayName, isPage: comment.author.isPage === true },
               text: comment.text,
               createdAt: comment.createdAt,
+              ...(comment.parentId ? { replyTo: comment.parentId } : {}),
             })),
             nextCursor: page.nextCursor,
           };
@@ -726,11 +727,11 @@ export class PageAssistantService {
         name: 'comment_on_post',
         description:
           'Comment on a post as the acting page. The comment is shown as the page’s, marked as run with AI.',
-        shape: { pageId, postId: id, text: z.string().min(1).max(1000), requestId },
+        shape: { pageId, postId: id, text: z.string().min(1).max(1000), replyTo: id.optional().describe('A comment id from get_post_comments, to answer that comment.'), requestId },
         run: (personId, args) =>
           this.counted(personId, args, 'comment', 'comment_on_post', async (page) => {
             const post = await this.posts.detail(page, String(args['postId']));
-            const comment = await this.engagement.add(page, post.id, String(args['text']), (args['requestId'] as string | undefined) ?? randomUUID());
+            const comment = await this.engagement.add(page, post.id, String(args['text']), (args['requestId'] as string | undefined) ?? randomUUID(), undefined, args['replyTo'] as string | undefined);
             return { result: comment, targetId: post.id };
           }),
       },

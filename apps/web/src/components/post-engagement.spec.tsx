@@ -65,7 +65,7 @@ it('queues a comment with the text and clears the draft', async () => {
   });
   fireEvent.click(screen.getByRole('button', { name: 'Post comment' }));
   await waitFor(() =>
-    expect(socialWrites.comment).toHaveBeenCalledWith('post', 'Hello'),
+    expect(socialWrites.comment).toHaveBeenCalledWith('post', 'Hello', undefined),
   );
   await waitFor(() =>
     expect(

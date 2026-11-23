@@ -7,6 +7,7 @@ export const NOTIFICATION_TYPES = [
   'friendRequest',
   'friendAccepted',
   'postComment',
+  'commentReply',
   'postLike',
   'postRepost',
   'message',

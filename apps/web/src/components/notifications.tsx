@@ -225,6 +225,7 @@ const TYPE_LABELS: { type: NotificationType; label: string; hint: string }[] = [
     hint: 'Someone accepted your request',
   },
   { type: 'postComment', label: 'Comments', hint: 'On your posts' },
+  { type: 'commentReply', label: 'Replies', hint: 'To your comments' },
   {
     type: 'postLike',
     label: 'Likes',
@@ -435,6 +436,8 @@ function activityText(item: ActivityItem): string {
       return `${who} accepted your friend request`;
     case 'postComment':
       return `${who} commented on ${post}`;
+    case 'commentReply':
+      return `${who} replied to your comment`;
     case 'postLike':
       return `${who} liked ${post}`;
     case 'postRepost':

@@ -37,6 +37,13 @@ export class PostCommentRecord {
   @Prop({ required: true }) requestId!: string;
   @Prop({ required: true, maxlength: 1000 }) text!: string;
   @Prop({ default: false }) deleted!: boolean;
+  /**
+   * A reply: the top-level comment it answers, and the author of the comment that was answered
+   * (so "replies to me" is one query). Replies are one level deep: a reply to a reply is stored
+   * under the same top-level comment.
+   */
+  @Prop() parentId?: string;
+  @Prop() parentUserId?: string;
   createdAt!: Date;
 }
 export const PostCommentSchema =
@@ -48,6 +55,8 @@ PostCommentSchema.index(
 PostCommentSchema.index({ postId: 1, deleted: 1, _id: -1 });
 // A viewer's own recent comments, for For You affinity (#9).
 PostCommentSchema.index({ userId: 1, createdAt: -1 });
+// Replies to someone's comments, for their Activity.
+PostCommentSchema.index({ parentUserId: 1, createdAt: -1 }, { sparse: true });
 
 const LIKE_WINDOW_MS = 15 * 60_000;
 const COMMENT_WINDOW_MS = 2 * 60_000;
@@ -77,6 +86,7 @@ export class PostEngagementService implements OnModuleInit {
       windowMs: COMMENT_WINDOW_MS,
       ...common,
     });
+    this.notifications.register({ type: 'commentReply', windowMs: COMMENT_WINDOW_MS, ...common });
     this.notifications.register({ type: 'postRepost', windowMs: LIKE_WINDOW_MS, ...common });
     this.notifications.registerActivitySource({
       rows: (userId, since, before, limit) => this.activity(userId, since, before, limit),
@@ -105,13 +115,19 @@ export class PostEngagementService implements OnModuleInit {
         .lean(),
       this.posts.repostRows([...titles.keys()], userId, since, before, limit),
     ]);
+    const replies = await this.comments
+      .find({ parentUserId: userId, userId: { $ne: userId }, deleted: false, createdAt: filter.createdAt })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
     const names = await this.social.displayNames([
       ...likes.map((row) => row.userId),
       ...comments.map((row) => row.userId),
+      ...replies.map((row) => row.userId),
       ...reposts.map((row) => row.userId),
     ]);
     const row = (
-      type: 'postLike' | 'postComment' | 'postRepost',
+      type: 'postLike' | 'postComment' | 'postRepost' | 'commentReply',
       r: { postId: string; userId: string; createdAt: Date },
     ): ActivityRow => ({
       type,
@@ -125,6 +141,8 @@ export class PostEngagementService implements OnModuleInit {
     return [
       ...likes.map((r) => row('postLike', r)),
       ...comments.map((r) => row('postComment', r)),
+      // A reply under my own post is already there as a comment; these are replies elsewhere.
+      ...replies.filter((r) => !titles.has(r.postId)).map((r) => row('commentReply', r)),
       ...reposts.map((r) =>
         row('postRepost', { postId: r.repostOf!, userId: r.userId, createdAt: r.createdAt }),
       ),
@@ -213,6 +231,7 @@ export class PostEngagementService implements OnModuleInit {
         username: '',
       },
       canDelete: owner || row.userId === viewerId,
+      ...(row.parentId ? { parentId: row.parentId } : {}),
     };
   }
   async list(
@@ -247,8 +266,21 @@ export class PostEngagementService implements OnModuleInit {
       ...(rows.length > 20 ? { nextCursor: String(rows[19]._id) } : {}),
     };
   }
-  async add(userId: string, postId: string, text: string, requestId: string, id?: string) {
+  async add(userId: string, postId: string, text: string, requestId: string, id?: string, parentId?: string) {
     const post = await this.posts.detail(userId, postId);
+    // A reply answers a comment on this post that is still there. Answering a reply lands under
+    // the same top-level comment: one level, never a tree.
+    let parent: { id: string; userId: string } | undefined;
+    if (parentId) {
+      const gone = () => new NotFoundException({ code: 'COMMENT_GONE', message: 'That comment is no longer there.' });
+      const target = isValidObjectId(parentId) ? await this.comments.findOne({ _id: parentId, postId, deleted: false }).lean() : null;
+      if (!target) throw gone();
+      const top = target.parentId ? await this.comments.findOne({ _id: target.parentId, postId, deleted: false }).lean() : target;
+      if (!top) throw gone();
+      if (target.userId !== userId && (await this.graph.between(userId, target.userId))?.blockedBy.length) throw gone();
+      // The person answered is the one whose comment was tapped, even under someone else's thread.
+      parent = { id: String(top._id), userId: target.userId };
+    }
     const value = text.trim();
     if (!value || value.length > 1000)
       throw new BadRequestException('Write a comment of 1–1,000 characters.');
@@ -260,15 +292,26 @@ export class PostEngagementService implements OnModuleInit {
     try {
       const result = await this.comments.updateOne(
         filter,
-        { $setOnInsert: { ...filter, ...withId(id), text: value, deleted: false } },
+        { $setOnInsert: { ...filter, ...withId(id), text: value, deleted: false, ...(parent ? { parentId: parent.id, parentUserId: parent.userId } : {}) } },
         { upsert: true },
       );
       // A retried requestId returns the original comment and must not notify again.
-      if (result.upsertedCount)
+      if (result.upsertedCount) {
         this.notifyOwner(post, userId, actor.displayName, {
           type: 'postComment',
           commentText: value,
         });
+        // The person answered hears about it too, unless they are the post's owner (told above).
+        if (parent && parent.userId !== userId && parent.userId !== post.author.userId)
+          void this.notifications.notify({
+            type: 'commentReply',
+            recipientId: parent.userId,
+            actorId: userId,
+            actorName: actor.displayName,
+            targetId: post.id,
+            commentText: value,
+          });
+      }
     } catch (error) {
       if ((error as { code?: number }).code !== 11000) throw error;
     }
@@ -290,6 +333,8 @@ export class PostEngagementService implements OnModuleInit {
       },
       { $set: { deleted: true, text: '' } },
     );
+    // A removed comment takes its replies with it.
+    if (result.matchedCount) await this.comments.updateMany({ postId, parentId: commentId, deleted: false }, { $set: { deleted: true, text: '' } });
     if (!result.matchedCount) {
       // Spec 031: removing a comment already removed (a retry, or another device) is done.
       const gone = await this.comments.exists({

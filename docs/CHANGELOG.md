@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Replies to comments
+
+- **Reply** under any comment. Replies sit one level deep under the comment they answer.
+- The person you answered gets a notification ("Replies", switchable in notification settings).
+- Removing a comment removes its replies.
+
 ## 2026-11-23: An assistant can put photos on a page's posts
 
 - The assistant asks for an upload link, sends its own JPEG to it, and attaches the photo to a

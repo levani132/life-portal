@@ -129,6 +129,14 @@ describe('shouldNotify', () => {
   });
 });
 
+describe('a reply to a comment', () => {
+  it('says so, with the reply only when previews are on', () => {
+    const event = { type: 'commentReply' as const, actorName: 'Ana', commentText: 'Agreed, thanks' };
+    expect(notificationText(event, { showCommentPreviews: false })).toEqual({ title: 'Ana', body: 'replied to your comment' });
+    expect(notificationText(event, { showCommentPreviews: true })).toEqual({ title: 'Ana', body: 'replied to your comment: Agreed, thanks' });
+  });
+});
+
 describe('pageNotification (spec 040)', () => {
   it('is titled with the page, names the actor in the body and opens as the page', () => {
     expect(pageNotification({ title: 'Ana', body: 'commented on your post' }, '/posts/p1', { id: 'pg1', name: 'Kitchen' })).toEqual({

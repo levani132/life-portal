@@ -218,6 +218,8 @@ export class AddPostCommentDto {
   @MaxLength(1000)
   text!: string;
   @IsUUID() requestId!: string;
+  /** The comment this answers. Replies are one level deep. */
+  @ValidateIf((_, v: unknown) => v !== undefined) @IsMongoId() parentId?: string;
   /** Spec 031: the id the device chose, so it can show and withdraw the comment before sync. */
   @IsOptional() @IsMongoId() id?: string;
 }

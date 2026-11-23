@@ -330,3 +330,17 @@ nothing stored or read assumes that, so a later feature can carry a plan and mea
 Domain tests cover source selection, canonicalisation, duplicates, calorie calculation and the audience matrix. API tests cover owned allowlists, historical snapshots, invalid combinations and private/import retry behavior. Isolated API/browser checks exercise the complete publication/import flow with separate accounts. Engagement tests cover idempotent likes and comments, delete rights, blocked commenters and notifying only on new rows. Reactions beyond a like, comment replies, image moderation before public launch, library video, financial posts, automatic posting, a public web page for a post (previews exist, the page itself still needs sign-in), a native Instagram Stories sticker (needs the native app) and collection updates are future work.
 
 Related: [social](social.md), [nutrition](nutrition.md), [portal](portal.md), [007 specification](../../specs/007-food-posts/spec.md).
+
+## Replies to comments
+
+One level deep. `post_comments.parentId` is the **top-level** comment a reply sits under;
+`parentUserId` is the author of the comment that was actually answered. `POST /:id/comments`
+takes an optional `parentId`: answering a reply stores the new one under the same top-level
+comment (never a tree). 404 `COMMENT_GONE` when the comment is missing, deleted, on another
+post, or its author and the replier are blocked either way. The list stays flat and paged as
+before, each row carrying `parentId`; the web groups replies under their comment
+(`post-engagement.tsx`), and shows a reply on its own when its comment is on an earlier page.
+Removing a comment removes its replies. A reply notifies the post's owner as any comment does,
+and the person answered with `commentReply` (push, a preference of its own, and an Activity row
+when the reply is under someone else's post). The assistant's `comment_on_post` takes `replyTo`.
+Tested in `integration/replies.integration.ts`.
