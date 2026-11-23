@@ -10,6 +10,9 @@ import { ACT_AS_HEADER } from '@life-portal/shared-types';
  */
 const KEY = 'lp.acting.v1';
 
+/** The page used most recently on this device, kept after switching back: a double tap on the profile tab returns to it. */
+const LAST_KEY = 'lp.acting.last';
+
 let cached: string | null | undefined;
 
 /** The page being acted as, or `null` for the person. */
@@ -26,10 +29,21 @@ export function actingPageId(): string | null {
 export function rememberActingPage(pageId: string | null): void {
   cached = pageId;
   try {
-    if (pageId) window.localStorage.setItem(KEY, pageId);
-    else window.localStorage.removeItem(KEY);
+    if (pageId) {
+      window.localStorage.setItem(KEY, pageId);
+      window.localStorage.setItem(LAST_KEY, pageId);
+    } else window.localStorage.removeItem(KEY);
   } catch {
     // Without storage the choice lasts until the next reload.
+  }
+}
+
+/** The page this device used last, if any. It may since have been deleted or switched off. */
+export function lastActingPageId(): string | null {
+  try {
+    return typeof window === 'undefined' ? null : window.localStorage.getItem(LAST_KEY);
+  } catch {
+    return null;
   }
 }
 

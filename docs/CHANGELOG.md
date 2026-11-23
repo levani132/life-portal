@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Your photo on the profile tab
+
+- The last tab shows your profile photo (or the page's, when you use the app as a page).
+- **Double tap it to switch** between yourself and the page you used last.
+- The "Using the app as…" banner is gone; the photo on the tab says who you are.
+
 ## 2026-11-23: Switch a page off
 
 - **Menu → Manage pages**: switch a page off (nobody finds it or its posts, nothing is deleted)

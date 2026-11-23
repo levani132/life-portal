@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { ApiError, api } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
 import { revalidate, useApi } from '../lib/hooks';
-import { actingPageId, rememberActingPage, stopActing } from '../lib/identity';
+import { actingPageId, lastActingPageId, rememberActingPage, stopActing } from '../lib/identity';
 import { deleteOfflineData, outbox } from '../lib/offline/runtime';
 import { Avatar } from './avatar';
 import { ErrorNote, Field, Input, Modal, Textarea } from './ui';
@@ -315,26 +315,27 @@ function useActAsLink(userId: string | undefined) {
   }, [pathname, userId]);
 }
 
-export function ActingBar() {
-  const identity = useIdentity();
+/**
+ * Mounted once by the shell. It shows nothing: which identity is in use is the photo on the
+ * profile tab. It keeps the `?as=` links working.
+ */
+export function ActAsLinks() {
   const { user } = useAuth();
   useActAsLink(user?.id);
-  const [error, setError] = useState<string | null>(null);
-  if (!user || !actingPageId()) return null;
-  const name = identity?.kind === 'page' ? identity.page.name : 'a page';
-  return (
-    <div role="status" className="flex items-center justify-center gap-2 bg-special-solid/10 px-3 py-1.5 text-xs text-special">
-      <Megaphone size={12} aria-hidden="true" />
-      <span className="min-w-0 truncate">
-        {error ?? (
-          <>
-            Using the app as <strong className="font-semibold">{name}</strong>
-          </>
-        )}
-      </span>
-      <button type="button" className="shrink-0 font-semibold underline" onClick={() => void switchTo(null, user.id).then(setError)}>
-        Switch back
-      </button>
-    </div>
-  );
+  return null;
+}
+
+/**
+ * The other identity, for a double tap on the profile tab: from a page back to yourself; from
+ * yourself to the page used last on this device (or your first usable page). Follows the menu's
+ * rules: nothing unsent is left behind, and the app starts again. Answers a sentence when it
+ * cannot switch, and `null` when it did or when there is nowhere to switch to.
+ */
+export async function switchToOtherIdentity(userId: string): Promise<string | null> {
+  if (actingPageId()) return switchTo(null, userId);
+  const mine = await api.get<MyPages>('/pages').catch(() => null);
+  const usable = (mine?.pages ?? []).filter((page) => !page.suspended && !page.disabled);
+  const last = lastActingPageId();
+  const target = usable.find((page) => page.id === last) ?? usable[0];
+  return target ? switchTo(target.id, userId) : null;
 }

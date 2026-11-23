@@ -189,9 +189,14 @@ manage.
 - **Switching reloads the app**, waits until the outbox is empty, and clears what the device kept
   for offline use, so one identity's data is never shown or sent as the other's. Per-identity
   offline stores are later work.
-- Menu: the switcher and **Create a page**. A bar under the header names the page and offers the
-  way back. Acting as a page, Home is the feeds, the menu is the switcher and the page's
-  profile, and the composer offers text, photos and video to everyone or to nobody.
+- Menu: the switcher and **Create a page**. Acting as a page, Home is the feeds, the menu is the
+  switcher and the page's profile, and the composer offers text, photos and video to everyone or
+  to nobody.
+- **Which identity is in use is the photo on the profile tab** (the last tab shows the acting
+  identity's profile photo, not an icon). There is no banner: the owner removed it (2026-11-23).
+  **A double tap on that tab switches** to the other identity: from a page back to yourself, from
+  yourself to the page used last on this device (`lp.acting.last`, else the first usable page).
+  It follows the menu's rules (nothing unsent, reload) and says why when it cannot.
 - `PageMark` sits beside a page's name in posts and on its profile.
 
 ## Tests

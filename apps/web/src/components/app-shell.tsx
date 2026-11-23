@@ -1,6 +1,9 @@
 'use client';
 import { Wordmark } from './wordmark';
-import { ActingBar } from './identity-switcher';
+import { ActAsLinks, switchToOtherIdentity } from './identity-switcher';
+import { Avatar } from './avatar';
+import { useSocialApi } from '../lib/social-hooks';
+import type { SocialProfile } from '@life-portal/shared-types';
 import { PageLibrary } from './page-library';
 import { HealthSyncBridge } from './apple-health';
 
@@ -78,6 +81,8 @@ function Portal({ children }: { children: ReactNode }) {
   );
   // Spec 040: a page has no badges, workouts or health data, so nothing asks for them.
   const isPage = !!portal.data?.page;
+  // The same read as the profile screen, so the tab's photo costs no extra request.
+  const me = useSocialApi<SocialProfile>(user && portal.data?.access.social ? '/social/me?preview=normal' : null);
   useBadgeCheckOnStart(!!portal.data && !isPage, !!portal.data?.access.nutrition);
   const needsSetup =
     !!portal.data && !portal.data.setupCompleted && !portal.data.setupDismissed;
@@ -159,7 +164,7 @@ function Portal({ children }: { children: ReactNode }) {
           </div>
           {/* Spec 025: while a workout is open. Inside the header, so it counts in --header-offset. */}
           <WorkoutBar enabled={!!portal.data.access.training && !isPage} push={!!portal.data.access.push} />
-          <ActingBar />
+          <ActAsLinks />
         </ScrollHeader>
       )}
       <HealthSyncBridge key={user.id} enabled={portal.data.access.nutrition && !isPage} />
@@ -233,7 +238,21 @@ function Portal({ children }: { children: ReactNode }) {
                 </span>
               </Link>
             ) : (
-            <TabLink key={tab.href} tab={tab} pathname={pathname}>
+            <TabLink
+              key={tab.href}
+              tab={tab}
+              pathname={pathname}
+              {...(tab.href === LAST_TAB_HREF.profile
+                ? {
+                    // The identity in use is the photo on this tab; two quick taps switch to the other one.
+                    picture: <Avatar name={me.data?.displayName ?? user.name} url={me.data?.avatarUrl} size={24} />,
+                    onDoubleTap: () =>
+                      void switchToOtherIdentity(user.id).then((problem) => {
+                        if (problem) window.alert(problem);
+                      }),
+                  }
+                : {})}
+            >
                 {tab.label === 'Messages' && unreadMessages > 0 && (
                   <span
                     className="absolute left-1/2 top-1 ml-1.5 rounded-full bg-info-solid px-1.5 py-0.5 text-[10px] leading-none text-white"
@@ -415,21 +434,39 @@ function withNewPost(tabs: Tab[], canPost: boolean): (Tab | typeof NEW_POST)[] {
   return [...tabs.slice(0, middle), NEW_POST, ...tabs.slice(middle)];
 }
 
+/** How close two taps on the profile tab must be to count as a double tap. */
+const DOUBLE_TAP_MS = 350;
+
 function TabLink({
   tab: { href, label, icon: Icon, active },
   pathname,
   children,
+  picture,
+  onDoubleTap,
 }: {
   tab: Tab;
   pathname: string;
   children?: ReactNode;
+  /** Shown in place of the icon: the profile tab carries the photo of the identity in use. */
+  picture?: ReactNode;
+  /** Two taps within a moment. The first tap has already opened the tab. */
+  onDoubleTap?: () => void;
 }) {
+  const lastTap = useRef(0);
   return (
     <Link
       href={href}
       // Each tab keeps its own scroll position; tapping the open tab goes to its top.
       scroll={false}
-      onClick={() => {
+      onClick={(event) => {
+        const now = Date.now();
+        if (onDoubleTap && now - lastTap.current < DOUBLE_TAP_MS) {
+          lastTap.current = 0;
+          event.preventDefault();
+          onDoubleTap();
+          return;
+        }
+        lastTap.current = now;
         if (href === pathname) window.scrollTo({ top: 0, behavior: 'smooth' });
       }}
       aria-current={active ? 'page' : undefined}
@@ -439,12 +476,23 @@ function TabLink({
       )}
     >
       {/* The icon dips under the finger and springs back, as a native tab does. */}
-      <Icon
-        size={21}
-        strokeWidth={active ? 2.4 : 2}
-        aria-hidden
-        className="transition-transform duration-200 ease-[cubic-bezier(0.3,1.6,0.5,1)] group-active:scale-[0.82]"
-      />
+      {picture ? (
+        <span
+          className={clsx(
+            'flex rounded-full transition-transform duration-200 ease-[cubic-bezier(0.3,1.6,0.5,1)] group-active:scale-[0.82]',
+            active && 'ring-2 ring-ink ring-offset-1 ring-offset-surface',
+          )}
+        >
+          {picture}
+        </span>
+      ) : (
+        <Icon
+          size={21}
+          strokeWidth={active ? 2.4 : 2}
+          aria-hidden
+          className="transition-transform duration-200 ease-[cubic-bezier(0.3,1.6,0.5,1)] group-active:scale-[0.82]"
+        />
+      )}
       <span className="tab-label">{label}</span>
       {children}
     </Link>
