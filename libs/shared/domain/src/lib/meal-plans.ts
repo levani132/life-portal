@@ -138,6 +138,8 @@ export interface PlanLineToMatch {
   slots?: readonly MealSlot[];
   foodId?: string;
   savedMealId?: string;
+  /** The food's name, for meals of another food by the same name. */
+  name?: string;
 }
 export interface EntryToMatch {
   id: string;
@@ -145,6 +147,7 @@ export interface EntryToMatch {
   foodId: string;
   savedMealId?: string;
   planEntryId?: string;
+  name?: string;
 }
 
 /**
@@ -152,9 +155,11 @@ export interface EntryToMatch {
  * stored, so it holds however the meal was logged: from the plan's Log button (the meal carries
  * the line's id), as the same recipe, or as the same food from search, a suggestion or before
  * the plan was in use. A recipe line takes that recipe's meals; a food line takes one meal of
- * that food. A meal at one of the line's meals is preferred to one at another. Each meal stands
+ * that food, or else of a food with the same name. A meal at one of the line's meals is preferred to one at another. Each meal stands
  * for one line at most. Returns line id → the ids of its meals; a line absent was not eaten.
  */
+const foodName = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase();
+
 export function matchPlanDay(lines: readonly PlanLineToMatch[], entries: readonly EntryToMatch[]): Map<string, string[]> {
   const matched = new Map<string, string[]>();
   const used = new Set<string>();
@@ -181,6 +186,15 @@ export function matchPlanDay(lines: readonly PlanLineToMatch[], entries: readonl
   for (const line of lines.filter((each) => open(each) && each.foodId)) {
     const allowed = planLineSlots(line);
     const candidates = free.filter((entry) => !used.has(entry.id) && entry.foodId === line.foodId);
+    const pick = candidates.find((entry) => allowed.includes(entry.slot)) ?? candidates[0];
+    if (pick) take(line.id, [pick]);
+  }
+  // 4. Another food by the same name: a plan saved from a post holds the reader's copies of its
+  //    foods, while they may log their own food of that name, as they always have.
+  for (const line of lines.filter((each) => open(each) && each.foodId && each.name)) {
+    const allowed = planLineSlots(line);
+    const wanted = foodName(line.name as string);
+    const candidates = free.filter((entry) => !used.has(entry.id) && !!entry.name && foodName(entry.name) === wanted);
     const pick = candidates.find((entry) => allowed.includes(entry.slot)) ?? candidates[0];
     if (pick) take(line.id, [pick]);
   }

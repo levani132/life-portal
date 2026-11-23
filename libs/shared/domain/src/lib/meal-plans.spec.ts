@@ -141,6 +141,15 @@ describe('matchPlanDay (spec 042)', () => {
     const entries = [entry('a', 'breakfast', 'oats', { savedMealId: 'porridge' }), entry('b', 'breakfast', 'milk', { savedMealId: 'porridge' }), entry('c', 'breakfast', 'oats')];
     expect(Object.fromEntries(matchPlanDay(lines, entries))).toEqual({ r: ['a', 'b'], f: ['c'] });
   });
+  it('counts another food by the same name, after any meal of the food itself', () => {
+    const lines = [
+      { id: 'copy', slot: 'lunch' as const, foodId: 'rice-copy', name: 'Arroz ultracongelado' },
+      { id: 'own', slot: 'lunch' as const, foodId: 'rice-own', name: 'Arroz ultracongelado' },
+    ];
+    const entries = [entry('e1', 'lunch', 'rice-own', { name: 'arroz  ultracongelado ' }), entry('e2', 'dinner', 'other', { name: 'Arroz ultracongelado' }), entry('e3', 'lunch', 'x', { name: 'Pasta' })];
+    // `own` takes its own food first; the copy takes the other rice by name.
+    expect(Object.fromEntries(matchPlanDay(lines, entries))).toEqual({ own: ['e1'], copy: ['e2'] });
+  });
   it('says how closely the day was followed', () => {
     const lines = [
       { id: 'l1', slot: 'lunch' as const, foodId: 'rice', totals: { energyKcal: 260 } },

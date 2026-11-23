@@ -8,6 +8,8 @@ User-visible changes. Newest first.
   Breakfast, Lunch and so on, with a Log button, instead of a separate list on top.
 - **What you already logged counts.** The same food or recipe counts for the plan however it was
   logged, even before you started the plan. Meals that count say "In your plan".
+  A food with the same name counts too, so a plan saved from a post matches the foods you
+  already log.
 - **Look back:** any earlier day shows its plan day and what was eaten, and the plan card shows
   the last seven days.
 - **A line can be eaten at more than one meal** ("lunch or dinner", or any time). It shows in each

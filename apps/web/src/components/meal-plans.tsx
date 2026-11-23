@@ -42,7 +42,7 @@ export function useActivePlan(today: string | null, day: string | null): ActiveM
 
 /** What the diary on screen says about the plan day: which meals stand for which lines. */
 export function planOnDay(plan: ActiveMealPlan | null, entries: readonly MealEntry[]) {
-  const match = plan ? matchPlanDay(plan.day.lines, entries) : new Map<string, string[]>();
+  const match = plan ? matchPlanDay(plan.day.lines, entries.map((entry) => ({ ...entry, name: entry.facts.name }))) : new Map<string, string[]>();
   const marks = new Set([...match.values()].flat());
   const counted = plan ? plan.day.lines.filter((line) => !line.missing) : [];
   return {

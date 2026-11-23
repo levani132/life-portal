@@ -458,7 +458,8 @@ the plan day picked and later days follow on from it; earlier days keep theirs.
 **What was eaten is matched, never marked.** `matchPlanDay()` (pure, tested) decides which of a
 day's diary meals stand for which plan lines: first meals logged from the plan (`planEntryId`),
 then a recipe line takes that recipe's meals (`savedMealId`), then a food line takes one meal of
-that food. A meal at one of the line's meals is preferred, but one at another meal still counts.
+that food, and failing that one meal of a food with the same name (case and spacing ignored): a
+plan saved from a post holds the reader's copies of its foods, while they keep logging their own. A meal at one of the line's meals is preferred, but one at another meal still counts.
 Each meal stands for one line. So a meal logged by hand, from a suggestion or before the plan was
 in use counts, deleting it makes the line open again, and `planDayAdherence()` can compare any day
 with its plan day. The web runs the same function on the day it shows, including meals still

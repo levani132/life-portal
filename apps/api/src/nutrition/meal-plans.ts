@@ -264,6 +264,7 @@ export class MealPlansService {
       foodId: row.foodId,
       ...(row.savedMealId ? { savedMealId: row.savedMealId } : {}),
       ...(row.planEntryId ? { planEntryId: row.planEntryId } : {}),
+      name: (row.facts as { name?: string } | undefined)?.name,
       totals: entryTotals(row.amount, row.facts as never),
     }));
   }
