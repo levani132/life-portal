@@ -82,7 +82,8 @@ export class PostEngagementService implements OnModuleInit {
     const common = {
       requires: ['social' as const, 'foodPosts' as const],
       collapseKey: (event: { targetId: string }) => event.targetId,
-      url: (event: { targetId: string }) => `/posts/${event.targetId}`,
+      // A comment or reply opens the post on that comment.
+      url: (event: { targetId: string; commentId?: string }) => `/posts/${event.targetId}${event.commentId ? `?comment=${event.commentId}` : ''}`,
     };
     this.notifications.register({ type: 'postLike', windowMs: LIKE_WINDOW_MS, ...common });
     this.notifications.register({
@@ -132,13 +133,13 @@ export class PostEngagementService implements OnModuleInit {
     ]);
     const row = (
       type: 'postLike' | 'postComment' | 'postRepost' | 'commentReply',
-      r: { postId: string; userId: string; createdAt: Date },
+      r: { postId: string; userId: string; createdAt: Date; _id?: unknown },
     ): ActivityRow => ({
       type,
       actorId: r.userId,
       actorName: names.get(r.userId) ?? 'Former member',
       targetId: r.postId,
-      url: `/posts/${r.postId}`,
+      url: type === 'postComment' || type === 'commentReply' ? `/posts/${r.postId}?comment=${String(r._id)}` : `/posts/${r.postId}`,
       postTitle: titles.get(r.postId),
       createdAt: r.createdAt,
     });
@@ -160,7 +161,7 @@ export class PostEngagementService implements OnModuleInit {
     extra:
       | { type: 'postLike' }
       | { type: 'postRepost' }
-      | { type: 'postComment'; commentText: string },
+      | { type: 'postComment'; commentText: string; commentId?: string },
   ) {
     void this.notifications.notify({
       ...extra,
@@ -314,6 +315,7 @@ export class PostEngagementService implements OnModuleInit {
       throw new BadRequestException('Write a comment of 1–1,000 characters.');
     const actor = await this.social.own(userId);
     const filter = { postId, userId, requestId };
+    let created = false;
     // Spec 031: a comment written offline carries the id the device gave it. A retry finds its
     // own row by `requestId`; a new one must not take an id anyone already has.
     if (id && !(await this.comments.exists(filter))) await assertFreeId(this.comments, id);
@@ -324,29 +326,52 @@ export class PostEngagementService implements OnModuleInit {
         { upsert: true },
       );
       // A retried requestId returns the original comment and must not notify again.
-      if (result.upsertedCount) {
-        this.notifyOwner(post, userId, actor.displayName, {
-          type: 'postComment',
-          commentText: value,
-        });
-        // The person answered hears about it too, unless they are the post's owner (told above).
-        if (parent && parent.userId !== userId && parent.userId !== post.author.userId)
-          void this.notifications.notify({
-            type: 'commentReply',
-            recipientId: parent.userId,
-            actorId: userId,
-            actorName: actor.displayName,
-            targetId: post.id,
-            commentText: value,
-          });
-      }
+      // A retried requestId returns the original comment and must not notify again.
+      created = !!result.upsertedCount;
     } catch (error) {
       if ((error as { code?: number }).code !== 11000) throw error;
     }
     const row = await this.comments.findOne(filter).lean();
     if (!row || row.deleted)
       throw new NotFoundException('Comment no longer available.');
+    if (created) {
+      const commentId = String(row._id);
+      this.notifyOwner(post, userId, actor.displayName, { type: 'postComment', commentText: value, commentId });
+      // The person answered hears about it too, unless they are the post's owner (told above).
+      if (parent && parent.userId !== userId && parent.userId !== post.author.userId)
+        void this.notifications.notify({
+          type: 'commentReply',
+          recipientId: parent.userId,
+          actorId: userId,
+          actorName: actor.displayName,
+          targetId: post.id,
+          commentText: value,
+          commentId,
+        });
+    }
     return this.commentDto(row, userId, post.isOwner);
+  }
+
+  /**
+   * The thread one comment sits in, for a link that points at it: its top-level comment with the
+   * reply count, and the reply itself when the link is to a reply. 404 when it is gone or hidden.
+   */
+  async thread(userId: string, postId: string, commentId: string): Promise<PostComment> {
+    const post = await this.posts.detail(userId, postId);
+    const gone = () => new NotFoundException({ code: 'COMMENT_GONE', message: 'That comment is no longer there.' });
+    const target = isValidObjectId(commentId) ? await this.comments.findOne({ _id: commentId, postId, deleted: false }).lean() : null;
+    if (!target) throw gone();
+    const top = target.parentId ? await this.comments.findOne({ _id: target.parentId, postId, deleted: false }).lean() : target;
+    if (!top) throw gone();
+    const [thread] = await this.visibleTo([top], userId, post.isOwner);
+    if (!thread) throw gone();
+    const replies = target.parentId
+      ? [target]
+      : await this.comments.find({ postId, deleted: false, parentId: String(top._id) }).sort({ _id: -1 }).limit(REPLIES_FIRST).lean();
+    thread.replyCount = await this.comments.countDocuments({ postId, deleted: false, parentId: String(top._id) });
+    thread.replies = (await this.visibleTo(replies, userId, post.isOwner)).reverse();
+    if (target.parentId && !thread.replies.length) throw gone();
+    return thread;
   }
   async remove(userId: string, postId: string, commentId: string) {
     const post = await this.posts.detail(userId, postId);

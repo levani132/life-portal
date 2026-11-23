@@ -923,3 +923,45 @@
     animation: none;
   }
 }
+
+/* The comment a notification pointed at: one bounce and a tint that fades, then nothing. */
+@keyframes comment-focus {
+  0% {
+    transform: scale(1);
+  }
+  18% {
+    transform: scale(1.04);
+  }
+  36% {
+    transform: scale(0.985);
+  }
+  54% {
+    transform: scale(1.015);
+  }
+  72%,
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes comment-focus-tint {
+  0%,
+  60% {
+    background-color: rgb(var(--accent) / 0.14);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.comment-focus {
+  border-radius: 0.75rem;
+  animation-name: comment-focus, comment-focus-tint;
+  animation-duration: 0.9s, 2.4s;
+  animation-timing-function: ease-out, ease-out;
+  animation-fill-mode: both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .comment-focus {
+    animation-name: comment-focus-tint;
+    animation-duration: 2.4s;
+  }
+}

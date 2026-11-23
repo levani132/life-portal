@@ -30,8 +30,11 @@ export function PostEngagement({
   post,
   onSaveFoods,
   openShare = false,
+  focusCommentId,
 }: {
   post: FoodPost;
+  /** Open the comments and bring this comment or reply into view. */
+  focusCommentId?: string;
   /** Opens the card's import dialog; absent for your own posts and posts without food. */
   onSaveFoods?: () => void;
   /** Start with the share sheet open. */
@@ -42,7 +45,11 @@ export function PostEngagement({
     revalidateOnFocus: true,
   });
   const [busy, setBusy] = useState(false);
-  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(!!focusCommentId);
+  // A second notification for a post already open points at another comment.
+  useEffect(() => {
+    if (focusCommentId) setCommentsOpen(true);
+  }, [focusCommentId]);
   const [error, setError] = useState('');
   const [shareOpen, setShareOpen] = useState(openShare);
   const feedStale = useRef(false);
@@ -145,6 +152,7 @@ export function PostEngagement({
       {commentsOpen && (
         <PostComments
           postId={post.id}
+          focusId={focusCommentId}
           onChanged={() => {
             void stats.mutate().catch(() => undefined);
           }}
@@ -258,9 +266,12 @@ const byId = (a: { id: string }, b: { id: string }) => a.id.localeCompare(b.id);
 function PostComments({
   postId,
   onChanged,
+  focusId,
 }: {
   postId: string;
   onChanged: () => void;
+  /** A comment or reply to load, scroll to and point out: where a notification's link leads. */
+  focusId?: string;
 }) {
   const result = useApi<PostCommentsPage>(`/posts/${postId}/comments?limit=${COMMENTS_FIRST}`, {
     refreshInterval: 15000,
@@ -308,7 +319,44 @@ function PostComments({
     });
   }, [latest]);
 
+  // A link to one comment: fetch its thread (it may be on an earlier page), then bring it into
+  // view and bounce it once so it is clear which comment the notification was about.
+  const [focused, setFocused] = useState<string | null>(null);
+  const focusDone = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusId || focusDone.current === focusId) return;
+    focusDone.current = focusId;
+    let cancelled = false;
+    void api
+      .get<PostComment>(`/posts/${postId}/comments/${focusId}`)
+      .then((thread) => {
+        if (cancelled) return;
+        setOlder((rows) => (rows.some((item) => item.id === thread.id) ? rows : [...rows, { ...thread, replies: [] }]));
+        setOlderReplies((all) => {
+          const known = new Set((all[thread.id] ?? []).map((item) => item.id));
+          const added = (thread.replies ?? []).filter((item) => !known.has(item.id));
+          return added.length ? { ...all, [thread.id]: [...(all[thread.id] ?? []), ...added] } : all;
+        });
+        setFocused(focusId);
+      })
+      .catch(() => {
+        if (!cancelled) setError('That comment is no longer there.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [focusId, postId]);
+  useEffect(() => {
+    if (!focused) return;
+    const node = document.getElementById(`comment-${focused}`);
+    if (!node) return;
+    node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const timer = window.setTimeout(() => setFocused(null), 2400);
+    return () => window.clearTimeout(timer);
+  }, [focused]);
+
   // Everything known, flat: comments and replies from the server, plus this device's waiting ones.
+  // The first page's copy of a comment wins: its reply count is the fresher one.
   const tops = [...new Map([...older, ...(result.data?.comments ?? [])].map((row) => [row.id, row])).values()];
   const serverReplies = (top: PostComment) => [...new Map([...(olderReplies[top.id] ?? []), ...(top.replies ?? [])].map((row) => [row.id, row])).values()];
   const flat = tops.flatMap((top) => [top, ...serverReplies(top)]);
@@ -348,7 +396,7 @@ function PostComments({
   }
 
   const row = (comment: ShownComment, topId: string) => (
-    <div className="flex items-start gap-2">
+    <div id={`comment-${comment.id}`} className={`flex items-start gap-2 ${focused === comment.id ? 'comment-focus' : ''}`}>
       <Avatar name={comment.author.displayName} url={comment.author.avatarUrl} size={28} className="mt-1" />
       <div className="min-w-0 flex-1 rounded-xl bg-special-solid/5 px-3 py-2">
         {comment.author.userId ? (

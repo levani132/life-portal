@@ -34,6 +34,8 @@ export interface NotificationEvent {
   postTitle?: string;
   /** Shown only when the recipient enabled comment previews. */
   commentText?: string;
+  /** The comment or reply this is about, so opening it lands on that comment. */
+  commentId?: string;
   /** For `message`: what was sent, and its text (shown only with message previews on). */
   messageKind?: 'text' | 'post';
   messageText?: string;

@@ -372,6 +372,13 @@ same way (5 by default). The web (`post-engagement.tsx`) shows the latest 3 comm
 reply each; "Show earlier comments" adds 10 and "Show N earlier replies" adds 5, until all are
 shown. What was on screen stays there when newer ones arrive. The box for a reply opens under
 the last reply of the thread being answered; the box at the bottom writes a new comment.
+
+**A link to one comment.** Comment and reply notifications, and their Activity rows, lead to
+`/posts/:id?comment=<commentId>` (the event carries `commentId`). The post page opens the
+comments, asks `GET /:id/comments/:commentId` for the thread that comment sits in (its top-level
+comment, and the reply itself when the link is to a reply), merges it in, scrolls it to the
+middle of the screen and plays `.comment-focus` once (a bounce and a fading tint; the tint alone
+with reduced motion). 404 `COMMENT_GONE` shows "That comment is no longer there."
 Removing a comment removes its replies. A reply notifies the post's owner as any comment does,
 and the person answered with `commentReply` (push, a preference of its own, and an Activity row
 when the reply is under someone else's post). The assistant's `comment_on_post` takes `replyTo`.

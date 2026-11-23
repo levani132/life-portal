@@ -212,6 +212,14 @@ class PostsController {
   ) {
     return this.engagement.list(userId, id, before, limit ? Number(limit) : undefined);
   }
+  /** The thread a comment sits in, for a notification that points at it. */
+  @Get(':id/comments/:commentId') commentThread(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Param('commentId') commentId: string,
+  ) {
+    return this.engagement.thread(userId, id, commentId);
+  }
   @Get(':id/comments/:commentId/replies') replies(
     @CurrentUser('userId') userId: string,
     @Param('id') id: string,

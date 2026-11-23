@@ -207,6 +207,7 @@ it('notifies the post owner once for a new like or comment, never for repeats', 
       {
         type: 'postComment',
         commentText: 'Looks great',
+        commentId: 'a'.repeat(24),
         recipientId: 'owner',
         actorId: 'reader',
         actorName: 'Reader',

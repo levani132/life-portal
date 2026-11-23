@@ -2,6 +2,11 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Notifications open on the comment
+
+- Tapping a notification about a comment or a reply opens the post with comments showing,
+  scrolls to that comment and bounces it once.
+
 ## 2026-11-23: Tidier comment threads
 
 - A post opens with its **latest 3 comments**, each with its latest reply. "Show earlier

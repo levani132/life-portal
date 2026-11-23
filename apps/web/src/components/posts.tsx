@@ -301,9 +301,12 @@ export function PostCard({
   detail = false,
   openShare = false,
   forYou,
+  focusCommentId,
 }: {
   post: FoodPost;
   detail?: boolean;
+  /** Open the comments on this comment or reply (a notification's link). */
+  focusCommentId?: string;
   /** Open with the share sheet showing (a post just made by sharing from Food or Training). */
   openShare?: boolean;
   /** Present on For You cards: enables Not interested / Hide author (issue #3, task A). */
@@ -659,6 +662,7 @@ export function PostCard({
       )}
       <PostEngagement
         openShare={openShare}
+        focusCommentId={focusCommentId}
         post={post}
         onSaveFoods={hasFood && !post.isOwner ? () => setImporting(true) : undefined}
       />

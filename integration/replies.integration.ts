@@ -51,6 +51,17 @@ describe('replies to comments', () => {
     expect(all.body.comments.map((row) => row.text)).toEqual(['Answering Gio']);
     expect(all.body.nextCursor).toBe(nested.body.id);
 
+    // A link to one comment (a notification's) gets the thread it sits in, with that reply in it.
+    const linked = await api.call<PostComment>(ana, 'GET', `/posts/${id}/comments/${reply.body.id}`);
+    expect(linked.body).toMatchObject({ id: top.body.id, text: 'First', replyCount: 2 });
+    expect(linked.body.replies?.map((row) => row.id)).toEqual([reply.body.id]);
+    const linkedTop = await api.call<PostComment>(ana, 'GET', `/posts/${id}/comments/${top.body.id}`);
+    expect(linkedTop.body.replies?.map((row) => row.text)).toEqual(['Answering Gio']);
+    expect((await api.call(ana, 'GET', `/posts/${id}/comments/0123456789abcdef01234567`)).status).toBe(404);
+    // The comment's notification and its Activity row lead to that comment.
+    const activity = await api.call<{ items?: { url: string; type: string }[] } & { url?: string }[]>(ana, 'GET', '/notifications/activity');
+    expect(JSON.stringify(activity.body)).toContain(`/posts/${id}?comment=`);
+
     // A comment from another post, or one that does not exist, cannot be answered here.
     const other = await api.call<FoodPost>(ana, 'POST', '/posts', { requestId: randomUUID(), title: '', caption: 'Elsewhere', audience: 'public' });
     const elsewhere = await say(beka, other.body.id, 'Over there');

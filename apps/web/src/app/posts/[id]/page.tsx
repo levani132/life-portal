@@ -33,7 +33,7 @@ function PostDetail() {
       {result.error instanceof ApiError ? (
         <ErrorNote message="This post is unavailable or its audience has changed." />
       ) : result.data ? (
-        <PostCard post={result.data} detail openShare={share} />
+        <PostCard post={result.data} detail openShare={share} focusCommentId={params.get('comment') ?? undefined} />
       ) : result.error ? (
         <ErrorNote message="This post can’t be loaded without a connection." />
       ) : (
