@@ -2867,3 +2867,11 @@ holds a short block that calls `get_worker_instructions`, and the full text is g
 API from the playbook. Only the owner's account can read it (it holds the plan for the pages).
 The instructions are trusted because they come from the owner's own app; the tool's result is
 the one place where the connector hands an assistant instructions rather than data.
+
+## 2026-11-23: Workers engage only among the owner's pages, for now
+
+Owner's decision. The ENGAGE run likes, comments on, follows and (not at all) reposts only the
+pages the owner runs; real people's posts and other people's pages are left alone. Answering
+comments and messages on the pages' own posts stays on for everyone. The playbook has one line,
+`REACH: OWN PAGES ONLY`, that becomes `REACH: EVERYONE` when the owner turns outside engagement
+on; the rules for that mode are already written beside it.

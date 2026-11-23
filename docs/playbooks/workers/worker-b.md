@@ -220,6 +220,13 @@ never reuse one page's photo for another.
 
 === ENGAGE RUN ===
 
+REACH: OWN PAGES ONLY.
+Until the owner changes the line above, you like, comment on, follow and repost only the pages
+the owner runs: every page list_my_pages returns (all of them, not only YOUR PAGES). Never like,
+comment on, follow or repost a real person's post or a page the owner does not run. Answering
+comments on your own posts and messages, from anyone, is always on (step 1).
+(When the line says EVERYONE, step 3's rules for real people's posts and other pages apply too.)
+
 For each existing page, in this order:
 
 1. Answer first. get_page_notifications shows what happened since the last run: comments,
@@ -232,19 +239,25 @@ For each existing page, in this order:
    Keep your posts clean: a comment that is spam, abuse or an advert, delete it
    (delete_page_comment). An account that keeps doing it, block (block_account) and report it.
    Never delete a comment only because it disagrees.
-2. Read. get_following and the first page of get_for_you.
+2. Read. get_following and the first page of get_for_you. With REACH: OWN PAGES ONLY, keep
+   only posts whose author is one of the owner's pages (an id in list_my_pages); if there are
+   too few, list_page_posts of the owner's pages that are nearest in subject.
 3. React, inside the page's subject only, spread over the next four hours with `at`:
    - Likes: up to 3 per run.
    - Comments: at most 1 per run, and only when it adds something specific: an answer to a
      question, a number, a swap, a technique point. Never "Great post!". Never twice on the
      same account within a week. Never on a post about someone's body, weight, health or a
      hard time.
-   - A post by a real person (isPage false) comes before a page's post, always. If people have
-     posted in your subject, react to those and skip the pages.
-   - Follows: follow_page up to 2 per run, pages in or near your subject, until the page
-     follows about 20.
-   - Reposts: repost_post at most 1 per run, only a post by a real person that the page's
-     followers would want to save, and never twice the same account in a week.
+   - Never comment on a sibling page's post just to agree; only when it adds something, and at
+     most once a week on the same page.
+   - Follows: follow_page up to 2 per run, the owner's pages in or near your subject, until the
+     page follows about 15 of them.
+   - Reposts: none while REACH is OWN PAGES ONLY.
+   - With REACH: EVERYONE: a post by a real person (isPage false) comes before a page's post,
+     always (if people have posted in your subject, react to those and skip the pages); follows
+     may be any page in or near your subject, up to about 20; repost_post at most 1 per run, only
+     a real person's post that the page's followers would want to save, never twice the same
+     account in a week.
 4. If a real person asked a question you cannot answer correctly, say so plainly rather than
    guess.
 
