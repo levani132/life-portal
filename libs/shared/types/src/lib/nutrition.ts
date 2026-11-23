@@ -743,7 +743,7 @@ export interface ActiveMealPlan {
 // ------------------------------------------------------------------ plan rules (spec 043)
 
 /** What a plan rule measures. */
-export const PLAN_RULE_METRICS = ['energy', 'protein', 'carb', 'fat'] as const;
+export const PLAN_RULE_METRICS = ['energy', 'protein', 'carb', 'fat', 'fibre', 'sugar', 'satFat'] as const;
 export type PlanRuleMetric = (typeof PLAN_RULE_METRICS)[number];
 /** Where it applies: the whole day, or one meal. */
 export const PLAN_RULE_SCOPES = ['day', 'breakfast', 'lunch', 'dinner', 'snack'] as const;
@@ -755,9 +755,9 @@ export type PlanRuleKind = (typeof PLAN_RULE_KINDS)[number];
  * What the number is. `amount`: kcal for calories, mg for a macro. `perKg` and `perKgTarget`:
  * the same per kg of current weight (latest weigh-in) or of target weight. `share`: whole
  * percent, of the calories in the rule's place that come from the macro, or, for calories at a
- * meal, of the day's calories.
+ * meal, of the day's calories. `per100`: per 100 g or ml of a food, for rules on each food only.
  */
-export const PLAN_RULE_BASES = ['amount', 'perKg', 'perKgTarget', 'share'] as const;
+export const PLAN_RULE_BASES = ['amount', 'perKg', 'perKgTarget', 'share', 'per100'] as const;
 export type PlanRuleBasis = (typeof PLAN_RULE_BASES)[number];
 
 export interface PlanRule {
@@ -773,6 +773,12 @@ export interface PlanRule {
   high?: number;
   /** About: how far either side still counts, in whole percent. Default 10. */
   tolerancePct?: number;
+  /**
+   * Spec 043, slice 4: checked on each food rather than the total ("snacks under 10 g of sugar per
+   * 100 g", "no food over 600 kcal", "30% of each food's calories from protein"). Advice shown
+   * while choosing a food and on meals that break it; never added up.
+   */
+  each?: boolean;
 }
 
 /** A rule as a save sends it: the id is given by the server when absent. */

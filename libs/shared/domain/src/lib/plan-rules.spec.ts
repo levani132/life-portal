@@ -1,5 +1,5 @@
 import type { PlanRule } from '@life-portal/shared-types';
-import { applyPlanTargets, combinePlanRules, describePlanRule, planRuleConflicts, planRuleProblem, planRuleStatus, resolvePlanRule } from './plan-rules';
+import { applyPlanTargets, checkFoodRules, combinePlanRules, describePlanRule, planRuleConflicts, planRuleProblem, planRuleStatus, resolvePlanRule } from './plan-rules';
 
 const rule = (over: Partial<PlanRule>): PlanRule => ({ id: 'r', metric: 'protein', scope: 'day', kind: 'atLeast', basis: 'amount', value: 150_000, ...over });
 
@@ -134,5 +134,41 @@ describe('applyPlanTargets (spec 043)', () => {
   it('makes targets available from plans even when the app has too little to go on', () => {
     const out = applyPlanTargets({ available: false, missingInputs: ['sex'] }, combinePlanRules([sourced('A', { metric: 'energy', kind: 'about', value: 1800 })], {}));
     expect([out.available, out.energyKcal?.value]).toEqual([true, 1800]);
+  });
+});
+
+describe('rules on each food (spec 043, slice 4)', () => {
+  const each = (over: Partial<PlanRule>) => rule({ each: true, ...over });
+  const cereal = { energyKcalPer100: 380, proteinMgPer100: 8000, fatMgPer100: 3000, carbMgPer100: 80_000, sugarMgPer100: 22_000 };
+  const sourced = (over: Partial<PlanRule>) => ({ planId: 'p', planName: 'Clean', rule: each(over) });
+  it('accepts amounts, per 100 g and shares, and refuses what cannot apply to one food', () => {
+    expect(planRuleProblem(each({ metric: 'sugar', scope: 'snack', kind: 'atMost', basis: 'per100', value: 10_000 }))).toBeUndefined();
+    expect(planRuleProblem(each({ metric: 'energy', kind: 'atMost', value: 600 }))).toBeUndefined();
+    expect(planRuleProblem(each({ basis: 'share', value: 30 }))).toBeUndefined();
+    expect(planRuleProblem(each({ basis: 'perKg', value: 1000 }))).toBe('A rule on each food is an amount, per 100 g or a share.');
+    expect(planRuleProblem(each({ metric: 'energy', basis: 'share', value: 30 }))).toMatch(/share of calories/);
+    expect(planRuleProblem(rule({ metric: 'sugar', kind: 'atMost', value: 30_000 }))).toBe('Sugar and saturated fat are checked on each food.');
+    expect(planRuleProblem(rule({ basis: 'per100', value: 10_000 }))).toBe('Per 100 g is for a rule on each food.');
+  });
+  it('reads as a sentence about each food', () => {
+    expect(describePlanRule(each({ metric: 'sugar', scope: 'snack', kind: 'atMost', basis: 'per100', value: 10_000 }))).toBe('Each food in snacks: at most 10 g sugar per 100 g');
+    expect(describePlanRule(each({ metric: 'energy', kind: 'atMost', value: 600 }))).toBe('Each food: at most 600 kcal');
+    expect(describePlanRule(each({ basis: 'share', value: 30 }))).toBe('Each food: at least 30% of its calories from protein');
+  });
+  it('checks a food at the meal it applies to, and never counts towards totals', () => {
+    const rules = [
+      sourced({ metric: 'sugar', scope: 'snack', kind: 'atMost', basis: 'per100', value: 10_000 }),
+      sourced({ metric: 'energy', kind: 'atMost', value: 600 }),
+      sourced({ basis: 'share', value: 30 }),
+    ];
+    expect(checkFoodRules(rules, cereal, 'snack', 100).map((check) => [check.status, check.value])).toEqual([
+      ['over', 22_000],
+      ['met', 380],
+      // 8 g of protein is 32 of 380 kcal: 8%.
+      ['under', 8],
+    ]);
+    expect(checkFoodRules(rules, cereal, 'lunch').map((check) => check.status)).toEqual(['unknown', 'under']);
+    expect(checkFoodRules(rules, { ...cereal, sugarMgPer100: undefined }, 'snack', 100)[0].status).toBe('unknown');
+    expect(combinePlanRules(rules, {})).toEqual([]);
   });
 });

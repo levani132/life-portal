@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Injectable, NotFoundException, Param, Post, Put, Query } from '@nestjs/common';
 import { InjectModel, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsIn, IsInt, IsMongoId, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsMongoId, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Model, Types, isValidObjectId } from 'mongoose';
 import {
   MEAL_PLAN_LIMITS,
@@ -79,6 +79,8 @@ class PlanRuleSub {
   @Prop({ type: Number }) low?: number;
   @Prop({ type: Number }) high?: number;
   @Prop({ type: Number }) tolerancePct?: number;
+  /** Checked on each food, never added up. */
+  @Prop({ type: Boolean }) each?: boolean;
 }
 const PlanRuleSchema = SchemaFactory.createForClass(PlanRuleSub);
 
@@ -161,6 +163,7 @@ class PlanRuleDto implements PlanRuleInput {
   @IsOptional() @IsInt() @Min(1) @Max(2_000_000) low?: number;
   @IsOptional() @IsInt() @Min(1) @Max(2_000_000) high?: number;
   @IsOptional() @IsInt() @Min(1) @Max(PLAN_RULE_LIMITS.toleranceMax) tolerancePct?: number;
+  @IsOptional() @IsBoolean() each?: boolean;
 }
 class MealPlanDayDto {
   @IsOptional() @IsString() @MaxLength(40) id?: string;
@@ -208,6 +211,7 @@ const withRuleId = (rule: PlanRuleInput): PlanRule => ({
   basis: rule.basis,
   ...(rule.kind === 'between' ? { low: rule.low, high: rule.high } : { value: rule.value }),
   ...(rule.kind === 'about' && rule.tolerancePct ? { tolerancePct: rule.tolerancePct } : {}),
+  ...(rule.each ? { each: true } : {}),
 });
 
 @Injectable()

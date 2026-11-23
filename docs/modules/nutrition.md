@@ -510,6 +510,15 @@ per metric and place, each naming its plan; daily calories first, since shares o
 taken of them, else of the app's target) and `planRuleConflicts` (asked about when following).
 A plan may be rules alone (`days: []`); its rules apply every day. Nothing resolved is stored.
 
+**Rules on each food (slice 4).** `each: true` checks every food at the rule's meal (or any meal
+for `day`) instead of the total: `amount` (in the food as eaten), `per100` (per 100 g or ml, only
+here) or `share` (of the food's own calories). Metrics also include `fibre` (totals too), `sugar`
+and `satFat` (each food only: no daily total). `combinePlanRules`, `applyPlanTargets` and conflicts
+skip them; `checkFoodRules()` checks a food's facts (and the amount, for amount rules) and says
+met, under, over or unknown (the food does not say). Web: the log sheet shows them for the chosen
+food at the chosen meal (`FoodRuleNotes`), and a logged meal that breaks one says so. Advice only:
+nothing is refused.
+
 Web: on any day in Food, a followed plan's daily rule replaces the app's target on that macro's
 tile and shows its limit there (`MacroTiles`); a meal's rules sit under that meal's header as bars
 in the macro's colour (`MealRules`). Lines not eaten yet sit inside each meal they may be eaten

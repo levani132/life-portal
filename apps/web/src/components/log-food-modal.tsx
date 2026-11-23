@@ -26,6 +26,7 @@ import type {
 } from '@life-portal/shared-types';
 import { MEAL_SLOTS } from '@life-portal/shared-types';
 import {
+  checkFoodRules,
   addDays,
   amountToServings,
   entryTotals,
@@ -38,6 +39,7 @@ import { FoodThumb } from './food-thumb';
 import { useAction } from '../lib/hooks';
 import { MacroSplit } from './macro-split';
 import { MealImpact } from './meal-impact';
+import { FoodRuleNotes, eachFoodRules, useFollowedPlans } from './meal-plans';
 import { Input, Modal } from './ui';
 
 /**
@@ -135,6 +137,12 @@ export function LogFoodModal({
   const validAmount = Number.isFinite(amount) && amount >= 1;
   const preview =
     facts && validAmount ? entryTotals(Math.round(amount), facts) : undefined;
+  // Spec 043: what the plans followed say about each food, for the one chosen here.
+  const plans = useFollowedPlans(open ? today : null, open ? entryDay : null);
+  const foodChecks = useMemo(
+    () => (facts ? checkFoodRules(eachFoodRules(plans), facts, slot, validAmount ? Math.round(amount) : undefined) : []),
+    [plans, facts, slot, validAmount, amount],
+  );
 
   // Spec 029: the day as this device has it, meals still waiting to be sent included.
   const overview = useNutritionDay(
@@ -451,6 +459,12 @@ export function LogFoodModal({
               )}
             </div>
 
+            {/* Spec 043: followed rules on each food, for this food at this meal. */}
+            {foodChecks.length > 0 && (
+              <div className="rounded-xl border border-border/70 bg-surface px-3 py-2">
+                <FoodRuleNotes checks={foodChecks} />
+              </div>
+            )}
             <MealImpact
               eaten={eaten}
               added={plus(waitingTotals, preview)}

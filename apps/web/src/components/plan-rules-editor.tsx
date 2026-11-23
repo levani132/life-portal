@@ -20,6 +20,8 @@ export interface RuleDraft {
   low: string;
   high: string;
   tolerance: string;
+  /** Checked on each food rather than the total. */
+  each: boolean;
 }
 
 let seq = 0;
@@ -46,6 +48,7 @@ export function ruleDraft(rule: PlanRule): RuleDraft {
     low: show(rule, rule.low),
     high: show(rule, rule.high),
     tolerance: rule.tolerancePct ? String(rule.tolerancePct) : '10',
+    each: !!rule.each,
   };
 }
 
@@ -58,6 +61,7 @@ export function toRuleInput(draft: RuleDraft): PlanRuleInput {
     basis: draft.basis,
     ...(draft.kind === 'between' ? { low: parse(draft, draft.low), high: parse(draft, draft.high) } : { value: parse(draft, draft.value) }),
     ...(draft.kind === 'about' ? { tolerancePct: Number(draft.tolerance) || 10 } : {}),
+    ...(draft.each ? { each: true } : {}),
   };
 }
 
@@ -71,6 +75,7 @@ const blank = (patch: Partial<RuleDraft>): RuleDraft => ({
   low: '',
   high: '',
   tolerance: '10',
+  each: false,
   ...patch,
 });
 
@@ -80,6 +85,8 @@ const PRESETS: { label: string; rules: Partial<RuleDraft>[] }[] = [
   { label: 'Calorie ceiling', rules: [{ metric: 'energy', kind: 'atMost', value: '2000' }] },
   { label: 'Calorie floor', rules: [{ metric: 'energy', value: '1800' }] },
   { label: 'Protein at breakfast', rules: [{ metric: 'protein', scope: 'breakfast', value: '30' }] },
+  { label: 'Low-sugar snacks', rules: [{ metric: 'sugar', scope: 'snack', kind: 'atMost', basis: 'per100', value: '10', each: true }] },
+  { label: 'No food over 600 kcal', rules: [{ metric: 'energy', kind: 'atMost', value: '600', each: true }] },
   {
     label: '40/30/30 split',
     rules: [
@@ -95,7 +102,12 @@ const METRICS: { id: PlanRuleMetric; label: string }[] = [
   { id: 'carb', label: 'carbs' },
   { id: 'fat', label: 'fat' },
   { id: 'energy', label: 'calories' },
+  { id: 'fibre', label: 'fibre' },
+  { id: 'sugar', label: 'sugar' },
+  { id: 'satFat', label: 'saturated fat' },
 ];
+/** Metrics with no daily total: only ever checked on each food. */
+const EACH_ONLY: PlanRuleMetric[] = ['sugar', 'satFat'];
 const SCOPES: { id: PlanRuleScope; label: string }[] = [
   { id: 'day', label: 'a day' },
   { id: 'breakfast', label: 'at breakfast' },
@@ -110,13 +122,19 @@ const KINDS: { id: PlanRuleKind; label: string }[] = [
   { id: 'about', label: 'About' },
 ];
 /** The unit choices, worded for the metric. */
-function bases(metric: PlanRuleMetric, scope: PlanRuleScope): { id: PlanRuleBasis; label: string }[] {
+function bases(metric: PlanRuleMetric, scope: PlanRuleScope, each: boolean): { id: PlanRuleBasis; label: string }[] {
   const energy = metric === 'energy';
+  if (each)
+    return [
+      { id: 'amount', label: energy ? 'kcal in it' : 'g in it' },
+      { id: 'per100', label: energy ? 'kcal per 100 g' : 'g per 100 g' },
+      ...(energy || metric === 'fibre' ? [] : [{ id: 'share' as const, label: '% of its calories' }]),
+    ];
   return [
     { id: 'amount', label: energy ? 'kcal' : 'g' },
     { id: 'perKg', label: energy ? 'kcal per kg' : 'g per kg' },
     { id: 'perKgTarget', label: energy ? 'kcal per kg of target' : 'g per kg of target' },
-    ...(energy && scope === 'day' ? [] : [{ id: 'share' as const, label: energy ? '% of the day' : '% of calories' }]),
+    ...((energy && scope === 'day') || metric === 'fibre' ? [] : [{ id: 'share' as const, label: energy ? '% of the day' : '% of calories' }]),
   ];
 }
 
@@ -130,8 +148,10 @@ export function PlanRulesEditor({ rules, onChange, max, presets = true }: { rule
       rules.map((rule) => {
         if (rule.key !== key) return rule;
         const next = { ...rule, ...patch };
-        // A share of the day's calories needs a meal: moving calories to the whole day drops it.
-        if (next.metric === 'energy' && next.scope === 'day' && next.basis === 'share') next.basis = 'amount';
+        // Sugar and saturated fat have no daily total: rules on them are on each food.
+        if (EACH_ONLY.includes(next.metric)) next.each = true;
+        // Keep the unit one this kind of rule offers.
+        if (!bases(next.metric, next.scope, next.each).some((basis) => basis.id === next.basis)) next.basis = 'amount';
         return next;
       }),
     );
@@ -160,7 +180,7 @@ export function PlanRulesEditor({ rules, onChange, max, presets = true }: { rule
                 <Input inputMode="decimal" aria-label="Number" className="w-24" value={rule.value} onChange={(event) => set(rule.key, { value: event.target.value })} />
               )}
               <Select aria-label="Unit" className="w-auto" value={rule.basis} onChange={(event) => set(rule.key, { basis: event.target.value as PlanRuleBasis })}>
-                {bases(rule.metric, rule.scope).map((basis) => (
+                {bases(rule.metric, rule.scope, rule.each).map((basis) => (
                   <option key={basis.id} value={basis.id}>
                     {basis.label}
                   </option>
@@ -175,10 +195,19 @@ export function PlanRulesEditor({ rules, onChange, max, presets = true }: { rule
                   </option>
                 ))}
               </Select>
+              <Select
+                aria-label="Applies to"
+                className="w-auto"
+                value={rule.each ? 'each' : 'total'}
+                onChange={(event) => set(rule.key, { each: event.target.value === 'each' })}
+              >
+                {!EACH_ONLY.includes(rule.metric) && <option value="total">in total</option>}
+                <option value="each">in each food</option>
+              </Select>
               <Select aria-label="Where" className="w-auto" value={rule.scope} onChange={(event) => set(rule.key, { scope: event.target.value as PlanRuleScope })}>
                 {SCOPES.map((scope) => (
                   <option key={scope.id} value={scope.id}>
-                    {scope.label}
+                    {rule.each && scope.id === 'day' ? 'at any meal' : scope.label}
                   </option>
                 ))}
               </Select>

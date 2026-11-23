@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { Apple, BookmarkPlus, Bot, CalendarCheck, ChevronDown, Info, Pencil, Plus, Search, Share2, Sparkles, Tags, Trash2, UserRound, Utensils, X, Zap, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { RecipeEditor } from '../../components/page-library';
-import { FollowingStrip, MealPlans, MealRules, PlannedLines, limitText, plansOnDay, ruleSources, ruleState, useFollowedPlans } from '../../components/meal-plans';
+import { FollowingStrip, FoodRuleNotes, MealPlans, MealRules, PlannedLines, eachFoodRules, limitText, plansOnDay, ruleSources, ruleState, useFollowedPlans } from '../../components/meal-plans';
 import { Programmes } from '../../components/programmes';
 import type {
   PortalState,
@@ -21,13 +21,16 @@ import type {
   MealSuggestion,
   NutritionOverview,
   NutritionTargets,
+  PlanRuleMetric,
   SavedMeal,
   SlotTotals,
   TargetFigure,
 } from '@life-portal/shared-types';
 import {
+  checkFoodRules,
   referenceOf,
   type CombinedRule,
+  type SourcedRule,
   figureValue,
   formatDay,
   GOAL_PLAN,
@@ -307,6 +310,7 @@ function Nutrition() {
                           marks: planState.marks,
                           lines: <PlannedLines items={planState.openAt(slot.slot)} slot={slot.slot} day={day} onChanged={refresh} />,
                           rules: <MealRules rules={planState.rulesAt(slot.slot)} totals={slot.totals} />,
+                          foodRules: eachFoodRules(plans),
                           count: planState.openAt(slot.slot).length,
                           kcal: planState.openAt(slot.slot).reduce((sum, item) => sum + item.line.totals.energyKcal, 0),
                         }
@@ -576,7 +580,7 @@ function SlotSection({
   onChanged: () => void;
   onShare?: (source: PostSelection) => void;
   /** Spec 042: the plan in use: meals that count for it, and its lines not eaten yet here. */
-  planned?: { marks: Set<string>; lines: ReactNode; rules: ReactNode; count: number; kcal: number };
+  planned?: { marks: Set<string>; lines: ReactNode; rules: ReactNode; count: number; kcal: number; foodRules: SourcedRule[] };
 }) {
   const { run, pending } = useAction();
   const [saving, setSaving] = useState(false);
@@ -733,6 +737,8 @@ function SlotSection({
                     <CalendarCheck size={12} aria-hidden /> In your plan
                   </p>
                 )}
+                {/* Spec 043: a followed rule on each food that this meal breaks. */}
+                {planned && planned.foodRules.length > 0 && <FoodRuleNotes checks={checkFoodRules(planned.foodRules, entry.facts, entry.slot, entry.amount)} onlyBroken />}
                 {isUnsaved(entry) && (
                   <p className="text-[11px] font-medium text-warning">Not saved yet · on this device</p>
                 )}
@@ -1495,8 +1501,8 @@ function TargetsPanel({ targets }: { targets: NutritionTargets }) {
   ];
 
   const plan = targets.plan;
-  const metricLabel = { energy: 'Calories', protein: 'Protein', carb: 'Carbs', fat: 'Fat' } as const;
-  const appValue = { energy: plan?.app.energyKcal, protein: plan?.app.proteinG, carb: plan?.app.carbG, fat: plan?.app.fatG } as const;
+  const metricLabel: Record<PlanRuleMetric, string> = { energy: 'Calories', protein: 'Protein', carb: 'Carbs', fat: 'Fat', fibre: 'Fibre', sugar: 'Sugar', satFat: 'Saturated fat' };
+  const appValue: Partial<Record<PlanRuleMetric, number>> = { energy: plan?.app.energyKcal, protein: plan?.app.proteinG, carb: plan?.app.carbG, fat: plan?.app.fatG };
   const limit = (rule: NonNullable<typeof plan>['rules'][number]) => {
     const unit = rule.metric === 'energy' ? 'kcal' : 'g';
     const f = (n: number) => `${n.toLocaleString('en-GB')} ${unit}`;

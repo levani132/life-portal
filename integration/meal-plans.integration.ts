@@ -296,6 +296,27 @@ describe('meal plans', () => {
     expect((await targets()).energyKcal?.value).toBe(appKcal);
   });
 
+  it('keeps rules on each food apart from the totals (spec 043, slice 4)', async () => {
+    const ana = await api.account('ana');
+    const sugar = { metric: 'sugar', scope: 'snack', kind: 'atMost', basis: 'per100', value: 10_000, each: true };
+    const big = { metric: 'energy', scope: 'day', kind: 'atMost', basis: 'amount', value: 600, each: true };
+    const made = await api.call<MealPlan>(ana, 'POST', '/nutrition/meal-plans', { name: 'Clean', rules: [sugar, big], days: [] });
+    expect(made.status).toBeLessThan(300);
+    expect(made.body.rules).toMatchObject([{ ...sugar }, { ...big }]);
+    // Sugar has no daily total, and per 100 g is only for a food.
+    expect((await api.call(ana, 'POST', '/nutrition/meal-plans', { name: 'X', rules: [{ ...sugar, each: undefined }], days: [] })).status).toBe(400);
+    expect((await api.call(ana, 'POST', '/nutrition/meal-plans', { name: 'X', rules: [{ ...big, basis: 'per100', each: undefined }], days: [] })).status).toBe(400);
+    // Following it changes no daily target: it is advice on single foods.
+    await api.call(ana, 'PUT', '/nutrition/profile', { sex: 'female', heightCm: 165, birthDate: '1992-01-01' });
+    await api.call(ana, 'PUT', '/nutrition/weigh-ins?today=2026-08-02', { day: '2026-08-01', weightGrams: 60_000 });
+    const before = (await api.call<{ targets: { energyKcal?: { value: number } } }>(ana, 'GET', '/nutrition/profile?today=2026-08-02')).body.targets.energyKcal?.value;
+    await api.call(ana, 'PUT', `/nutrition/meal-plans/${made.body.id}/follow`, { today: '2026-08-02' });
+    const after = (await api.call<{ targets: { energyKcal?: { value: number }; plan?: unknown } }>(ana, 'GET', '/nutrition/profile?today=2026-08-02')).body.targets;
+    expect([after.energyKcal?.value, after.plan]).toEqual([before, undefined]);
+    const followed = (await api.call<{ following: ActiveMealPlan[] }>(ana, 'GET', '/nutrition/meal-plans/following?today=2026-08-02')).body.following[0];
+    expect(followed.rules.map((rule) => rule.each)).toEqual([true, true]);
+  });
+
   it('keeps a target weight on the profile', async () => {
     const ana = await api.account('ana');
     expect((await api.call(ana, 'PUT', '/nutrition/profile', { targetWeightGrams: 75_000 })).status).toBeLessThan(300);

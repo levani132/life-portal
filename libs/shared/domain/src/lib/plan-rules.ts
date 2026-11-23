@@ -5,6 +5,7 @@ import {
   PLAN_RULE_METRICS,
   PLAN_RULE_SCOPES,
   type EntryTotals,
+  type NutritionFacts,
   type NutritionTargets,
   type TargetFigure,
   type PlanRule,
@@ -23,11 +24,24 @@ import {
  */
 
 /** kcal in a gram of each macro, for shares. */
-const KCAL_PER_G: Record<Exclude<PlanRuleMetric, 'energy'>, number> = { protein: 4, carb: 4, fat: 9 };
-const TOTAL_KEY: Record<PlanRuleMetric, keyof EntryTotals> = { energy: 'energyKcal', protein: 'proteinMg', carb: 'carbMg', fat: 'fatMg' };
+const KCAL_PER_G: Partial<Record<PlanRuleMetric, number>> = { protein: 4, carb: 4, fat: 9, sugar: 4, satFat: 9 };
+/** Where a day's or meal's total of each metric is; sugar and saturated fat have none (each food only). */
+const TOTAL_KEY: Partial<Record<PlanRuleMetric, keyof EntryTotals>> = { energy: 'energyKcal', protein: 'proteinMg', carb: 'carbMg', fat: 'fatMg', fibre: 'fibreMg' };
+/** A food's figure per 100 for each metric. */
+const PER100_KEY: Record<PlanRuleMetric, keyof NutritionFacts> = {
+  energy: 'energyKcalPer100',
+  protein: 'proteinMgPer100',
+  carb: 'carbMgPer100',
+  fat: 'fatMgPer100',
+  fibre: 'fibreMgPer100',
+  sugar: 'sugarMgPer100',
+  satFat: 'satFatMgPer100',
+};
+/** Metrics that can only be checked on each food: there is no daily total of them. */
+export const EACH_FOOD_ONLY: readonly PlanRuleMetric[] = ['sugar', 'satFat'];
 const DEFAULT_TOLERANCE = 10;
 
-const WORDS: Record<PlanRuleMetric, string> = { energy: 'calories', protein: 'protein', carb: 'carbs', fat: 'fat' };
+const WORDS: Record<PlanRuleMetric, string> = { energy: 'calories', protein: 'protein', carb: 'carbs', fat: 'fat', fibre: 'fibre', sugar: 'sugar', satFat: 'saturated fat' };
 const SCOPE_WORDS: Record<PlanRuleScope, string> = { day: 'a day', breakfast: 'at breakfast', lunch: 'at lunch', dinner: 'at dinner', snack: 'in snacks' };
 
 /** The largest number each basis accepts, by whether the rule is about calories. */
@@ -36,6 +50,7 @@ const MAX: Record<PlanRule['basis'], { energy: number; macro: number }> = {
   perKg: { energy: 200, macro: 20_000 },
   perKgTarget: { energy: 200, macro: 20_000 },
   share: { energy: 100, macro: 100 },
+  per100: { energy: 900, macro: 100_000 },
 };
 
 /** Why a rule cannot be saved as sent, or nothing when it can. */
@@ -44,7 +59,16 @@ export function planRuleProblem(rule: PlanRuleInput): string | undefined {
   if (!(PLAN_RULE_SCOPES as readonly string[]).includes(rule.scope)) return 'Choose the day or a meal.';
   if (!(PLAN_RULE_KINDS as readonly string[]).includes(rule.kind)) return 'Choose at least, at most, between or about.';
   if (!(PLAN_RULE_BASES as readonly string[]).includes(rule.basis)) return 'Choose an amount, per kg or a share.';
-  if (rule.metric === 'energy' && rule.scope === 'day' && rule.basis === 'share') return 'A share of the day’s calories needs a meal.';
+  if (rule.each) {
+    // On each food: an amount in it as eaten, per 100 g, or a share of its own calories.
+    if (rule.basis === 'perKg' || rule.basis === 'perKgTarget') return 'A rule on each food is an amount, per 100 g or a share.';
+    if (rule.basis === 'share' && !KCAL_PER_G[rule.metric]) return 'A share of calories is for protein, carbs, fat, sugar or saturated fat.';
+  } else {
+    if (EACH_FOOD_ONLY.includes(rule.metric)) return 'Sugar and saturated fat are checked on each food.';
+    if (rule.basis === 'per100') return 'Per 100 g is for a rule on each food.';
+    if (rule.metric === 'energy' && rule.scope === 'day' && rule.basis === 'share') return 'A share of the day’s calories needs a meal.';
+    if (rule.basis === 'share' && rule.metric !== 'energy' && !KCAL_PER_G[rule.metric]) return 'A share of calories is for protein, carbs or fat.';
+  }
   const max = MAX[rule.basis][rule.metric === 'energy' ? 'energy' : 'macro'];
   const ok = (n: number | undefined) => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= max;
   if (rule.kind === 'between') {
@@ -77,7 +101,13 @@ export function describePlanRule(rule: PlanRuleInput): string {
   const where = SCOPE_WORDS[rule.scope];
   const perKg = rule.basis === 'perKg' ? ' per kg' : rule.basis === 'perKgTarget' ? ' per kg of target weight' : '';
   let text: string;
-  if (rule.basis === 'share')
+  if (rule.each) {
+    // "Each food at lunch: at most 10 g sugar per 100 g", "Each food: at least 30% of calories from protein".
+    const head = `Each food${rule.scope === 'day' ? '' : ` ${where}`}: ${lead.toLowerCase()} `;
+    if (rule.basis === 'share') text = `${head}${number} of its calories from ${WORDS[rule.metric]}`;
+    else if (rule.metric === 'energy') text = `${head}${number}${rule.basis === 'per100' ? ' per 100 g' : ''}`;
+    else text = `${head}${number} ${WORDS[rule.metric]}${rule.basis === 'per100' ? ' per 100 g' : ''}`;
+  } else if (rule.basis === 'share')
     text = rule.metric === 'energy' ? `${lead} ${number} of the day’s calories ${where}` : `${lead} ${number} of calories from ${WORDS[rule.metric]} ${where}`;
   else if (rule.metric === 'energy') text = `${lead} ${number}${perKg} ${where}`;
   else text = `${lead} ${number} ${WORDS[rule.metric]}${perKg} ${where}`;
@@ -140,7 +170,7 @@ export function resolvePlanRule(rule: PlanRule, ctx: RuleContext, eaten?: { dayK
     }
     reference = reference ?? 0;
     // A share is a percent of kcal; a macro's is then turned into mg.
-    scale = rule.metric === 'energy' ? reference / 100 : (reference / 100 / KCAL_PER_G[rule.metric]) * 1000;
+    scale = rule.metric === 'energy' ? reference / 100 : (reference / 100 / (KCAL_PER_G[rule.metric] ?? 4)) * 1000;
   }
   const at = (n: number | undefined) => (n === undefined ? undefined : Math.round(n * scale));
   const common = { ...base, estimated, ...(ofEaten ? { ofEaten } : {}) };
@@ -169,7 +199,61 @@ export function planRuleStatus(rule: Pick<ResolvedRule, 'low' | 'high'>, amount:
 
 /** How much of a metric was eaten in a scope, in the rule's unit. */
 export function eatenFor(metric: PlanRuleMetric, totals: EntryTotals): number {
-  return totals[TOTAL_KEY[metric]] as number;
+  const key = TOTAL_KEY[metric];
+  return key ? ((totals[key] as number | undefined) ?? 0) : 0;
+}
+
+/** A rule's own bounds, in its own unit, with no scaling: for rules on each food. */
+function boundsOf(rule: PlanRule): { low?: number; high?: number } {
+  switch (rule.kind) {
+    case 'atLeast':
+      return { low: rule.value };
+    case 'atMost':
+      return { high: rule.value };
+    case 'between':
+      return { low: rule.low, high: rule.high };
+    case 'about': {
+      const spread = (rule.tolerancePct ?? DEFAULT_TOLERANCE) / 100;
+      return { low: Math.round((rule.value ?? 0) * (1 - spread)), high: Math.round((rule.value ?? 0) * (1 + spread)) };
+    }
+  }
+}
+
+/** A followed rule on each food, checked against one food. */
+export interface FoodRuleCheck {
+  text: string;
+  planName: string;
+  metric: PlanRuleMetric;
+  basis: PlanRule['basis'];
+  /** `unknown`: the food does not say (no sugar figure), or no amount was given for an amount rule. */
+  status: RuleStatus | 'unknown';
+  /** What the food has, in the rule's unit (kcal, mg or percent). */
+  value?: number;
+}
+
+/**
+ * Followed rules on each food that apply at a meal, checked against a food's facts (per 100) and,
+ * for amount rules, the amount about to be eaten (spec 043, slice 4).
+ */
+export function checkFoodRules(rules: readonly SourcedRule[], facts: NutritionFacts, slot: string, amount?: number): FoodRuleCheck[] {
+  return rules
+    .filter(({ rule }) => rule.each && (rule.scope === 'day' || rule.scope === slot))
+    .map(({ rule, planName }) => {
+      const text = describePlanRule(rule);
+      const about = { text, planName, metric: rule.metric, basis: rule.basis };
+      const per100 = facts[PER100_KEY[rule.metric]] as number | undefined;
+      let value: number | undefined;
+      if (per100 !== undefined) {
+        if (rule.basis === 'per100') value = per100;
+        else if (rule.basis === 'amount') value = amount === undefined ? undefined : Math.round((per100 * amount) / 100);
+        else if (rule.basis === 'share') {
+          const kcalPerG = KCAL_PER_G[rule.metric] ?? 0;
+          value = facts.energyKcalPer100 > 0 ? Math.round(((per100 / 1000) * kcalPerG * 100) / facts.energyKcalPer100) : undefined;
+        }
+      }
+      if (value === undefined) return { ...about, status: 'unknown' as const };
+      return { ...about, value, status: planRuleStatus(boundsOf(rule), value) };
+    });
 }
 
 /** A plan's rule, with which plan it is from. */
@@ -214,7 +298,8 @@ export function combinePlanRules(
   eaten?: { dayKcal: number; scopeKcal: (scope: PlanRuleScope) => number },
 ): CombinedRule[] {
   const groups = new Map<string, SourcedRule[]>();
-  for (const sourced of rules) {
+  // Rules on each food are advice on single foods, never a total.
+  for (const sourced of rules.filter((each) => !each.rule.each)) {
     const key = `${sourced.rule.metric}:${sourced.rule.scope}`;
     groups.set(key, [...(groups.get(key) ?? []), sourced]);
   }
@@ -265,7 +350,7 @@ export function planRuleConflicts(
   ctx: RuleContext,
 ): { metric: PlanRuleMetric; scope: PlanRuleScope; ours: string; theirs: string; theirPlan: string }[] {
   const found: { metric: PlanRuleMetric; scope: PlanRuleScope; ours: string; theirs: string; theirPlan: string }[] = [];
-  for (const mine of next) {
+  for (const mine of next.filter((each) => !each.rule.each)) {
     const a = resolvePlanRule(mine.rule, ctx);
     if (a.missing || a.ofEaten) continue;
     for (const other of followed) {

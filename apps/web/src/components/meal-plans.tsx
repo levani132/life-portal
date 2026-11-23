@@ -39,6 +39,7 @@ import {
   planSlotsLabel,
   referenceOf,
   type CombinedRule,
+  type FoodRuleCheck,
   type RuleContext,
   type RuleStatus,
 } from '@life-portal/shared-domain';
@@ -152,9 +153,17 @@ export function limitText(rule: CombinedRule): string {
 /** Which plans a combined rule's numbers come from. */
 export const ruleSources = (rule: CombinedRule) => [...new Set([rule.lowFrom, rule.highFrom].filter(Boolean))].join(' and ') || rule.rules[0]?.planName || '';
 
-const METRIC_COLOR: Record<PlanRuleMetric, string> = { energy: MACRO_COLORS.kcal, protein: MACRO_COLORS.protein, carb: MACRO_COLORS.carbs, fat: MACRO_COLORS.fat };
-const METRIC_LABEL: Record<PlanRuleMetric, string> = { energy: 'Calories', protein: 'Protein', carb: 'Carbs', fat: 'Fat' };
-const METRIC_UNIT: Record<PlanRuleMetric, string> = { energy: 'kcal', protein: 'g', carb: 'g', fat: 'g' };
+const METRIC_COLOR: Record<PlanRuleMetric, string> = {
+  energy: MACRO_COLORS.kcal,
+  protein: MACRO_COLORS.protein,
+  carb: MACRO_COLORS.carbs,
+  fat: MACRO_COLORS.fat,
+  fibre: 'rgb(var(--fresh-solid))',
+  sugar: 'rgb(var(--special-solid))',
+  satFat: 'rgb(var(--warning-solid))',
+};
+const METRIC_LABEL: Record<PlanRuleMetric, string> = { energy: 'Calories', protein: 'Protein', carb: 'Carbs', fat: 'Fat', fibre: 'Fibre', sugar: 'Sugar', satFat: 'Saturated fat' };
+const METRIC_UNIT: Record<PlanRuleMetric, string> = { energy: 'kcal', protein: 'g', carb: 'g', fat: 'g', fibre: 'g', sugar: 'g', satFat: 'g' };
 
 /** A rule's status in words and colour, for the eaten amount. */
 export function ruleState(rule: CombinedRule, eaten: number): { status: RuleStatus | 'conflict' | 'unknown'; tone: string } {
@@ -996,5 +1005,38 @@ export function MealPlanEditor({ plan, onClose, onSaved }: { plan?: MealPlan; on
         </div>
       )}
     </Modal>
+  );
+}
+
+/** Every followed rule on each food, with its plan. */
+export const eachFoodRules = (plans: readonly ActiveMealPlan[]) =>
+  plans.flatMap((plan) => plan.rules.filter((rule) => rule.each).map((rule) => ({ rule, planId: plan.planId, planName: plan.name })));
+
+/**
+ * Followed rules on each food, against one food (spec 043, slice 4): shown while choosing a food
+ * and under a logged meal that breaks one. Advice only: nothing is refused. `onlyBroken` hides the
+ * rules the food meets.
+ */
+export function FoodRuleNotes({ checks, onlyBroken = false }: { checks: readonly FoodRuleCheck[]; onlyBroken?: boolean }) {
+  const shown = onlyBroken ? checks.filter((check) => check.status === 'over' || check.status === 'under') : checks;
+  if (!shown.length) return null;
+  const valueText = (check: FoodRuleCheck) =>
+    check.value === undefined
+      ? ''
+      : check.basis === 'share'
+        ? `${check.value}%`
+        : check.metric === 'energy'
+          ? `${check.value} kcal`
+          : `${mgToG(check.value, 1)} g`;
+  return (
+    <ul className="space-y-0.5 text-[12px] leading-snug" aria-label="Your plan on this food">
+      {shown.map((check, index) => (
+        <li key={index} className={check.status === 'met' ? 'text-success' : check.status === 'unknown' ? 'text-ink-faint' : 'text-warning'} title={check.planName}>
+          {check.status === 'met' ? '✓ ' : check.status === 'unknown' ? '? ' : '! '}
+          {check.text}
+          {check.status === 'unknown' ? ' (this food does not say)' : ` · this has ${valueText(check)}`}
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -2,6 +2,15 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Plan rules about each food
+
+- A rule can apply to **each food** instead of the total: "snacks under 10 g sugar per 100 g",
+  "no food over 600 kcal", "at least 30% of each food's calories from protein". Rules can now
+  also be about **fibre, sugar and saturated fat**.
+- While choosing a food, the plans you follow say whether it fits (✓, ! or ? when the food has no
+  figure). A logged meal that breaks one says so. It is advice: nothing is refused.
+- Presets: Low-sugar snacks, No food over 600 kcal.
+
 ## 2026-11-23: Target weight in the app's advice
 
 - Food → You says how many weeks your target weight is at your goal's pace, or that your goal

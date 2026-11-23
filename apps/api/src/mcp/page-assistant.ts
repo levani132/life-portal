@@ -666,6 +666,7 @@ export class PageAssistantService {
                 low: z.number().positive().optional().describe('For between, in the same unit.'),
                 high: z.number().positive().optional(),
                 tolerancePct: z.number().int().min(1).max(50).optional().describe('For about; default 10.'),
+                each: z.boolean().optional().describe('Checked on each food, not the total: then basis is amount (in the food as eaten), per100 (per 100 g) or share (of its own calories). Sugar and satFat rules are always on each food.'),
                 dayIndex: z.number().int().min(0).max(13).optional().describe('Only for that day of the plan; absent: every day.'),
               }),
             )
