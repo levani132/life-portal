@@ -8,7 +8,7 @@ import { programmeProblem } from '@life-portal/shared-domain';
 import { api } from '../lib/api';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { mealContextNow } from '../lib/local-day';
-import { MealPlanEditor } from './meal-plans';
+import { MealPlanEditor, okToReplacePlan } from './meal-plans';
 import { PlanEditor } from './training/plan-editor';
 import { ErrorNote, Field, Input, Modal, Select, Spinner, Textarea } from './ui';
 
@@ -134,6 +134,7 @@ export function Programmes({ canUse }: { canUse: boolean }) {
                         onClick={() =>
                           void run(async () => {
                             setNote(null);
+                            if (!(await okToReplacePlan(programme.name, programme.mealPlan?.id))) return;
                             await api.put(`${MEAL_PLANS_KEY}/active`, { planId: programme.mealPlan?.id, today: mealContextNow().day });
                             setNote(`You are using ${programme.name}. Its meals are in Food → Today${programme.trainingPlan ? ', and its workouts are in Training → Plans' : ''}.`);
                           })

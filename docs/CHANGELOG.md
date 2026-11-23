@@ -7,6 +7,8 @@ User-visible changes. Newest first.
 - An exercise's sets are the rows you see. Add a row and it is planned; an exercise you add during
   a workout with three rows is done after three sets and moves you on, with a 0/3 chip like any
   other. The separate "Plan: N sets" line is gone.
+- Starting a meal plan or programme while another plan is in use now asks first, naming the plan
+  it replaces.
 - Finished exercises stack closer together, without "Superset with next" under them.
 
 ## 2026-11-23: Meal plans inside your day

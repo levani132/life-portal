@@ -478,7 +478,8 @@ post. Nothing is logged.
 Web: on any day in Food, the plan's lines not eaten yet sit inside each meal they may be eaten at,
 dashed, with a Log button that logs into that meal (`PlannedLines`); a meal that counts for the
 plan says "In your plan". Above the meals, `PlanStrip` has the plan day (a picker), how much of
-it is eaten, the last seven days and Stop. Food → Meal
+it is eaten, the last seven days and Stop. Putting another plan in use (Use, Start this programme, Use this plan)
+first asks when one is in use already (`okToReplacePlan`). Food → Meal
 plans has Use / Stop using; a meal plan post has **Use this plan** (`UsePlanFromPost`: saves the
 foods and the plan, then starts it). A page's Library → Meal plans has no logging and no use.
 Also: Food → Meal plans (with "Log this day today"); a page's Library → Meal plans (no logging).

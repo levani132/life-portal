@@ -35,6 +35,19 @@ const lineSlotsInput = (slots: MealSlot[]) => ({ slot: slots[0] ?? 'breakfast', 
 /** Everything a change to plans or to what is logged from one can alter. */
 const refreshPlans = () => Promise.all([revalidate(PLANS_KEY), revalidate('/nutrition?'), revalidate('/dashboard')]);
 
+/**
+ * Before another meal plan is put in use (from the list, a programme or a post): when one is in
+ * use already, say which and ask. True to go ahead. Only one plan is in use at a time, and the
+ * one replaced keeps everything: it stays in Meal plans and nothing logged changes.
+ */
+export async function okToReplacePlan(nextName: string, nextId?: string): Promise<boolean> {
+  const { active } = await api.get<{ active: ActiveMealPlan | null }>(`${ACTIVE_KEY}?today=${mealContextNow().day}`);
+  if (!active || active.planId === nextId) return true;
+  return window.confirm(
+    `You are using ${active.name}. Start ${nextName} instead?\n\nOnly one meal plan is used at a time. ${active.name} stays in your meal plans, and nothing you logged changes.`,
+  );
+}
+
 /** The plan in use as it applies to the calendar day on screen. A page has no diary, so none. */
 export function useActivePlan(today: string | null, day: string | null): ActiveMealPlan | null {
   const key = today && day && !actingPageId() ? `${ACTIVE_KEY}?today=${today}&day=${day}` : null;
@@ -236,6 +249,7 @@ export function UsePlanFromPost({ postId, title }: { postId: string; title: stri
   const begin = () =>
     void action.run(
       async () => {
+        if (!(await okToReplacePlan(title))) return;
         const preview = await api.get<PostImportPreview>(`/posts/${postId}/import`);
         const mine = [...new Set(preview.items.flatMap((item) => (item.duplicateName ? [item.duplicateName] : [])))];
         if (mine.length) setAsking(mine);
@@ -339,7 +353,12 @@ export function MealPlans({ canLog }: { canLog: boolean }) {
                       type="button"
                       className="btn-ghost"
                       disabled={action.pending}
-                      onClick={() => void run(() => api.put(ACTIVE_KEY, { planId: plan.activeSince ? null : plan.id, today: mealContextNow().day }))}
+                      onClick={() =>
+                        void run(async () => {
+                          if (!plan.activeSince && !(await okToReplacePlan(plan.name, plan.id))) return;
+                          await api.put(ACTIVE_KEY, { planId: plan.activeSince ? null : plan.id, today: mealContextNow().day });
+                        })
+                      }
                     >
                       {plan.activeSince ? 'Stop using' : 'Use'}
                     </button>
