@@ -99,6 +99,29 @@ export class StorageService {
     });
     if (!response.ok) throw new Error(`Storage copy failed with ${response.status}.`);
   }
+  /**
+   * Reads an object into memory, or null when it is missing. Only for the one case where the
+   * server must look inside a file (an assistant's upload, spec 041); `maxBytes` is enforced
+   * before and while reading, so a larger object is refused rather than loaded.
+   */
+  async read(key: string, maxBytes: number): Promise<Uint8Array | null> {
+    const response = await this.require().fetch(this.url(key), { method: 'GET' });
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error(`Storage GET failed with ${response.status}.`);
+    if (Number(response.headers.get('content-length') ?? 0) > maxBytes) throw new Error('Stored object is larger than allowed.');
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.length > maxBytes) throw new Error('Stored object is larger than allowed.');
+    return bytes;
+  }
+  /** Replaces an object's bytes. Only used after `read`, to store the cleaned copy. */
+  async write(key: string, contentType: string, bytes: Uint8Array): Promise<void> {
+    const response = await this.require().fetch(this.url(key), {
+      method: 'PUT',
+      headers: { 'content-type': contentType, 'content-length': String(bytes.length) },
+      body: Buffer.from(bytes) as unknown as BodyInit,
+    });
+    if (!response.ok) throw new Error(`Storage PUT failed with ${response.status}.`);
+  }
   /** Deletes an object. A missing one counts as deleted. Never throws. */
   async delete(key: string): Promise<boolean> {
     try {

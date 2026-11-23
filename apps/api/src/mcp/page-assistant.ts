@@ -7,6 +7,8 @@ import {
   ASSISTANT_ACTION_KINDS,
   ASSISTANT_CAP_MAX,
   ASSISTANT_CAP_NONE,
+  MAX_POST_MEDIA,
+  MEDIA_LIMITS,
   EQUIPMENT_TYPES,
   MEASURES,
   MUSCLES,
@@ -19,6 +21,7 @@ import {
 import { assistantCap, assistantDefaults, underAssistantCap } from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
 import { FollowsService } from '../follows/follows.module';
+import { MediaService } from '../media/media.service';
 import { MessagesService } from '../messages/messages.service';
 import { NutritionService } from '../nutrition/nutrition.service';
 import { PagesService } from '../pages/pages.module';
@@ -113,6 +116,7 @@ export class PageAssistantService {
     private readonly catalogue: CatalogueService,
     private readonly follows: FollowsService,
     private readonly messages: MessagesService,
+    private readonly media: MediaService,
   ) {}
 
   // ------------------------------------------------------------------ caps and the log
@@ -477,6 +481,39 @@ export class PageAssistantService {
           })),
       },
 
+      // ---- photos (video can join this flow later)
+      {
+        name: 'prepare_page_media_upload',
+        description:
+          'Step 1 of 3 to put a photo on a page’s post. Answers a one-time upload link. Before calling: convert the picture to JPEG, make its longest edge 2048 pixels or less, and measure the file. Step 2: send the file with an HTTP PUT to uploadUrl with exactly the headers given (the link accepts only that size and type, for 15 minutes). Step 3: call finish_page_media_upload. Only upload pictures the page has the right to use.',
+        shape: {
+          pageId,
+          kind: z.enum(['image']).describe('Only "image" for now.'),
+          bytes: z.number().int().min(1).max(MEDIA_LIMITS.image.maxBytes).describe('The exact size of the JPEG file in bytes.'),
+          width: z.number().int().min(1).max(8192),
+          height: z.number().int().min(1).max(8192),
+        },
+        run: (personId, args) =>
+          this.counted(personId, args, 'media', 'prepare_page_media_upload', async (page) => {
+            const ticket = await this.media.assistantTicket(page, { kind: 'image', bytes: Number(args['bytes']), width: Number(args['width']), height: Number(args['height']) });
+            return {
+              result: { mediaId: ticket.id, uploadUrl: ticket.uploadUrl, method: 'PUT', headers: ticket.headers, expiresInSeconds: ticket.expiresInSeconds, next: 'PUT the file, then call finish_page_media_upload with this mediaId.' },
+              targetId: ticket.id,
+            };
+          }),
+      },
+      {
+        name: 'finish_page_media_upload',
+        description:
+          'Step 3 of 3: after the file was sent to the upload link, checks it (a real JPEG within the limits) and removes hidden details such as location data. Answers the mediaId to pass in mediaIds of create_page_post. A file that is not a JPEG is deleted and refused.',
+        shape: { pageId, mediaId: id },
+        run: async (personId, args) => {
+          const page = await this.acting(personId, args);
+          const checked = await this.media.finishAssistantUpload(page, String(args['mediaId']));
+          return { mediaId: checked.id, width: checked.width, height: checked.height, ready: true };
+        },
+      },
+
       // ---- posts
       {
         name: 'create_page_post',
@@ -491,6 +528,7 @@ export class PageAssistantService {
           recipeId: id.optional(),
           planId: id.optional(),
           exerciseId: id.optional(),
+          mediaIds: z.array(id).max(MAX_POST_MEDIA).optional().describe('Photos to show on the post: ids from finish_page_media_upload, in order.'),
           requestId,
         },
         run: (personId, args) =>
@@ -503,17 +541,20 @@ export class PageAssistantService {
               caption: String(args['caption'] ?? ''),
               audience: args['draft'] ? 'private' : 'public',
             };
-            let dto: Record<string, unknown> = base;
+            const mediaIds = (args['mediaIds'] as string[] | undefined) ?? [];
+            await this.media.requireAssistantChecked(page, mediaIds);
+            let dto: Record<string, unknown> = mediaIds.length ? { ...base, mediaIds } : base;
+            const withMedia = (value: Record<string, unknown>) => (mediaIds.length ? { ...value, mediaIds } : value);
             if (args['foodId'] || args['recipeId']) {
               const source = args['foodId'] ? { kind: 'food', foodId: args['foodId'] } : { kind: 'combination', savedMealId: args['recipeId'] };
               const preview = await this.posts.preview(page, { source } as never);
-              dto = { ...base, source, previewHash: preview.previewHash };
+              dto = withMedia({ ...base, source, previewHash: preview.previewHash });
             } else if (args['planId'] || args['exerciseId']) {
               const training = args['planId'] ? { kind: 'plan', planId: args['planId'] } : { kind: 'exercise', exerciseId: args['exerciseId'] };
               const preview = await this.posts.previewTraining(page, training as never);
-              dto = { ...base, training, trainingHash: preview.trainingHash, allowCopy: true };
-            } else if (!base.caption.trim() && !base.title.trim()) {
-              throw new BadRequestException('A post needs some text or a library item.');
+              dto = withMedia({ ...base, training, trainingHash: preview.trainingHash, allowCopy: true });
+            } else if (!base.caption.trim() && !base.title.trim() && !mediaIds.length) {
+              throw new BadRequestException('A post needs some text, a photo or a library item.');
             }
             const post = await this.posts.create(page, dto as never);
             return { result: { ...brief(post), draft: post.audience === 'private' }, targetId: post.id };

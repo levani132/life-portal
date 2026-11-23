@@ -49,3 +49,4 @@ export * from './lib/account';
 export * from './lib/usage';
 export * from './lib/pages';
 export * from './lib/assistant';
+export * from './lib/jpeg';

@@ -4,7 +4,7 @@
  */
 
 /** What is counted against a page's daily caps. Reading is not counted. */
-export const ASSISTANT_ACTION_KINDS = ['post', 'comment', 'like', 'follow', 'message', 'library'] as const;
+export const ASSISTANT_ACTION_KINDS = ['post', 'comment', 'like', 'follow', 'message', 'library', 'media'] as const;
 export type AssistantActionKind = (typeof ASSISTANT_ACTION_KINDS)[number];
 
 /** A cap per kind, per page, per day. `ASSISTANT_CAP_NONE` means no cap. */
@@ -13,7 +13,7 @@ export const ASSISTANT_CAP_NONE = -1;
 export const ASSISTANT_CAP_MAX = 100_000;
 
 /** The caps every page gets until the owner changes them. */
-export const ASSISTANT_CAP_DEFAULTS: AssistantCaps = { post: 10, comment: 30, like: 100, follow: 30, message: 30, library: 200 };
+export const ASSISTANT_CAP_DEFAULTS: AssistantCaps = { post: 10, comment: 30, like: 100, follow: 30, message: 30, library: 200, media: 20 };
 
 export const ASSISTANT_ACTION_LABELS: Record<AssistantActionKind, string> = {
   post: 'Posts',
@@ -22,6 +22,7 @@ export const ASSISTANT_ACTION_LABELS: Record<AssistantActionKind, string> = {
   follow: 'Follows',
   message: 'Messages',
   library: 'Library changes',
+  media: 'Photo uploads',
 };
 
 /** One thing the assistant did as a page, as its managers see it. */

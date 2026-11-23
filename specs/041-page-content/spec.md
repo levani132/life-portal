@@ -54,17 +54,11 @@ did (spec 040, FR-024).
 
 ## Photos through the assistant
 
-An assistant cannot hold a camera, and most cannot upload a file to a signed link. Three ways,
-in the order they will be built:
-
-1. **The page's photo shelf.** A manager uploads photos to the page in the app (the normal
-   upload: re-encoded in the browser, checked like any photo). The assistant lists the shelf and
-   attaches a photo by id. Nothing new reaches the server by a new road.
-2. **A food's or recipe's own photo** is used automatically when the post attaches it.
-3. **A web address of an image** the assistant gives, fetched by the server: only if the first
-   two are not enough. It needs strict limits (https only, public addresses only, size and type
-   checked, re-encoded, moderation check before it is shown) and a line in the privacy policy.
-   Not built until asked for.
+Built 2026-11-23 (owner's choice): the assistant uploads its own JPEG to a one-time link
+(`prepare_page_media_upload`), then `finish_page_media_upload` checks and cleans it, and the id
+goes in `mediaIds` of `create_page_post`. The server generates nothing and fetches nothing.
+Details in `docs/modules/mcp.md`. Not built: a photo shelf stocked by hand, fetching from a web
+address, generating on the server (rejected for its cost), video (the tools are named for it).
 
 ## Slices
 

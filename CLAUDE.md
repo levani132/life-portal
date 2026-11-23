@@ -185,7 +185,10 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   to R2 with a link whose type and size are signed; reads are signed after the audience check,
   per read. Never return a storage `key`, never make the bucket or a URL permanent, and never
   accept a media id that `PostMediaService.reserve()` has not checked. A photo is re-encoded in
-  the browser (that is what strips GPS), so don't add a path that uploads the original file. See
+  the browser (that is what strips GPS), so don't add a path that uploads the original file. The
+  one exception is an assistant's upload (spec 041, `viaAssistant`): the server reads that file
+  once, requires a real JPEG and strips its metadata with `cleanJpeg()` before `checkedAt` is set;
+  never attach one without `checkedAt`. See
   `docs/modules/posts.md`.
 - **`GET /api/public/posts/:id/preview` is the only `@Public()` posts route**, for link-preview
   crawlers. It answers for public, live, original posts only and returns a narrow projection;

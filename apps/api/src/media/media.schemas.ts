@@ -21,6 +21,13 @@ export class MediaUploadRecord {
   @Prop() postId?: string;
   /** The create request that claimed it, so a retried publish finds its own media again. */
   @Prop() requestId?: string;
+  /**
+   * Spec 041: the upload link was handed to an assistant, not a browser. Such a file was not
+   * re-encoded on a device, so it may not be attached until the server has looked inside it
+   * (`checkedAt`): a real JPEG, its true size, descriptive metadata removed.
+   */
+  @Prop() viaAssistant?: boolean;
+  @Prop() checkedAt?: Date;
   createdAt!: Date;
 }
 export const MediaUploadSchema = SchemaFactory.createForClass(MediaUploadRecord);

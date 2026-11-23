@@ -34,7 +34,8 @@
 - [ ] T051 Collections. T052 Pinned post, link and contact.
 
 ## Slice 7: photos and insights
-- [ ] T060 The page's photo shelf, and attaching from it through the connector.
+- [x] T060 Photos through the connector: upload link, server-side check and clean, `mediaIds` on posts. (The hand-stocked shelf was dropped in favour of this.)
+- [ ] T062 Video through the same flow.
 - [ ] T061 Insights: followers over time, saves and copies per item.
 
 ## Later (on the roadmap)
@@ -44,7 +45,8 @@
 
 - The pages consent is one switch on the account, shared by every assistant connection the
   person made. A separate OAuth scope chosen per connection is stricter and not built.
-- The assistant cannot upload photos (slice 7: the photo shelf).
+- Photo upload needs an assistant that can send an HTTP PUT with a file and reach the storage host; not verified with ChatGPT or Claude yet.
+- `update_page_post` cannot change a post's photos.
 - `create_page_plan` covers workouts, exercises and planned sets; supersets and edits to an
   existing plan are not offered.
 - Caps reset at midnight UTC, not the person's midnight.

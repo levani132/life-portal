@@ -159,15 +159,37 @@ together. A separate `pages` scope on the grant is the stricter design and is no
 | --- | --- |
 | Pages | `list_my_pages`, `create_page`, `update_page`, `disable_page` (off, not deleted; only the app switches it on), `get_assistant_activity` |
 | Library | `list_page_foods`, `create_page_food`, `update_page_food`, `delete_page_food`, `list_page_recipes`, `create_page_recipe`, `delete_page_recipe`, `list_page_exercises`, `create_page_exercise`, `list_page_plans`, `get_page_plan`, `create_page_plan`, `delete_page_plan` |
-| Posts | `create_page_post` (text, one library item, `draft`), `publish_page_draft`, `update_page_post`, `delete_page_post`, `list_page_posts` |
+| Photos | `prepare_page_media_upload`, `finish_page_media_upload` |
+| Posts | `create_page_post` (text, one library item, `mediaIds`, `draft`), `publish_page_draft`, `update_page_post`, `delete_page_post`, `list_page_posts` |
 | Reading | `get_for_you`, `get_following`, `get_post`, `get_post_comments`, `get_account_profile`, `get_suggested_pages` |
 | Engaging | `follow_page`, `unfollow_page`, `like_post`, `unlike_post`, `comment_on_post`, `list_page_conversations`, `get_conversation_messages`, `reply_in_conversation` |
 
 A draft is a post with audience `private`; publishing sets it to `public`. There is no tool to
-delete a page, to upload a photo, or to open a conversation.
+delete a page or to open a conversation.
+
+**Photos.** The server generates nothing and fetches nothing; the assistant uploads its own
+file, the way a browser does, in three steps:
+
+1. `prepare_page_media_upload {pageId, kind: 'image', bytes, width, height}` answers a one-time
+   upload link (`MediaService.assistantTicket`, the ordinary upload ledger with `viaAssistant`).
+   The link is signed for `image/jpeg` and that exact size, for 15 minutes. Counted against the
+   `media` cap (20 a day by default).
+2. The assistant PUTs the file to the link. Whether it can depends on the assistant: it needs
+   somewhere to run an HTTP request with the file (ChatGPT's agent mode, Claude with code
+   execution), and that place must be allowed to reach the storage host.
+3. `finish_page_media_upload {pageId, mediaId}`: the server reads the file once
+   (`StorageService.read`, capped at the photo limit), requires a real JPEG (`cleanJpeg()` in
+   `libs/shared/domain`), replaces the declared size with the true one, and removes Exif (GPS),
+   XMP, IPTC and comments, which a device's re-encoding would have dropped. Anything else is
+   deleted and refused (`NOT_A_PHOTO`). Only then does `create_page_post` accept the id in
+   `mediaIds` (`MEDIA_NOT_CHECKED` otherwise).
+
+JPEG only: the app shows, shares and checks JPEGs and the server has no image library to
+convert. The photo check runs on the post as for any photo. `kind` is in the tool so video can
+join the same flow; video is not accepted yet.
 
 **Caps.** `assistantCap()` in `libs/shared/domain`: per page, per UTC day, per kind (`post`,
-`comment`, `like`, `follow`, `message`, `library`). Defaults 10/30/100/30/30/200, stored by the
+`comment`, `like`, `follow`, `message`, `library`, `media`). Defaults 10/30/100/30/30/200/20, stored by the
 owner in `assistant_settings` (`GET/PUT /page-assistant/caps`); one person's override in
 `users.assistantCaps` (`PUT /page-assistant/caps/:personId`, `null` clears); `-1` is no cap; the
 owner's own account has none. A capped call answers 429 `CAP_REACHED`. Reading, unfollowing and

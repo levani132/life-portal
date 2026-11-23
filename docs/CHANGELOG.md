@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: An assistant can put photos on a page's posts
+
+- The assistant asks for an upload link, sends its own JPEG to it, and attaches the photo to a
+  post. Hidden details such as location are removed, and the usual photo check applies.
+- A daily limit on uploads per page (20 by default), set in Menu → People like the others.
+- Whether a given assistant can send the file depends on the assistant; nothing is generated or
+  fetched by LifePortal.
+
 ## 2026-11-23: Your photo on the profile tab
 
 - The last tab shows your profile photo (or the page's, when you use the app as a page).

@@ -2808,3 +2808,13 @@ between pages sharing a manager ("never a crowd", from the roadmap). The owner r
 is always labelled as a page, and as run with AI when it is, so such engagement is not presented
 as coming from people. What still limits it is the daily caps per page. If a rule on fake
 engagement ever applies here, the place to bring a check back is `PageAssistantService`.
+
+**An assistant uploads its own pictures; the server generates and fetches nothing** (owner's
+decision, 2026-11-23, spec 041). Three routes were weighed: fetching an image from a web address
+(arbitrary fetches from the server, and ChatGPT does not hand a connector a fetchable link to
+what it generated), generating on the server (rejected: a cost per image on the owner's account),
+and handing the assistant the same one-time upload link a browser gets. The last was built. It
+is the one upload that does not pass a browser's re-encoding, so the server reads the file once
+and does what the browser would have: a real JPEG or nothing, true size, Exif/XMP/IPTC removed
+(`cleanJpeg()`, pure, no image library). JPEG only, because nothing on the server can convert.
+The tools say "media" and take a `kind`, so video can join later.

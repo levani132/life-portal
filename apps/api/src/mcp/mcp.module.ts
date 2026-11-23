@@ -33,6 +33,7 @@ import { McpService } from './mcp.service';
 import { McpToolCallDto } from './mcp.dto';
 import { handleMcpRequest } from './mcp-protocol';
 import { AsPerson } from '../auth/acting';
+import { MediaModule } from '../media/media.module';
 import { MessagesModule } from '../messages/messages.module';
 import { PostsModule } from '../posts/posts.module';
 import { SocialModule } from '../social/social.module';
@@ -203,6 +204,7 @@ export class PageAssistantController {
     NutritionModule,
     AuthModule,
     PostsModule,
+    MediaModule,
     TrainingModule,
     MessagesModule,
     SocialModule,

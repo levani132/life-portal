@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Model, Types } from 'mongoose';
+import { Model, Types, isValidObjectId } from 'mongoose';
 import {
   MAX_POST_MEDIA,
   MAX_VIDEO_SECONDS,
@@ -18,7 +18,7 @@ import {
   type MediaUploadTicket,
   type PostMedia,
 } from '@life-portal/shared-types';
-import { mediaLimitError, mediaListError } from '@life-portal/shared-domain';
+import { cleanJpeg, mediaLimitError, mediaListError } from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
 import { CONFIG, type AppConfig } from '../config/configuration';
 import { StorageService } from '../storage/storage.module';
@@ -293,6 +293,64 @@ export class MediaService {
   /** Deletes a file that belonged to something removed. Never throws. */
   async deleteKey(key: string | undefined) {
     if (key && this.storage.configured) await this.storage.delete(key);
+  }
+
+  // ------------------------------------------------------------------ an assistant's uploads (spec 041)
+
+  /**
+   * An upload link for an assistant acting as a page. Photos only for now, JPEG only: the app
+   * shows, shares and checks JPEGs, and the server cannot convert. `kind` is in the signature so
+   * video can join this flow later.
+   */
+  async assistantTicket(userId: string, input: { kind: 'image'; bytes: number; width: number; height: number }): Promise<{ id: string; uploadUrl: string; headers: Record<string, string>; expiresInSeconds: number }> {
+    if (input.kind !== 'image') throw new BadRequestException('Only photos can be uploaded this way for now.');
+    const ticket = await this.ticket(userId, { kind: 'image', contentType: 'image/jpeg', bytes: input.bytes, width: input.width, height: input.height });
+    await this.media.updateOne({ _id: ticket.id }, { $set: { viaAssistant: true } });
+    return {
+      id: ticket.id,
+      uploadUrl: ticket.upload.url,
+      // Signed into the link: storage refuses any other type or size.
+      headers: { ...ticket.upload.headers, 'content-length': String(input.bytes) },
+      expiresInSeconds: 15 * 60,
+    };
+  }
+
+  /**
+   * Looks inside an assistant's upload before it can be used: it must be a real JPEG within the
+   * limits. Its true size replaces the declared one, and Exif (GPS), XMP, IPTC and comments are
+   * removed, as a device's re-encoding would have done. Anything else is deleted and refused.
+   */
+  async finishAssistantUpload(userId: string, id: string): Promise<{ id: string; width: number; height: number; bytes: number }> {
+    await this.requireAvailable(userId);
+    if (!isValidObjectId(id)) throw new BadRequestException('Unknown upload.');
+    const row = await this.media.findOne({ _id: id, userId, viaAssistant: true, postId: { $exists: false } }).lean();
+    if (!row) throw new BadRequestException({ code: 'MEDIA_GONE', message: 'That upload does not exist or was already used. Prepare a new one.' });
+    if (row.checkedAt) return { id, width: row.width, height: row.height, bytes: row.bytes };
+    const limit = MEDIA_LIMITS.image.maxBytes;
+    const stored = await this.storage.head(row.key);
+    if (!stored) throw new BadRequestException({ code: 'NOT_UPLOADED', message: 'Nothing has been uploaded to that link yet. PUT the file to the uploadUrl first.' });
+    const refuse = async (message: string) => {
+      await this.storage.delete(row.key);
+      await this.media.deleteOne({ _id: id });
+      return new BadRequestException({ code: 'NOT_A_PHOTO', message });
+    };
+    if (stored.bytes > limit) throw await refuse('The file is larger than a photo may be.');
+    const file = await this.storage.read(row.key, limit);
+    const clean = file ? cleanJpeg(file) : null;
+    if (!clean) throw await refuse('The file is not a JPEG photo. Convert it to JPEG and upload again.');
+    if (clean.width < 1 || clean.height < 1 || clean.width > 8192 || clean.height > 8192) throw await refuse('The photo is too large in pixels. Make its longest edge 2048 or less.');
+    if (clean.changed) await this.storage.write(row.key, 'image/jpeg', clean.bytes);
+    await this.media.updateOne({ _id: id }, { $set: { checkedAt: new Date(), bytes: clean.bytes.length, width: clean.width, height: clean.height } });
+    return { id, width: clean.width, height: clean.height, bytes: clean.bytes.length };
+  }
+
+  /** Refuses an assistant's upload that has not been through `finishAssistantUpload`. */
+  async requireAssistantChecked(userId: string, ids: string[]): Promise<void> {
+    if (!ids.length) return;
+    const rows = await this.media.find({ _id: { $in: ids.filter((id) => isValidObjectId(id)) }, userId }).select('viaAssistant checkedAt').lean();
+    if (rows.length !== ids.length || rows.some((row) => !row.viaAssistant || !row.checkedAt)) {
+      throw new BadRequestException({ code: 'MEDIA_NOT_CHECKED', message: 'Each photo must be uploaded and then finished with finish_page_media_upload before it is attached.' });
+    }
   }
 
   /** Uploads no post claimed within a day: abandoned drafts. */
