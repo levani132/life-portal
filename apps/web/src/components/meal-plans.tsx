@@ -17,6 +17,8 @@ import {
   type MealPlanInput,
   type MealSlot,
   type EntryTotals,
+  type NutritionProfile,
+  type NutritionTargets,
   type PlanRule,
   type PlanRuleMetric,
   type PostImportPreview,
@@ -68,9 +70,20 @@ export const allPlanRules = (plan: Pick<MealPlan, 'rules' | 'days'>): PlanRule[]
  */
 export async function okToFollow(name: string, rules: readonly PlanRule[], planId?: string): Promise<boolean> {
   if (!rules.length) return true;
-  const { following } = await api.get<{ following: ActiveMealPlan[] }>(`${FOLLOWING_KEY}?today=${mealContextNow().day}`);
+  const today = mealContextNow().day;
+  // The weights and the calorie target let per-kg rules and shares be compared too.
+  const [{ following }, { profile, targets }] = await Promise.all([
+    api.get<{ following: ActiveMealPlan[] }>(`${FOLLOWING_KEY}?today=${today}`),
+    api.get<{ profile: NutritionProfile; targets: NutritionTargets }>(`/nutrition/profile?today=${today}`),
+  ]);
   const followed = following.filter((plan) => plan.planId !== planId).flatMap((plan) => plan.rules.map((rule) => ({ rule, planId: plan.planId, planName: plan.name })));
-  const clashes = planRuleConflicts(followed, rules.map((rule) => ({ rule, planId: planId ?? 'new', planName: name })), {});
+  const ctx: RuleContext = {
+    weightGrams: targets.weightGrams,
+    targetWeightGrams: profile.targetWeightGrams,
+    // The app's own calories, not those of plans already followed: shares are compared on one base.
+    dayEnergyKcal: targets.plan?.app.energyKcal ?? targets.energyKcal?.value,
+  };
+  const clashes = planRuleConflicts(followed, rules.map((rule) => ({ rule, planId: planId ?? 'new', planName: name })), ctx);
   if (!clashes.length) return true;
   return window.confirm(
     `${name} cannot be met together with a plan you follow:\n\n${clashes.map((clash) => `• ${clash.ours}, but ${clash.theirPlan} says: ${clash.theirs.toLowerCase()}`).join('\n')}\n\nFollow it anyway? Both will show, and the one not met will say so.`,

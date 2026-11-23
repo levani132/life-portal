@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Target weight in the app's advice
+
+- Food → You says how many weeks your target weight is at your goal's pace, or that your goal
+  heads the other way and which goal would get you there.
+- Following a plan now also catches clashes between per-kg rules (it knows your weight).
+
 ## 2026-11-23: A plan's targets are your targets
 
 - When a plan you follow sets daily calories or macros, **those are your targets everywhere**:

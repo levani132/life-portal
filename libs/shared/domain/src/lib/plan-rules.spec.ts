@@ -88,6 +88,16 @@ describe('planRuleConflicts', () => {
   });
 });
 
+describe('planRuleConflicts with weights', () => {
+  it('compares per-kg rules once a weight is known, and skips them without one', () => {
+    const followed = [{ planId: 'a', planName: 'Low protein', rule: rule({ kind: 'atMost', value: 100_000 }) }];
+    const next = [{ planId: 'b', planName: 'Per kg', rule: rule({ basis: 'perKg', value: 2000 }) }];
+    expect(planRuleConflicts(followed, next, { weightGrams: 80_000 })).toHaveLength(1);
+    expect(planRuleConflicts(followed, next, { weightGrams: 45_000 })).toHaveLength(0);
+    expect(planRuleConflicts(followed, next, {})).toHaveLength(0);
+  });
+});
+
 describe('applyPlanTargets (spec 043)', () => {
   const app = {
     available: true,

@@ -1531,6 +1531,17 @@ function TargetsPanel({ targets }: { targets: NutritionTargets }) {
           <p className="mt-1 text-xs text-ink-faint">Stop following them in Food → Today to go back to the app’s targets.</p>
         </div>
       )}
+      {/* Spec 043: the target weight against the goal. */}
+      {targets.targetWeight && (
+        <p className={clsx('mb-3 rounded-xl px-3 py-2 text-sm', targets.targetWeight.status === 'mismatch' ? 'bg-warning-solid/10 text-warning' : 'bg-surface text-ink-muted')}>
+          {targets.targetWeight.status === 'there'
+            ? `You are within a kilogram of your target weight of ${targets.targetWeight.grams / 1000} kg.`
+            : targets.targetWeight.status === 'heading'
+              ? `Target weight ${targets.targetWeight.grams / 1000} kg (${targets.targetWeight.diffKg > 0 ? '+' : ''}${targets.targetWeight.diffKg} kg): about ${targets.targetWeight.weeks?.value} weeks at this goal's pace.`
+              : `Your target weight of ${targets.targetWeight.grams / 1000} kg is ${targets.targetWeight.diffKg > 0 ? 'above' : 'below'} where you are, but this goal ${targets.projectedWeeklyChangeKg && targets.projectedWeeklyChangeKg !== 0 ? (targets.projectedWeeklyChangeKg > 0 ? 'gains' : 'loses') : 'keeps your weight steady'}. Choose a goal that ${targets.targetWeight.diffKg > 0 ? 'gains' : 'loses'} weight to head there.`}
+          {targets.targetWeight.weeks && <EstimateMark basis={targets.targetWeight.weeks.basis} />}
+        </p>
+      )}
       <dl className="divide-y divide-border">
         {rows.map((row) =>
           row.figure == null ? null : (

@@ -7,6 +7,7 @@ import type {
 import {
   ACTIVITY_FACTORS,
   GOAL_PLAN,
+  targetWeightOutlook,
   addTotals,
   ageOn,
   amountToServings,
@@ -1076,5 +1077,17 @@ describe('snapshot', () => {
     const decorated = entry({ day: TODAY, slot: 'lunch', amount: 60 });
     expect(decorated.servings).toBe(1.5);
     expect(decorated.totals.energyKcal).toBe(228);
+  });
+});
+
+describe('targetWeightOutlook (spec 043)', () => {
+  it('says how many weeks at the projected rate, when the goal heads there', () => {
+    expect(targetWeightOutlook(85_000, 80_000, -0.5)).toMatchObject({ diffKg: -5, status: 'heading', weeks: { value: 10 } });
+    expect(targetWeightOutlook(70_000, 72_500, 0.2)).toMatchObject({ diffKg: 2.5, status: 'heading', weeks: { value: 13 } });
+  });
+  it('is there within a kilogram, and a mismatch when the goal goes the other way or stands still', () => {
+    expect(targetWeightOutlook(80_000, 80_800, 0.3).status).toBe('there');
+    expect(targetWeightOutlook(80_000, 75_000, 0.3).status).toBe('mismatch');
+    expect(targetWeightOutlook(80_000, 75_000, 0).status).toBe('mismatch');
   });
 });

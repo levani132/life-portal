@@ -695,6 +695,25 @@ export interface TargetsInput {
  * `specs/001-nutrition-tracking/research.md` (R5): basal rate, activity, goal, floor, reference
  * mass, protein cap, fat floor, carbohydrate remainder, then the projected rate.
  */
+/**
+ * Spec 043: the target weight against the goal's projected weekly change. Within 1 kg is "there".
+ * Heading the right way, the weeks to get there at that rate (an estimate: the rate is one). The
+ * wrong way, or standing still with more than 1 kg to go, is a mismatch the person is told about:
+ * a goal that gains with a lower target, or one that loses with a higher one.
+ */
+export function targetWeightOutlook(weightGrams: number, targetWeightGrams: number, weeklyChangeKg: number): NonNullable<NutritionTargets['targetWeight']> {
+  const diffKg = Math.round((targetWeightGrams - weightGrams) / 100) / 10;
+  const base = { grams: targetWeightGrams, diffKg };
+  if (Math.abs(diffKg) <= 1) return { ...base, status: 'there' };
+  const heading = Math.sign(weeklyChangeKg) === Math.sign(diffKg) && Math.abs(weeklyChangeKg) >= 0.05;
+  if (!heading) return { ...base, status: 'mismatch' };
+  return {
+    ...base,
+    status: 'heading',
+    weeks: { value: Math.ceil(Math.abs(diffKg / weeklyChangeKg)), basis: `${Math.abs(diffKg)} kg at the projected ${Math.abs(weeklyChangeKg)} kg a week. Real change is rarely that even.` },
+  };
+}
+
 export function nutritionTargets(input: TargetsInput): NutritionTargets {
   const { profile, weighIns, today } = input;
   const weighIn = currentWeighIn(weighIns, today);
@@ -981,6 +1000,8 @@ export function nutritionTargets(input: TargetsInput): NutritionTargets {
 
   if (floorApplied) targets.floorApplied = floorApplied;
   if (macroAdjustment) targets.macroAdjustment = macroAdjustment;
+  // Spec 043: how the goal stands against the target weight, when there is one.
+  if (profile.targetWeightGrams) targets.targetWeight = targetWeightOutlook(weighIn.weightGrams, profile.targetWeightGrams, projectedWeeklyChangeKg);
   if (bodyFatRecordedPct != null) {
     targets.bodyFatRecordedPct = bodyFatRecordedPct;
   } else if (profile.heightCm && profile.birthDate) {

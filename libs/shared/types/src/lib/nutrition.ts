@@ -407,6 +407,11 @@ export interface NutritionTargets {
   weightGrams?: number;
   weighInDay?: IsoDate;
   /**
+   * Spec 043: the target weight against the goal. `there` within 1 kg; `heading` with the weeks
+   * it would take at the projected rate; `mismatch` when the goal does not move towards it.
+   */
+  targetWeight?: { grams: number; diffKg: number; status: 'there' | 'heading' | 'mismatch'; weeks?: Estimate<number> };
+  /**
    * Spec 043: present when followed plans set daily targets. Their numbers replace the app's in
    * `energyKcal`, `proteinG`, `fatG` and `carbG`; `app` keeps what the app worked out.
    */

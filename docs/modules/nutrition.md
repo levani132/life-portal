@@ -479,6 +479,11 @@ brand and unit, not archived) stands in for the post's in the plan, so nothing i
 with `copy` every food is copied (`MealPlansService.saveImported`), once per
 post. Nothing is logged.
 
+**Target weight (spec 043).** `profile.targetWeightGrams`, optional. `nutritionTargets` adds
+`targetWeight` from `targetWeightOutlook()`: within 1 kg `there`; `heading` when the goal's
+projected weekly change moves towards it, with the weeks at that pace (an estimate); `mismatch`
+when the goal moves away or stands still, which Food → You explains. Per-kg-of-target rules use it.
+
 **Plans set the targets (spec 043, slice 2).** `NutritionService.withActivity`, the one funnel for
 targets (Food, the profile, Home's summary, sharing, the assistant), applies followed plans after
 activity: `followedRulesOn` (each plan's rules and its plan day's) → `combinePlanRules` →
