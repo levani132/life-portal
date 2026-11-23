@@ -254,8 +254,15 @@ export class PageAssistantService {
         shape: {},
         run: async (personId) => {
           const [mine, allowed] = await Promise.all([this.pages.mine(personId), this.pages.assistantAllowed(personId)]);
+          const marked = mine.pages.some((page) => page.aiManaged);
           return {
             assistantAllowed: allowed,
+            // What the person has to do, in words the assistant can pass on.
+            ...(allowed
+              ? marked || !mine.pages.length
+                ? {}
+                : { note: 'None of these pages is marked "run with AI". The person marks one from the page’s own profile in the app, or you can create a new page, which is marked from the start.' }
+              : { note: 'Not allowed yet. The person turns it on in the app: Menu → AI assistant connections → "Let a connected assistant manage my pages". A page must also be marked "run with AI" to be usable.' }),
             canCreateMore: mine.remaining === null ? 'no limit' : mine.remaining,
             pages: mine.pages.map((page) => ({
               id: page.id,
