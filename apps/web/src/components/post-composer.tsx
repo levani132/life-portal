@@ -855,17 +855,16 @@ export function PostComposer({
 
       {creating && <PostCreate
         open
-        kinds={[...(isPage ? (['food'] as const) : []), 'recipe', ...(canCreateTraining ? (['plan', 'exercise'] as const) : [])]}
+        kinds={[...(isPage ? (['food'] as const) : []), 'recipe', ...(canCreateTraining ? (['existing-plan', 'plan', 'exercise'] as const) : [])]}
         onClose={() => setCreating(false)}
+        // Spec 042: food and training sit side by side on one post; adding one keeps the other.
         onFood={(picked) => {
           setNewFood(null);
-          setTraining(null);
           setFood(picked);
           setRetry(0);
         }}
         onTraining={(selection) => {
           setNewFood(null);
-          setFood(null);
           setTraining(selection);
         }}
       />}
@@ -873,7 +872,6 @@ export function PostComposer({
         <PostFoodPicker
           onPick={(picked) => {
             setNewFood(null);
-            setTraining(null);
             setFood(picked);
             setRetry(0);
           }}

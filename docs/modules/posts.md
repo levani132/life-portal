@@ -331,6 +331,15 @@ Domain tests cover source selection, canonicalisation, duplicates, calorie calcu
 
 Related: [social](social.md), [nutrition](nutrition.md), [portal](portal.md), [007 specification](../../specs/007-food-posts/spec.md).
 
+## Food and training on one post (spec 042)
+
+`POST /posts` accepts `source` + `previewHash` and `training` + `trainingHash` together. Nothing
+else changed: each half is previewed, hashed and frozen by its own service and stored beside the
+other (`publication` / `training`); the card shows both, `POST /:id/import` saves the foods and
+`POST /:id/training-copy` copies the training, each without the other. In the composer adding one
+keeps the other, and "Create and attach" offers "One of my training plans". Meal plans and
+programmes are the next slices (`specs/042-programmes`).
+
 ## People before pages in For You (spec 041)
 
 With `forYouRanking`, a post by a person (not a page) from the last 7 days

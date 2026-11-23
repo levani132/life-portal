@@ -782,10 +782,9 @@ describe('training attachments (spec 036)', () => {
     expect(f.posts.updateOne).not.toHaveBeenCalled();
   });
 
-  it('refuses food and training together for now, and sharing without the feature', async () => {
+  it('refuses sharing training without the feature (food and training together is allowed, spec 042)', async () => {
     const f = setup();
     f.posts.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
-    await expect(f.service.create('owner', { ...dto, source: { kind: 'food', foodId: 'f' }, previewHash: 'hash' } as never)).rejects.toThrow('not both');
     f.access.require.mockImplementation(async (_userId: string, flag: string) => {
       if (flag === 'trainingPosts') throw new Error('not available');
     });

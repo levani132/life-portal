@@ -2,7 +2,7 @@
 
 import { BookOpen, ClipboardList, CookingPot, Dumbbell, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import type { FoodWithUsage, TrainingPostSelection } from '@life-portal/shared-types';
+import type { FoodWithUsage, PlanList, TrainingPostSelection } from '@life-portal/shared-types';
 import { useApi } from '../lib/hooks';
 import { FoodForm } from './food-form';
 import { RecipeEditor } from './page-library';
@@ -11,12 +11,13 @@ import { ExerciseForm } from './training/exercise-form';
 import { PlanEditor } from './training/plan-editor';
 import { Modal } from './ui';
 
-export type CreateKind = 'food' | 'recipe' | 'exercise' | 'plan';
+export type CreateKind = 'food' | 'recipe' | 'exercise' | 'plan' | 'existing-plan';
 
 const KINDS: { id: CreateKind; label: string; detail: string; icon: typeof CookingPot }[] = [
   { id: 'food', label: 'Food', detail: 'A food with its numbers, for people to save', icon: CookingPot },
   { id: 'recipe', label: 'Recipe', detail: 'Several of your foods with amounts', icon: BookOpen },
-  { id: 'plan', label: 'Training plan', detail: 'Workouts with exercises and planned sets', icon: ClipboardList },
+  { id: 'existing-plan', label: 'One of my training plans', detail: 'Attach a plan you already have', icon: ClipboardList },
+  { id: 'plan', label: 'New training plan', detail: 'Workouts with exercises and planned sets', icon: ClipboardList },
   { id: 'exercise', label: 'Exercise', detail: 'One exercise of your own', icon: Dumbbell },
 ];
 
@@ -42,6 +43,7 @@ export function PostCreate({
   const [creating, setCreating] = useState<CreateKind | null>(null);
   const needsFoods = creating === 'recipe';
   const foods = useApi<FoodWithUsage[]>(needsFoods ? '/nutrition/foods' : null);
+  const plans = useApi<PlanList>(creating === 'existing-plan' ? '/training/plans' : null);
   const live = useMemo(() => (foods.data ?? []).filter((food) => !food.archived), [foods.data]);
   const done = () => {
     setCreating(null);
@@ -68,7 +70,9 @@ export function PostCreate({
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-xs text-ink-faint">It is saved to your library and attached to this post.</p>
+        <p className="mt-3 text-xs text-ink-faint">
+          What you make is saved to your library and attached. A post can carry food and training together: add one, then the other.
+        </p>
       </Modal>
 
       <FoodForm
@@ -96,6 +100,36 @@ export function PostCreate({
             }}
           />
         ) : null)}
+
+      {creating === 'existing-plan' && (
+        <Modal open onClose={() => setCreating(null)} title="Attach a training plan">
+          {!plans.data ? (
+            <p className="text-sm text-ink-muted">{plans.error ? (plans.error as Error).message : 'Loading…'}</p>
+          ) : plans.data.own.length === 0 ? (
+            <p className="text-sm text-ink-muted">You have no training plans yet. Create one instead.</p>
+          ) : (
+            <ul className="space-y-2">
+              {plans.data.own.map((plan) => (
+                <li key={plan.id}>
+                  <button
+                    type="button"
+                    className="flex w-full flex-col rounded-xl border border-border px-4 py-3 text-left hover:bg-surface-raised"
+                    onClick={() => {
+                      onTraining({ kind: 'plan', planId: plan.id });
+                      done();
+                    }}
+                  >
+                    <span className="font-medium">{plan.name}</span>
+                    <span className="text-xs text-ink-muted">
+                      {plan.workoutCount} {plan.workoutCount === 1 ? 'workout' : 'workouts'} · {plan.exerciseCount} exercises
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Modal>
+      )}
 
       <ExerciseForm
         open={creating === 'exercise'}

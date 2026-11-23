@@ -741,7 +741,7 @@ export class PageAssistantService {
       {
         name: 'create_page_post',
         description:
-          'Publish a post as a page, or save it as a draft (draft: true) that only the page’s managers see until it is published. A post is text, and may carry one item from the page’s library for people to save or copy: a food, a recipe, a training plan or an exercise. Present library content as something to save, never as something the page ate or did.',
+          'Publish a post as a page, or save it as a draft (draft: true) that only the page’s managers see until it is published. A post is text, and may carry items from the page’s library for people to save or copy: a food or a recipe, a training plan or an exercise, or one of each together (a recipe with the plan it goes with). Present library content as something to save, never as something the page ate or did.',
         shape: {
           pageId,
           caption: z.string().max(1000),
@@ -756,8 +756,9 @@ export class PageAssistantService {
         },
         run: (personId, args) =>
           this.counted(personId, args, 'post', 'create_page_post', async (page) => {
-            const attached = ['foodId', 'recipeId', 'planId', 'exerciseId'].filter((key) => args[key] !== undefined);
-            if (attached.length > 1) throw new BadRequestException('Attach one library item at most.');
+            // Spec 042: one food item and one training item may go together.
+            if (args['foodId'] !== undefined && args['recipeId'] !== undefined) throw new BadRequestException('Attach a food or a recipe, not both.');
+            if (args['planId'] !== undefined && args['exerciseId'] !== undefined) throw new BadRequestException('Attach a plan or an exercise, not both.');
             const base = {
               requestId: (args['requestId'] as string | undefined) ?? randomUUID(),
               title: (args['title'] as string | undefined) ?? '',
@@ -767,16 +768,18 @@ export class PageAssistantService {
             const mediaIds = (args['mediaIds'] as string[] | undefined) ?? [];
             await this.media.requireAssistantChecked(page, mediaIds);
             let dto: Record<string, unknown> = mediaIds.length ? { ...base, mediaIds } : base;
-            const withMedia = (value: Record<string, unknown>) => (mediaIds.length ? { ...value, mediaIds } : value);
             if (args['foodId'] || args['recipeId']) {
               const source = args['foodId'] ? { kind: 'food', foodId: args['foodId'] } : { kind: 'combination', savedMealId: args['recipeId'] };
               const preview = await this.posts.preview(page, { source } as never);
-              dto = withMedia({ ...base, source, previewHash: preview.previewHash });
-            } else if (args['planId'] || args['exerciseId']) {
+              dto = { ...dto, source, previewHash: preview.previewHash };
+            }
+            if (args['planId'] || args['exerciseId']) {
               const training = args['planId'] ? { kind: 'plan', planId: args['planId'] } : { kind: 'exercise', exerciseId: args['exerciseId'] };
               const preview = await this.posts.previewTraining(page, training as never);
-              dto = withMedia({ ...base, training, trainingHash: preview.trainingHash, allowCopy: true });
-            } else if (!base.caption.trim() && !base.title.trim() && !mediaIds.length) {
+              dto = { ...dto, training, trainingHash: preview.trainingHash, allowCopy: true };
+            }
+            const attached = !!dto['source'] || !!dto['training'];
+            if (!attached && !base.caption.trim() && !base.title.trim() && !mediaIds.length) {
               throw new BadRequestException('A post needs some text, a photo or a library item.');
             }
             const post = await this.posts.create(page, dto as never);

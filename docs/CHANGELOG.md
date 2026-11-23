@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Food and training on one post
+
+- **A post can carry both**: a recipe or food together with a training plan or exercise. Readers
+  save the food and copy the training, each on its own. Works for people and for pages.
+- In the new post screen, adding one keeps the other, and you can attach a training plan you
+  already have.
+
 ## 2026-11-23: A lighter tab bar
 
 - The bottom bar shows **only the open tab's name**; the others are icons. The name unfolds under

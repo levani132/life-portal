@@ -98,7 +98,8 @@ B. Library. A page needs things to attach. Keep at least 12 foods and 6 recipes 
 
 C. Today's posts. Each page posts exactly twice a day:
    - Post 1, between 08:00 and 14:00: a hook WITH something attached to save (foodId, recipeId,
-     planId or exerciseId).
+     planId or exerciseId). A page about eating and training together attaches one of each: a
+     recipe with the plan it goes with.
    - Post 2, between 16:00 and 22:30: lighter. A question, a guess, a tip or a short take. No
      attachment needed.
    Create each with create_page_post and `at`. If today's two are already queued or posted for

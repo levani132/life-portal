@@ -276,9 +276,8 @@ export class PostsService {
       throw new BadRequestException('A preview needs the food it previews.');
     if (!dto.training && dto.trainingHash)
       throw new BadRequestException('A preview needs the training it previews.');
-    // One attachment for now. Nothing below depends on it: each is stored and read on its own.
-    if (dto.source && dto.training)
-      throw new BadRequestException('A post carries food or training, not both yet.');
+    // Spec 042: a post may carry food and training together (a recipe with the plan it goes
+    // with). Each is previewed, hashed, stored, saved and copied on its own, by its own module.
     if (dto.training) await this.requireTrainingPosts(userId);
     const existing = await this.posts
       .findOne({ userId, requestId: dto.requestId })

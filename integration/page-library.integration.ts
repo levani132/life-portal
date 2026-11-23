@@ -100,4 +100,39 @@ describe('a page’s library', () => {
     // A page has a library, never a workout.
     expect((await api.call(ana, 'POST', '/training/sessions', {}, as(page.id))).status).toBe(403);
   });
+
+  it('lets one post carry food and training together, for a person and for a page (spec 042)', async () => {
+    const ana = await api.account('ana');
+    const beka = await api.account('beka');
+    const page = await pageOf(ana, 'both');
+    for (const headers of [undefined, as(page.id)]) {
+      const made = await api.call<{ id: string }>(ana, 'POST', '/nutrition/foods', food(`Together ${headers ? 'page' : 'person'}`), headers);
+      const exercise = await api.call<{ id: string }>(
+        ana,
+        'POST',
+        '/training/exercises',
+        { name: `Together move ${randomUUID().slice(0, 4)}`, primaryMuscles: ['chest'], equipmentType: 'barbell', measure: 'weight_reps' },
+        headers,
+      );
+      const source = { kind: 'food', foodId: made.body.id };
+      const training = { kind: 'exercise', exerciseId: exercise.body.id };
+      const foodPreview = await api.call<PostPreview>(ana, 'POST', '/posts/preview', { source }, headers);
+      const trainingPreview = await api.call<{ trainingHash: string }>(ana, 'POST', '/posts/preview', { training }, headers);
+      const posted = await api.call<FoodPost>(
+        ana,
+        'POST',
+        '/posts',
+        { requestId: randomUUID(), title: 'Eat and train', caption: '', audience: 'public', source, previewHash: foodPreview.body.previewHash, training, trainingHash: trainingPreview.body.trainingHash, allowCopy: true },
+        headers,
+      );
+      expect(posted.status).toBe(201);
+
+      // The reader gets both, and saves or copies each on its own.
+      const read = await api.call<FoodPost>(beka, 'GET', `/posts/${posted.body.id}`);
+      expect(read.body.items).toHaveLength(1);
+      expect(read.body.training).toBeTruthy();
+      expect((await api.call(beka, 'POST', `/posts/${posted.body.id}/import`, { itemKeys: [read.body.items[0].key], duplicatePolicy: 'skip', saveAsMeal: false })).status).toBeLessThan(300);
+      expect((await api.call(beka, 'POST', `/posts/${posted.body.id}/training-copy`, { requestId: randomUUID() })).status).toBeLessThan(300);
+    }
+  });
 });
