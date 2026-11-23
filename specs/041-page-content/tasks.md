@@ -1,0 +1,41 @@
+# Tasks: Page content and the assistant for pages
+
+## Slice 1: library screens and attachments
+- [ ] T001 Web: a page's Food tab is its library (foods, recipes): list, create, edit, delete.
+- [ ] T002 Web: a page's Training tab is its library (exercises, plans): list, create, edit, delete.
+- [ ] T003 Composer: a page attaches a food selection or a training plan; preview routes open to pages.
+- [ ] T004 Integration test: page creates a food and a plan, posts each, a person saves and copies.
+- [ ] T005 Docs: pages.md, posts.md, changelog; close T040 in specs/040-pages/tasks.md.
+
+## Slice 2: connector for pages
+- [ ] T010 The `pages` consent on a connector grant, chosen per page; acting check (FR-010).
+- [ ] T011 Tools: list_pages, create_page (run with AI), update_page.
+- [ ] T012 Tools: page library (foods, recipes, exercises, plans).
+- [ ] T013 Tools: create_post, save_draft, publish_draft, update_post, delete_post, list_page_posts.
+- [ ] T014 Tools: get_for_you, get_following, get_post, get_comments, get_page_profile, suggested_pages.
+- [ ] T015 Privacy policy and docs/modules/mcp.md; LEGAL_VERSION.
+
+## Slice 3: engaging, caps, log
+- [ ] T020 Domain: caps (defaults, override, none), the same-manager rule; tests.
+- [ ] T021 `page_assistant_actions` log and daily counts; in ACCOUNT_PLAN.
+- [ ] T022 Tools: follow, unfollow, like, unlike, comment, reply_message.
+- [ ] T023 People screen: caps per person; defaults for everyone.
+- [ ] T024 Web: "What the assistant did" on a page, for its managers.
+
+## Slice 4: disabling a page
+- [ ] T030 `users.disabledAt` for a page; hidden everywhere; enable/delete in the app; tool disable_page.
+
+## Slice 5: recipes and meal plans
+- [ ] T040 Recipe steps and photo on a saved meal.
+- [ ] T041 Meal plans: module, publication snapshot, copy; for people and pages.
+
+## Slice 6: programmes, collections, profile
+- [ ] T050 A post carrying food and training together.
+- [ ] T051 Collections. T052 Pinned post, link and contact.
+
+## Slice 7: photos and insights
+- [ ] T060 The page's photo shelf, and attaching from it through the connector.
+- [ ] T061 Insights: followers over time, saves and copies per item.
+
+## Later (on the roadmap)
+- Co-managers. Verification of real businesses. Challenges. Images from a web address.
