@@ -50,6 +50,15 @@ export interface FoodPublication {
   day?: string;
   slot?: MealSlot;
   items: PublishedFood[];
+  /**
+   * Spec 042: a published recipe's own words. A recipe may be published with these and no foods:
+   * its author gave no nutrition numbers, and the post says so.
+   */
+  recipe?: PublishedRecipe;
+}
+export interface PublishedRecipe {
+  ingredients: string[];
+  steps: string[];
 }
 export interface PostPreview {
   publication: FoodPublication;
@@ -132,6 +141,8 @@ export interface FoodPost {
   itemCount: number;
   /** Feed cards contain only a teaser; detail includes the full publication. */
   items: PublishedFood[];
+  /** Spec 042: the recipe's written ingredients and method, when the post carries a recipe. */
+  recipe?: PublishedRecipe;
   totalKcal?: number;
   totalMacros?: PublishedMacros;
   targets?: Partial<PublishedMacros>;

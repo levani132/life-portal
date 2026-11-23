@@ -7,6 +7,9 @@
 - [x] T004 Integration test: a person and a page each post both; a reader saves and copies each.
 - [x] T005 Docs: posts.md, mcp.md, playbook, changelog.
 
+## Slice 1b: recipes
+- [x] T006 Recipes: steps, written ingredients, foods optional; create a food from inside; publish with or without numbers; assistant tool.
+
 ## Slice 2: meal plans
 - [ ] T010 Types and domain: meal plan shape, `mealPlanTotals()` (per meal, per day, daily average), tests.
 - [ ] T011 `meal_plans` collection and CRUD in Nutrition, open to pages for the library; in ACCOUNT_PLAN.

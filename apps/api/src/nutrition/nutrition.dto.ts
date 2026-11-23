@@ -24,6 +24,7 @@ import {
   MEAL_SLOTS,
   NUTRITION_GOALS,
   SEXES,
+  RECIPE_LIMITS,
 } from '@life-portal/shared-types';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -116,12 +117,17 @@ export class SavedMealComponentDto {
 export class CreateSavedMealDto {
   @IsString() @MaxLength(120) name!: string;
   @IsOptional() @IsIn(MEAL_SLOTS) defaultSlot?: string;
+  /** Spec 042: may be empty when the recipe has written ingredients or steps instead. */
+  @IsOptional()
   @IsArray()
-  @ArrayMinSize(1)
   @ArrayMaxSize(20)
   @ValidateNested({ each: true })
   @Type(() => SavedMealComponentDto)
-  components!: SavedMealComponentDto[];
+  components?: SavedMealComponentDto[];
+  @IsOptional() @IsArray() @ArrayMaxSize(RECIPE_LIMITS.ingredients) @IsString({ each: true }) @MaxLength(RECIPE_LIMITS.ingredientLength, { each: true })
+  ingredients?: string[];
+  @IsOptional() @IsArray() @ArrayMaxSize(RECIPE_LIMITS.steps) @IsString({ each: true }) @MaxLength(RECIPE_LIMITS.stepLength, { each: true })
+  steps?: string[];
 }
 
 export class UpdateSavedMealDto extends CreateSavedMealDto {
@@ -131,7 +137,7 @@ export class UpdateSavedMealDto extends CreateSavedMealDto {
   @ArrayMaxSize(20)
   @ValidateNested({ each: true })
   @Type(() => SavedMealComponentDto)
-  override components!: SavedMealComponentDto[];
+  override components?: SavedMealComponentDto[];
   @IsOptional() @IsBoolean() archived?: boolean;
 }
 

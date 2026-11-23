@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Recipes with a method, with or without numbers
+
+- **A recipe has a method** (steps) and can list ingredients in plain words.
+- **Foods are optional.** Write a recipe with no nutrition numbers and share it; it says so, and
+  it cannot be logged or saved as foods.
+- **Create a food from inside a recipe**, without leaving it.
+- Food → "Saved meals and recipes" now has New recipe and Edit.
+
 ## 2026-11-23: Food and training on one post
 
 - **A post can carry both**: a recipe or food together with a training plan or exercise. Readers

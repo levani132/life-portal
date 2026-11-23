@@ -189,6 +189,9 @@ export class SavedMeal {
   @Prop({ enum: MEAL_SLOTS }) defaultSlot?: string;
   @Prop({ type: [SavedMealComponentSchema], default: [] })
   components!: SavedMealComponentSub[];
+  /** Spec 042: ingredients written by hand and the method, one step each. */
+  @Prop({ type: [String], default: undefined }) ingredients?: string[];
+  @Prop({ type: [String], default: undefined }) steps?: string[];
   @Prop({ default: false }) archived!: boolean;
 }
 

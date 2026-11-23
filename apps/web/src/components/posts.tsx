@@ -273,6 +273,52 @@ export function PostsList({
   );
 }
 /**
+ * A recipe's own words (spec 042): ingredients written by hand and the method. In a feed the
+ * card says how much there is and links to the post; the post itself shows all of it.
+ */
+function RecipeText({ recipe, postId, detail }: { recipe: NonNullable<FoodPost['recipe']>; postId: string; detail: boolean }) {
+  if (!recipe.ingredients.length && !recipe.steps.length) return null;
+  if (!detail) {
+    const parts = [
+      recipe.ingredients.length ? `${recipe.ingredients.length} more ${recipe.ingredients.length === 1 ? 'ingredient' : 'ingredients'}` : '',
+      recipe.steps.length ? `${recipe.steps.length} ${recipe.steps.length === 1 ? 'step' : 'steps'}` : '',
+    ].filter(Boolean);
+    return (
+      <Link href={`/posts/${postId}`} className="mt-3 block text-sm text-accent">
+        Recipe: {parts.join(' · ')} →
+      </Link>
+    );
+  }
+  return (
+    <div className="mt-4 space-y-3 border-t border-border/70 pt-3 text-sm">
+      {recipe.ingredients.length > 0 && (
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Ingredients</h3>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5">
+            {recipe.ingredients.map((line, index) => (
+              <li key={index} className="break-words">
+                {line}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {recipe.steps.length > 0 && (
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Method</h3>
+          <ol className="mt-1 list-decimal space-y-1 pl-5">
+            {recipe.steps.map((line, index) => (
+              <li key={index} className="break-words">
+                {line}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </div>
+  );
+}
+/**
  * The post's diet tags (issue #8), computed by the API from the published facts. Each states its
  * basis on hover and to screen readers (principle VI). Hashtags are not repeated as chips: they
  * are already in the caption.
@@ -571,12 +617,13 @@ export function PostCard({
                 ? `${post.slot.charAt(0).toUpperCase() + post.slot.slice(1)} · `
                 : ''}
               {post.day ? `${post.day} · ` : ''}
-              {post.itemCount} food{post.itemCount === 1 ? '' : 's'}
-              {post.totalKcal === undefined ? '' : ` · ${post.totalKcal} kcal`}
+              {post.itemCount === 0
+                ? 'Recipe · no nutrition numbers'
+                : `${post.itemCount} food${post.itemCount === 1 ? '' : 's'}${post.totalKcal === undefined ? '' : ` · ${post.totalKcal} kcal`}`}
             </p>
           </div>
         </div>
-        {post.kind !== 'day' && post.totalMacros ? (
+        {post.itemCount === 0 ? null : post.kind !== 'day' && post.totalMacros ? (
           <MacroRings
             className="mt-3"
             kcal={post.totalMacros.energyKcal}
@@ -639,6 +686,7 @@ export function PostCard({
             View all {post.itemCount} foods →
           </Link>
         )}
+        {post.recipe && <RecipeText recipe={post.recipe} postId={post.id} detail={detail} />}
         </div>
       </div>
       )}
@@ -664,7 +712,7 @@ export function PostCard({
         openShare={openShare}
         focusCommentId={focusCommentId}
         post={post}
-        onSaveFoods={hasFood && !post.isOwner ? () => setImporting(true) : undefined}
+        onSaveFoods={hasFood && post.itemCount > 0 && !post.isOwner ? () => setImporting(true) : undefined}
       />
       {action.error && <ErrorNote message={action.error} />}
       {editing && <EditPost post={post} onClose={() => setEditing(false)} />}

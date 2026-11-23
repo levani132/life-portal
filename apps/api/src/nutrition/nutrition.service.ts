@@ -114,6 +114,9 @@ const DEFAULT_PROFILE = {
  */
 const isDuplicateKey = (error: unknown) => (error as { code?: number } | null)?.code === 11000;
 
+/** A recipe's written lines: trimmed, empty ones dropped. */
+const cleanLines = (lines?: string[]) => (lines ?? []).map((line) => line.trim()).filter(Boolean);
+
 @Injectable()
 export class NutritionService {
   private readonly logger = new Logger(NutritionService.name);
@@ -1075,15 +1078,23 @@ export class NutritionService {
     userId: string,
     dto: CreateSavedMealDto,
   ): Promise<SavedMealDto> {
+    const components = dto.components ?? [];
+    const ingredients = cleanLines(dto.ingredients);
+    const steps = cleanLines(dto.steps);
+    // Spec 042: a recipe may have no foods with numbers, as long as it says something.
+    if (!components.length && !ingredients.length && !steps.length)
+      throw new BadRequestException('Add a food, an ingredient or a step.');
     await this.assertFoodsExist(
       userId,
-      dto.components.map((c) => c.foodId),
+      components.map((c) => c.foodId),
     );
     const created = await this.savedMeals.create({
       userId,
       name: dto.name,
       defaultSlot: dto.defaultSlot,
-      components: dto.components,
+      components,
+      ...(ingredients.length ? { ingredients } : {}),
+      ...(steps.length ? { steps } : {}),
       archived: false,
     } as never);
     return this.oneSavedMeal(userId, String(created._id));
@@ -1130,9 +1141,13 @@ export class NutritionService {
         dto.components.map((c) => c.foodId),
       );
     }
+    const text = {
+      ...(dto.ingredients !== undefined ? { ingredients: cleanLines(dto.ingredients) } : {}),
+      ...(dto.steps !== undefined ? { steps: cleanLines(dto.steps) } : {}),
+    };
     const updated = await this.savedMeals.findOneAndUpdate(
       { userId, _id: id },
-      { $set: { ...dto } },
+      { $set: { ...dto, ...text } },
       { new: true, runValidators: true },
     );
     if (!updated) throw new NotFoundException(`Saved meal ${id} not found`);

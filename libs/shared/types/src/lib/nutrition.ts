@@ -212,6 +212,13 @@ export interface SavedMeal extends Timestamped {
   name: string;
   defaultSlot?: MealSlot;
   components: SavedMealComponentView[];
+  /**
+   * Spec 042: a recipe's own words. Ingredients written out by hand, for a recipe (or a part of
+   * one) that has no foods with numbers behind it, and the method, one step a line. Both
+   * optional; a recipe needs foods, ingredients or steps.
+   */
+  ingredients?: string[];
+  steps?: string[];
   archived: boolean;
   totals: EntryTotals;
   loggable: boolean;
@@ -551,3 +558,6 @@ export interface PublicFoodsResponse {
   /** Total count of public foods available (for pagination info). */
   total: number;
 }
+
+/** How much text a recipe may carry (spec 042). */
+export const RECIPE_LIMITS = { ingredients: 40, ingredientLength: 200, steps: 30, stepLength: 600 } as const;

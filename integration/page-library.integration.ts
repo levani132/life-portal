@@ -135,4 +135,44 @@ describe('a page’s library', () => {
       expect((await api.call(beka, 'POST', `/posts/${posted.body.id}/training-copy`, { requestId: randomUUID() })).status).toBeLessThan(300);
     }
   });
+
+  it('keeps a recipe’s method, and lets one be written and shared with no numbers at all (spec 042)', async () => {
+    const ana = await api.account('ana');
+    const beka = await api.account('beka');
+    type Meal = { id: string; components: unknown[]; ingredients?: string[]; steps?: string[]; loggable: boolean; totals: { energyKcal: number } };
+
+    // Nothing at all is not a recipe; words alone are.
+    expect((await api.call(ana, 'POST', '/nutrition/meals', { name: 'Empty', components: [] })).status).toBe(400);
+    const words = await api.call<Meal>(ana, 'POST', '/nutrition/meals', { name: 'Grandma’s stew', components: [], ingredients: ['2 onions', ' ', 'a handful of herbs'], steps: ['Fry the onions.', 'Add the rest and wait.'] });
+    expect(words.status).toBeLessThan(300);
+    expect(words.body).toMatchObject({ components: [], ingredients: ['2 onions', 'a handful of herbs'], steps: ['Fry the onions.', 'Add the rest and wait.'], loggable: false });
+
+    const source = { kind: 'combination', savedMealId: words.body.id };
+    const preview = await api.call<PostPreview>(ana, 'POST', '/posts/preview', { source });
+    expect(preview.status).toBeLessThan(300);
+    const posted = await api.call<FoodPost>(ana, 'POST', '/posts', { requestId: randomUUID(), title: 'Stew', caption: '', audience: 'public', source, previewHash: preview.body.previewHash });
+    expect(posted.status).toBe(201);
+    const read = await api.call<FoodPost>(beka, 'GET', `/posts/${posted.body.id}`);
+    expect(read.body).toMatchObject({ itemCount: 0, items: [], recipe: { ingredients: ['2 onions', 'a handful of herbs'], steps: ['Fry the onions.', 'Add the rest and wait.'] } });
+    // There are no foods to save from it.
+    expect((await api.call(beka, 'POST', `/posts/${posted.body.id}/import`, { itemKeys: ['0'], duplicatePolicy: 'skip', saveAsMeal: false })).status).toBe(400);
+
+    // A recipe with foods keeps its method through a post and into the reader's own copy.
+    const made = await api.call<{ id: string }>(ana, 'POST', '/nutrition/foods', food('Stew beef'));
+    const full = await api.call<Meal>(ana, 'POST', '/nutrition/meals', { name: 'Beef stew', components: [{ foodId: made.body.id, amount: 300 }], steps: ['Brown the beef.'] });
+    expect(full.body).toMatchObject({ loggable: true, steps: ['Brown the beef.'] });
+    const fullSource = { kind: 'combination', savedMealId: full.body.id };
+    const fullPreview = await api.call<PostPreview>(ana, 'POST', '/posts/preview', { source: fullSource });
+    const fullPost = await api.call<FoodPost>(ana, 'POST', '/posts', { requestId: randomUUID(), title: 'Beef stew', caption: '', audience: 'public', source: fullSource, previewHash: fullPreview.body.previewHash });
+    const fullRead = await api.call<FoodPost>(beka, 'GET', `/posts/${fullPost.body.id}`);
+    expect(fullRead.body.recipe?.steps).toEqual(['Brown the beef.']);
+    expect((await api.call(beka, 'POST', `/posts/${fullPost.body.id}/import`, { itemKeys: fullRead.body.items.map((item) => item.key), duplicatePolicy: 'copy', saveAsMeal: true })).status).toBeLessThan(300);
+    const copied = (await api.call<Meal[]>(beka, 'GET', '/nutrition/meals')).body.find((meal) => meal.steps?.length);
+    expect(copied).toMatchObject({ steps: ['Brown the beef.'], loggable: true });
+
+    // Clearing the words of a recipe that has foods is fine; editing keeps what was not sent.
+    const edited = await api.call<Meal>(ana, 'PATCH', `/nutrition/meals/${full.body.id}`, { steps: [] });
+    expect(edited.body.steps ?? []).toEqual([]);
+    expect(edited.body.components).toHaveLength(1);
+  });
 });

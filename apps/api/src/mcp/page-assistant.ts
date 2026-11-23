@@ -587,20 +587,25 @@ export class PageAssistantService {
             name: meal.name,
             totals: meal.totals,
             foods: meal.components.map((component) => ({ foodId: component.foodId, name: component.name, amount: component.amount, unit: component.unit })),
+            ...(meal.ingredients?.length ? { ingredients: meal.ingredients } : {}),
+            ...(meal.steps?.length ? { steps: meal.steps } : {}),
           }));
         },
       },
       {
         name: 'create_page_recipe',
-        description: 'Create a recipe from foods already in the page’s library. Amounts are in each food’s own unit (g or ml).',
+        description:
+          'Create a recipe. Give its foods from the page’s library with amounts (in each food’s own unit, g or ml) so it has nutrition numbers; add the method as steps. A recipe with no numbers is allowed: write its ingredients as lines instead of foods. At least one of foods, ingredients or steps.',
         shape: {
           pageId,
           name: z.string().min(1).max(120),
-          foods: z.array(z.object({ foodId: id, amount: z.number().int().min(1).max(10_000) })).min(1).max(20),
+          foods: z.array(z.object({ foodId: id, amount: z.number().int().min(1).max(10_000) })).max(20).optional(),
+          ingredients: z.array(z.string().min(1).max(200)).max(40).optional().describe('Ingredients written out, one per line, for what has no food with numbers.'),
+          steps: z.array(z.string().min(1).max(600)).max(30).optional().describe('The method, one step per entry.'),
         },
         run: (personId, args) =>
           this.counted(personId, args, 'library', 'create_page_recipe', async (page) => {
-            const created = await this.nutrition.createSavedMeal(page, { name: String(args['name']), components: args['foods'] } as never);
+            const created = await this.nutrition.createSavedMeal(page, { name: String(args['name']), components: args['foods'] ?? [], ingredients: args['ingredients'], steps: args['steps'] } as never);
             return { result: { id: created.id, name: created.name, totals: created.totals }, targetId: created.id };
           }),
       },

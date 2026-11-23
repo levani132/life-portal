@@ -15,7 +15,7 @@ export type CreateKind = 'food' | 'recipe' | 'exercise' | 'plan' | 'existing-pla
 
 const KINDS: { id: CreateKind; label: string; detail: string; icon: typeof CookingPot }[] = [
   { id: 'food', label: 'Food', detail: 'A food with its numbers, for people to save', icon: CookingPot },
-  { id: 'recipe', label: 'Recipe', detail: 'Several of your foods with amounts', icon: BookOpen },
+  { id: 'recipe', label: 'Recipe', detail: 'A method, with foods for the numbers or ingredients in words', icon: BookOpen },
   { id: 'existing-plan', label: 'One of my training plans', detail: 'Attach a plan you already have', icon: ClipboardList },
   { id: 'plan', label: 'New training plan', detail: 'Workouts with exercises and planned sets', icon: ClipboardList },
   { id: 'exercise', label: 'Exercise', detail: 'One exercise of your own', icon: Dumbbell },
@@ -85,21 +85,16 @@ export function PostCreate({
         }}
       />
 
-      {creating === 'recipe' &&
-        (foods.data && live.length === 0 ? (
-          <Modal open onClose={() => setCreating(null)} title="New recipe">
-            <p className="text-sm text-ink-muted">A recipe is built from your foods, and you have none yet. Create a food first.</p>
-          </Modal>
-        ) : foods.data ? (
-          <RecipeEditor
-            foods={live}
-            onClose={() => setCreating(null)}
-            onSaved={(meal) => {
-              onFood({ source: { kind: 'combination', savedMealId: meal.id }, label: meal.name });
-              done();
-            }}
-          />
-        ) : null)}
+      {creating === 'recipe' && foods.data && (
+        <RecipeEditor
+          foods={live}
+          onClose={() => setCreating(null)}
+          onSaved={(meal) => {
+            onFood({ source: { kind: 'combination', savedMealId: meal.id }, label: meal.name });
+            done();
+          }}
+        />
+      )}
 
       {creating === 'existing-plan' && (
         <Modal open onClose={() => setCreating(null)} title="Attach a training plan">

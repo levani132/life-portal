@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import Link from 'next/link';
 import { Pencil, Plus, Share2, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import type { Food, FoodWithUsage, SavedMeal } from '@life-portal/shared-types';
+import { RECIPE_LIMITS, type Food, type FoodWithUsage, type SavedMeal } from '@life-portal/shared-types';
 import { api } from '../lib/api';
 import { useBrands } from '../lib/brands';
 import { revalidate, useAction, useApi } from '../lib/hooks';
@@ -16,7 +16,7 @@ import { FoodForm } from './food-form';
 import { PageHeader } from './page-header';
 import { ExerciseLibrary } from './training/exercise-library';
 import { Plans } from './training/plans';
-import { ErrorNote, Field, Input, Modal, Spinner } from './ui';
+import { ErrorNote, Field, Input, Modal, Spinner, Textarea } from './ui';
 
 const FOODS_KEY = '/nutrition/foods';
 const MEALS_KEY = '/nutrition/meals';
@@ -155,8 +155,8 @@ function Recipes() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm text-ink-muted">A recipe is a set of this page’s foods with amounts.</p>
-        <button type="button" className="btn-primary shrink-0" disabled={!live.length} onClick={() => setEditing('new')}>
+        <p className="text-sm text-ink-muted">A recipe is its method, with foods for the numbers or ingredients in words.</p>
+        <button type="button" className="btn-primary shrink-0" onClick={() => setEditing('new')}>
           <Plus size={16} /> New recipe
         </button>
       </div>
@@ -167,7 +167,7 @@ function Recipes() {
         <Spinner />
       ) : meals.data.length === 0 ? (
         <p className="card p-6 text-sm text-ink-muted">
-          {live.length ? 'No recipes yet.' : 'Add foods first: a recipe is built from them.'}
+          No recipes yet.
         </p>
       ) : (
         <ul className="card divide-y divide-border">
@@ -176,8 +176,10 @@ function Recipes() {
               <div className="flex-1">
                 <p className="font-medium">{meal.name}</p>
                 <p className="text-xs text-ink-faint">
-                  {meal.components.length} {meal.components.length === 1 ? 'food' : 'foods'} · {meal.totals.energyKcal} kcal
-                  {meal.loggable ? '' : ' · a food is missing'}
+                  {meal.components.length
+                    ? `${meal.components.length} ${meal.components.length === 1 ? 'food' : 'foods'} · ${meal.totals.energyKcal} kcal${meal.loggable ? '' : ' · a food is missing'}`
+                    : 'No nutrition numbers'}
+                  {meal.steps?.length ? ` · ${meal.steps.length} ${meal.steps.length === 1 ? 'step' : 'steps'}` : ''}
                 </p>
               </div>
               <Link
@@ -243,22 +245,33 @@ export function RecipeEditor({
 }) {
   const action = useAction();
   const [name, setName] = useState(meal?.name ?? '');
+  // Foods are optional: a recipe may start with none, and a food can be made from here.
   const [rows, setRows] = useState<Row[]>(() =>
-    meal
-      ? meal.components.map((component) => newRow(foods.find((food) => food.id === component.foodId), String(component.amount)))
-      : [newRow()],
+    meal ? meal.components.map((component) => newRow(foods.find((food) => food.id === component.foodId), String(component.amount))) : [],
   );
+  const [ingredients, setIngredients] = useState((meal?.ingredients ?? []).join('\n'));
+  const [steps, setSteps] = useState((meal?.steps ?? []).join('\n'));
+  /** The row a new food is being made for, and what was typed for its name. */
+  const [making, setMaking] = useState<{ key: string; name: string } | null>(null);
   const set = (key: string, patch: Partial<Row>) => setRows((all) => all.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+  const lines = (text: string, max: number, length: number) =>
+    text
+      .split('\n')
+      .map((line) => line.trim().slice(0, length))
+      .filter(Boolean)
+      .slice(0, max);
   const components = rows
     .filter((row) => row.food && Number(row.amount) >= 1)
     .map((row) => ({ foodId: (row.food as FoodWithUsage).id, amount: Math.round(Number(row.amount)) }));
-  const ready = name.trim().length > 0 && components.length > 0 && components.length === rows.filter((row) => row.food || row.amount).length;
+  const written = { ingredients: lines(ingredients, RECIPE_LIMITS.ingredients, RECIPE_LIMITS.ingredientLength), steps: lines(steps, RECIPE_LIMITS.steps, RECIPE_LIMITS.stepLength) };
+  const halfFilled = rows.some((row) => (row.food ? !(Number(row.amount) >= 1) : !!row.amount));
+  const ready = name.trim().length > 0 && !halfFilled && (components.length > 0 || written.ingredients.length > 0 || written.steps.length > 0);
 
   const save = () =>
     action
       .run(
         async () => {
-          const body = { name: name.trim(), components };
+          const body = { name: name.trim(), components, ingredients: written.ingredients, steps: written.steps };
           const result = await (meal ? api.patch<SavedMeal>(`/nutrition/meals/${meal.id}`, body) : api.post<SavedMeal>(MEALS_KEY, body));
           await changed();
           onSaved?.(result);
@@ -273,36 +286,56 @@ export function RecipeEditor({
         <Field label="Name">
           <Input value={name} maxLength={120} onChange={(event) => setName(event.target.value)} />
         </Field>
-        <ul className="space-y-3">
-          {rows.map((row) => (
-            <li key={row.key} className="flex items-end gap-2">
-              <div className="flex-1">
-                <FoodCombobox foods={foods} selected={row.food} onSelect={(food) => set(row.key, { food, amount: row.amount || String(food.servingSize) })} />
-              </div>
-              <Input
-                inputMode="numeric"
-                aria-label={`Amount${row.food ? ` of ${row.food.name}` : ''}`}
-                className="w-24"
-                placeholder={row.food?.unit ?? 'g'}
-                value={row.amount}
-                onChange={(event) => set(row.key, { amount: event.target.value.replace(/\D/g, '') })}
-              />
-              <button
-                type="button"
-                className="btn-ghost"
-                aria-label="Remove this food"
-                disabled={rows.length === 1}
-                onClick={() => setRows((all) => all.filter((item) => item.key !== row.key))}
-              >
-                <Trash2 size={16} />
-              </button>
-            </li>
-          ))}
-        </ul>
-        {rows.length < MAX_ROWS && (
-          <button type="button" className="btn-ghost" onClick={() => setRows((all) => [...all, newRow()])}>
-            <Plus size={16} /> Add a food
-          </button>
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Foods with numbers</p>
+          <p className="text-xs text-ink-muted">
+            Foods give the recipe its calories and macros, and let people save it into their own foods. Optional: a recipe can
+            be only words.
+          </p>
+          <ul className="space-y-3">
+            {rows.map((row) => (
+              <li key={row.key} className="flex items-end gap-2">
+                <div className="flex-1">
+                  <FoodCombobox
+                    foods={foods}
+                    selected={row.food}
+                    onSelect={(food) => set(row.key, { food, amount: row.amount || String(food.servingSize) })}
+                    onCreate={(typed) => setMaking({ key: row.key, name: typed })}
+                  />
+                </div>
+                <Input
+                  inputMode="numeric"
+                  aria-label={`Amount${row.food ? ` of ${row.food.name}` : ''}`}
+                  className="w-24"
+                  placeholder={row.food?.unit ?? 'g'}
+                  value={row.amount}
+                  onChange={(event) => set(row.key, { amount: event.target.value.replace(/\D/g, '') })}
+                />
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  aria-label="Remove this food"
+                  onClick={() => setRows((all) => all.filter((item) => item.key !== row.key))}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </li>
+            ))}
+          </ul>
+          {rows.length < MAX_ROWS && (
+            <button type="button" className="btn-ghost" onClick={() => setRows((all) => [...all, newRow()])}>
+              <Plus size={16} /> Add a food
+            </button>
+          )}
+        </div>
+        <Field label="Other ingredients" hint="One per line, as you would write them: “2 cloves of garlic”. No numbers needed.">
+          <Textarea rows={4} value={ingredients} onChange={(event) => setIngredients(event.target.value)} />
+        </Field>
+        <Field label="Method" hint="One step per line.">
+          <Textarea rows={5} value={steps} onChange={(event) => setSteps(event.target.value)} />
+        </Field>
+        {components.length === 0 && (written.ingredients.length > 0 || written.steps.length > 0) && (
+          <p className="text-xs text-warning">This recipe has no nutrition numbers. It can be shared; people cannot save its foods or log it.</p>
         )}
         {action.error && <ErrorNote message={action.error} />}
         <div className="flex justify-end gap-2">
@@ -314,6 +347,17 @@ export function RecipeEditor({
           </button>
         </div>
       </div>
+      {/* A food made from inside the recipe lands in the row that asked for it. */}
+      <FoodForm
+        open={making !== null}
+        onClose={() => setMaking(null)}
+        initialName={making?.name}
+        lookupAvailable
+        onSaved={(food) => {
+          if (food && making) set(making.key, { food: food as FoodWithUsage, amount: String(food.servingSize) });
+          void changed();
+        }}
+      />
     </Modal>
   );
 }

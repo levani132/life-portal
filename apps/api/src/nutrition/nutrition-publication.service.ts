@@ -176,6 +176,7 @@ export class NutritionPublicationService {
       let components = source.components!;
       let label = 'Food combination';
       let slot: FoodPublication['slot'];
+      let recipe: FoodPublication['recipe'];
       if (source.savedMealId) {
         const meal = await this.meals
           .findOne({ userId, _id: source.savedMealId, archived: false })
@@ -184,6 +185,8 @@ export class NutritionPublicationService {
         components = meal.components;
         label = meal.name;
         slot = meal.defaultSlot as FoodPublication['slot'];
+        // Spec 042: the recipe's own words travel with it.
+        if (meal.ingredients?.length || meal.steps?.length) recipe = { ingredients: meal.ingredients ?? [], steps: meal.steps ?? [] };
       }
       const rows = await this.foods
         .find({
@@ -205,6 +208,7 @@ export class NutritionPublicationService {
         label,
         ...(slot ? { slot } : {}),
         items,
+        ...(recipe ? { recipe } : {}),
       };
     }
     if (source.kind === 'day' && publication.day) {
@@ -216,7 +220,9 @@ export class NutritionPublicationService {
         fatG: summary.fatTargetG,
       };
     }
-    if (!publication.items.length || publication.items.length > MAX_POST_ITEMS)
+    // A recipe with written ingredients or steps may be shared without foods: no numbers, and
+    // the post says so. Everything else needs at least one food.
+    if ((!publication.items.length && !publication.recipe) || publication.items.length > MAX_POST_ITEMS)
       throw new BadRequestException(
         `Share between 1 and ${MAX_POST_ITEMS} foods at a time.`,
       );
@@ -362,6 +368,8 @@ export class NutritionPublicationService {
               postImportKey: postId,
               name: mealName?.trim() || publication.label,
               components,
+              ...(publication.recipe?.ingredients.length ? { ingredients: publication.recipe.ingredients } : {}),
+              ...(publication.recipe?.steps.length ? { steps: publication.recipe.steps } : {}),
               ...(publication.slot ? { defaultSlot: publication.slot } : {}),
               archived: false,
             },

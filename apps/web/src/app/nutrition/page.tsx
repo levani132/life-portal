@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Apple, BookmarkPlus, Bot, ChevronDown, Info, Pencil, Plus, Search, Share2, Sparkles, Tags, Trash2, UserRound, Utensils, X, Zap, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { RecipeEditor } from '../../components/page-library';
 import type {
   PortalState,
   PostSelection,
@@ -1287,6 +1288,8 @@ function SavedMealsPanel({
   onShare?: (source: PostSelection) => void;
 }) {
   const { run, pending } = useAction();
+  // Spec 042: a recipe can be written here too, with or without foods behind it.
+  const [editing, setEditing] = useState<SavedMeal | 'new' | null>(null);
 
   const remove = (id: string) =>
     void run(async () => api.delete(`/nutrition/meals/${id}`)).then((ok) => {
@@ -1295,9 +1298,23 @@ function SavedMealsPanel({
 
   return (
     <Panel
-      title="Saved meals"
-      description="Groups of foods you log together. Build one by logging a meal and saving the slot."
+      title="Saved meals and recipes"
+      description="Groups of foods you log together, and recipes with their method. Save a logged meal from its bookmark icon, or write a recipe."
     >
+      <button type="button" className="btn-ghost mb-2" onClick={() => setEditing('new')}>
+        New recipe
+      </button>
+      {editing !== null && (
+        <RecipeEditor
+          meal={editing === 'new' ? undefined : editing}
+          foods={overview.foods.filter((food) => !food.archived)}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            onChanged();
+          }}
+        />
+      )}
       {overview.savedMeals.length === 0 ? (
         <EmptyState message="None yet. Log a breakfast you repeat, then tap its bookmark icon to save it." />
       ) : (
@@ -1308,12 +1325,14 @@ function SavedMealsPanel({
                 <p className="min-w-0 truncate">
                   {meal.name}
                   <span className="ml-2 text-xs text-ink-faint">
-                    {meal.totals.energyKcal} kcal · P{' '}
-                    {mgToG(meal.totals.proteinMg)}g
+                    {meal.components.length ? `${meal.totals.energyKcal} kcal · P ${mgToG(meal.totals.proteinMg)}g` : 'no nutrition numbers'}
                   </span>
                 </p>
                 <div className="flex shrink-0 items-center gap-3">
-                  {onShare && meal.loggable && (
+                  <button type="button" className="text-xs text-accent" aria-label={`Edit ${meal.name}`} onClick={() => setEditing(meal)}>
+                    Edit
+                  </button>
+                  {onShare && (meal.loggable || (!meal.components.length && !!(meal.ingredients?.length || meal.steps?.length))) && (
                     <button
                       type="button"
                       className="text-xs text-accent"

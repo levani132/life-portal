@@ -225,6 +225,7 @@ export class PostsService {
       totalKcal: publicationCalories(p.items),
       totalMacros: publicationMacros(p.items),
       ...(p.kind === 'day' && p.targets ? { targets: p.targets } : {}),
+      ...(p.recipe ? { recipe: p.recipe } : {}),
     };
   }
   /**

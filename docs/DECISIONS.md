@@ -2824,3 +2824,9 @@ width, because the sliding pill and the swipe between tabs rely on equal cells; 
 beneath the icon (`--show` on `.tab-label` in `global.css`, 0 to 1), and during a swipe it follows
 `--tab-swipe`: the open tab's fades as the target's (`data-swipe="next|prev"`) appears. The names
 stay in the page for screen readers. Scrolling down still folds the bar to icons only.
+
+**A recipe may have no nutrition numbers** (owner's decision, 2026-11-23, spec 042). The app is
+built on honest numbers, and this lets a recipe be shared with none: ingredients in words and a
+method. It is the owner's call that a reader can ask for the macros, and a recipe people cannot
+post at all is worse than one that says "no nutrition numbers". Such a recipe is never logged and
+offers no foods to save, so no invented figure enters anyone's diary.

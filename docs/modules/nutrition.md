@@ -417,6 +417,22 @@ A refused meal (`FOOD_GONE`, `MEAL_CHANGED`) stays on
 the day with its reason and Discard. Banked calories, the cheat countdown and suggestions stay the
 server's until it answers.
 
+## Recipes (spec 042)
+
+A saved meal is also a recipe. `saved_meals` gained `ingredients: string[]` (written by hand, up
+to 40 lines of 200 characters) and `steps: string[]` (the method, up to 30 of 600). `components`
+may now be empty: a recipe needs foods, ingredients or steps, and one with no foods has no
+numbers, cannot be logged (`loggable: false`) and says so wherever it is shown. `POST` and `PATCH
+/nutrition/meals` take both fields; a `PATCH` changes only what it is sent.
+
+Published (`{kind: 'combination', savedMealId}`), the recipe's words travel as
+`publication.recipe {ingredients, steps}`; a recipe with words and no foods may be published with
+zero items, the one food publication allowed to be empty. Saving a post's foods as a meal copies
+the words into the reader's recipe. A recipe with no foods offers nothing to save.
+
+Web: `RecipeEditor` (`components/page-library.tsx`) is used in Food (Saved meals and recipes),
+in a page's Library and in the composer's Create. A food can be created from inside it.
+
 ## Brands
 
 A brand is a name and an optional logo, in `food_brands`:
