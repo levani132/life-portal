@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react';
 import { RECIPE_LIMITS, type Food, type FoodWithUsage, type SavedMeal } from '@life-portal/shared-types';
 import { api } from '../lib/api';
 import { useBrands } from '../lib/brands';
+import { entryTotals } from '@life-portal/shared-domain';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { newPostHref } from '../lib/new-post';
 import { BrandsManager } from './brands-manager';
@@ -257,6 +258,8 @@ export function RecipeEditor({
   );
   const [ingredients, setIngredients] = useState((meal?.ingredients ?? []).join('\n'));
   const [steps, setSteps] = useState((meal?.steps ?? []).join('\n'));
+  // Spec 044: how many servings the whole recipe makes.
+  const [servings, setServings] = useState(String(meal?.servings ?? 1));
   /** The row a new food is being made for, and what was typed for its name. */
   const [making, setMaking] = useState<{ key: string; name: string } | null>(null);
   const set = (key: string, patch: Partial<Row>) => setRows((all) => all.map((row) => (row.key === key ? { ...row, ...patch } : row)));
@@ -269,6 +272,7 @@ export function RecipeEditor({
   const components = rows
     .filter((row) => row.food && Number(row.amount) >= 1)
     .map((row) => ({ foodId: (row.food as FoodWithUsage).id, amount: Math.round(Number(row.amount)) }));
+  const totalKcal = rows.reduce((sum, row) => sum + (row.food && Number(row.amount) >= 1 ? entryTotals(Number(row.amount), row.food).energyKcal : 0), 0);
   const written = { ingredients: lines(ingredients, RECIPE_LIMITS.ingredients, RECIPE_LIMITS.ingredientLength), steps: lines(steps, RECIPE_LIMITS.steps, RECIPE_LIMITS.stepLength) };
   const halfFilled = rows.some((row) => (row.food ? !(Number(row.amount) >= 1) : !!row.amount));
   const ready = name.trim().length > 0 && !halfFilled && (components.length > 0 || written.ingredients.length > 0 || written.steps.length > 0);
@@ -277,7 +281,8 @@ export function RecipeEditor({
     action
       .run(
         async () => {
-          const body = { name: name.trim(), components, ingredients: written.ingredients, steps: written.steps };
+          const makes = Math.min(RECIPE_LIMITS.servingsMax, Math.max(1, Math.round(Number(servings) || 1)));
+          const body = { name: name.trim(), components, ingredients: written.ingredients, steps: written.steps, servings: makes };
           const result = await (meal ? api.patch<SavedMeal>(`/nutrition/meals/${meal.id}`, body) : api.post<SavedMeal>(MEALS_KEY, body));
           await changed();
           onSaved?.(result);
@@ -350,6 +355,17 @@ export function RecipeEditor({
             </div>
           )}
         </div>
+        <Field label="Makes" hint="How many servings the whole recipe makes. Logging one serving logs that share of every food.">
+          <div className="flex items-center gap-2">
+            <Input inputMode="numeric" className="w-20" value={servings} onChange={(event) => setServings(event.target.value.replace(/\D/g, '').slice(0, 2))} />
+            <span className="text-sm text-ink-muted">{Number(servings) === 1 ? 'serving' : 'servings'}</span>
+            {components.length > 0 && Number(servings) > 1 && (
+              <span className="ml-auto text-xs text-ink-faint">
+                about {Math.round(totalKcal / Number(servings))} kcal a serving
+              </span>
+            )}
+          </div>
+        </Field>
         <Field label="Other ingredients" hint="One per line, as you would write them: “2 cloves of garlic”. No numbers needed.">
           <Textarea rows={4} value={ingredients} onChange={(event) => setIngredients(event.target.value)} />
         </Field>

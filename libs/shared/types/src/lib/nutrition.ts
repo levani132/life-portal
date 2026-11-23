@@ -169,6 +169,13 @@ export interface MealEntry extends Timestamped {
   cheatMealId?: Id;
   /** Spec 042: the meal plan line it was logged from, set by the server. */
   planEntryId?: Id;
+  /**
+   * Spec 044: the meals logged together from one recipe share this id, so the day shows them as
+   * the recipe. Chosen by the device (or the server) when the recipe is logged.
+   */
+  mealLogId?: Id;
+  /** Spec 044: how many of the recipe's servings that logging was. */
+  mealServings?: number;
   note?: string;
   /** Spec 030: how many times it was edited; sent back as `baseVersion` with an edit. */
   version?: number;
@@ -221,6 +228,8 @@ export interface SavedMeal extends Timestamped {
    */
   ingredients?: string[];
   steps?: string[];
+  /** Spec 044: how many servings the whole recipe makes. Absent: one. `totals` are for the whole. */
+  servings?: number;
   archived: boolean;
   totals: EntryTotals;
   loggable: boolean;
@@ -594,7 +603,7 @@ export interface PublicFoodsResponse {
 }
 
 /** How much text a recipe may carry (spec 042). */
-export const RECIPE_LIMITS = { ingredients: 40, ingredientLength: 200, steps: 30, stepLength: 600 } as const;
+export const RECIPE_LIMITS = { ingredients: 40, ingredientLength: 200, steps: 30, stepLength: 600, servingsMax: 50, logServingsMax: 20 } as const;
 
 // ------------------------------------------------------------------ meal plans (spec 042)
 

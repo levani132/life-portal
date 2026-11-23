@@ -548,6 +548,16 @@ the words into the reader's recipe. A recipe with no foods offers nothing to sav
 Web: `RecipeEditor` (`components/page-library.tsx`) is used in Food (Saved meals and recipes),
 in a page's Library and in the composer's Create. A food can be created from inside it.
 
+
+**Logging a recipe (spec 044).** `saved_meals.servings?` (1–50; absent is one) is how many
+servings the whole recipe makes; its `totals` stay the whole. `POST /nutrition/meals/:id/log`
+takes `servings` (quarters, up to 20; default 1) and `logId` (the device's group id). Each food is
+scaled by servings ÷ makes (`recipePortion`, shared with the offline path) and logged as its own
+meal, all with `mealLogId` and `mealServings`. The day shows them as one row (`recipeGroups` in
+the web), which opens to its foods: Remove and Share act on the recipe, Edit on one food. Food →
+"Log it again" opens `LogRecipeSheet` (servings and meal). Older recipe logs, with no group id,
+are grouped by recipe and minute. See `specs/044-recipe-logging/spec.md`.
+
 ## Brands
 
 A brand is a name and an optional logo, in `food_brands`:

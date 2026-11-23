@@ -155,6 +155,10 @@ export class MealEntry {
   @Prop({ index: true }) cheatMealId?: string;
   /** Spec 042: the line of a meal plan this was logged from. Set by the server, never by a request. */
   @Prop() planEntryId?: string;
+  /** Spec 044: the meals logged together from one recipe share it. */
+  @Prop({ type: String, index: true }) mealLogId?: string;
+  /** Spec 044: how many of the recipe's servings that logging was. */
+  @Prop({ type: Number }) mealServings?: number;
   @Prop({ maxlength: 300 }) note?: string;
   /** Spec 030: edits so far (missing = 0), for stale-edit checks (`common/row-version.ts`). */
   @Prop({ type: Number, min: 0 }) version?: number;
@@ -194,6 +198,8 @@ export class SavedMeal {
   /** Spec 042: ingredients written by hand and the method, one step each. */
   @Prop({ type: [String], default: undefined }) ingredients?: string[];
   @Prop({ type: [String], default: undefined }) steps?: string[];
+  /** Spec 044: how many servings the whole recipe makes. Absent: one. */
+  @Prop({ type: Number, min: 1, max: 50 }) servings?: number;
   @Prop({ default: false }) archived!: boolean;
 }
 

@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Logging a recipe
+
+- A recipe says **how many servings it makes**. Logging asks how many you had (¼ steps, quick
+  ½ · 1 · 1½ · 2 · all) and at which meal; every food is scaled.
+- A logged recipe is **one row** in the meal, with its total and macros. Tap it to see its foods
+  and change any one ("less rice today"); remove or share it whole.
+- The recipe editor shows calories per serving.
+
 ## 2026-11-23: Page assistants can do everything pages can
 
 - Assistants can now **edit** recipes, meal plans, training plans and programmes, **repost**,

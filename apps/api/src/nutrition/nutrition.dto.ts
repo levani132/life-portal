@@ -128,6 +128,8 @@ export class CreateSavedMealDto {
   ingredients?: string[];
   @IsOptional() @IsArray() @ArrayMaxSize(RECIPE_LIMITS.steps) @IsString({ each: true }) @MaxLength(RECIPE_LIMITS.stepLength, { each: true })
   steps?: string[];
+  /** Spec 044: how many servings the whole recipe makes. */
+  @IsOptional() @IsInt() @Min(1) @Max(RECIPE_LIMITS.servingsMax) servings?: number;
 }
 
 export class UpdateSavedMealDto extends CreateSavedMealDto {
@@ -152,6 +154,10 @@ export class LogSavedMealDto {
   @IsOptional() @IsIn(MEAL_SLOTS) slot?: string;
   /** Spec 029: one device-chosen id per component, in component order. */
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsMongoId({ each: true }) ids?: string[];
+  /** Spec 044: how many of the recipe's servings, in quarters. Absent: one. */
+  @IsOptional() @IsNumber() @Min(0.25) @Max(RECIPE_LIMITS.logServingsMax) servings?: number;
+  /** Spec 044: the id that groups this logging's meals, chosen by the device. */
+  @IsOptional() @IsMongoId() logId?: string;
 }
 
 export class UpdateProfileDto {

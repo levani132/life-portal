@@ -279,7 +279,9 @@ export function PostsList({
  * card says how much there is and links to the post; the post itself shows all of it.
  */
 function RecipeText({ recipe, postId, detail }: { recipe: NonNullable<FoodPost['recipe']>; postId: string; detail: boolean }) {
-  if (!recipe.ingredients.length && !recipe.steps.length) return null;
+  // Spec 044: how many servings the numbers above are for.
+  const makes = recipe.servings && recipe.servings > 1 ? <p className="mt-2 text-xs text-ink-muted">Makes {recipe.servings} servings · the numbers are for all of it</p> : null;
+  if (!recipe.ingredients.length && !recipe.steps.length) return makes;
   if (!detail) {
     const parts = [
       recipe.ingredients.length ? `${recipe.ingredients.length} more ${recipe.ingredients.length === 1 ? 'ingredient' : 'ingredients'}` : '',

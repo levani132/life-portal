@@ -4,6 +4,7 @@
  * and posts plans and can never log one.
  */
 import { randomUUID } from 'node:crypto';
+import { ObjectId } from 'mongodb';
 import type { ActiveMealPlan, FoodPost, MealPlan, PageSummary, PostImportResult, PostPreview } from '@life-portal/shared-types';
 import { startApi, type Account, type TestApi } from './harness';
 
@@ -315,6 +316,41 @@ describe('meal plans', () => {
     expect([after.energyKcal?.value, after.plan]).toEqual([before, undefined]);
     const followed = (await api.call<{ following: ActiveMealPlan[] }>(ana, 'GET', '/nutrition/meal-plans/following?today=2026-08-02')).body.following[0];
     expect(followed.rules.map((rule) => rule.each)).toEqual([true, true]);
+  });
+
+  it('logs some servings of a recipe, grouped as the recipe (spec 044)', async () => {
+    const ana = await api.account('ana');
+    const ids = await library(ana);
+    // A pot: 400 g of oats and 200 g of rice, making four servings.
+    const pot = (await api.call<{ id: string; servings?: number }>(ana, 'POST', '/nutrition/meals', { name: 'Pot', servings: 4, components: [{ foodId: ids.oats, amount: 400 }, { foodId: ids.rice, amount: 200 }] })).body;
+    expect(pot.servings).toBe(4);
+    expect((await api.call(ana, 'POST', '/nutrition/meals', { name: 'Bad', servings: 0, components: [{ foodId: ids.oats, amount: 1 }] })).status).toBe(400);
+
+    const logId = new ObjectId().toHexString();
+    const logged = await api.call<{ amount: number; mealLogId?: string; mealServings?: number; savedMealId?: string }[]>(ana, 'POST', `/nutrition/meals/${pot.id}/log`, { day: '2026-09-01', slot: 'lunch', servings: 1.5, logId });
+    expect(logged.status).toBeLessThan(300);
+    // One and a half of four servings: 150 g and 75 g, both grouped as the recipe.
+    expect(logged.body.map((each) => [each.amount, each.mealLogId, each.mealServings, each.savedMealId])).toEqual([
+      [150, logId, 1.5, pot.id],
+      [75, logId, 1.5, pot.id],
+    ]);
+    // Without a number, one serving; without an id, the server gives one.
+    const again = (await api.call<{ amount: number; mealLogId?: string }[]>(ana, 'POST', `/nutrition/meals/${pot.id}/log`, { day: '2026-09-01' })).body;
+    expect(again.map((each) => each.amount)).toEqual([100, 50]);
+    expect(again[0].mealLogId).toBeTruthy();
+    expect(again[0].mealLogId).toBe(again[1].mealLogId);
+    expect((await api.call(ana, 'POST', `/nutrition/meals/${pot.id}/log`, { day: '2026-09-01', servings: 0.3 })).status).toBe(400);
+
+    // One food of the recipe can be changed on its own and stays in the group.
+    const rice = logged.body[1] as { id?: string };
+    const changed = await api.call<{ amount: number; mealLogId?: string }>(ana, 'PATCH', `/nutrition/entries/${rice.id}`, { amount: 60 });
+    expect([changed.body.amount, changed.body.mealLogId]).toEqual([60, logId]);
+
+    // A recipe logged from a meal plan is grouped too.
+    const plan = (await api.call<MealPlan>(ana, 'POST', '/nutrition/meal-plans', { name: 'P', days: [{ name: 'D', entries: [{ slot: 'breakfast', savedMealId: ids.recipe }] }] })).body;
+    await api.call(ana, 'POST', `/nutrition/meal-plans/${plan.id}/days/${plan.days[0].id}/log`, { day: '2026-09-02' });
+    const fromPlan = await api.db.collection('meal_entries').find({ userId: ana.id, day: '2026-09-02' }).toArray();
+    expect(fromPlan.every((each) => !!each['mealLogId'] && each['mealLogId'] === fromPlan[0]['mealLogId'])).toBe(true);
   });
 
   it('keeps a target weight on the profile', async () => {

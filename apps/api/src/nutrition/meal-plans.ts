@@ -339,14 +339,17 @@ export class MealPlansService {
         const picked = dto.choice ? entry.options?.[dto.choice - 1] : entry;
         if (!picked) throw new BadRequestException('That option is not in this plan.');
         if (picked.missing) throw new BadRequestException({ code: 'PLAN_INCOMPLETE', message: 'That option has no foods with numbers any more. Edit the plan first.' });
+        // Spec 044: a recipe's foods are grouped as the recipe in the day.
+        const mealLogId = picked.savedMealId ? newId() : undefined;
         return picked.savedMealId
-          ? (recipes.get(picked.savedMealId)?.components ?? []).map((component) => ({ planEntryId: entry.id, slot, ...component, savedMealId: picked.savedMealId }))
-          : [{ planEntryId: entry.id, slot, foodId: picked.foodId as string, amount: picked.amount as number, savedMealId: undefined }];
+          ? (recipes.get(picked.savedMealId)?.components ?? []).map((component) => ({ planEntryId: entry.id, slot, ...component, savedMealId: picked.savedMealId, mealLogId }))
+          : [{ planEntryId: entry.id, slot, foodId: picked.foodId as string, amount: picked.amount as number, savedMealId: undefined, mealLogId }];
       });
     for (const line of lines)
       await this.nutrition.createEntry(userId, { day: dto.day, slot: line.slot, foodId: line.foodId, amount: line.amount } as never, {
         planEntryId: line.planEntryId,
         ...(line.savedMealId ? { savedMealId: line.savedMealId } : {}),
+        ...(line.mealLogId ? { mealLogId: line.mealLogId } : {}),
       });
     return { logged: lines.length };
   }

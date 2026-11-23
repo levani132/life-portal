@@ -23,7 +23,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { assertFreeId, withId } from '../common/client-id';
 import { assertBase, atVersion, BUMP, rowDeleted, staleEdit, versionOf } from '../common/row-version';
-import { isValidObjectId, Model } from 'mongoose';
+import { isValidObjectId, Model, Types } from 'mongoose';
 import type {
   BarcodeLookupResponse,
   CheatDayInfo,
@@ -68,6 +68,8 @@ import {
   weekEnd,
   weekStart,
   isRecorded,
+  recipePortion,
+  servingsProblem,
 } from '@life-portal/shared-domain';
 import { BrandsService } from './brands';
 import { OpenFoodFactsProvider } from './openfoodfacts.provider';
@@ -944,7 +946,7 @@ export class NutritionService {
     userId: string,
     dto: CreateEntryDto,
     /** Spec 042: where the server itself is logging from. Never read from a request. */
-    origin?: { planEntryId: string; savedMealId?: string },
+    origin?: { planEntryId: string; savedMealId?: string; mealLogId?: string },
   ): Promise<MealEntryDto> {
     const food = await this.findFood(userId, dto.foodId, 'log');
     const amount = this.resolveAmount(dto, food.servingSize);
@@ -961,7 +963,7 @@ export class NutritionService {
       unit: food.unit,
       facts: snapshotFacts(food),
       note: dto.note,
-      ...(origin ? { planEntryId: origin.planEntryId, ...(origin.savedMealId ? { savedMealId: origin.savedMealId } : {}) } : {}),
+      ...(origin ? { planEntryId: origin.planEntryId, ...(origin.savedMealId ? { savedMealId: origin.savedMealId } : {}), ...(origin.mealLogId ? { mealLogId: origin.mealLogId } : {}) } : {}),
     } as never);
     return this.serializeEntry(created);
   }
@@ -1154,6 +1156,7 @@ export class NutritionService {
       components,
       ...(ingredients.length ? { ingredients } : {}),
       ...(steps.length ? { steps } : {}),
+      ...(dto.servings ? { servings: dto.servings } : {}),
       archived: false,
     } as never);
     return this.oneSavedMeal(userId, String(created._id));
@@ -1253,9 +1256,15 @@ export class NutritionService {
       });
     }
     for (const entryId of dto.ids ?? []) await assertFreeId(this.entries, entryId);
+    // Spec 044: some servings of the recipe, every food scaled alike, grouped by one id.
+    const servings = dto.servings ?? 1;
+    const problem = servingsProblem(servings);
+    if (problem) throw new BadRequestException(problem);
+    const mealLogId = dto.logId ?? String(new Types.ObjectId());
+    const portion = recipePortion(meal.components, meal.servings, servings);
 
     const created = await this.entries.insertMany(
-      meal.components.map((component, index) => {
+      portion.map((component, index) => {
         const food = byId.get(component.foodId) as FoodDto;
         return {
           ...withId(dto.ids?.[index]),
@@ -1267,6 +1276,8 @@ export class NutritionService {
           unit: food.unit,
           facts: snapshotFacts(food),
           savedMealId: meal.id,
+          mealLogId,
+          mealServings: servings,
         };
       }) as never,
     );

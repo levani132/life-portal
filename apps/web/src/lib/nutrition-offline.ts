@@ -18,7 +18,7 @@ import { enqueueWrite, outbox, outboxItems, useOutbox } from './offline/runtime'
 import { earlierEditsOf } from './offline/conflicts';
 import { moduleWrites } from './offline/settling';
 import type { OutboxItem, WriteMethod } from './offline/types';
-import { decorateEntry } from '@life-portal/shared-domain';
+import { decorateEntry, recipePortion } from '@life-portal/shared-domain';
 
 /**
  * Food that works without a connection (spec 029, issue #18), on the outbox (spec 027).
@@ -256,23 +256,29 @@ export const foodWrites = {
     );
   },
 
-  /** One meal per component, with ids chosen here, from this device's copy of the foods. */
-  async logSavedMeal(meal: SavedMeal, foods: Food[], input: { day: string; slot?: MealSlot }): Promise<void> {
+  /**
+   * One meal per component, with ids chosen here, from this device's copy of the foods. Spec 044:
+   * some servings of the recipe (the same scaling as the server's, `recipePortion`), grouped by an
+   * id chosen here so the day shows them as the recipe before and after they are sent.
+   */
+  async logSavedMeal(meal: SavedMeal, foods: Food[], input: { day: string; slot?: MealSlot; servings?: number }): Promise<void> {
     const byId = new Map(foods.map((food) => [food.id, food]));
     const slot = input.slot ?? meal.defaultSlot ?? 'uncategorized';
-    const entries = meal.components.map((component) => {
+    const servings = input.servings ?? 1;
+    const mealLogId = newObjectId();
+    const entries = recipePortion(meal.components, meal.servings, servings).map((component) => {
       const food = byId.get(component.foodId);
       if (!food) throw new Error(`"${meal.name}" uses a food this device does not have. Log it once you are online.`);
-      return localEntry(food, { day: input.day, slot, amount: component.amount });
+      return { ...localEntry(food, { day: input.day, slot, amount: component.amount }), savedMealId: meal.id, mealLogId, mealServings: servings };
     });
     await write(
       { op: 'meal.log', mealId: meal.id, entries },
       {
         method: 'POST',
         path: `/nutrition/meals/${meal.id}/log`,
-        body: { day: input.day, ...(input.slot ? { slot: input.slot } : {}), ids: entries.map((entry) => entry.id) },
+        body: { day: input.day, ...(input.slot ? { slot: input.slot } : {}), ids: entries.map((entry) => entry.id), servings, logId: mealLogId },
       },
-      `Saved meal · ${meal.name}`,
+      `Recipe · ${meal.name}`,
     );
   },
 

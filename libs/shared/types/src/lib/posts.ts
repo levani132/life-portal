@@ -82,6 +82,8 @@ export interface PublishedPlanRules {
 export interface PublishedRecipe {
   ingredients: string[];
   steps: string[];
+  /** Spec 044: how many servings it makes. */
+  servings?: number;
 }
 export interface PostPreview {
   publication: FoodPublication;

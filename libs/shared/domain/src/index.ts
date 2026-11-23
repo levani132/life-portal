@@ -53,3 +53,4 @@ export * from './lib/jpeg';
 export * from './lib/meal-plans';
 export * from './lib/programmes';
 export * from './lib/plan-rules';
+export * from './lib/recipes';

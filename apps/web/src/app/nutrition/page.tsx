@@ -5,11 +5,13 @@ import { MACRO_COLORS, withAlpha } from '../../lib/macro-colors';
 import { useIsIOS } from '../../lib/ios-device';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Apple, BookmarkPlus, Bot, CalendarCheck, ChevronDown, Info, Pencil, Plus, Search, Share2, Sparkles, Tags, Trash2, UserRound, Utensils, X, Zap, type LucideIcon } from 'lucide-react';
+import { Apple, BookmarkPlus, Bot, CalendarCheck, CookingPot, ChevronDown, Info, Pencil, Plus, Search, Share2, Sparkles, Tags, Trash2, UserRound, Utensils, X, Zap, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { RecipeEditor } from '../../components/page-library';
 import { FollowingStrip, FoodRuleNotes, MealPlans, MealRules, PlannedLines, eachFoodRules, limitText, plansOnDay, ruleSources, ruleState, useFollowedPlans } from '../../components/meal-plans';
 import { Programmes } from '../../components/programmes';
+import { LogRecipeSheet } from '../../components/recipe-log';
+import { recipeGroups, type MealItem } from '../../lib/recipe-groups';
 import type {
   PortalState,
   PostSelection,
@@ -28,6 +30,8 @@ import type {
 } from '@life-portal/shared-types';
 import {
   checkFoodRules,
+  servingsText,
+  sumTotals,
   referenceOf,
   type CombinedRule,
   type SourcedRule,
@@ -304,6 +308,7 @@ function Nutrition() {
                   onEdit={(entry) => setLogging({ slot: entry.slot, entry })}
                   onChanged={refresh}
                   onShare={canPost ? setSharing : undefined}
+                  recipes={data.savedMeals}
                   planned={
                     plans.length
                       ? {
@@ -569,6 +574,7 @@ function SlotSection({
   onChanged,
   onShare,
   planned,
+  recipes = [],
 }: {
   slot: SlotTotals;
   day: string;
@@ -581,10 +587,13 @@ function SlotSection({
   onShare?: (source: PostSelection) => void;
   /** Spec 042: the plan in use: meals that count for it, and its lines not eaten yet here. */
   planned?: { marks: Set<string>; lines: ReactNode; rules: ReactNode; count: number; kcal: number; foodRules: SourcedRule[] };
+  /** Spec 044: the person's recipes, for the names of recipes logged into this meal. */
+  recipes?: SavedMeal[];
 }) {
   const { run, pending } = useAction();
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set());
 
   const updatedAfterSync = useUpdatedAfterSync();
   // Spec 029: kept on the device and applied at once; a meal never sent is just withdrawn.
@@ -613,6 +622,160 @@ function SlotSection({
   const [collapsed, setCollapsed] = useCollapsedSlot(slot.slot);
   const action = 'flex h-10 w-9 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface hover:text-ink active:scale-95';
   const rowAction = 'flex h-9 w-8 items-center justify-center rounded-lg text-ink-faint transition hover:bg-surface hover:text-ink';
+
+  const renderEntry = (entry: MealEntry) => {
+            // On a phone the row's actions are behind it: swipe left, or all the way to remove.
+            const actions: SwipeAction[] = [
+              ...(onShare && !isUnsaved(entry)
+                ? [{ label: `Share ${entry.facts.name}`, short: 'Share', tone: 'accent' as const, icon: Share2, onClick: () => onShare({ kind: 'entry' as const, entryId: entry.id }) }]
+                : []),
+              { label: `Edit ${entry.facts.name}`, short: 'Edit', icon: Pencil, onClick: () => onEdit(entry) },
+              { label: `Remove ${entry.facts.name}`, short: 'Remove', icon: Trash2, onClick: () => remove(entry), danger: true, disabled: pending },
+            ];
+            return (
+            <li key={entry.id}>
+              <SwipeRow actions={actions} className="rounded-xl">
+              <div className="flex items-center gap-2 rounded-xl bg-surface px-2.5 py-2 text-[15px] leading-snug">
+              {/* The food's photo, else its brand's logo, else an icon from its name. */}
+              <FoodThumb
+                name={entry.facts.name}
+                imageUrl={foods.find((food) => food.id === entry.foodId)?.image?.url}
+                brand={entry.facts.brand}
+                macros={entry.totals}
+                size={38}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold">
+                  {entry.facts.name}
+                  {entry.facts.brand && <span className="ml-1 text-xs font-normal text-ink-faint">{entry.facts.brand}</span>}
+                </p>
+                <p className="truncate text-[13px] text-ink-muted">
+                  {entry.amount} {entry.unit}
+                  {entry.servings > 0 && ` · ${entry.servings} serving${entry.servings === 1 ? '' : 's'}`}
+                  {' · '}
+                  <MacroLine totals={entry.totals} />
+                </p>
+                {planned?.marks.has(entry.id) && (
+                  <p className="flex items-center gap-1 text-[11px] font-medium text-success">
+                    <CalendarCheck size={12} aria-hidden /> In your plan
+                  </p>
+                )}
+                {/* Spec 043: a followed rule on each food that this meal breaks. */}
+                {planned && planned.foodRules.length > 0 && <FoodRuleNotes checks={checkFoodRules(planned.foodRules, entry.facts, entry.slot, entry.amount)} onlyBroken />}
+                {isUnsaved(entry) && (
+                  <p className="text-[11px] font-medium text-warning">Not saved yet · on this device</p>
+                )}
+                {updatedAfterSync.has(entry.id) && updatedAfterSync.get(entry.id) !== entry.totals.energyKcal && (
+                  <p className="text-[11px] text-ink-faint">
+                    Updated after sync: the food changed since, so it was saved at {entry.totals.energyKcal} kcal, not{' '}
+                    {updatedAfterSync.get(entry.id)}.
+                  </p>
+                )}
+              </div>
+              <span className="shrink-0 text-right leading-tight">
+                <span className="tabular block text-base font-bold">{entry.totals.energyKcal}</span>
+                <span className="block text-[10px] text-ink-faint">kcal</span>
+              </span>
+              {/* With a mouse or trackpad the same three actions stay visible. */}
+              <div className="pointer-fine-flex shrink-0 items-center">
+                {onShare && !isUnsaved(entry) && (
+                  <button
+                    type="button"
+                    className={rowAction}
+                    onClick={() => onShare({ kind: 'entry', entryId: entry.id })}
+                    aria-label={`Share ${entry.facts.name}`}
+                    title="Share"
+                  >
+                    <Share2 size={15} aria-hidden="true" />
+                  </button>
+                )}
+                <button type="button" className={rowAction} onClick={() => onEdit(entry)} aria-label={`Edit ${entry.facts.name}`} title="Edit">
+                  <Pencil size={15} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className={clsx(rowAction, 'hover:text-danger')}
+                  onClick={() => remove(entry)}
+                  disabled={pending}
+                  aria-label={`Remove ${entry.facts.name}`}
+                  title="Remove"
+                >
+                  <X size={16} aria-hidden="true" />
+                </button>
+              </div>
+              </div>
+              </SwipeRow>
+            </li>
+            );
+  };
+
+  // Spec 044: the foods logged together from one recipe, as one row that opens to them.
+  const renderGroup = (group: Extract<MealItem, { kind: 'group' }>) => {
+    const open = openGroups.has(group.id);
+    const recipe = recipes.find((each) => each.id === group.savedMealId);
+    const name = recipe?.name ?? 'Recipe';
+    const totals = sumTotals(group.entries.map((each) => each.totals));
+    const unsaved = group.entries.some(isUnsaved);
+    const makes = recipe?.servings ?? 1;
+    const amount = group.servings !== undefined && (makes > 1 || group.servings !== 1) ? `${servingsText(group.servings)} ${makes > 1 ? (group.servings === 1 ? 'serving' : 'servings') : '× recipe'} · ` : '';
+    const removeAll = () =>
+      void run(async () => {
+        for (const each of group.entries) await foodWrites.removeEntry(each);
+      }, { revalidate: false }).then((ok) => {
+        if (ok) onChanged();
+      });
+    const actions: SwipeAction[] = [
+      ...(onShare && group.savedMealId && !unsaved
+        ? [{ label: `Share ${name}`, short: 'Share', tone: 'accent' as const, icon: Share2, onClick: () => onShare({ kind: 'combination' as const, savedMealId: group.savedMealId as string }) }]
+        : []),
+      { label: `Remove ${name}`, short: 'Remove', icon: Trash2, onClick: removeAll, danger: true, disabled: pending },
+    ];
+    const toggle = () =>
+      setOpenGroups((now) => {
+        const next = new Set(now);
+        if (next.has(group.id)) next.delete(group.id);
+        else next.add(group.id);
+        return next;
+      });
+    return (
+      <li key={group.id}>
+        <SwipeRow actions={actions} className="rounded-xl">
+          <div className="flex items-center gap-2 rounded-xl bg-surface px-2.5 py-2 text-[15px] leading-snug">
+            <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" aria-expanded={open} onClick={toggle}>
+              <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg bg-accent-solid/15 text-accent">
+                <CookingPot size={20} aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-semibold">{name}</span>
+                <span className="block truncate text-[13px] text-ink-muted">
+                  {amount}
+                  {group.entries.length} {group.entries.length === 1 ? 'food' : 'foods'} · <MacroLine totals={totals} />
+                </span>
+                {group.entries.some((each) => planned?.marks.has(each.id)) && (
+                  <span className="flex items-center gap-1 text-[11px] font-medium text-success">
+                    <CalendarCheck size={12} aria-hidden /> In your plan
+                  </span>
+                )}
+                {unsaved && <span className="block text-[11px] font-medium text-warning">Not saved yet · on this device</span>}
+              </span>
+              <span className="shrink-0 text-right leading-tight">
+                <span className="tabular block text-base font-bold">{totals.energyKcal}</span>
+                <span className="block text-[10px] text-ink-faint">kcal</span>
+              </span>
+              <ChevronDown className={clsx('h-4 w-4 shrink-0 text-ink-faint transition-transform', open && 'rotate-180')} aria-hidden />
+            </button>
+            <div className="pointer-fine-flex shrink-0 items-center">
+              <button type="button" className={clsx(rowAction, 'hover:text-danger')} onClick={removeAll} disabled={pending} aria-label={`Remove ${name}`} title="Remove the recipe">
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+        </SwipeRow>
+        {/* Its foods, each changed on its own: "less rice today". */}
+        {open && <ul className="ml-3 mt-1 space-y-1 border-l-2 border-border pl-2">{group.entries.map(renderEntry)}</ul>}
+      </li>
+    );
+  };
 
   return (
     <section className={clsx('card overflow-hidden border-l-4', style.edge)} aria-label={label}>
@@ -700,91 +863,7 @@ function SlotSection({
 
       {!collapsed && slot.entries.length > 0 && (
         <ul className="space-y-1 px-1.5 pb-1.5 sm:px-4 sm:pb-3">
-          {slot.entries.map((entry) => {
-            // On a phone the row's actions are behind it: swipe left, or all the way to remove.
-            const actions: SwipeAction[] = [
-              ...(onShare && !isUnsaved(entry)
-                ? [{ label: `Share ${entry.facts.name}`, short: 'Share', tone: 'accent' as const, icon: Share2, onClick: () => onShare({ kind: 'entry' as const, entryId: entry.id }) }]
-                : []),
-              { label: `Edit ${entry.facts.name}`, short: 'Edit', icon: Pencil, onClick: () => onEdit(entry) },
-              { label: `Remove ${entry.facts.name}`, short: 'Remove', icon: Trash2, onClick: () => remove(entry), danger: true, disabled: pending },
-            ];
-            return (
-            <li key={entry.id}>
-              <SwipeRow actions={actions} className="rounded-xl">
-              <div className="flex items-center gap-2 rounded-xl bg-surface px-2.5 py-2 text-[15px] leading-snug">
-              {/* The food's photo, else its brand's logo, else an icon from its name. */}
-              <FoodThumb
-                name={entry.facts.name}
-                imageUrl={foods.find((food) => food.id === entry.foodId)?.image?.url}
-                brand={entry.facts.brand}
-                macros={entry.totals}
-                size={38}
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">
-                  {entry.facts.name}
-                  {entry.facts.brand && <span className="ml-1 text-xs font-normal text-ink-faint">{entry.facts.brand}</span>}
-                </p>
-                <p className="truncate text-[13px] text-ink-muted">
-                  {entry.amount} {entry.unit}
-                  {entry.servings > 0 && ` · ${entry.servings} serving${entry.servings === 1 ? '' : 's'}`}
-                  {' · '}
-                  <MacroLine totals={entry.totals} />
-                </p>
-                {planned?.marks.has(entry.id) && (
-                  <p className="flex items-center gap-1 text-[11px] font-medium text-success">
-                    <CalendarCheck size={12} aria-hidden /> In your plan
-                  </p>
-                )}
-                {/* Spec 043: a followed rule on each food that this meal breaks. */}
-                {planned && planned.foodRules.length > 0 && <FoodRuleNotes checks={checkFoodRules(planned.foodRules, entry.facts, entry.slot, entry.amount)} onlyBroken />}
-                {isUnsaved(entry) && (
-                  <p className="text-[11px] font-medium text-warning">Not saved yet · on this device</p>
-                )}
-                {updatedAfterSync.has(entry.id) && updatedAfterSync.get(entry.id) !== entry.totals.energyKcal && (
-                  <p className="text-[11px] text-ink-faint">
-                    Updated after sync: the food changed since, so it was saved at {entry.totals.energyKcal} kcal, not{' '}
-                    {updatedAfterSync.get(entry.id)}.
-                  </p>
-                )}
-              </div>
-              <span className="shrink-0 text-right leading-tight">
-                <span className="tabular block text-base font-bold">{entry.totals.energyKcal}</span>
-                <span className="block text-[10px] text-ink-faint">kcal</span>
-              </span>
-              {/* With a mouse or trackpad the same three actions stay visible. */}
-              <div className="pointer-fine-flex shrink-0 items-center">
-                {onShare && !isUnsaved(entry) && (
-                  <button
-                    type="button"
-                    className={rowAction}
-                    onClick={() => onShare({ kind: 'entry', entryId: entry.id })}
-                    aria-label={`Share ${entry.facts.name}`}
-                    title="Share"
-                  >
-                    <Share2 size={15} aria-hidden="true" />
-                  </button>
-                )}
-                <button type="button" className={rowAction} onClick={() => onEdit(entry)} aria-label={`Edit ${entry.facts.name}`} title="Edit">
-                  <Pencil size={15} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  className={clsx(rowAction, 'hover:text-danger')}
-                  onClick={() => remove(entry)}
-                  disabled={pending}
-                  aria-label={`Remove ${entry.facts.name}`}
-                  title="Remove"
-                >
-                  <X size={16} aria-hidden="true" />
-                </button>
-              </div>
-              </div>
-              </SwipeRow>
-            </li>
-            );
-          })}
+          {recipeGroups(slot.entries).map((item) => (item.kind === 'group' ? renderGroup(item) : renderEntry(item.entry)))}
         </ul>
       )}
 
@@ -1045,6 +1124,8 @@ function RepeatPanel({
   onChanged: () => void;
 }) {
   const { run, pending } = useAction();
+  // Spec 044: how many servings, and at which meal, before it is logged (offline too, spec 029).
+  const [logging, setLogging] = useState<SavedMeal | null>(null);
   const meals = overview.recentMeals.filter((meal) => meal.day !== day);
 
   if (meals.length === 0 && overview.savedMeals.length === 0) return null;
@@ -1061,18 +1142,7 @@ function RepeatPanel({
       if (ok) onChanged();
     });
 
-  // Spec 029: one meal per component from this device's foods; sent when there is a connection.
-  const logMeal = (meal: SavedMeal) =>
-    void run(
-      async () =>
-        foodWrites.logSavedMeal(meal, overview.foods, {
-          day,
-          slot: meal.defaultSlot ?? 'uncategorized',
-        }),
-      { revalidate: false },
-    ).then((ok) => {
-      if (ok) onChanged();
-    });
+  const logMeal = (meal: SavedMeal) => setLogging(meal);
 
   return (
     <Panel
@@ -1135,6 +1205,7 @@ function RepeatPanel({
           ))}
         </ul>
       )}
+      <LogRecipeSheet meal={logging} foods={overview.foods} day={day} onClose={() => setLogging(null)} onLogged={onChanged} />
     </Panel>
   );
 }

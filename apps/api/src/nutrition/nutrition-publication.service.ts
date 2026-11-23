@@ -232,7 +232,8 @@ export class NutritionPublicationService {
         label = meal.name;
         slot = meal.defaultSlot as FoodPublication['slot'];
         // Spec 042: the recipe's own words travel with it.
-        if (meal.ingredients?.length || meal.steps?.length) recipe = { ingredients: meal.ingredients ?? [], steps: meal.steps ?? [] };
+        if (meal.ingredients?.length || meal.steps?.length || (meal.servings ?? 1) > 1)
+          recipe = { ingredients: meal.ingredients ?? [], steps: meal.steps ?? [], ...((meal.servings ?? 1) > 1 ? { servings: meal.servings } : {}) };
       }
       const rows = await this.foods
         .find({
@@ -427,6 +428,7 @@ export class NutritionPublicationService {
               components,
               ...(publication.recipe?.ingredients.length ? { ingredients: publication.recipe.ingredients } : {}),
               ...(publication.recipe?.steps.length ? { steps: publication.recipe.steps } : {}),
+              ...(publication.recipe?.servings ? { servings: publication.recipe.servings } : {}),
               ...(publication.slot ? { defaultSlot: publication.slot } : {}),
               archived: false,
             },
