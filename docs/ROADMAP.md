@@ -1,6 +1,6 @@
 # Roadmap
 
-Where Life Portal is, where it is going, and in what order. Updated 2026-11-22. The admin sees this roadmap in the app (Menu → Roadmap); its content lives in
+Where Life Portal is, where it is going, and in what order. Updated 2026-11-23. The admin sees this roadmap in the app (Menu → Roadmap); its content lives in
 `apps/api/src/roadmap/roadmap.data.ts`, which must change with this file. Product
 direction comes from the owner; the order and the architecture tiers are recommendations agreed
 in conversation, not commitments. Costs are rough late-2026 list prices, order of magnitude only.
@@ -15,9 +15,10 @@ the same day. The core stays free; AI is the paid part.
 |---|---|---|
 | **Money** | Loans with payoff scenarios, free-money cash flow, items to sell, shares and the ESPP plan, spending from bank messages (Shortcut ingest), multi-currency with daily FX history | 002 |
 | **Work and life** | EPAM boards, side projects, personal plans | — |
-| **Food** | Nutrition tracking, food profile and activity targets, Apple Health sync with resumable batches, AI assistant connectors (MCP with OAuth: ChatGPT, Claude), brands with logos (public and own) and brand filters, logging several foods for several meals in one go, suggestions from recent meals, collapsible meals | 001, 004, 010, 011 |
-| **Training** | Exercise catalogue and logging, ready-made and own plans, the workout flow (rest, supersets, pinned bar), levels. Built and off for production: strength ranks, monthly tournaments, sharing and copying workouts, plans and exercises | 020, 023–025, 036 |
-| **Social** | Friends, shared widgets, shared daily diary, posts (text, photos, 30 s camera video, food, training) with likes, comments and Share, a camera-first new post page, a Share sheet with chats, reposts and app buttons, Story share images and public link previews, Home feed, link-only posts (sent to particular people, on no wall) | 006–009, 014–017 |
+| **Food** | Nutrition tracking, food profile and activity targets with a target weight, Apple Health sync with resumable batches, AI assistant connectors (MCP with OAuth: ChatGPT, Claude), brands with logos (public and own) and brand filters, logging several foods for several meals in one go, suggestions from recent meals, collapsible meals. Recipes with a method, servings, portions and one row per recipe in the day. Meal plans (days, "or" options, lines at several meals) with rules (amounts, per kg of weight or target weight, shares; on totals or on each food), followed several at a time: their daily rules become the targets everywhere, planned food sits in each meal, the diary is matched to them, past days too. Programmes (a meal plan and a training plan) followed in one tap | 001, 004, 010, 011, 042–044 |
+| **Training** | Exercise catalogue and logging, ready-made and own plans, the workout flow (rest, supersets, pinned bar; an exercise's rows are its plan), levels, strength ranks, monthly tournaments, sharing and copying workouts, plans and exercises | 020, 023–025, 036 |
+| **Social** | Friends, shared widgets, shared daily diary, posts (text, photos, 30 s camera video, food, training, or food and training together) with likes, comments with one level of replies (deep links to a comment) and Share, For You with real people first and unseen posts first, Following, endless scrolling, pages (spec 040), a camera-first new post page, a Share sheet with chats, reposts and app buttons, Story share images and public link previews, Home feed, link-only posts (sent to particular people, on no wall) | 006–009, 014–017 |
+| **Assistants** | Assistants that run pages marked as run with AI, with the person's consent: everything a page can do in the app (library, posts with photos and drafts, reading feeds, reactions, replies, follows, messages, notifications, moderation), actions scheduled to the minute, caps per person, a 90-day activity log, an overview of all pages; a playbook and five worker instructions for 100 pages | 041 |
 | **Offline** | Training, food and social writes work with no connection and sync later; conflicts are shown, never merged silently; sync health counters for the admin | 027–035 |
 | **Look and feel** | Colour themes as data with an admin page (v0 and Crisp), glass surfaces, a floating tab bar that shrinks on scroll, resizable Home widgets, the Food page redesign | 037 |
 | **Platform** | Onboarding and setup, feature flags per cohort and user, installable PWA, push notifications with Activity and icon badge, direct messages, tabs that stay alive with swipe navigation, CI running the checks on every push, its own address (`lifeportal.one`) with email sending, password reset and email verification, an error log, download-your-data and account deletion (038), photo moderation with a review queue and account suspension (039; the automatic check waits for its key) | 003, 005, 012, 013 |
@@ -44,6 +45,20 @@ lets anyone test whether a person has an account; make that answer generic. The 
 plans (the server sleeps; Vercel Hobby is not for commercial use) need replacing before the app
 is promoted.
 
+**2026-11-23: pages, assistants and plans.** Pages went into use (the owner runs them, several
+with AI); assistants can now do everything a page can (spec 041); and plans became the centre of
+Food: meal plans of days and of rules, followed several at a time, with their rules as targets
+everywhere and their food inside each meal, programmes followed in one tap, and recipes logged in
+portions (specs 042–044). CI now runs the API against a real database on every push. The plan for
+day one is content: 100 AI pages by 1 January (`docs/playbooks/pages-assistant.md`). The biggest
+gap a stranger meets is now in Food: there is no general food database, only their own foods,
+public foods and barcodes.
+
+**Next, in order (recommended 2026-11-23):** check on a phone what was built this week; start
+the five page workers; a world food database; the AI meal guess; groups and challenges (with
+"keep to this plan for 30 days"); what a plan's creator sees; your portal; paid hosting on
+1 January.
+
 ### Known gaps to close before a public launch
 
 No public launch is planned soon. These are a gate for the day launch is scheduled. The first
@@ -56,8 +71,10 @@ three have moved into the numbered steps, because friends already use the app.
   The operator is named as the owner's individual-entrepreneur registration
   (`apps/web/src/lib/brand.ts`); change it when a company takes over. A lawyer read the three pages on
   2026-11-22; have them read again before payments or a company change.
-- **`apps/api-e2e` is still the generated "Hello API" test.** `npm run test:integration` boots
-  the real app against a database, but needs one supplied; nothing runs it automatically.
+- **Nothing drives the screens.** CI runs `npm run check` and the integration tests (the real API
+  against a real Mongo) on every push since 2026-11-23's work; `apps/api-e2e` is still the
+  generated stub, and every UI change waits for a phone check.
+- **No general food database:** see step 10a.
 - **Real-device checks** of push, messages and swiping on an iPhone.
 - **Tier 0 limits:** Atlas M0 has 512 MB; Vercel Hobby does not allow commercial use, and Render
   free is kept awake by a cron job.
@@ -88,9 +105,11 @@ three have moved into the numbered steps, because friends already use the app.
 - ~~**When does the invite code go?**~~ Gone 2026-11-22: registration is open to anyone, after
   the owner tested sign-up, reports, removal, suspension, export and deletion on a phone. Setting
   `REGISTRATION_INVITE_CODE` again closes it.
-- **Where does the AI mark show?** The owner's proposal: on the page only, since anyone who opens
-  it sees it is AI-managed. The recommendation: a small mark beside the page's name wherever it
-  appears, because most people meet a post in the feed and never open the page.
+- ~~**Where does the AI mark show?**~~ Beside the page's name wherever it appears ("Page · AI").
+- **What does a plan's creator see?** How many follow a plan is useful and harmless; how closely
+  each follower keeps to it is health information about that person. Totals only, or nothing.
+- **When do pages switch on for everyone?** After a phone check, the Georgian legal copy, and the
+  open concerns in `specs/040-pages/tasks.md`.
 - **What may a promoted post target?** The business model rules out ads targeted on health data,
   and in this app almost everything a person does is health data. Promotion would have to work
   from language, country and what a person chose to follow, not from their diary.
@@ -144,7 +163,11 @@ three have moved into the numbered steps, because friends already use the app.
    - **The words follow:** "Profile" becomes "Portal" in the tab bar, the menu, sharing and
      links, and a portal has an address a person can send.
 6. **Pages.** An account that is not a person: a page that one or more people manage, which
-   publishes content and nothing else. Decided 2026-11-20; spec 040.
+   publishes content and nothing else. Decided 2026-11-20; spec 040. **In use since
+   2026-11-23** (the owner's pages, several run with AI): libraries (foods, recipes, meal plans,
+   programmes, training), pages following people. Still to build: the "by a person" mark,
+   insights (followers, saves, copies), a pinned post and link, collections, co-managers and
+   verified businesses later.
    - **Built 2026-11-22, behind the `pages` switch (owner and internal group):** create a page
      and act as it; Follow and the Following feed; pages to follow; messages with pages;
      notifications to a page's manager; a page can block; the "run with AI" and official marks;
@@ -169,7 +192,13 @@ three have moved into the numbered steps, because friends already use the app.
      each such action carries the page mark, so nothing is presented as a person.
    - **Later uses of the same thing:** restaurants with verified menus, gyms and brands with
      challenges, coaches with plans (see the business model).
-7. **Assistant tools for pages, training and challenges.** The connector (MCP) handles food
+7. ~~**Assistant tools for pages, training and challenges.**~~ Done 2026-11-23 for pages (spec 041,
+   `docs/modules/mcp.md`): an assistant can do everything a page can, schedule to the minute,
+   upload photos, within caps, with a 90-day log. Challenges get tools when they exist. Open: a
+   post's photos cannot be changed after it exists; photo upload not yet proven with ChatGPT.
+   **7a. Content for day one: 100 pages by 1 January**, five ChatGPT workers
+   (`docs/playbooks/workers/`), real people first in For You. Next: one worker run end to end,
+   then all five. Was: the connector (MCP) handled food
    only. Add tools to act as a page: read the public and friends feeds, create a post, comment,
    react. Then the same for training, and for challenges once they exist. A tool acts as one
    named page, never as the person behind it, and what it did is visible in the page's history.
@@ -184,9 +213,17 @@ three have moved into the numbered steps, because friends already use the app.
    calories. A challenge sees only a computed score, never the diary. Group chat reuses the
    messages module (conversations already have a members shape). Ahead of search (2026-11-20):
    a small group of friends will use a challenge before it needs search.
-10. **Plans.** One thing a person or a page can publish: a diet plan, a workout plan, or both,
-   with the creator's notes and advice. Others copy it into their own foods and plans (copying
-   training plans exists since 036). Free first; paid plans arrive with payments (step 13).
+10. ~~**Plans.**~~ Done 2026-11-23 (specs 042–044, `docs/modules/nutrition.md`,
+   `docs/modules/programmes.md`): meal plans of days and of rules, "or" options, rules on totals
+   and on each food, following several, their rules as targets everywhere, conflicts warned,
+   adherence matched from the diary, programmes followed in one tap, recipes in portions.
+   **Next for plans:** what a creator sees (see the open decision), logging from a plan offline,
+   a plan's updates reaching people who follow a copy, paid plans with payments (step 13).
+   **10a. A world food database.** A stranger cannot find "banana" without typing its label.
+   Open data first: USDA FoodData Central for basics and Open Food Facts (already used for
+   barcodes) for packaged food, searched beside the person's own foods; saving one makes it
+   theirs. Licences and attribution checked before importing. Ahead of the AI meal guess, which
+   is better with it.
 11. **The desktop version.** The app is designed for a phone and merely works on a wide screen.
     Making it good there is a long piece of work, done in parts (asked for 2026-11-22):
     - **Navigation in the header** instead of the bottom tabs, which belong to a thumb.
@@ -229,7 +266,7 @@ three have moved into the numbered steps, because friends already use the app.
 Also wanted, unscheduled: more themes, real refraction for the glass (tried 2026-11-18: it works
 in Safari only for small elements and looked poor; shelved), quote reposts (a repost with your
 own text), a native Instagram Stories sticker with a link back (needs the Capacitor app), recipes
-(steps and time on combination posts), message requests from non-friends, reactions, typing
+(done: spec 042), message requests from non-friends, reactions, typing
 indicators, stories (the inbox's friend row is ready for rings).
 
 ## Architecture by tier

@@ -26,11 +26,11 @@
 - [x] T030 `users.disabledAt` for a page; hidden everywhere; enable/delete in the app; tool disable_page.
 
 ## Slice 5: recipes and meal plans
-- [ ] T040 Recipe steps and photo on a saved meal.
-- [ ] T041 Meal plans: module, publication snapshot, copy; for people and pages.
+- [x] T040 Recipe steps on a saved meal (spec 042; a recipe photo is still open).
+- [x] T041 Meal plans: module, publication snapshot, copy; for people and pages (specs 042, 043).
 
 ## Slice 6: programmes, collections, profile
-- [ ] T050 A post carrying food and training together.
+- [x] T050 A post carrying food and training together (spec 042).
 - [ ] T051 Collections. T052 Pinned post, link and contact.
 
 ## Slice 7: photos and insights
