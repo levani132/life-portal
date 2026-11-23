@@ -15,24 +15,27 @@ Once, by the owner:
 2. In ChatGPT, refresh the LifePortal connection so it sees the page tools (about 60).
 3. Test one photo upload end to end on a draft before relying on photos (see "Photos" in the
    prompt). If it fails, run without photos; everything else works.
-4. Create five scheduled tasks, one per worker, each running hourly with the prompt and its own
-   page list. Start with worker A alone for two or three days.
+4. Create five scheduled tasks, one per worker, each running hourly with the instructions from
+   its file in `workers/`. Start with worker A alone for two or three days.
    To stop everything at once, untick the box from step 1: nothing more runs, queued or not.
 5. After a page exists, mark the app's own pages official in Menu → People.
 
 ## Workers
 
 **Five workers, twenty pages each**, not one. One run that writes for a hundred voices drifts
-into one voice, runs out of time, and a single failure stops everything. Each worker has one
-cluster, so its pages share a subject and it can keep them distinct.
+into one voice, runs out of time, and a single failure stops everything.
 
-| Worker | Pages | Subject |
-|---|---|---|
-| A | 1–8, 21–25, 34–40 | Recipes by goal, ways of eating, situations, methods |
-| B | 9–20, 26–33 | World cuisines, food knowledge |
-| C | 41–60 | Training programmes, body and skills, sports |
-| D | 61–80 | Gym knowledge, goals, programmes with food |
-| E | 81–100 | Programmes with food, athletes, general |
+Every worker has the same mix as the whole: **8 food, 6 gym, 4 food and training, 2 general**,
+with the sub-subjects spread across the workers. Each creates its pages in an order that keeps
+that mix at every step of the ramp, so the first fifteen pages are already five food, five gym
+and five mixed, and it stays in proportion up to a hundred. Pages that need verified local facts
+(†) come last.
+
+The five ready-to-paste files, each with the prompt and its own twenty pages in creation order:
+[A](workers/worker-a.md) · [B](workers/worker-b.md) · [C](workers/worker-c.md) ·
+[D](workers/worker-d.md) · [E](workers/worker-e.md). They are generated from this document by
+`build-workers.py`; change the prompt or the roster here and run it again
+(`python3 docs/playbooks/build-workers.py` from the repository root).
 
 **One scheduled task per worker, running every hour**: five tasks in all. The prompt decides
 from the clock what the run is, and most hours it does nothing and stops. Times are Tbilisi time
@@ -67,8 +70,8 @@ spread over its first day before it joins the normal rhythm, so no profile is em
 
 ## The prompt
 
-One prompt for every worker. Replace the worker letter, and paste the rows of that worker's
-pages from the table below under "YOUR PAGES". Schedule the task to run every hour.
+One prompt for every worker. The files in `workers/` are this prompt with the worker's letter
+and its pages filled in; use those. Schedule each to run every hour.
 
 ```text
 You run a set of pages on LifePortal, an app where people track food and training and share
