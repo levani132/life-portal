@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ApiError, api } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
-import { useApi } from '../lib/hooks';
+import { revalidate, useApi } from '../lib/hooks';
 import { actingPageId, rememberActingPage, stopActing } from '../lib/identity';
 import { deleteOfflineData, outbox } from '../lib/offline/runtime';
 import { Avatar } from './avatar';
@@ -78,11 +78,11 @@ export function IdentitySwitcher() {
           <Row
             key={page.id}
             name={page.name}
-            note={page.suspended ? 'Suspended' : `@${page.username}`}
+            note={page.suspended ? 'Suspended' : page.disabled ? 'Switched off' : `@${page.username}`}
             avatarUrl={page.avatarUrl}
             page
             active={acting === page.id}
-            disabled={page.suspended}
+            disabled={page.suspended || page.disabled}
             onChoose={() => choose(page.id)}
           />
         ))}
@@ -92,6 +92,7 @@ export function IdentitySwitcher() {
           <ErrorNote message={error} />
         </div>
       )}
+      {pages.data.pages.length > 0 && <ManagePages pages={pages.data.pages} userId={user.id} />}
       <div className="border-t border-border px-5 py-3">
         {canCreate ? (
           <button type="button" className="btn-ghost gap-2" onClick={() => setCreating(true)}>
@@ -152,6 +153,72 @@ function Row({
         {active && <Check size={18} className="shrink-0 text-accent" aria-label="In use" />}
       </button>
     </li>
+  );
+}
+
+/**
+ * Spec 041: switch a page off or on, or delete it. Off, nobody finds the page or its posts and
+ * nobody can use the app as it; nothing is deleted. Deleting removes everything, at once.
+ */
+function ManagePages({ pages, userId }: { pages: PageSummary[]; userId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = async (work: () => Promise<unknown>, pageId: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await work();
+      // The page in use was switched off or deleted: go back to the person.
+      if (actingPageId() === pageId) {
+        await switchTo(null, userId);
+        return;
+      }
+      await revalidate('/pages');
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'That did not work. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <details className="border-t border-border px-5 py-3 text-sm">
+      <summary className="cursor-pointer text-ink-muted">Manage pages</summary>
+      <ul className="mt-2 space-y-2">
+        {pages.map((page) => (
+          <li key={page.id} className="flex flex-wrap items-center justify-between gap-2">
+            <span className="min-w-0 truncate">
+              {page.name}
+              {page.disabled && <span className="ml-2 text-xs text-ink-faint">switched off</span>}
+            </span>
+            <span className="flex gap-2">
+              <button
+                type="button"
+                className="btn-ghost"
+                disabled={busy}
+                onClick={() => {
+                  if (page.disabled || window.confirm(`Switch ${page.name} off? Nobody will find it or its posts until you switch it on again. Nothing is deleted.`))
+                    void run(() => api.put(`/pages/${page.id}/disabled`, { disabled: !page.disabled }), page.disabled ? '' : page.id);
+                }}
+              >
+                {page.disabled ? 'Switch on' : 'Switch off'}
+              </button>
+              <button
+                type="button"
+                className="btn-danger"
+                disabled={busy}
+                onClick={() => {
+                  if (window.prompt(`Delete ${page.name} and everything it posted? This cannot be undone. Type the page’s username (${page.username}) to confirm.`) === page.username)
+                    void run(() => api.delete(`/pages/${page.id}`), page.id);
+                }}
+              >
+                Delete
+              </button>
+            </span>
+          </li>
+        ))}
+      </ul>
+      {error && <p className="mt-2 text-xs text-danger" role="alert">{error}</p>}
+    </details>
   );
 }
 

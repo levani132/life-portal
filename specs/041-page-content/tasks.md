@@ -23,7 +23,7 @@
 - [x] T024 Web: "What the assistant did" on a page, for its managers.
 
 ## Slice 4: disabling a page
-- [ ] T030 `users.disabledAt` for a page; hidden everywhere; enable/delete in the app; tool disable_page.
+- [x] T030 `users.disabledAt` for a page; hidden everywhere; enable/delete in the app; tool disable_page.
 
 ## Slice 5: recipes and meal plans
 - [ ] T040 Recipe steps and photo on a saved meal.

@@ -36,7 +36,7 @@ export class FollowsService {
   /** A live page: an account of kind `page` that is not suspended. */
   private async livePage(pageId: string): Promise<boolean> {
     if (!isValidObjectId(pageId)) return false;
-    return !!(await this.users.exists({ _id: pageId, kind: 'page', suspendedAt: { $exists: false } }));
+    return !!(await this.users.exists({ _id: pageId, kind: 'page', suspendedAt: { $exists: false }, disabledAt: { $exists: false } }));
   }
 
   async follow(followerId: string, pageId: string): Promise<{ following: true }> {
@@ -83,7 +83,7 @@ export class FollowsService {
     const [already, pages] = await Promise.all([
       this.followedPageIds(viewerId),
       this.users
-        .find({ kind: 'page', suspendedAt: { $exists: false }, managers: { $ne: viewerId } })
+        .find({ kind: 'page', suspendedAt: { $exists: false }, disabledAt: { $exists: false }, managers: { $ne: viewerId } })
         .select('official')
         .limit(500)
         .lean<{ _id: Types.ObjectId; official?: boolean }[]>(),

@@ -166,4 +166,34 @@ describe('the assistant for pages', () => {
     expect((await api.call(ana, 'DELETE', `/pages/${first}`)).status).toBe(200);
     expect(await api.db.collection('page_assistant_actions').countDocuments({ pageId: first })).toBe(0);
   });
+
+  it('can switch a page off but not delete it; the manager switches it on again in the app', async () => {
+    const ana = await api.account('ana');
+    const beka = await api.account('beka');
+    await allow(ana);
+    const call = await connector(ana);
+    const pageId = String((await call('create_page', { name: 'Robot off', username: name('off') })).body.result?.['id']);
+    const posted = await call('create_page_post', { pageId, caption: 'Visible for now' });
+    const postId = String(posted.body.result?.['id']);
+    await api.call(beka, 'PUT', `/follows/${pageId}`, {});
+    const today = new Date().toISOString().slice(0, 10);
+
+    expect((await call('delete_page', { pageId })).status).toBeGreaterThanOrEqual(400);
+    expect((await call('disable_page', { pageId })).status).toBeLessThan(300);
+    // Hidden from everyone else, unusable by the assistant and in the app, and nothing is gone.
+    expect((await api.call(beka, 'GET', `/posts/${postId}`)).status).toBe(404);
+    expect((await api.call(beka, 'GET', `/social/profiles/${pageId}?today=${today}`)).status).toBe(404);
+    expect((await api.call(beka, 'PUT', `/follows/${pageId}`, {})).status).toBe(404);
+    expect((await call('create_page_post', { pageId, caption: 'While off' })).body.code).toBe('PAGE_DISABLED');
+    const acting = await api.call<{ code?: string }>(ana, 'GET', '/social/me', undefined, { 'x-lp-act-as': pageId });
+    expect([acting.status, acting.body.code]).toEqual([403, 'PAGE_DISABLED']);
+    expect(await api.db.collection('food_posts').countDocuments({ userId: pageId })).toBe(1);
+    expect(await api.db.collection('follows').countDocuments({ pageId })).toBe(1);
+
+    // Only the manager, in the app, switches it on again.
+    expect((await api.call(beka, 'PUT', `/pages/${pageId}/disabled`, { disabled: false })).status).toBe(403);
+    expect((await api.call(ana, 'PUT', `/pages/${pageId}/disabled`, { disabled: false })).status).toBe(200);
+    expect((await api.call(beka, 'GET', `/posts/${postId}`)).status).toBe(200);
+    expect((await call('create_page_post', { pageId, caption: 'Back' })).status).toBeLessThan(300);
+  });
 });

@@ -58,6 +58,9 @@ type PageRow = User & { _id: Types.ObjectId };
 
 const notManager = () => new ForbiddenException({ code: 'NOT_A_MANAGER', message: 'You do not manage that page.' });
 
+const disabledPage = () =>
+  new ForbiddenException({ code: 'PAGE_DISABLED', message: 'This page is switched off. Its manager switches it on again in the app: Menu → Manage pages.' });
+
 /** A page's reserved address: required and unique on the account, and unable to receive mail. */
 export const pageEmail = (id: string) => `${id}@pages.lifeportal.invalid`;
 
@@ -66,6 +69,10 @@ export class CreatePageDto implements CreatePageRequest {
   @Matches(/^[a-z0-9][a-z0-9_-]{2,29}$/, { message: 'Use 3–30 lowercase letters, numbers, underscores or hyphens.' })
   username!: string;
   @IsOptional() @IsString() @MaxLength(PAGE_BIO_MAX) bio?: string;
+}
+
+export class DisabledDto {
+  @IsBoolean() disabled!: boolean;
 }
 
 export class AssistantDto {
@@ -126,6 +133,7 @@ export class PagesService {
         aiManaged: row.aiManaged === true,
         official: row.official === true,
         suspended: !!row.suspendedAt,
+        disabled: !!row.disabledAt,
       };
     });
   }
@@ -296,12 +304,24 @@ export class PagesService {
   async actingAs(personId: string, pageId: string): Promise<string> {
     if (!isValidObjectId(pageId)) throw notManager();
     const [page, { access }] = await Promise.all([
-      this.users.findOne({ _id: pageId, kind: 'page', managers: personId }).select('suspendedAt').lean(),
+      this.users.findOne({ _id: pageId, kind: 'page', managers: personId }).select('suspendedAt disabledAt').lean(),
       this.access.forUser(personId),
     ]);
     if (!page || !access.pages) throw notManager();
     if (page.suspendedAt) throw new ForbiddenException({ code: 'PAGE_SUSPENDED', message: 'This page has been suspended.' });
+    if (page.disabledAt) throw disabledPage();
     return String(page._id);
+  }
+
+  /**
+   * Spec 041: a manager switches a page off, or on again. Off, nobody can use the app as it,
+   * nobody else finds it or its posts, and nothing is deleted.
+   */
+  async setDisabled(personId: string, pageId: string, disabled: boolean): Promise<PageSummary> {
+    const row = await this.managed(personId, pageId);
+    await this.users.updateOne({ _id: row._id }, disabled ? { $set: { disabledAt: new Date() } } : { $unset: { disabledAt: '' } });
+    const [summary] = await this.summaries([(await this.users.findById(row._id).lean<PageRow>()) as PageRow]);
+    return summary;
   }
 
   /** Spec 041: the person lets a linked AI assistant act as their pages marked "run with AI", or stops it. */
@@ -327,9 +347,10 @@ export class PagesService {
     if (!(await this.assistantAllowed(personId)))
       throw new ForbiddenException({ code: 'ASSISTANT_OFF', message: 'Assistants are not allowed to manage this account’s pages. The person turns that on in the app: Menu → AI assistant connections.' });
     if (!isValidObjectId(pageId)) throw notManager();
-    const page = await this.users.findOne({ _id: pageId, kind: 'page', managers: personId }).select('suspendedAt aiManaged').lean();
+    const page = await this.users.findOne({ _id: pageId, kind: 'page', managers: personId }).select('suspendedAt disabledAt aiManaged').lean();
     if (!page) throw notManager();
     if (page.suspendedAt) throw new ForbiddenException({ code: 'PAGE_SUSPENDED', message: 'This page has been suspended.' });
+    if (page.disabledAt) throw disabledPage();
     if (!page.aiManaged)
       throw new ForbiddenException({ code: 'PAGE_NOT_AI', message: 'This page is not marked "run with AI", so an assistant cannot act as it. Its manager turns the mark on from the page’s profile in the app.' });
     return String(page._id);
@@ -413,6 +434,12 @@ export class PagesController {
   @Patch(':id')
   update(@CurrentUser('userId') personId: string, @Param('id') id: string, @Body() dto: UpdatePageDto): Promise<PageSummary> {
     return this.pages.update(personId, id, dto);
+  }
+
+  /** Spec 041: switch a page off (hidden everywhere, nothing deleted) or on again. */
+  @Put(':id/disabled')
+  disabled(@CurrentUser('userId') personId: string, @Param('id') id: string, @Body() dto: DisabledDto) {
+    return this.pages.setDisabled(personId, id, dto.disabled);
   }
 
   /** Spec 041: let a linked AI assistant act as this person's "run with AI" pages, or stop it. */

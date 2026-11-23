@@ -112,7 +112,7 @@ export class AccessService {
   async forUser(userId: string) {
     const user = await this.users
       .findById(userId)
-      .select('cohort featureOverrides suspendedAt kind')
+      .select('cohort featureOverrides suspendedAt disabledAt kind')
       .lean();
     if (!user) throw new UnauthorizedException('Account not found.');
     const cohort: UserCohort | 'developer' =
@@ -133,7 +133,8 @@ export class AccessService {
     // Spec 040: a page's features are fixed. The owner's switches are for people.
     const access = user.kind === 'page' ? pageAccess() : resolveFeatureAccess(cohort, overrides);
     // Spec 039: a suspended account has nothing switched on, so nothing of it is shown.
-    if (user.suspendedAt) for (const id of Object.keys(access) as FeatureId[]) access[id] = false;
+    // Spec 041: the same holds for a page its manager disabled.
+    if (user.suspendedAt || user.disabledAt) for (const id of Object.keys(access) as FeatureId[]) access[id] = false;
     return { cohort, access, ...(user.kind === 'page' ? { page: true as const } : {}) };
   }
   async require(userId: string, module: FeatureId) {

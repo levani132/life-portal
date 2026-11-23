@@ -26,6 +26,8 @@ export interface PageSummary {
   /** The app's own page. */
   official: boolean;
   suspended: boolean;
+  /** Spec 041: switched off by its manager; hidden everywhere until switched on again. */
+  disabled: boolean;
 }
 
 /** A page offered to follow. */
@@ -99,5 +101,5 @@ export type Identity =
   | { kind: 'page'; id: string; page: PageSummary; personId: string };
 
 /** Error codes of the pages routes and the acting check. */
-export const PAGE_ERROR_CODES = ['PAGE_LIMIT', 'USERNAME_TAKEN', 'NOT_A_MANAGER', 'NOT_FOR_PAGES', 'PAGES_OFF'] as const;
+export const PAGE_ERROR_CODES = ['PAGE_LIMIT', 'USERNAME_TAKEN', 'NOT_A_MANAGER', 'NOT_FOR_PAGES', 'PAGES_OFF', 'PAGE_DISABLED'] as const;
 export type PageErrorCode = (typeof PAGE_ERROR_CODES)[number];

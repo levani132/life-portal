@@ -102,6 +102,10 @@ export class User {
   @Prop()
   pageLimit?: number;
 
+  /** Spec 041, on a page: switched off by its manager. Hidden everywhere, nothing deleted. */
+  @Prop()
+  disabledAt?: Date;
+
   /** Spec 041, on a person: whether a linked AI assistant may act as the pages they marked "run with AI". */
   @Prop()
   assistantPages?: boolean;

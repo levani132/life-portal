@@ -264,7 +264,8 @@ export class PageAssistantService {
               bio: page.bio,
               runWithAi: page.aiManaged,
               suspended: page.suspended,
-              usable: allowed && page.aiManaged && !page.suspended,
+              disabled: page.disabled,
+              usable: allowed && page.aiManaged && !page.suspended && !page.disabled,
             })),
           };
         },
@@ -293,6 +294,18 @@ export class PageAssistantService {
           const page = await this.acting(personId, args);
           const updated = await this.pages.update(personId, page, { name: String(args['name']), username: String(args['username']), bio: String(args['bio']) });
           return { id: updated.id, name: updated.name, username: updated.username, bio: updated.bio };
+        },
+      },
+      {
+        name: 'disable_page',
+        description:
+          'Switch a page off: it is hidden from everyone and nobody can use the app as it, but nothing is deleted. Only the page’s manager can switch it on again, in the app. An assistant cannot delete a page.',
+        shape: { pageId },
+        run: async (personId, args) => {
+          const page = await this.acting(personId, args);
+          await this.record(personId, page, 'library', 'disable_page', page);
+          const summary = await this.pages.setDisabled(personId, page, true);
+          return { id: summary.id, name: summary.name, disabled: true };
         },
       },
       {

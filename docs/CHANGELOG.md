@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Switch a page off
+
+- **Menu → Manage pages**: switch a page off (nobody finds it or its posts, nothing is deleted)
+  and on again, or delete it for good.
+- An assistant can switch a page off. It cannot switch one on or delete one.
+
 ## 2026-11-23: Create from the + button
 
 - **Create and attach** in the new post screen: make a recipe, a training plan or an exercise

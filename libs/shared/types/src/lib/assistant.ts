@@ -48,5 +48,5 @@ export interface AssistantCapSettings {
 export type AssistantCapOverride = Partial<AssistantCaps>;
 
 /** Error codes the assistant can relay. */
-export const ASSISTANT_ERROR_CODES = ['ASSISTANT_OFF', 'PAGE_NOT_AI', 'NOT_A_MANAGER', 'CAP_REACHED', 'PAGE_SUSPENDED'] as const;
+export const ASSISTANT_ERROR_CODES = ['ASSISTANT_OFF', 'PAGE_NOT_AI', 'NOT_A_MANAGER', 'CAP_REACHED', 'PAGE_SUSPENDED', 'PAGE_DISABLED'] as const;
 export type AssistantErrorCode = (typeof ASSISTANT_ERROR_CODES)[number];

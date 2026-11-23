@@ -165,6 +165,16 @@ email. The manager's own account is untouched. Suspending a person does not susp
 
 Open concerns for this feature are listed at the end of `specs/040-pages/tasks.md`.
 
+## Switching a page off (spec 041)
+
+`users.disabledAt` on a page, set by a manager with `PUT /pages/:id/disabled {disabled}` (Menu →
+Manage pages) or by an assistant with `disable_page`. `AccessService.forUser()` then answers
+nothing-on, exactly as for a suspended account, so the profile, the posts and the page's place
+in feeds and suggestions disappear for everyone else; follows refuse it; acting as it and the
+assistant answer `PAGE_DISABLED`. Nothing is deleted. Only a manager, in the app, switches it on
+again: an assistant can switch off and has no tool to switch on or delete. Menu → Manage pages
+is also where a page is deleted (the username is typed to confirm).
+
 ## Limits and deletion
 
 `mayCreatePage()`: three pages per person by default, counted by `createdBy`; `pageLimit` on the

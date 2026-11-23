@@ -40,7 +40,7 @@ export function actingHeaders(): Record<string, string> {
 }
 
 /** The server's answers that mean "you can no longer act as that page". */
-export const ACTING_ENDED_CODES = ['NOT_A_MANAGER', 'PAGE_SUSPENDED'];
+export const ACTING_ENDED_CODES = ['NOT_A_MANAGER', 'PAGE_SUSPENDED', 'PAGE_DISABLED'];
 
 /** Goes back to the person and starts the app again. */
 export function stopActing(): void {
