@@ -213,10 +213,10 @@ describe('meal plans', () => {
   it('keeps a target weight on the profile', async () => {
     const ana = await api.account('ana');
     expect((await api.call(ana, 'PUT', '/nutrition/profile', { targetWeightGrams: 75_000 })).status).toBeLessThan(300);
-    expect(((await api.call<{ targetWeightGrams?: number }>(ana, 'GET', '/nutrition/profile')).body).targetWeightGrams).toBe(75_000);
+    expect((await api.call<{ profile: { targetWeightGrams?: number } }>(ana, 'GET', '/nutrition/profile')).body.profile.targetWeightGrams).toBe(75_000);
     expect((await api.call(ana, 'PUT', '/nutrition/profile', { targetWeightGrams: 5 })).status).toBe(400);
     await api.call(ana, 'PUT', '/nutrition/profile', { targetWeightGrams: null });
-    expect(((await api.call<{ targetWeightGrams?: number }>(ana, 'GET', '/nutrition/profile')).body).targetWeightGrams).toBeUndefined();
+    expect((await api.call<{ profile: { targetWeightGrams?: number } }>(ana, 'GET', '/nutrition/profile')).body.profile.targetWeightGrams).toBeUndefined();
   });
 
   it('lets a reader use their own foods of the same name instead of copies', async () => {
