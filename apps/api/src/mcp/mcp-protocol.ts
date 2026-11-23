@@ -34,6 +34,32 @@ setInterval(() => {
   }
 }, 60_000).unref();
 
+/**
+ * Closes the session that has been quiet longest, preferring one with no stream open. A
+ * listening stream (GET) can stay open for hours, so "open" alone never frees a slot.
+ */
+function evictOldestSession() {
+  let oldest: [string, McpSession] | undefined;
+  for (const entry of sessions) {
+    const [, session] = entry;
+    if (!oldest) oldest = entry;
+    else {
+      const [, best] = oldest;
+      const idleFirst = (session.open === 0 ? 0 : 1) - (best.open === 0 ? 0 : 1);
+      if (idleFirst < 0 || (idleFirst === 0 && session.lastActive < best.lastActive)) oldest = entry;
+    }
+  }
+  if (!oldest) return;
+  const [id, session] = oldest;
+  sessions.delete(id);
+  session.transport.close().catch(() => undefined);
+}
+
+/** How many sessions are held; for tests. */
+export function mcpSessionCount(): number {
+  return sessions.size;
+}
+
 /** A refusal as the assistant should read it: the code and the sentence, never a stack. */
 function toolError(error: unknown): { error: string; code?: string } {
   const response = (error as { getResponse?: () => unknown }).getResponse?.();
@@ -448,11 +474,10 @@ export async function handleMcpRequest(
 
       // Check if this is an initialization request
       if (!sessionId && isInitializeRequest(body)) {
-        if (sessions.size >= MAX_SESSIONS) {
-          res.writeHead(503, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32000, message: 'Too many sessions' }, id: null }));
-          return;
-        }
+        // Full: the longest-idle session makes room rather than the newcomer being refused.
+        // Sessions keep nothing a tool needs, and a call on an evicted one is answered on its
+        // own (below), so nobody notices. Refusing here broke every worker at once.
+        if (sessions.size >= MAX_SESSIONS) evictOldestSession();
 
         // Create new transport and server
         const transport = new StreamableHTTPServerTransport({
@@ -490,6 +515,7 @@ export async function handleMcpRequest(
           await handleStateless(req, res, body, userId, nutrition, pageTools);
           return;
         }
+        session.lastActive = Date.now();
         trackResponse(session, res);
         await session.transport.handleRequest(req, res, body);
         return;

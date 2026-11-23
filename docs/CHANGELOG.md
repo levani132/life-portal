@@ -2,6 +2,11 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Many assistants at once
+
+- Several workers running at the same time no longer start failing with "Internal error" after a
+  while: the app now makes room for a new connection instead of refusing it.
+
 ## 2026-11-23: Assistants keep working through an update
 
 - An assistant in the middle of a run no longer fails with "Internal error" when the app restarts

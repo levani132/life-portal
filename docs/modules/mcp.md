@@ -265,3 +265,12 @@ its own (`handleStateless`: a server and transport for that request, closed with
 404 `Session not found`; ChatGPT does not start a new session on a 404 and reported `-32603`
 mid-run. A session that belongs to another account is still a 404. Tools keep no session state,
 so nothing is lost.
+
+### A full session table (2026-11-23)
+
+The server holds at most 100 sessions. It used to refuse a new one with 503 `Too many sessions`
+once full, and a session only left the table after 30 idle minutes with no stream open. ChatGPT
+keeps a listening stream (GET) open, so its sessions never left, and with five workers the table
+filled during a day: every new connection was refused, which ChatGPT shows as `-32603`, for
+every worker at once. Now a new session evicts the longest-idle one (sessions with no open stream
+first). A later call on the evicted session is answered statelessly, as after a restart.

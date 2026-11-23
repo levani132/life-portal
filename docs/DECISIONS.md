@@ -2879,3 +2879,10 @@ on; the rules for that mode are already written beside it.
 Changed the same day: the owner wants the pages to engage with real people. `REACH: EVERYONE` is
 on: people's posts first, any page in the subject, one repost of a person's post per run at most.
 `OWN PAGES ONLY` stays written as the fallback.
+
+## 2026-11-23: A full MCP session table evicts, never refuses
+
+Five page workers filled the 100-session table (ChatGPT holds a GET stream open, so idle cleanup
+never freed them) and every new connection got 503, shown as `-32603`. Sessions hold no state a
+tool needs and an unknown session is answered statelessly, so evicting the longest-idle session
+costs nothing; refusing broke every worker at once. The cap stays, so memory stays bounded.
