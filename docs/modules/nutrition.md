@@ -427,6 +427,7 @@ web `components/meal-plans.tsx`. For people and pages.
 | `userId`, `name`, `description?` | |
 | `days[]` | 1 to 14, each `{id, name, entries[]}`; names are free ("Training day", "Day 1") |
 | `days[].entries[]` | Up to 20, each `{id, slot, savedMealId}` (a recipe) or `{id, slot, foodId, amount}` (one food, amount in its own unit) |
+| `days[].entries[].options?` | Spec 043: up to 5 other options, each a recipe or a food with an amount ("chicken, or pork, or tofu"). Eating any one meets the line (`matchPlanDay`); the day's totals count the first. `logDay` takes `choice` (0 the first, 1 the first other option). Published as each option's foods with `line` and `choice`; the reader's copy rebuilds the options, and an option that was a recipe becomes the reader's own recipe |
 | `days[].entries[].slots?` | Every meal the line may be eaten at, when more than one ("lunch or dinner"); `slot` is the first. `planLineSlots()` reads a line's meals, with `uncategorized` meaning any time |
 | `postImportKey?` | A copy saved from a post: one per reader and post |
 | `activeSince?` | The calendar day the person started following this plan. Any number of plans may have it (spec 043). A choice, not a derived value |

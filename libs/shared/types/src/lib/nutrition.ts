@@ -584,7 +584,17 @@ export interface MealPlanEntry {
   savedMealId?: Id;
   foodId?: Id;
   amount?: number;
+  /** Spec 043: other things that may be eaten instead ("chicken, or pork, or tofu"). */
+  options?: MealPlanChoice[];
 }
+
+/** One option of a plan line: a recipe, or one food with an amount. */
+export interface MealPlanChoice {
+  savedMealId?: Id;
+  foodId?: Id;
+  amount?: number;
+}
+export const MEAL_PLAN_OPTIONS_MAX = 5;
 
 export interface MealPlanDay {
   id: Id;
@@ -603,13 +613,21 @@ export interface MealPlanInput {
   days: {
     id?: Id;
     name: string;
-    entries: { id?: Id; slot: MealSlot; slots?: MealSlot[]; savedMealId?: Id; foodId?: Id; amount?: number }[];
+    entries: { id?: Id; slot: MealSlot; slots?: MealSlot[]; savedMealId?: Id; foodId?: Id; amount?: number; options?: MealPlanChoice[] }[];
     rules?: PlanRuleInput[];
   }[];
 }
 
 /** An entry with today's facts resolved. `missing`: its food or recipe is gone, or the recipe has no numbers. */
-export interface MealPlanEntryView extends MealPlanEntry {
+export interface MealPlanEntryView extends Omit<MealPlanEntry, 'options'> {
+  name: string;
+  unit?: FoodUnit;
+  totals: EntryTotals;
+  missing: boolean;
+  /** Spec 043: the other options, resolved the same way. */
+  options?: MealPlanChoiceView[];
+}
+export interface MealPlanChoiceView extends MealPlanChoice {
   name: string;
   unit?: FoodUnit;
   totals: EntryTotals;

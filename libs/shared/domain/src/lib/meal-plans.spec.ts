@@ -77,7 +77,7 @@ describe('mealPlanProblem (spec 042)', () => {
     expect(mealPlanProblem({ ...ok, days: [{ name: '', entries: ok.days[0].entries }] })).toMatch(/Name every day/);
     expect(mealPlanProblem({ ...ok, days: [{ name: 'A', entries: [] }] })).toBe('Add a rule or a meal.');
     expect(mealPlanProblem({ ...ok, days: [{ name: 'A', entries: [{ slot: 'lunch', foodId: 'oats' }] }] })).toMatch(/amount/);
-    expect(mealPlanProblem({ ...ok, days: [{ name: 'A', entries: [{ slot: 'lunch', foodId: 'oats', amount: 10, savedMealId: 'porridge' }] }] })).toMatch(/one recipe or one food/);
+    expect(mealPlanProblem({ ...ok, days: [{ name: 'A', entries: [{ slot: 'lunch', foodId: 'oats', amount: 10, savedMealId: 'porridge' }] }] })).toMatch(/is one recipe or one food/);
     expect(mealPlanProblem({ ...ok, days: [{ name: 'A', entries: [{ slot: 'brunch' as never, foodId: 'oats', amount: 10 }] }] })).toMatch(/meal for every line/);
     expect(mealPlanProblem({ ...ok, days: Array.from({ length: 15 }, () => ok.days[0]) })).toMatch(/14 days/);
   });
@@ -125,6 +125,30 @@ describe('plan lines at more than one meal (spec 042)', () => {
     expect(mealPlanProblem(plan(['lunch', 'dinner']))).toBeUndefined();
     expect(mealPlanProblem(plan(['lunch', 'lunch']))).toBe('Choose a meal for every line.');
     expect(mealPlanProblem(plan(['brunch']))).toBe('Choose a meal for every line.');
+  });
+});
+
+describe('plan lines with options (spec 043)', () => {
+  it('resolves each option, counting the first in the day’s totals', () => {
+    const view = mealPlanView([day('1', [{ id: 'a', slot: 'lunch', foodId: 'oats', amount: 100, options: [{ foodId: 'oats', amount: 50 }, { savedMealId: 'gone' }] }])], foods, recipes);
+    const line = view.days[0].entries[0];
+    expect([line.totals.energyKcal, line.options?.map((option) => [option.totals.energyKcal, option.missing])]).toEqual([400, [[200, false], [0, true]]]);
+    expect(view.days[0].totals.energyKcal).toBe(400);
+  });
+  it('checks every option', () => {
+    const plan = (options: object[]) => ({ name: 'P', days: [{ name: 'D', entries: [{ slot: 'lunch' as const, foodId: 'f', amount: 100, options: options as never }] }] });
+    expect(mealPlanProblem(plan([{ foodId: 'g', amount: 50 }, { savedMealId: 'r' }]))).toBeUndefined();
+    expect(mealPlanProblem(plan([{ foodId: 'g' }]))).toBe('Give every food an amount.');
+    expect(mealPlanProblem(plan([{}]))).toBe('Each line and each option is one recipe or one food.');
+    expect(mealPlanProblem(plan(Array.from({ length: 6 }, () => ({ foodId: 'g', amount: 1 }))))).toMatch(/5 other options/);
+  });
+  it('is met by eating any one option, by id, recipe or name', () => {
+    const line = { id: 'l', slot: 'lunch' as const, foodId: 'chicken', name: 'Chicken', options: [{ foodId: 'pork', name: 'Pork' }, { savedMealId: 'tofu-bowl' }] };
+    const meal = (id: string, extra: Record<string, string>) => ({ id, slot: 'lunch' as const, foodId: 'x', ...extra });
+    expect(matchPlanDay([line], [meal('e', { foodId: 'pork' })]).get('l')).toEqual(['e']);
+    expect(matchPlanDay([line], [meal('e', { savedMealId: 'tofu-bowl' }), meal('f', { savedMealId: 'tofu-bowl' })]).get('l')).toEqual(['e', 'f']);
+    expect(matchPlanDay([line], [meal('e', { name: 'pork' })]).get('l')).toEqual(['e']);
+    expect(matchPlanDay([line], [meal('e', { name: 'Beef' })]).has('l')).toBe(false);
   });
 });
 

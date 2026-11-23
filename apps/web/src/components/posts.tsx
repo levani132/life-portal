@@ -678,6 +678,7 @@ export function PostCard({
               )}
               <div className="flex flex-wrap justify-between gap-2">
                 <span className="font-medium">
+                  {food.choice && !(post.items[index - 1]?.line === food.line && post.items[index - 1]?.choice === food.choice) ? <span className="mr-1 text-xs font-semibold uppercase text-accent">or</span> : null}
                   {food.name}
                   {food.brand && (
                     <span className="ml-1 text-ink-faint">{food.brand}</span>

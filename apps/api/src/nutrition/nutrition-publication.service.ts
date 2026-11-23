@@ -162,23 +162,38 @@ export class NutritionPublicationService {
       // foods it is made of, named for the recipe. Only foods, amounts, slots and day names leave.
       const plan = await this.mealPlans.row(userId, source.mealPlanId as string);
       if (!plan) throw new NotFoundException('Meal plan not found.');
-      const recipeIds = plan.days.flatMap((day) => day.entries.flatMap((entry) => (entry.savedMealId ? [entry.savedMealId] : [])));
+      const recipeIds = plan.days.flatMap((day) =>
+        day.entries.flatMap((entry) => [entry, ...(entry.options ?? [])].flatMap((choice) => (choice.savedMealId ? [choice.savedMealId] : []))),
+      );
       const recipes = recipeIds.length ? await this.meals.find({ userId, _id: { $in: recipeIds }, archived: false }).lean() : [];
+      // Spec 043: a line with options publishes each option's foods, marked with the line and option.
       const lines = plan.days.flatMap((day, dayIndex) =>
-        day.entries.flatMap((entry) => {
+        day.entries.flatMap((entry, lineIndex) => {
           const slots = entry.slots && entry.slots.length > 1 ? entry.slots : undefined;
-          if (!entry.savedMealId) return [{ dayIndex, slot: entry.slot, slots, foodId: entry.foodId as string, amount: entry.amount as number, group: undefined as string | undefined }];
-          const recipe = recipes.find((meal) => String(meal._id) === entry.savedMealId);
-          if (!recipe || !recipe.components.length)
-            throw new BadRequestException({ code: 'PLAN_INCOMPLETE', message: 'A recipe in this plan has no foods with numbers. Edit the plan before sharing it.' });
-          return recipe.components.map((component) => ({ dayIndex, slot: entry.slot, slots, foodId: component.foodId, amount: component.amount, group: recipe.name as string | undefined }));
+          const choices = [entry, ...(entry.options ?? [])];
+          return choices.flatMap((choice, choiceIndex) => {
+            const tag = choices.length > 1 ? { line: lineIndex, choice: choiceIndex } : {};
+            if (!choice.savedMealId)
+              return [{ dayIndex, slot: entry.slot, slots, foodId: choice.foodId as string, amount: choice.amount as number, group: undefined as string | undefined, ...tag }];
+            const recipe = recipes.find((meal) => String(meal._id) === choice.savedMealId);
+            if (!recipe || !recipe.components.length)
+              throw new BadRequestException({ code: 'PLAN_INCOMPLETE', message: 'A recipe in this plan has no foods with numbers. Edit the plan before sharing it.' });
+            return recipe.components.map((component) => ({ dayIndex, slot: entry.slot, slots, foodId: component.foodId, amount: component.amount, group: recipe.name as string | undefined, ...tag }));
+          });
         }),
       );
       const rows = await this.foods.find({ userId, archived: false, _id: { $in: lines.map((line) => line.foodId) } }).lean();
       const items = lines.map((line, index) => {
         const food = rows.find((row) => String(row._id) === line.foodId);
         if (!food) throw new BadRequestException({ code: 'PLAN_INCOMPLETE', message: 'A food in this plan is no longer available. Edit the plan before sharing it.' });
-        return { ...this.fromFood(food, String(index), line.amount), slot: line.slot, ...(line.slots ? { slots: line.slots } : {}), dayIndex: line.dayIndex, ...(line.group ? { group: line.group } : {}) };
+        return {
+          ...this.fromFood(food, String(index), line.amount),
+          slot: line.slot,
+          ...(line.slots ? { slots: line.slots } : {}),
+          dayIndex: line.dayIndex,
+          ...(line.group ? { group: line.group } : {}),
+          ...('line' in line ? { line: line.line, choice: line.choice } : {}),
+        };
       });
       // Spec 043: the rules travel as written, which holds nothing but numbers and limits.
       const strip = (rules: PlanRule[] | undefined) => (rules ?? []).map(({ id: _id, ...rule }) => ({ ...rule, id: '' }) as PlanRule);
@@ -362,7 +377,7 @@ export class NutritionPublicationService {
     let createdCount = 0;
     // Upserts are independent/idempotent. A retry resumes an interrupted collection import.
     for (const [key, { item }] of unique) {
-      const { key: _key, amount: _amount, slot: _slot, slots: _slots, dayIndex: _dayIndex, group: _group, ...facts } = item;
+      const { key: _key, amount: _amount, slot: _slot, slots: _slots, dayIndex: _dayIndex, group: _group, line: _line, choice: _choice, ...facts } = item;
       try {
         const result = await this.foods.updateOne(
           { userId, postImportKey: key },
@@ -432,13 +447,53 @@ export class NutritionPublicationService {
       const copies = await this.foods.find({ userId, postImportKey: { $in: unique.map(([key]) => key) } }).lean();
       const own = new Map(skipped.map((row) => [row.item.key, String(row.duplicate!._id)]));
       const idOf = (item: PublishedFood) => own.get(item.key) ?? String(copies.find((food) => food.postImportKey === this.importKey(postId, item))!._id);
-      const days = (publication.days ?? ['Day 1']).map((name, dayIndex) => ({
-        name,
-        entries: selected
-          .filter((item) => (item.dayIndex ?? 0) === dayIndex)
-          .map((item) => ({ slot: item.slot ?? ('uncategorized' as const), ...(item.slots ? { slots: item.slots } : {}), foodId: idOf(item), amount: item.amount ?? item.servingSize })),
-        ...(publication.planRules?.days[dayIndex]?.length ? { rules: publication.planRules.days[dayIndex] } : {}),
-      }));
+      // An option that was a recipe becomes a recipe of the reader's own, once.
+      const recipeOf = async (dayIndex: number, items: PublishedFood[]): Promise<{ savedMealId: string } | { foodId: string; amount: number }> => {
+        // A single food is a food; anything published from a recipe (it has a `group`) stays a recipe.
+        if (items.length === 1 && !items[0].group) return { foodId: idOf(items[0]), amount: items[0].amount ?? items[0].servingSize };
+        const key = `${postId}:plan:${dayIndex}:${items[0].line}:${items[0].choice}`;
+        try {
+          await this.meals.updateOne(
+            { userId, postImportKey: key },
+            {
+              $setOnInsert: {
+                userId,
+                postImportKey: key,
+                name: items[0].group ?? items.map((item) => item.name).join(', '),
+                components: items.map((item) => ({ foodId: idOf(item), amount: item.amount ?? item.servingSize })),
+                archived: false,
+              },
+            },
+            { upsert: true },
+          );
+        } catch (error) {
+          if ((error as { code?: number }).code !== 11000) throw error;
+        }
+        return { savedMealId: String((await this.meals.findOne({ userId, postImportKey: key }).select('_id').lean())!._id) };
+      };
+      const days = [];
+      for (const [dayIndex, name] of (publication.days ?? ['Day 1']).entries()) {
+        const onDay = selected.filter((item) => (item.dayIndex ?? 0) === dayIndex);
+        const entries = [];
+        const seen = new Set<number>();
+        for (const item of onDay) {
+          const placement = { slot: item.slot ?? ('uncategorized' as const), ...(item.slots ? { slots: item.slots } : {}) };
+          if (item.line === undefined) {
+            entries.push({ ...placement, foodId: idOf(item), amount: item.amount ?? item.servingSize });
+            continue;
+          }
+          if (seen.has(item.line)) continue;
+          seen.add(item.line);
+          // A line with options: each option's foods, the first option first.
+          const ofLine = onDay.filter((each) => each.line === item.line);
+          const choices = [...new Set(ofLine.map((each) => each.choice ?? 0))].sort((a, b) => a - b);
+          const resolved = [];
+          for (const choice of choices) resolved.push(await recipeOf(dayIndex, ofLine.filter((each) => (each.choice ?? 0) === choice)));
+          const [first, ...options] = resolved;
+          entries.push({ ...placement, ...first, ...(options.length ? { options } : {}) });
+        }
+        days.push({ name, entries, ...(publication.planRules?.days[dayIndex]?.length ? { rules: publication.planRules.days[dayIndex] } : {}) });
+      }
       // A plan of rules alone has no days.
       const kept = publication.items.length || (publication.days ?? []).length ? days : [];
       mealPlanId = await this.mealPlans.saveImported(userId, postId, mealName?.trim() || publication.label, kept, { authorId, rules: publication.planRules?.plan });

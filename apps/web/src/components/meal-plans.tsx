@@ -5,6 +5,7 @@ import { CalendarCheck, Pencil, Plus, Share2, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
   MEAL_PLAN_LIMITS,
+  MEAL_PLAN_OPTIONS_MAX,
   MEAL_SLOTS,
   PLAN_RULE_LIMITS,
   type ActiveMealPlan,
@@ -114,15 +115,15 @@ export function plansOnDay(plans: readonly ActiveMealPlan[], entries: readonly M
     marks,
     /** Lines not eaten yet, each listed at every meal it may be eaten at. */
     openAt: (slot: MealSlot): PlannedItem[] =>
-      states.flatMap(({ plan, match }) => plan.day.lines.filter((line) => !match.has(line.id) && !line.missing && planLineSlots(line).includes(slot)).map((line) => ({ plan, line }))),
+      states.flatMap(({ plan, match }) => plan.day.lines.filter((line) => !match.has(line.id) && (!line.missing || line.options?.some((option) => !option.missing)) && planLineSlots(line).includes(slot)).map((line) => ({ plan, line }))),
     /** Combined rules for the whole day, and for one meal. */
     dayRules: rules.filter((rule) => rule.scope === 'day'),
     rulesAt: (slot: MealSlot) => rules.filter((rule) => rule.scope === slot),
   };
 }
 
-const logPlanned = (plan: ActiveMealPlan, day: string, lines: ActivePlanLine[], slot?: MealSlot) =>
-  api.post(`${PLANS_KEY}/${plan.planId}/days/${plan.day.id}/log`, { day, entryIds: lines.map((line) => line.id), ...(slot ? { slot } : {}) });
+const logPlanned = (plan: ActiveMealPlan, day: string, lines: ActivePlanLine[], slot?: MealSlot, choice = 0) =>
+  api.post(`${PLANS_KEY}/${plan.planId}/days/${plan.day.id}/log`, { day, entryIds: lines.map((line) => line.id), ...(slot ? { slot } : {}), ...(choice ? { choice } : {}) });
 
 /** A combined rule's number in display units: kcal, or g for a macro. */
 const shown = (metric: PlanRuleMetric, n: number) => (metric === 'energy' ? Math.round(n) : mgToG(n));
@@ -339,12 +340,12 @@ export function PlannedLines({ items, slot, day, onChanged }: { items: PlannedIt
   const action = useAction();
   const [busy, setBusy] = useState<string | null>(null);
   if (!items.length) return null;
-  const log = ({ plan, line }: PlannedItem) => {
-    setBusy(line.id);
+  const log = ({ plan, line }: PlannedItem, choice: number) => {
+    setBusy(`${line.id}:${choice}`);
     void action
       .run(
         async () => {
-          await logPlanned(plan, day, [line], slot);
+          await logPlanned(plan, day, [line], slot, choice);
           await refreshPlans();
           onChanged();
         },
@@ -352,26 +353,46 @@ export function PlannedLines({ items, slot, day, onChanged }: { items: PlannedIt
       )
       .finally(() => setBusy(null));
   };
+  const amountText = (choice: { amount?: number; unit?: string }) => (choice.amount ? `${choice.amount} ${choice.unit ?? ''} · ` : '');
+  const logButton = (item: PlannedItem, choice: number, name: string, disabled = false) => (
+    <button type="button" className="btn-ghost shrink-0 border border-border px-3" disabled={action.pending || disabled} aria-label={`Log ${name}`} onClick={() => log(item, choice)}>
+      {busy === `${item.line.id}:${choice}` ? '…' : 'Log'}
+    </button>
+  );
   return (
     <ul className="space-y-1 px-1.5 pb-1.5 sm:px-4 sm:pb-3" aria-label="Planned">
       {items.map((item) => {
         const { line } = item;
         const slots = planLineSlots(line);
         return (
-          <li key={`${item.plan.planId}:${line.id}`} className="flex items-center gap-2 rounded-xl border border-dashed border-border px-2.5 py-2 text-[15px] leading-snug">
-            <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg text-ink-faint">
-              <CalendarCheck size={18} aria-hidden />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium text-ink-muted">{line.name}</p>
-              <p className="truncate text-[13px] text-ink-faint">
-                Planned{slots.length > 1 ? ` · ${planSlotsLabel(slots).toLowerCase()}` : ''} · {line.amount ? `${line.amount} ${line.unit ?? ''} · ` : ''}
-                {line.totals.energyKcal} kcal · P {mgToG(line.totals.proteinMg)} g
-              </p>
+          <li key={`${item.plan.planId}:${line.id}`} className="rounded-xl border border-dashed border-border px-2.5 py-2 text-[15px] leading-snug">
+            <div className="flex items-center gap-2">
+              <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg text-ink-faint">
+                <CalendarCheck size={18} aria-hidden />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-ink-muted">{line.name}</p>
+                <p className="truncate text-[13px] text-ink-faint">
+                  Planned{slots.length > 1 ? ` · ${planSlotsLabel(slots).toLowerCase()}` : ''} · {amountText(line)}
+                  {line.totals.energyKcal} kcal · P {mgToG(line.totals.proteinMg)} g
+                </p>
+              </div>
+              {logButton(item, 0, line.name, line.missing)}
             </div>
-            <button type="button" className="btn-ghost shrink-0 border border-border px-3" disabled={action.pending} aria-label={`Log ${line.name}`} onClick={() => log(item)}>
-              {busy === line.id ? '…' : 'Log'}
-            </button>
+            {/* Spec 043: or one of these instead. Any of them meets the line. */}
+            {line.options?.map((option, index) => (
+              <div key={index} className="mt-1.5 flex items-center gap-2 border-t border-dashed border-border/70 pt-1.5">
+                <span className="w-[38px] shrink-0 text-center text-[11px] font-semibold uppercase text-accent">or</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-ink-muted">{option.name}</p>
+                  <p className="truncate text-[13px] text-ink-faint">
+                    {amountText(option)}
+                    {option.missing ? 'no numbers' : `${option.totals.energyKcal} kcal · P ${mgToG(option.totals.proteinMg)} g`}
+                  </p>
+                </div>
+                {logButton(item, index + 1, option.name, option.missing)}
+              </div>
+            ))}
           </li>
         );
       })}
@@ -616,7 +637,7 @@ export function MealPlans({ canLog }: { canLog: boolean }) {
                       ) : (
                         <ul className="mt-1 space-y-0.5 text-sm">
                           {day.entries.map((entry) => (
-                            <li key={entry.id} className="flex justify-between gap-3">
+                            <li key={entry.id} className="flex flex-wrap justify-between gap-x-3">
                               <span className={entry.missing ? 'text-danger' : undefined}>
                                 <span className="text-ink-faint">{planSlotsLabel(planLineSlots(entry))} · </span>
                                 {entry.name}
@@ -624,6 +645,12 @@ export function MealPlans({ canLog }: { canLog: boolean }) {
                                 {entry.missing ? ' (no numbers)' : ''}
                               </span>
                               <span className="shrink-0 text-ink-muted">{entry.totals.energyKcal} kcal</span>
+                              {entry.options?.map((option, index) => (
+                                <span key={index} className="basis-full pl-4 text-ink-muted">
+                                  <span className="font-semibold text-accent">or</span> {option.name}
+                                  {option.amount ? ` · ${option.amount} ${option.unit ?? ''}` : ''} · {option.totals.energyKcal} kcal
+                                </span>
+                              ))}
                             </li>
                           ))}
                         </ul>
@@ -649,7 +676,19 @@ interface Line {
   savedMealId: string;
   food?: FoodWithUsage;
   amount: string;
+  /** Spec 043: other things that may be eaten instead. */
+  options: OptionDraft[];
 }
+interface OptionDraft {
+  key: string;
+  kind: 'recipe' | 'food';
+  savedMealId: string;
+  food?: FoodWithUsage;
+  amount: string;
+}
+/** An option or a line, as a save sends it: a recipe, or a food with its amount. */
+const choiceInput = (choice: { kind: 'recipe' | 'food'; savedMealId: string; food?: FoodWithUsage; amount: string }) =>
+  choice.kind === 'recipe' ? { savedMealId: choice.savedMealId || undefined } : { foodId: choice.food?.id, amount: choice.amount ? Number(choice.amount) : undefined };
 interface DayDraft {
   key: string;
   id?: string;
@@ -660,6 +699,23 @@ interface DayDraft {
 }
 let seq = 0;
 const key = () => `k${seq++}`;
+
+/** An amount in a food's own unit, beside an option (spec 043). */
+function AmountInput({ value, food, onChange }: { value: string; food?: FoodWithUsage; onChange: (amount: string) => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <Input
+        inputMode="numeric"
+        aria-label={`Amount${food ? ` of ${food.name}` : ''}`}
+        className="w-24 shrink-0"
+        placeholder={food?.unit ?? 'g'}
+        value={value}
+        onChange={(event) => onChange(event.target.value.replace(/\D/g, ''))}
+      />
+      <span className="text-xs text-ink-faint">{food?.unit ?? 'g'}</span>
+    </div>
+  );
+}
 
 export function MealPlanEditor({ plan, onClose, onSaved }: { plan?: MealPlan; onClose: () => void; /** Told about the saved plan, e.g. to pair it in a programme. */ onSaved?: (plan: MealPlan) => void }) {
   const foods = useApi<FoodWithUsage[]>('/nutrition/foods');
@@ -690,6 +746,13 @@ export function MealPlanEditor({ plan, onClose, onSaved }: { plan?: MealPlan; on
             savedMealId: entry.savedMealId ?? '',
             food: entry.foodId ? live.find((food) => food.id === entry.foodId) : undefined,
             amount: entry.amount ? String(entry.amount) : '',
+            options: (entry.options ?? []).map((option) => ({
+              key: key(),
+              kind: option.savedMealId ? ('recipe' as const) : ('food' as const),
+              savedMealId: option.savedMealId ?? '',
+              food: option.foodId ? live.find((food) => food.id === option.foodId) : undefined,
+              amount: option.amount ? String(option.amount) : '',
+            })),
           })),
         }))
       : [{ key: key(), name: 'Day 1', lines: [], rules: [] }]);
@@ -711,7 +774,8 @@ export function MealPlanEditor({ plan, onClose, onSaved }: { plan?: MealPlan; on
       entries: day.lines.map((line) =>
         ({
           ...lineSlotsInput(line.slots),
-          ...(line.kind === 'recipe' ? { savedMealId: line.savedMealId || undefined } : { foodId: line.food?.id, amount: line.amount ? Number(line.amount) : undefined }),
+          ...choiceInput(line),
+          ...(line.options.length ? { options: line.options.map(choiceInput) } : {}),
         }),
       ),
     })),
@@ -778,6 +842,59 @@ export function MealPlanEditor({ plan, onClose, onSaved }: { plan?: MealPlan; on
                     ) : (
                       <FoodCombobox foods={live} selected={line.food} onSelect={(food) => setLine(day.key, line.key, { food, amount: line.amount || String(food.servingSize) })} />
                     )}
+                    {line.kind === 'food' && line.options.length > 0 && (
+                      <AmountInput value={line.amount} food={line.food} onChange={(amount) => setLine(day.key, line.key, { amount })} />
+                    )}
+                    {/* Spec 043: "or" options. Eating any one of them meets the line. */}
+                    {line.options.map((option) => {
+                      const setOption = (patch: Partial<OptionDraft>) => setLine(day.key, line.key, { options: line.options.map((each) => (each.key === option.key ? { ...each, ...patch } : each)) });
+                      return (
+                        <div key={option.key} className="space-y-1.5 border-l-2 border-accent-solid/40 pl-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold uppercase tracking-wide text-accent">or</span>
+                            <button type="button" className="btn-ghost shrink-0" aria-label="Remove this option" onClick={() => setLine(day.key, line.key, { options: line.options.filter((each) => each.key !== option.key) })}>
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                          {option.kind === 'recipe' ? (
+                            <Select aria-label="Recipe" value={option.savedMealId} onChange={(event) => setOption({ savedMealId: event.target.value })}>
+                              <option value="">Choose a recipe…</option>
+                              {usable.map((meal) => (
+                                <option key={meal.id} value={meal.id}>
+                                  {meal.name} · {meal.totals.energyKcal} kcal
+                                </option>
+                              ))}
+                            </Select>
+                          ) : (
+                            <>
+                              <FoodCombobox foods={live} selected={option.food} onSelect={(food) => setOption({ food, amount: option.amount || String(food.servingSize) })} />
+                              <AmountInput value={option.amount} food={option.food} onChange={(amount) => setOption({ amount })} />
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {line.options.length < MEAL_PLAN_OPTIONS_MAX && (
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          className="rounded-full border border-border px-2.5 py-1 text-xs text-ink-muted hover:text-ink"
+                          disabled={!live.length}
+                          onClick={() => setLine(day.key, line.key, { options: [...line.options, { key: key(), kind: 'food', savedMealId: '', amount: '' }] })}
+                        >
+                          + Or a food
+                        </button>
+                        {usable.length > 0 && (
+                          <button
+                            type="button"
+                            className="rounded-full border border-border px-2.5 py-1 text-xs text-ink-muted hover:text-ink"
+                            onClick={() => setLine(day.key, line.key, { options: [...line.options, { key: key(), kind: 'recipe', savedMealId: '', amount: '' }] })}
+                          >
+                            + Or a recipe
+                          </button>
+                        )}
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
                       {/* One meal, or several: "lunch or dinner", or all four for any time. */}
                       <div className="flex min-w-0 flex-1 flex-wrap gap-1" role="group" aria-label="Eaten at">
@@ -799,7 +916,7 @@ export function MealPlanEditor({ plan, onClose, onSaved }: { plan?: MealPlan; on
                           );
                         })}
                       </div>
-                      {line.kind === 'food' && (
+                      {line.kind === 'food' && line.options.length === 0 && (
                         <Input
                           inputMode="numeric"
                           aria-label={`Amount${line.food ? ` of ${line.food.name}` : ''}`}
@@ -830,7 +947,7 @@ export function MealPlanEditor({ plan, onClose, onSaved }: { plan?: MealPlan; on
                     className="btn-ghost"
                     disabled={!usable.length}
                     title={usable.length ? undefined : 'You have no recipes with foods yet'}
-                    onClick={() => setDay(day.key, { lines: [...day.lines, { key: key(), slots: ['breakfast'], kind: 'recipe', savedMealId: '', amount: '' }] })}
+                    onClick={() => setDay(day.key, { lines: [...day.lines, { key: key(), slots: ['breakfast'], kind: 'recipe', savedMealId: '', amount: '', options: [] }] })}
                   >
                     <Plus size={16} /> Recipe
                   </button>
@@ -839,7 +956,7 @@ export function MealPlanEditor({ plan, onClose, onSaved }: { plan?: MealPlan; on
                     className="btn-ghost"
                     disabled={!live.length}
                     title={live.length ? undefined : 'You have no foods yet'}
-                    onClick={() => setDay(day.key, { lines: [...day.lines, { key: key(), slots: ['breakfast'], kind: 'food', savedMealId: '', amount: '' }] })}
+                    onClick={() => setDay(day.key, { lines: [...day.lines, { key: key(), slots: ['breakfast'], kind: 'food', savedMealId: '', amount: '', options: [] }] })}
                   >
                     <Plus size={16} /> Food
                   </button>

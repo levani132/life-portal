@@ -8,6 +8,9 @@
 - [x] T005 Food: daily rules on the macro tiles, meal rules in meal headers, any day.
 - [x] T006 Integration tests, docs.
 
+## Slice 3 (built 2026-11-23, before slice 2, at the owner's ask)
+- [x] T020 Food options: a line may have up to five other options; any one meets it; logged by choice; shared and copied (a recipe option becomes the reader's recipe); the assistant can write them.
+
 ## Slice 2
 - [ ] T010 Daily rules override the app's targets everywhere; You says so; choosing an app goal warns and stops following.
 

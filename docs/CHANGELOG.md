@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Food options in plans
+
+- **"This, or that"**: a plan line can have up to five options ("chicken, or pork, or tofu"),
+  each a food with an amount or a recipe. Eating any of them counts for the plan.
+- In Food each option has its own Log button; options travel with shared plans.
+
 ## 2026-11-23: Plans made of rules
 
 - **A plan can be numbers**, not only foods: at least, at most, between or about so much

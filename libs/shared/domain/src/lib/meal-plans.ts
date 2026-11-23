@@ -7,8 +7,11 @@ import {
   type MealPlanDay,
   type MealPlanDayView,
   type MealPlanEntryView,
+  type MealPlanChoice,
+  type MealPlanChoiceView,
   type MealPlanInput,
   type MealSlot,
+  MEAL_PLAN_OPTIONS_MAX,
   type NutritionFacts,
 } from '@life-portal/shared-types';
 import { diffDays } from './dates';
@@ -38,28 +41,34 @@ export function mealPlanView(
     return food && !food.archived ? food : undefined;
   };
   const view = days.map((day): MealPlanDayView => {
-    const entries = day.entries.map((entry): MealPlanEntryView => {
-      if (entry.savedMealId) {
-        const recipe = recipes.get(entry.savedMealId);
+    // One recipe or one food with an amount: the line's first option, or another of its options.
+    const resolve = (choice: MealPlanChoice): MealPlanChoiceView => {
+      if (choice.savedMealId) {
+        const recipe = recipes.get(choice.savedMealId);
         const parts = recipe?.components.map((component) => ({ component, food: usable(component.foodId) })) ?? [];
         const missing = !recipe || !parts.length || parts.some((part) => !part.food);
         return {
-          ...entry,
+          ...choice,
           name: recipe?.name ?? 'A recipe that is gone',
           totals: missing ? emptyTotals() : sumTotals(parts.map((part) => entryTotals(part.component.amount, part.food as PlanFood))),
           missing,
         };
       }
-      const food = entry.foodId ? usable(entry.foodId) : undefined;
-      const amount = entry.amount ?? 0;
+      const food = choice.foodId ? usable(choice.foodId) : undefined;
+      const amount = choice.amount ?? 0;
       const missing = !food || amount < 1;
       return {
-        ...entry,
-        name: food?.name ?? (entry.foodId ? foods.get(entry.foodId)?.name : undefined) ?? 'A food that is gone',
+        ...choice,
+        name: food?.name ?? (choice.foodId ? foods.get(choice.foodId)?.name : undefined) ?? 'A food that is gone',
         ...(food ? { unit: food.unit } : {}),
         totals: missing ? emptyTotals() : entryTotals(amount, food as PlanFood),
         missing,
       };
+    };
+    const entries = day.entries.map((entry): MealPlanEntryView => {
+      const { options, ...rest } = entry;
+      // The day's totals count the first option: it is what the plan puts first.
+      return { ...rest, ...resolve(entry), ...(options?.length ? { options: options.map(resolve) } : {}) };
     });
     return { id: day.id, name: day.name, entries, totals: sumTotals(entries.map((entry) => entry.totals)), ...(day.rules?.length ? { rules: day.rules } : {}) };
   });
@@ -99,10 +108,13 @@ export function mealPlanProblem(input: MealPlanInput): string | undefined {
       if (!(MEAL_SLOTS as readonly string[]).includes(entry.slot)) return 'Choose a meal for every line.';
       if (entry.slots && (entry.slots.some((slot) => !(MEAL_SLOTS as readonly string[]).includes(slot)) || new Set(entry.slots).size !== entry.slots.length))
         return 'Choose a meal for every line.';
-      const recipe = !!entry.savedMealId;
-      const food = !!entry.foodId;
-      if (recipe === food) return 'Each line is one recipe or one food.';
-      if (food && !(Number.isInteger(entry.amount) && (entry.amount as number) >= 1 && (entry.amount as number) <= 20_000)) return 'Give every food an amount.';
+      if ((entry.options ?? []).length > MEAL_PLAN_OPTIONS_MAX) return `A line can have ${MEAL_PLAN_OPTIONS_MAX} other options at most.`;
+      for (const choice of [entry, ...(entry.options ?? [])]) {
+        const recipe = !!choice.savedMealId;
+        const food = !!choice.foodId;
+        if (recipe === food) return 'Each line and each option is one recipe or one food.';
+        if (food && !(Number.isInteger(choice.amount) && (choice.amount as number) >= 1 && (choice.amount as number) <= 20_000)) return 'Give every food an amount.';
+      }
     }
   }
   if (!rules.length && !input.days.some((day) => day.entries.length || day.rules?.length)) return 'Add a rule or a meal.';
@@ -155,7 +167,11 @@ export interface PlanLineToMatch {
   savedMealId?: string;
   /** The food's name, for meals of another food by the same name. */
   name?: string;
+  /** Spec 043: other options; eating any one of them meets the line. */
+  options?: readonly { foodId?: string; savedMealId?: string; name?: string }[];
 }
+/** A line's options, its own first. */
+const choicesOf = (line: PlanLineToMatch) => [line, ...(line.options ?? [])];
 export interface EntryToMatch {
   id: string;
   slot: MealSlot;
@@ -191,25 +207,30 @@ export function matchPlanDay(lines: readonly PlanLineToMatch[], entries: readonl
   const open = (line: PlanLineToMatch) => !matched.has(line.id);
   const free = entries.filter((entry) => !used.has(entry.id));
   // 2. A recipe: that recipe's meals, at one of the line's meals if there are any there.
-  for (const line of lines.filter((each) => open(each) && each.savedMealId)) {
+  for (const line of lines.filter((each) => open(each) && choicesOf(each).some((choice) => choice.savedMealId))) {
     const allowed = planLineSlots(line);
-    const candidates = free.filter((entry) => !used.has(entry.id) && entry.savedMealId === line.savedMealId);
+    const recipes = new Set(choicesOf(line).flatMap((choice) => (choice.savedMealId ? [choice.savedMealId] : [])));
+    const all = free.filter((entry) => !used.has(entry.id) && !!entry.savedMealId && recipes.has(entry.savedMealId));
+    // Meals of one recipe at one meal: the first recipe found there.
+    const first = all.find((entry) => allowed.includes(entry.slot)) ?? all[0];
+    const candidates = first ? all.filter((entry) => entry.savedMealId === first.savedMealId) : [];
     const slot = candidates.find((entry) => allowed.includes(entry.slot))?.slot ?? candidates[0]?.slot;
     take(line.id, candidates.filter((entry) => entry.slot === slot));
   }
   // 3. A food: one meal of it, at one of the line's meals first.
-  for (const line of lines.filter((each) => open(each) && each.foodId)) {
+  for (const line of lines.filter((each) => open(each) && choicesOf(each).some((choice) => choice.foodId))) {
     const allowed = planLineSlots(line);
-    const candidates = free.filter((entry) => !used.has(entry.id) && entry.foodId === line.foodId);
+    const ids = new Set(choicesOf(line).flatMap((choice) => (choice.foodId ? [choice.foodId] : [])));
+    const candidates = free.filter((entry) => !used.has(entry.id) && ids.has(entry.foodId));
     const pick = candidates.find((entry) => allowed.includes(entry.slot)) ?? candidates[0];
     if (pick) take(line.id, [pick]);
   }
   // 4. Another food by the same name: a plan saved from a post holds the reader's copies of its
   //    foods, while they may log their own food of that name, as they always have.
-  for (const line of lines.filter((each) => open(each) && each.foodId && each.name)) {
+  for (const line of lines.filter((each) => open(each) && choicesOf(each).some((choice) => choice.foodId && choice.name))) {
     const allowed = planLineSlots(line);
-    const wanted = foodName(line.name as string);
-    const candidates = free.filter((entry) => !used.has(entry.id) && !!entry.name && foodName(entry.name) === wanted);
+    const wanted = new Set(choicesOf(line).flatMap((choice) => (choice.foodId && choice.name ? [foodName(choice.name)] : [])));
+    const candidates = free.filter((entry) => !used.has(entry.id) && !!entry.name && wanted.has(foodName(entry.name)));
     const pick = candidates.find((entry) => allowed.includes(entry.slot)) ?? candidates[0];
     if (pick) take(line.id, [pick]);
   }

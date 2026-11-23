@@ -5,6 +5,7 @@ import { ArrayMaxSize, IsArray, IsIn, IsInt, IsMongoId, IsOptional, IsString, Ma
 import { Model, Types, isValidObjectId } from 'mongoose';
 import {
   MEAL_PLAN_LIMITS,
+  MEAL_PLAN_OPTIONS_MAX,
   MEAL_SLOTS,
   PLAN_RULE_BASES,
   PLAN_RULE_KINDS,
@@ -44,6 +45,15 @@ import { NutritionService } from './nutrition.service';
  * total are worked out on read from the foods as they are now (principle 3). People and pages
  * both keep them; only a person can log a day from one.
  */
+/** Spec 043: another option of a line: a recipe, or a food with an amount. */
+@Schema({ _id: false })
+class MealPlanChoiceSub {
+  @Prop({ type: String }) savedMealId?: string;
+  @Prop({ type: String }) foodId?: string;
+  @Prop({ type: Number }) amount?: number;
+}
+const MealPlanChoiceSchema = SchemaFactory.createForClass(MealPlanChoiceSub);
+
 @Schema({ _id: false })
 class MealPlanEntrySub {
   @Prop({ required: true }) id!: string;
@@ -53,6 +63,7 @@ class MealPlanEntrySub {
   @Prop() savedMealId?: string;
   @Prop() foodId?: string;
   @Prop() amount?: number;
+  @Prop({ type: [MealPlanChoiceSchema], default: undefined }) options?: MealPlanChoiceSub[];
 }
 const MealPlanEntrySchema = SchemaFactory.createForClass(MealPlanEntrySub);
 
@@ -126,6 +137,11 @@ MealPlanSchema.index({ userId: 1, postImportKey: 1 }, { unique: true, partialFil
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
+class MealPlanChoiceDto {
+  @IsOptional() @IsMongoId() savedMealId?: string;
+  @IsOptional() @IsMongoId() foodId?: string;
+  @IsOptional() @IsInt() @Min(1) @Max(20_000) amount?: number;
+}
 class MealPlanEntryDto {
   @IsOptional() @IsString() @MaxLength(40) id?: string;
   @IsIn(MEAL_SLOTS) slot!: MealSlot;
@@ -133,6 +149,7 @@ class MealPlanEntryDto {
   @IsOptional() @IsMongoId() foodId?: string;
   @IsOptional() @IsInt() @Min(1) @Max(20_000) amount?: number;
   @IsOptional() @IsArray() @ArrayMaxSize(MEAL_SLOTS.length) @IsIn(MEAL_SLOTS, { each: true }) slots?: MealSlot[];
+  @IsOptional() @IsArray() @ArrayMaxSize(MEAL_PLAN_OPTIONS_MAX) @ValidateNested({ each: true }) @Type(() => MealPlanChoiceDto) options?: MealPlanChoiceDto[];
 }
 class PlanRuleDto implements PlanRuleInput {
   @IsOptional() @IsString() @MaxLength(40) id?: string;
@@ -164,6 +181,8 @@ export class LogPlanDayDto {
   @IsOptional() @IsArray() @ArrayMaxSize(MEAL_PLAN_LIMITS.entriesPerDay) @IsString({ each: true }) entryIds?: string[];
   /** The meal to log into, which every line must allow. Absent: each line's first meal. */
   @IsOptional() @IsIn(MEAL_SLOTS) slot?: MealSlot;
+  /** Spec 043: which option of the lines to log: 0 the first, 1 the line's first other option. */
+  @IsOptional() @IsInt() @Min(0) @Max(MEAL_PLAN_OPTIONS_MAX) choice?: number;
 }
 
 export class FollowPlanDto {
@@ -245,7 +264,7 @@ export class MealPlansService {
     const problem = mealPlanProblem(input);
     if (problem) throw new BadRequestException(problem);
     const library = await this.library(userId);
-    for (const entry of input.days.flatMap((day) => day.entries)) {
+    for (const entry of input.days.flatMap((day) => day.entries.flatMap((each) => [each, ...(each.options ?? [])]))) {
       if (entry.foodId && !library.foods.has(entry.foodId)) throw new BadRequestException('One of those foods no longer exists.');
       if (entry.savedMealId && !library.recipes.has(entry.savedMealId)) throw new BadRequestException('One of those recipes no longer exists.');
     }
@@ -264,6 +283,9 @@ export class MealPlansService {
           slot: entry.slots?.length ? entry.slots[0] : entry.slot,
           ...(entry.slots && entry.slots.length > 1 ? { slots: entry.slots } : {}),
           ...(entry.savedMealId ? { savedMealId: entry.savedMealId } : { foodId: entry.foodId, amount: entry.amount }),
+          ...(entry.options?.length
+            ? { options: entry.options.map((choice) => (choice.savedMealId ? { savedMealId: choice.savedMealId } : { foodId: choice.foodId, amount: choice.amount })) }
+            : {}),
         })),
       })),
     };
@@ -299,7 +321,8 @@ export class MealPlansService {
     if (!day) throw new NotFoundException('That day is not in this plan.');
     const wanted = dto.entryIds ? day.entries.filter((entry) => dto.entryIds?.includes(entry.id)) : day.entries;
     if (!wanted.length) throw new BadRequestException('There is nothing to log.');
-    if (wanted.some((entry) => entry.missing))
+    // Each option is checked when it is picked, below; the first is what is logged otherwise.
+    if (!dto.choice && wanted.some((entry) => entry.missing))
       throw new BadRequestException({ code: 'PLAN_INCOMPLETE', message: 'Something in this plan has no foods with numbers any more. Edit the plan first.' });
     if (dto.slot && wanted.some((entry) => !planLineSlots(entry).includes(dto.slot as MealSlot)))
       throw new BadRequestException('That is not one of the meals this is planned for.');
@@ -309,9 +332,12 @@ export class MealPlansService {
       .filter((entry) => !done.has(entry.id))
       .flatMap((entry) => {
         const slot = dto.slot ?? entry.slot;
-        return entry.savedMealId
-          ? (recipes.get(entry.savedMealId)?.components ?? []).map((component) => ({ planEntryId: entry.id, slot, ...component, savedMealId: entry.savedMealId }))
-          : [{ planEntryId: entry.id, slot, foodId: entry.foodId as string, amount: entry.amount as number, savedMealId: undefined }];
+        const picked = dto.choice ? entry.options?.[dto.choice - 1] : entry;
+        if (!picked) throw new BadRequestException('That option is not in this plan.');
+        if (picked.missing) throw new BadRequestException({ code: 'PLAN_INCOMPLETE', message: 'That option has no foods with numbers any more. Edit the plan first.' });
+        return picked.savedMealId
+          ? (recipes.get(picked.savedMealId)?.components ?? []).map((component) => ({ planEntryId: entry.id, slot, ...component, savedMealId: picked.savedMealId }))
+          : [{ planEntryId: entry.id, slot, foodId: picked.foodId as string, amount: picked.amount as number, savedMealId: undefined }];
       });
     for (const line of lines)
       await this.nutrition.createEntry(userId, { day: dto.day, slot: line.slot, foodId: line.foodId, amount: line.amount } as never, {
@@ -419,7 +445,7 @@ export class MealPlansService {
     userId: string,
     postId: string,
     name: string,
-    days: { name: string; entries: { slot: MealSlot; slots?: MealSlot[]; foodId: string; amount: number }[]; rules?: PlanRule[] }[],
+    days: { name: string; entries: { slot: MealSlot; slots?: MealSlot[]; foodId?: string; savedMealId?: string; amount?: number; options?: { foodId?: string; savedMealId?: string; amount?: number }[] }[]; rules?: PlanRule[] }[],
     extra: { authorId?: string; rules?: PlanRule[] } = {},
   ): Promise<string> {
     try {

@@ -210,6 +210,49 @@ describe('meal plans', () => {
     expect((await api.call(beka, 'POST', `/posts/${posted.body.id}/import`, { itemKeys: [], duplicatePolicy: 'skip', saveAsMeal: false })).status).toBe(400);
   });
 
+  it('lets a line have options, any of which meets it, logged by choice and shared whole (spec 043)', async () => {
+    const ana = await api.account('ana');
+    const beka = await api.account('beka');
+    const ids = await library(ana);
+    const pork = (await api.call<{ id: string }>(ana, 'POST', '/nutrition/foods', food('Plan pork', 200))).body.id;
+    const made = await api.call<MealPlan>(ana, 'POST', '/nutrition/meal-plans', {
+      name: 'Options',
+      days: [{ name: 'Any day', entries: [{ slot: 'lunch', foodId: ids.rice, amount: 200, options: [{ foodId: pork, amount: 150 }, { savedMealId: ids.recipe }] }] }],
+    });
+    expect(made.status).toBeLessThan(300);
+    const line = made.body.days[0].entries[0];
+    expect([line.name, line.options?.map((option) => [option.name, option.totals.energyKcal])]).toEqual(['Plan rice', [['Plan pork', 300], ['Plan porridge', 200]]]);
+    // The day counts the first option.
+    expect(made.body.days[0].totals.energyKcal).toBe(260);
+    // Someone else's food is refused as an option too.
+    const others = await library(beka);
+    expect((await api.call(ana, 'POST', '/nutrition/meal-plans', { name: 'X', days: [{ name: 'D', entries: [{ slot: 'lunch', foodId: ids.rice, amount: 1, options: [{ foodId: others.rice, amount: 1 }] }] }] })).status).toBe(400);
+
+    // Logging the second option, then the line is met, and logging again adds nothing.
+    await api.call(ana, 'PUT', `/nutrition/meal-plans/${made.body.id}/follow`, { today: '2026-06-01' });
+    const log = (body: Record<string, unknown>) => api.call<{ logged: number }>(ana, 'POST', `/nutrition/meal-plans/${made.body.id}/days/${made.body.days[0].id}/log`, { day: '2026-06-01', entryIds: [line.id], ...body });
+    expect((await log({ choice: 9 })).status).toBe(400);
+    expect((await log({ choice: 1 })).body).toEqual({ logged: 1 });
+    expect((await api.db.collection('meal_entries').findOne({ userId: ana.id, day: '2026-06-01' }))?.['foodId']).toBe(pork);
+    const followed = (await api.call<{ following: ActiveMealPlan[] }>(ana, 'GET', '/nutrition/meal-plans/following?today=2026-06-01')).body.following[0];
+    expect(followed.day.lines[0].logged).toBe(true);
+    expect((await log({ choice: 2 })).body).toEqual({ logged: 0 });
+
+    // Shared, the options travel and the reader's copy has them, a recipe option as their own recipe.
+    const source = { kind: 'mealPlan', mealPlanId: made.body.id };
+    const preview = await api.call<PostPreview>(ana, 'POST', '/posts/preview', { source });
+    const posted = await api.call<FoodPost>(ana, 'POST', '/posts', { requestId: randomUUID(), title: 'Options', caption: '', audience: 'public', source, previewHash: preview.body.previewHash });
+    const read = await api.call<FoodPost>(beka, 'GET', `/posts/${posted.body.id}`);
+    expect(read.body.items.map((item) => [item.name, item.line, item.choice])).toEqual([['Plan rice', 0, 0], ['Plan pork', 0, 1], ['Plan oats', 0, 2]]);
+    const saved = await api.call<PostImportResult>(beka, 'POST', `/posts/${posted.body.id}/import`, { itemKeys: read.body.items.map((item) => item.key), duplicatePolicy: 'copy', saveAsMeal: false, savePlan: true });
+    expect(saved.status).toBeLessThan(300);
+    const copy = (await api.call<MealPlan[]>(beka, 'GET', '/nutrition/meal-plans')).body.find((each) => each.id === saved.body.mealPlanId);
+    expect(copy?.days[0].entries).toHaveLength(1);
+    const copied = copy?.days[0].entries[0];
+    expect([copied?.name, copied?.options?.map((option) => option.name)]).toEqual(['Plan rice', ['Plan pork', 'Plan porridge']]);
+    expect(copied?.options?.[1].savedMealId).toBeTruthy();
+  });
+
   it('keeps a target weight on the profile', async () => {
     const ana = await api.account('ana');
     expect((await api.call(ana, 'PUT', '/nutrition/profile', { targetWeightGrams: 75_000 })).status).toBeLessThan(300);

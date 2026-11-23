@@ -643,7 +643,7 @@ export class PageAssistantService {
             complete: plan.complete,
             dailyAverage: plan.dailyAverage,
             rules: plan.rules.map((rule) => describePlanRule(rule)),
-            days: plan.days.map((day) => ({ name: day.name, totals: day.totals, rules: (day.rules ?? []).map((rule) => describePlanRule(rule)), lines: day.entries.map((entry) => ({ meal: entry.slot, ...(entry.slots ? { alsoAt: entry.slots.slice(1) } : {}), name: entry.name, amount: entry.amount })) })),
+            days: plan.days.map((day) => ({ name: day.name, totals: day.totals, rules: (day.rules ?? []).map((rule) => describePlanRule(rule)), lines: day.entries.map((entry) => ({ meal: entry.slot, ...(entry.slots ? { alsoAt: entry.slots.slice(1) } : {}), name: entry.name, amount: entry.amount, ...(entry.options?.length ? { or: entry.options.map((option) => ({ name: option.name, amount: option.amount })) } : {}) })) })),
           }));
         },
       },
@@ -676,7 +676,15 @@ export class PageAssistantService {
               z.object({
                 name: z.string().min(1).max(40),
                 lines: z
-                  .array(z.object({ meal: z.enum(MEAL_SLOTS), alsoAt: z.array(z.enum(MEAL_SLOTS)).max(4).optional(), recipeId: id.optional(), foodId: id.optional(), amount: z.number().int().min(1).max(20_000).optional() }))
+                  .array(z.object({
+                    meal: z.enum(MEAL_SLOTS),
+                    alsoAt: z.array(z.enum(MEAL_SLOTS)).max(4).optional(),
+                    options: z
+                      .array(z.object({ recipeId: id.optional(), foodId: id.optional(), amount: z.number().int().min(1).max(20_000).optional() }))
+                      .max(5)
+                      .optional()
+                      .describe('Other things that may be eaten instead (chicken, or pork, or tofu): each a recipe or a food with an amount.'),
+                    recipeId: id.optional(), foodId: id.optional(), amount: z.number().int().min(1).max(20_000).optional() }))
                   .max(20),
               }),
             )
@@ -684,10 +692,13 @@ export class PageAssistantService {
         },
         run: (personId, args) =>
           this.counted(personId, args, 'library', 'create_page_meal_plan', async (page) => {
-            const days = (args['days'] as { name: string; lines: { meal: MealSlot; alsoAt?: MealSlot[]; recipeId?: string; foodId?: string; amount?: number }[] }[]).map((day) => ({
+            const days = (args['days'] as { name: string; lines: { meal: MealSlot; alsoAt?: MealSlot[]; options?: { recipeId?: string; foodId?: string; amount?: number }[]; recipeId?: string; foodId?: string; amount?: number }[] }[]).map((day) => ({
               name: day.name,
               entries: day.lines.map((line) => ({
                 slot: line.meal,
+                ...(line.options?.length
+                  ? { options: line.options.map((option) => (option.recipeId ? { savedMealId: option.recipeId } : { foodId: option.foodId, amount: option.amount })) }
+                  : {}),
                 ...(line.alsoAt?.length ? { slots: [...new Set([line.meal, ...line.alsoAt])] } : {}),
                 ...(line.recipeId ? { savedMealId: line.recipeId } : { foodId: line.foodId, amount: line.amount }) })),
             }));
