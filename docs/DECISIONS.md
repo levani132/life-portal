@@ -2852,3 +2852,10 @@ partial following: changing a plan is saving it as one's own. Resolving a rule (
 happens on read with the weights and the day's calorie target passed in, so nothing derived is
 stored. The single-plan routes (`/meal-plans/active`) were replaced by `/following` and
 `/:id/follow`, the same day they shipped.
+
+## 2026-11-23: A followed plan's number beats a hand-typed override (spec 043)
+
+Owner's decision. Precedence for each daily target is: a followed plan's daily rule, then the
+person's own override ("Override the targets by hand"), then the app's calculation. Following a
+plan is the newer, more deliberate choice; the overrides section says when a plan is setting the
+numbers, and stopping the plan brings the override back.
