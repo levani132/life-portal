@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Assistants keep working through an update
+
+- An assistant in the middle of a run no longer fails with "Internal error" when the app restarts
+  after an update; its next call simply works. Workers also try a failed call once more after a
+  minute.
+
 ## 2026-11-23: Screen tests, and workers that update themselves
 
 - Every push now also opens the app in a phone-sized browser and goes through sign-in, the food

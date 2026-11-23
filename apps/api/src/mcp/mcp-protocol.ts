@@ -388,6 +388,29 @@ function trackResponse(session: McpSession, res: ServerResponse) {
 }
 
 /**
+ * One request with no session: a server and transport for it alone, closed when it is answered.
+ */
+async function handleStateless(
+  req: IncomingMessage & { body?: unknown },
+  res: ServerResponse,
+  body: unknown,
+  userId: string,
+  nutrition: NutritionService,
+  pageTools: AssistantTool[],
+): Promise<void> {
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  const server = createMcpServer(userId, nutrition, pageTools);
+  res.on('close', () => {
+    transport.close().catch(() => undefined);
+    server.close().catch(() => undefined);
+  });
+  await server.connect(transport);
+  // The stateless transport answers without a session; the caller's header is not one it knows.
+  delete req.headers['mcp-session-id'];
+  await transport.handleRequest(req, res, body);
+}
+
+/**
  * Handle MCP protocol requests (POST/GET/DELETE on /api/mcp).
  */
 export async function handleMcpRequest(
@@ -453,9 +476,18 @@ export async function handleMcpRequest(
       // Existing session
       if (sessionId) {
         const session = sessions.get(sessionId);
-        if (!session || session.userId !== userId) {
+        // Another account's session: never theirs to use.
+        if (session && session.userId !== userId) {
           res.writeHead(404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32001, message: 'Session not found' }, id: null }));
+          return;
+        }
+        if (!session) {
+          // A session this server does not hold: the server restarted (every push to main does)
+          // or it expired. Sessions keep no state any tool needs, and the caller was just signed
+          // in by its token, so the request is answered on its own rather than failed. Assistants
+          // that do not start a new session on a 404 (ChatGPT) otherwise break mid-run.
+          await handleStateless(req, res, body, userId, nutrition, pageTools);
           return;
         }
         trackResponse(session, res);

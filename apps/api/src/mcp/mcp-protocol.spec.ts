@@ -71,4 +71,14 @@ describe('MCP transport authentication', () => {
     expired = false;
     expect((await rpc({}, 'owner-token', sid, 'DELETE')).status).toBe(200);
   });
+
+  it('answers a call whose session the server no longer holds (after a restart), for the signed-in account', async () => {
+    const call = { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'get_profile', arguments: {} } };
+    const answered = await rpc(call, 'owner-token', 'a-session-from-before-a-restart');
+    expect(answered.status).toBe(200);
+    expect(await answered.text()).toContain('maintain');
+    expect(profile).toHaveBeenCalledWith('owner-1');
+    // Still never without a credential.
+    expect((await rpc(call, undefined, 'a-session-from-before-a-restart')).status).toBe(401);
+  });
 });

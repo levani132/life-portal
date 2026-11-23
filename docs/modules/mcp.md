@@ -256,3 +256,12 @@ workers, with a version hash. Only the developer account (`DEVELOPER_USER_ID`) m
 `docs/playbooks/build-workers.py` into `apps/api/src/mcp/worker-instructions.ts`; each ChatGPT task
 holds only a short block that loads it, so a push changes what every worker does on its next run.
 `list_my_pages` says `hasPhoto` for each page; the instructions require a profile photo first.
+
+### Surviving a restart (2026-11-23)
+
+Sessions live in the API's memory, and every push to `main` restarts the server. A request that
+names a session the server no longer holds, from an account its token signs in, is answered on
+its own (`handleStateless`: a server and transport for that request, closed with it) instead of
+404 `Session not found`; ChatGPT does not start a new session on a 404 and reported `-32603`
+mid-run. A session that belongs to another account is still a 404. Tools keep no session state,
+so nothing is lost.
