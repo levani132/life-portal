@@ -45,7 +45,8 @@ describe('sign-in limits', () => {
   it('limits one IP across accounts', async () => {
     const address = ip();
     let last = 0;
-    for (let i = 0; i < 31; i++) {
+    // Twice the limit: the window is a quarter-hour bucket, and a run can straddle its edge.
+    for (let i = 0; i < 62; i++) {
       last = (await api.call(null, 'POST', '/auth/login', { email: `nobody-${i}@int.test`, password: 'whatever-123' }, from(address))).status;
     }
     expect(last).toBe(429);

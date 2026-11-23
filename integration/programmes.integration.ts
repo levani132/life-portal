@@ -83,13 +83,15 @@ describe('programmes', () => {
 
     const source = { kind: 'mealPlan', mealPlanId: ids.mealPlanId };
     const training = { kind: 'plan', planId: ids.trainingPlanId };
-    const preview = await api.call<PostPreview & { trainingHash: string }>(ana, 'POST', '/posts/preview', { source, training }, as(page.id));
-    expect(preview.status).toBeLessThan(300);
+    // Each half is previewed on its own, as the composer does.
+    const preview = await api.call<PostPreview>(ana, 'POST', '/posts/preview', { source }, as(page.id));
+    const trainingPreview = await api.call<{ trainingHash: string }>(ana, 'POST', '/posts/preview', { training }, as(page.id));
+    expect([preview.status, trainingPreview.status].every((status) => status < 300)).toBe(true);
     const posted = await api.call<FoodPost>(
       ana,
       'POST',
       '/posts',
-      { requestId: randomUUID(), title: 'Page programme', caption: '', audience: 'public', source, previewHash: preview.body.previewHash, training, trainingHash: preview.body.trainingHash, allowCopy: true },
+      { requestId: randomUUID(), title: 'Page programme', caption: '', audience: 'public', source, previewHash: preview.body.previewHash, training, trainingHash: trainingPreview.body.trainingHash, allowCopy: true },
       as(page.id),
     );
     expect(posted.status).toBe(201);
