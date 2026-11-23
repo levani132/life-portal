@@ -45,6 +45,7 @@ import { PostEngagementService } from '../posts/post-engagement.service';
 import { PostsService } from '../posts/posts.service';
 import { SocialService } from '../social/social.module';
 import { CatalogueService } from '../training/catalogue.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ProgrammesService } from '../programmes/programmes.module';
 import { PlansService } from '../training/plans.service';
 
@@ -96,7 +97,7 @@ PageScheduledActionSchema.index({ pageId: 1, runAt: 1 });
 PageScheduledActionSchema.index({ doneAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60, sparse: true });
 
 /** The tools that take `at`: done at that time instead of now. */
-const SCHEDULABLE = new Set(['create_page_post', 'publish_page_draft', 'comment_on_post', 'like_post', 'follow_page', 'reply_in_conversation']);
+const SCHEDULABLE = new Set(['create_page_post', 'publish_page_draft', 'comment_on_post', 'like_post', 'repost_post', 'follow_page', 'reply_in_conversation']);
 /** How many due actions one run of the clock takes. */
 const DUE_PER_RUN = 100;
 /** A row left "running" this long was cut off by a restart; it is failed, never run twice. */
@@ -171,6 +172,7 @@ export class PageAssistantService {
     private readonly media: MediaService,
     private readonly mealPlans: MealPlansService,
     private readonly programmes: ProgrammesService,
+    private readonly notifications: NotificationsService,
     @InjectModel(PageScheduledAction.name) private readonly scheduledActions: Model<PageScheduledAction>,
     @Inject(CONFIG) private readonly config: AppConfig,
   ) {}
@@ -404,6 +406,75 @@ export class PageAssistantService {
   }
 
   private baseTools(): AssistantTool[] {
+    /** Spec 042/043: a meal plan as the assistant writes it, for create and update alike. */
+    const mealPlanShape = {
+      pageId,
+      name: z.string().min(1).max(80),
+      description: z.string().max(500).optional(),
+      rules: z
+        .array(
+          z.object({
+            metric: z.enum(PLAN_RULE_METRICS).describe('energy is calories'),
+            scope: z.enum(PLAN_RULE_SCOPES).describe('day, or one meal'),
+            kind: z.enum(PLAN_RULE_KINDS),
+            basis: z.enum(PLAN_RULE_BASES).describe('amount; perKg of current weight; perKgTarget of target weight; share: percent of calories (a macro), or of the day (calories at a meal)'),
+            value: z.number().positive().optional().describe('For atLeast, atMost, about. Grams for a macro (150 = 150 g), kcal for calories, g or kcal per kg, or percent.'),
+            low: z.number().positive().optional().describe('For between, in the same unit.'),
+            high: z.number().positive().optional(),
+            tolerancePct: z.number().int().min(1).max(50).optional().describe('For about; default 10.'),
+            each: z.boolean().optional().describe('Checked on each food, not the total: then basis is amount (in the food as eaten), per100 (per 100 g) or share (of its own calories). Sugar and satFat rules are always on each food.'),
+            dayIndex: z.number().int().min(0).max(13).optional().describe('Only for that day of the plan; absent: every day.'),
+          }),
+        )
+        .max(20)
+        .optional(),
+      days: z
+        .array(
+          z.object({
+            name: z.string().min(1).max(40),
+            lines: z
+              .array(z.object({
+                meal: z.enum(MEAL_SLOTS),
+                alsoAt: z.array(z.enum(MEAL_SLOTS)).max(4).optional(),
+                options: z
+                  .array(z.object({ recipeId: id.optional(), foodId: id.optional(), amount: z.number().int().min(1).max(20_000).optional() }))
+                  .max(5)
+                  .optional()
+                  .describe('Other things that may be eaten instead (chicken, or pork, or tofu): each a recipe or a food with an amount.'),
+                recipeId: id.optional(), foodId: id.optional(), amount: z.number().int().min(1).max(20_000).optional() }))
+              .max(20),
+          }),
+        )
+        .max(14),
+    };
+    const mealPlanInput = (args: Record<string, unknown>) => {
+      const days = (args['days'] as { name: string; lines: { meal: MealSlot; alsoAt?: MealSlot[]; options?: { recipeId?: string; foodId?: string; amount?: number }[]; recipeId?: string; foodId?: string; amount?: number }[] }[]).map((day) => ({
+        name: day.name,
+        entries: day.lines.map((line) => ({
+          slot: line.meal,
+          ...(line.options?.length
+            ? { options: line.options.map((option) => (option.recipeId ? { savedMealId: option.recipeId } : { foodId: option.foodId, amount: option.amount })) }
+            : {}),
+          ...(line.alsoAt?.length ? { slots: [...new Set([line.meal, ...line.alsoAt])] } : {}),
+          ...(line.recipeId ? { savedMealId: line.recipeId } : { foodId: line.foodId, amount: line.amount }) })),
+      }));
+      // Rules come in the units people use (g, kcal, g per kg, %) and are stored as integers (mg).
+      type RuleArg = Omit<PlanRuleInput, 'id'> & { dayIndex?: number };
+      const toStored = (rule: RuleArg): PlanRuleInput => {
+        const mg = rule.metric !== 'energy' && rule.basis !== 'share';
+        const n = (x: number | undefined) => (x === undefined ? undefined : Math.round(mg ? x * 1000 : x));
+        const { dayIndex: _dayIndex, ...rest } = rule;
+        return { ...rest, value: n(rule.value), low: n(rule.low), high: n(rule.high) };
+      };
+      const ruleArgs = (args['rules'] as RuleArg[] | undefined) ?? [];
+      const planDays = days.map((day, index) => ({ ...day, rules: ruleArgs.filter((rule) => rule.dayIndex === index).map(toStored) }));
+      return {
+        name: String(args['name']),
+        description: args['description'] as string | undefined,
+        rules: ruleArgs.filter((rule) => rule.dayIndex === undefined).map(toStored),
+        days: planDays,
+      };
+    };
     const food = {
       name: z.string().min(1).max(160),
       brand: z.string().max(120).optional(),
@@ -621,6 +692,28 @@ export class PageAssistantService {
           }),
       },
       {
+        name: 'update_page_recipe',
+        description: 'Change a recipe in a page’s library: its name, its foods with amounts, its written ingredients or its steps. Only what you send changes; a list you send replaces that list.',
+        shape: {
+          pageId,
+          recipeId: id,
+          name: z.string().min(1).max(120).optional(),
+          foods: z.array(z.object({ foodId: id, amount: z.number().int().min(1).max(10_000) })).max(20).optional(),
+          ingredients: z.array(z.string().min(1).max(200)).max(40).optional(),
+          steps: z.array(z.string().min(1).max(600)).max(30).optional(),
+        },
+        run: (personId, args) =>
+          this.counted(personId, args, 'library', 'update_page_recipe', async (page) => {
+            const updated = await this.nutrition.updateSavedMeal(page, String(args['recipeId']), {
+              ...(args['name'] !== undefined ? { name: String(args['name']) } : {}),
+              ...(args['foods'] !== undefined ? { components: args['foods'] } : {}),
+              ...(args['ingredients'] !== undefined ? { ingredients: args['ingredients'] } : {}),
+              ...(args['steps'] !== undefined ? { steps: args['steps'] } : {}),
+            } as never);
+            return { result: { id: updated.id, name: updated.name, totals: updated.totals }, targetId: updated.id };
+          }),
+      },
+      {
         name: 'delete_page_recipe',
         description: 'Remove a recipe from a page’s library.',
         shape: { pageId, recipeId: id },
@@ -653,75 +746,22 @@ export class PageAssistantService {
         name: 'create_page_meal_plan',
         description:
           'Create a meal plan in a page’s library: one to fourteen named days ("Training day", "Rest day", or "Day 1"), each a list of lines. A plan may also have rules (numbers to aim for), and may be rules only with no days. A line is a meal (breakfast, lunch, dinner, snack), or several in `alsoAt` when it may be eaten at any of them (lunch or dinner; all four for any time), with either a recipe from the library (recipeId) or one food with an amount in its own unit (foodId and amount). Use recipes and foods that have numbers.',
-        shape: {
-          pageId,
-          name: z.string().min(1).max(80),
-          description: z.string().max(500).optional(),
-          rules: z
-            .array(
-              z.object({
-                metric: z.enum(PLAN_RULE_METRICS).describe('energy is calories'),
-                scope: z.enum(PLAN_RULE_SCOPES).describe('day, or one meal'),
-                kind: z.enum(PLAN_RULE_KINDS),
-                basis: z.enum(PLAN_RULE_BASES).describe('amount; perKg of current weight; perKgTarget of target weight; share: percent of calories (a macro), or of the day (calories at a meal)'),
-                value: z.number().positive().optional().describe('For atLeast, atMost, about. Grams for a macro (150 = 150 g), kcal for calories, g or kcal per kg, or percent.'),
-                low: z.number().positive().optional().describe('For between, in the same unit.'),
-                high: z.number().positive().optional(),
-                tolerancePct: z.number().int().min(1).max(50).optional().describe('For about; default 10.'),
-                each: z.boolean().optional().describe('Checked on each food, not the total: then basis is amount (in the food as eaten), per100 (per 100 g) or share (of its own calories). Sugar and satFat rules are always on each food.'),
-                dayIndex: z.number().int().min(0).max(13).optional().describe('Only for that day of the plan; absent: every day.'),
-              }),
-            )
-            .max(20)
-            .optional(),
-          days: z
-            .array(
-              z.object({
-                name: z.string().min(1).max(40),
-                lines: z
-                  .array(z.object({
-                    meal: z.enum(MEAL_SLOTS),
-                    alsoAt: z.array(z.enum(MEAL_SLOTS)).max(4).optional(),
-                    options: z
-                      .array(z.object({ recipeId: id.optional(), foodId: id.optional(), amount: z.number().int().min(1).max(20_000).optional() }))
-                      .max(5)
-                      .optional()
-                      .describe('Other things that may be eaten instead (chicken, or pork, or tofu): each a recipe or a food with an amount.'),
-                    recipeId: id.optional(), foodId: id.optional(), amount: z.number().int().min(1).max(20_000).optional() }))
-                  .max(20),
-              }),
-            )
-            .max(14),
-        },
+        shape: mealPlanShape,
         run: (personId, args) =>
           this.counted(personId, args, 'library', 'create_page_meal_plan', async (page) => {
-            const days = (args['days'] as { name: string; lines: { meal: MealSlot; alsoAt?: MealSlot[]; options?: { recipeId?: string; foodId?: string; amount?: number }[]; recipeId?: string; foodId?: string; amount?: number }[] }[]).map((day) => ({
-              name: day.name,
-              entries: day.lines.map((line) => ({
-                slot: line.meal,
-                ...(line.options?.length
-                  ? { options: line.options.map((option) => (option.recipeId ? { savedMealId: option.recipeId } : { foodId: option.foodId, amount: option.amount })) }
-                  : {}),
-                ...(line.alsoAt?.length ? { slots: [...new Set([line.meal, ...line.alsoAt])] } : {}),
-                ...(line.recipeId ? { savedMealId: line.recipeId } : { foodId: line.foodId, amount: line.amount }) })),
-            }));
-            // Rules come in the units people use (g, kcal, g per kg, %) and are stored as integers (mg).
-            type RuleArg = Omit<PlanRuleInput, 'id'> & { dayIndex?: number };
-            const toStored = (rule: RuleArg): PlanRuleInput => {
-              const mg = rule.metric !== 'energy' && rule.basis !== 'share';
-              const n = (x: number | undefined) => (x === undefined ? undefined : Math.round(mg ? x * 1000 : x));
-              const { dayIndex: _dayIndex, ...rest } = rule;
-              return { ...rest, value: n(rule.value), low: n(rule.low), high: n(rule.high) };
-            };
-            const ruleArgs = (args['rules'] as RuleArg[] | undefined) ?? [];
-            const planDays = days.map((day, index) => ({ ...day, rules: ruleArgs.filter((rule) => rule.dayIndex === index).map(toStored) }));
-            const created = await this.mealPlans.create(page, {
-              name: String(args['name']),
-              description: args['description'] as string | undefined,
-              rules: ruleArgs.filter((rule) => rule.dayIndex === undefined).map(toStored),
-              days: planDays,
-            });
+            const created = await this.mealPlans.create(page, mealPlanInput(args));
             return { result: { id: created.id, name: created.name, dailyAverage: created.dailyAverage, complete: created.complete }, targetId: created.id };
+          }),
+      },
+      {
+        name: 'update_page_meal_plan',
+        description:
+          'Replace a meal plan in a page’s library: send it whole, as for create_page_meal_plan (name, rules, days). Read it first with list_page_meal_plans.',
+        shape: { ...mealPlanShape, mealPlanId: id },
+        run: (personId, args) =>
+          this.counted(personId, args, 'library', 'update_page_meal_plan', async (page) => {
+            const updated = await this.mealPlans.replace(page, String(args['mealPlanId']), mealPlanInput(args));
+            return { result: { id: updated.id, name: updated.name, dailyAverage: updated.dailyAverage, complete: updated.complete }, targetId: updated.id };
           }),
       },
       {
@@ -756,6 +796,21 @@ export class PageAssistantService {
               trainingPlanId: args['planId'] as string | undefined,
             });
             return { result: created, targetId: created.id };
+          }),
+      },
+      {
+        name: 'update_page_programme',
+        description: 'Change a programme: its name, description, meal plan or training plan. Send the whole programme; a plan left out is taken out of it.',
+        shape: { pageId, programmeId: id, name: z.string().min(1).max(80), description: z.string().max(500).optional(), mealPlanId: id.optional(), planId: id.optional() },
+        run: (personId, args) =>
+          this.counted(personId, args, 'library', 'update_page_programme', async (page) => {
+            const updated = await this.programmes.replace(page, String(args['programmeId']), {
+              name: String(args['name']),
+              description: args['description'] as string | undefined,
+              mealPlanId: args['mealPlanId'] as string | undefined,
+              trainingPlanId: args['planId'] as string | undefined,
+            });
+            return { result: updated, targetId: updated.id };
           }),
       },
       {
@@ -830,6 +885,20 @@ export class PageAssistantService {
               workouts: args['workouts'] as never,
             });
             return { result: { id: created.id, name: created.name }, targetId: created.id };
+          }),
+      },
+      {
+        name: 'update_page_plan',
+        description: 'Replace a training plan in a page’s library: send it whole, as for create_page_plan. Read it first with get_page_plan.',
+        shape: { pageId, planId: id, name: z.string().min(1).max(80), description: z.string().max(500).optional(), workouts },
+        run: (personId, args) =>
+          this.counted(personId, args, 'library', 'update_page_plan', async (page) => {
+            const updated = await this.plans.replace(page, String(args['planId']), {
+              name: String(args['name']),
+              ...(args['description'] ? { description: String(args['description']) } : {}),
+              workouts: args['workouts'] as never,
+            });
+            return { result: { id: updated.id, name: updated.name }, targetId: updated.id };
           }),
       },
       {
@@ -1111,6 +1180,52 @@ export class PageAssistantService {
         description: 'Take back a like.',
         shape: { pageId, postId: id },
         run: async (personId, args) => this.engagement.setLike(await this.acting(personId, args), String(args['postId']), false),
+      },
+      {
+        name: 'repost_post',
+        description: 'Repost a post as the acting page, so the page’s followers see it. Only posts the page can read; never its own.',
+        shape: { pageId, postId: id },
+        run: (personId, args) =>
+          this.counted(personId, args, 'like', 'repost_post', async (page) => ({
+            result: await this.engagement.setRepost(page, String(args['postId']), true),
+            targetId: String(args['postId']),
+          })),
+      },
+      {
+        name: 'unrepost_post',
+        description: 'Take back a repost.',
+        shape: { pageId, postId: id },
+        run: async (personId, args) => this.engagement.setRepost(await this.acting(personId, args), String(args['postId']), false),
+      },
+      {
+        name: 'delete_page_comment',
+        description: 'Delete a comment: one the page wrote anywhere, or anyone’s comment on the page’s own post.',
+        shape: { pageId, postId: id, commentId: id },
+        run: async (personId, args) => this.engagement.remove(await this.acting(personId, args), String(args['postId']), String(args['commentId'])),
+      },
+      {
+        name: 'get_page_notifications',
+        description:
+          'What happened to the page lately, newest first: likes, comments, replies, reposts, follows, messages. Each names the post or comment it is about, so you can answer with get_post_comments and comment_on_post (replyTo). Pass `before` (an ISO time from the last item) for older ones.',
+        shape: { pageId, before: z.string().datetime().optional() },
+        run: async (personId, args) =>
+          this.notifications.activity(await this.acting(personId, args), args['before'] ? new Date(String(args['before'])) : undefined),
+      },
+      {
+        name: 'block_account',
+        description: 'Block a person or page from the acting page: they can no longer see, follow, comment on or message it, and any follow between them ends. For abuse and spam only.',
+        shape: { pageId, accountId: id },
+        run: (personId, args) =>
+          this.counted(personId, args, 'follow', 'block_account', async (page) => ({
+            result: await this.social.act(page, String(args['accountId']), { action: 'block' } as never),
+            targetId: String(args['accountId']),
+          })),
+      },
+      {
+        name: 'unblock_account',
+        description: 'Unblock an account the acting page blocked.',
+        shape: { pageId, accountId: id },
+        run: async (personId, args) => this.social.act(await this.acting(personId, args), String(args['accountId']), { action: 'unblock' } as never),
       },
       {
         name: 'comment_on_post',

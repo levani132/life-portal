@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Page assistants can do everything pages can
+
+- Assistants can now **edit** recipes, meal plans, training plans and programmes, **repost**,
+  read the page's **notifications**, **delete** spam comments and **block** accounts.
+- The five worker instructions now list everything plans can hold (rules, per-food rules,
+  options, programmes) and ask each page to show all of it over a week.
+
 ## 2026-11-23: Follow a whole programme
 
 - A post with a meal plan and a training plan has **Follow this programme**: one tap follows its

@@ -4,6 +4,7 @@
  * AI"; everything counted is capped and listed.
  */
 import { randomUUID } from 'node:crypto';
+import { ObjectId } from 'mongodb';
 import type { AssistantActivity, MyPages, PageSummary } from '@life-portal/shared-types';
 import { startApi, type Account, type TestApi } from './harness';
 
@@ -291,10 +292,40 @@ describe('the assistant for pages', () => {
     const listed = await call('list_page_meal_plans', { pageId });
     expect(JSON.stringify(listed.body.result)).toContain('At least 1.8 g protein per kg of target weight a day');
 
+    // Everything it makes it can also change.
+    const mealPlanId = String(stored?.['_id']);
+    const edited = await call('update_page_meal_plan', { pageId, mealPlanId, name: 'Bot plan 2', days: [{ name: 'Any day', lines: [{ meal: 'dinner', foodId: pork, amount: 100 }] }] });
+    expect(edited.status).toBeLessThan(300);
+    expect(await api.db.collection('meal_plans').findOne({ _id: stored?.['_id'] })).toMatchObject({ name: 'Bot plan 2', rules: [], days: [{ name: 'Any day' }] });
+    const recipe = String((await call('create_page_recipe', { pageId, name: 'Bot bowl', foods: [{ foodId: rice, amount: 100 }] })).body.result?.['id']);
+    const recipeEdit = await call('update_page_recipe', { pageId, recipeId: recipe, steps: ['Boil the rice.'] });
+    expect(recipeEdit.status).toBeLessThan(300);
+    expect(await api.db.collection('saved_meals').findOne({ userId: pageId, name: 'Bot bowl' })).toMatchObject({ steps: ['Boil the rice.'], components: [{ foodId: rice, amount: 100 }] });
+
     const programme = await call('create_page_programme', { pageId, name: 'Bot programme', mealPlanId: String(stored?.['_id']) });
+    expect((await call('update_page_programme', { pageId, programmeId: String(programme.body.result?.['id']), name: 'Bot programme 2', mealPlanId })).status).toBeLessThan(300);
     expect(programme.status).toBeLessThan(300);
     expect((await call('list_page_programmes', { pageId })).body.result).toHaveLength(1);
     expect((await call('delete_page_programme', { pageId, programmeId: String(programme.body.result?.['id']) })).status).toBeLessThan(300);
     expect(await api.db.collection('programmes').countDocuments({ userId: pageId })).toBe(0);
+
+    // It reposts, reads what happened to the page, deletes a comment and blocks an account.
+    const beka = await api.account('beka');
+    const post = await call('create_page_post', { pageId, caption: 'Rice tonight' });
+    const postId = String(post.body.result?.['id']);
+    // Another page of the same person, whose post this one reposts.
+    const otherId = String((await call('create_page', { name: 'Plan robot two', username: name('planbot2') })).body.result?.['id']);
+    const otherPost = String((await call('create_page_post', { pageId: otherId, caption: 'From the other page' })).body.result?.['id']);
+    const comment = (await api.call<{ id: string }>(beka, 'POST', `/posts/${postId}/comments`, { text: 'Spam spam', requestId: randomUUID() })).body;
+    const notes = await call('get_page_notifications', { pageId });
+    expect(notes.status).toBeLessThan(300);
+    expect(JSON.stringify(notes.body.result)).toContain(postId);
+    expect((await call('delete_page_comment', { pageId, postId, commentId: comment.id })).status).toBeLessThan(300);
+    expect(await api.db.collection('post_comments').findOne({ _id: new ObjectId(comment.id) })).toMatchObject({ deleted: true, text: '' });
+    expect((await call('repost_post', { pageId, postId: otherPost })).status).toBeLessThan(300);
+    expect((await call('unrepost_post', { pageId, postId: otherPost })).status).toBeLessThan(300);
+    expect((await call('block_account', { pageId, accountId: beka.id })).status).toBeLessThan(300);
+    expect((await api.call(beka, 'POST', `/posts/${postId}/comments`, { text: 'Again', requestId: randomUUID() })).status).toBeGreaterThanOrEqual(400);
+    expect((await call('unblock_account', { pageId, accountId: beka.id })).status).toBeLessThan(300);
   });
 });

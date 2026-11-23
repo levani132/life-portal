@@ -158,12 +158,12 @@ together. A separate `pages` scope on the grant is the stricter design and is no
 | Group | Tools |
 | --- | --- |
 | Pages | `list_my_pages`, `create_page`, `update_page`, `disable_page` (off, not deleted; only the app switches it on), `get_assistant_activity` |
-| Library | `list_page_foods`, `create_page_food`, `update_page_food`, `delete_page_food`, `list_page_recipes`, `create_page_recipe`, `delete_page_recipe`, `list_page_meal_plans`, `create_page_meal_plan`, `delete_page_meal_plan`, `list_page_programmes`, `create_page_programme`, `delete_page_programme`, `list_page_exercises`, `create_page_exercise`, `list_page_plans`, `get_page_plan`, `create_page_plan`, `delete_page_plan` |
+| Library | `list_page_foods`, `create_page_food`, `update_page_food`, `delete_page_food`, `list_page_recipes`, `create_page_recipe`, `delete_page_recipe`, `list_page_meal_plans`, `create_page_meal_plan`, `update_page_meal_plan`, `delete_page_meal_plan`, `list_page_programmes`, `create_page_programme`, `update_page_programme`, `delete_page_programme`, `update_page_recipe`, `update_page_plan`, `list_page_exercises`, `create_page_exercise`, `list_page_plans`, `get_page_plan`, `create_page_plan`, `delete_page_plan` |
 | | `create_page_meal_plan` takes `rules` (spec 043) in the units people use (g, kcal, g or kcal per kg, %), each for the whole plan or one `dayIndex`, and converts them to stored integers (mg); a plan may be rules alone. `list_page_meal_plans` returns rules as sentences |
 | Photos | `prepare_page_media_upload`, `finish_page_media_upload`, `set_page_photo` (the page's profile photo, from a checked upload) |
 | Posts | `create_page_post` (text; one food, recipe or meal plan and/or one training plan or exercise; `mediaIds`; `draft`), `publish_page_draft`, `update_page_post`, `delete_page_post`, `list_page_posts` |
 | Reading | `get_for_you`, `get_following`, `get_post`, `get_post_comments`, `get_account_profile`, `get_suggested_pages` |
-| Engaging | `follow_page`, `unfollow_page`, `like_post`, `unlike_post`, `comment_on_post`, `list_page_conversations`, `get_conversation_messages`, `reply_in_conversation` |
+| Engaging | `follow_page`, `unfollow_page`, `like_post`, `unlike_post`, `repost_post`, `unrepost_post`, `comment_on_post`, `delete_page_comment`, `get_page_notifications`, `block_account`, `unblock_account`, `list_page_conversations`, `get_conversation_messages`, `reply_in_conversation` |
 
 A draft is a post with audience `private`; publishing sets it to `public`. There is no tool to
 delete a page or to open a conversation.
@@ -236,3 +236,14 @@ Menu → **All pages at a glance** (`/settings/pages`), failures first. For the 
 screen also offers **Mark all official** (`PUT /page-assistant/official`: every page they
 manage). Changing a post's photos is not supported for anyone; the assistant deletes the post
 and creates it again.
+
+### Parity with the app (2026-11-23)
+
+Everything a page can do in the app, its assistant can do, except changing a post's photos after
+it exists (delete and post again) and the managers' own settings (official mark, co-managers,
+caps), which stay with people. Edits mirror creates: a meal plan or training plan is replaced
+whole (`update_page_meal_plan` takes the same fields as create), a recipe or programme by the
+fields sent. `get_page_notifications` is the page's activity list (`NotificationsService.activity`
+as the page); `delete_page_comment` follows the app's rule (own comments anywhere, anyone's on
+the page's own posts); `block_account` is the app's block, which ends follows both ways.
+`repost_post` is schedulable with `at`.
