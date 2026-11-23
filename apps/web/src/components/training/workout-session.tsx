@@ -429,8 +429,12 @@ export function WorkoutSession({
         const place = focus.supersets.get(exercise.id);
         const next = session.exercises[index + 1];
         const linked = Boolean(place && next && focus.supersets.get(next.id)?.ids === place.ids);
+        // A finished exercise offers no superset control, and finished ones stack close together.
+        const done = open && focus.doneIds.has(exercise.id);
+        const previous = session.exercises[index - 1];
+        const afterDone = open && !!previous && focus.doneIds.has(previous.id);
         return (
-        <div key={exercise.id}>
+        <div key={exercise.id} className={clsx(afterDone && '!mt-2')}>
         <ExerciseBlock
           session={session}
           exercise={exercise}
@@ -449,7 +453,7 @@ export function WorkoutSession({
           onSwap={(replacement) => void run(() => trainingWrites.swap(session.id, exercise, replacement))}
           busy={busy}
         />
-        {next && (open || linked) && (
+        {next && !done && (open || linked) && (
           <div className={clsx('flex justify-center', linked ? '-my-1' : 'py-0.5')}>
             {open ? (
               <button
