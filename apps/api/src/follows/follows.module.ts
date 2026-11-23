@@ -5,13 +5,14 @@ import { User, UserSchema } from '../auth/schemas/user.schema';
 import { SocialGraphService } from '../social-graph/social-graph.module';
 
 /**
- * A follow (spec 040): a one-way link from a person or a page to a page. No approval. Nobody
- * follows a person: people are friends, mutually. The only stored fact is the link; counts are
+ * A follow (spec 040): a one-way link, no approval. A person or a page follows a page; a page
+ * may also follow a person. A person never follows a person: people are friends, mutually. The only stored fact is the link; counts are
  * counted on read.
  */
 @Schema({ collection: 'follows', timestamps: { createdAt: true, updatedAt: false }, versionKey: false })
 export class Follow {
   @Prop({ required: true }) followerId!: string;
+  /** The account followed: a page, or (when the follower is a page) a person. The name is older than that. */
   @Prop({ required: true, index: true }) pageId!: string;
   createdAt!: Date;
 }
@@ -33,18 +34,24 @@ export class FollowsService {
     private readonly graph: SocialGraphService,
   ) {}
 
-  /** A live page: an account of kind `page` that is not suspended. */
-  private async livePage(pageId: string): Promise<boolean> {
-    if (!isValidObjectId(pageId)) return false;
-    return !!(await this.users.exists({ _id: pageId, kind: 'page', suspendedAt: { $exists: false }, disabledAt: { $exists: false } }));
-  }
-
-  async follow(followerId: string, pageId: string): Promise<{ following: true }> {
-    if (followerId === pageId) throw new ConflictException('A page cannot follow itself.');
-    // One answer for a person, a missing page, a suspended one and a block in either direction.
-    if (!(await this.livePage(pageId)) || (await this.graph.isBlocked(followerId, pageId))) throw notFound();
+  /**
+   * Follows an account. Anyone may follow a page. Only a page may follow a person (the owner's
+   * decision, 2026-11-23): it then sees that person's public posts in its Following feed. A
+   * person does not follow a person; people are friends. One answer for a missing, suspended or
+   * switched-off account, a person following a person, and a block in either direction.
+   */
+  async follow(followerId: string, targetId: string): Promise<{ following: true }> {
+    if (followerId === targetId) throw new ConflictException('An account cannot follow itself.');
+    if (!isValidObjectId(targetId) || !isValidObjectId(followerId)) throw notFound();
+    const [target, follower] = await Promise.all([
+      this.users.findOne({ _id: targetId, suspendedAt: { $exists: false }, disabledAt: { $exists: false } }).select('kind').lean(),
+      this.users.findById(followerId).select('kind').lean(),
+    ]);
+    if (!target || !follower) throw notFound();
+    if (target.kind !== 'page' && follower.kind !== 'page') throw notFound();
+    if (await this.graph.isBlocked(followerId, targetId)) throw notFound();
     try {
-      await this.follows.updateOne({ followerId, pageId }, { $setOnInsert: { followerId, pageId } }, { upsert: true });
+      await this.follows.updateOne({ followerId, pageId: targetId }, { $setOnInsert: { followerId, pageId: targetId } }, { upsert: true });
     } catch (error) {
       if ((error as { code?: number }).code !== 11000) throw error;
     }
@@ -58,6 +65,13 @@ export class FollowsService {
 
   async isFollowing(followerId: string, pageId: string): Promise<boolean> {
     return !!(await this.follows.exists({ followerId, pageId }));
+  }
+
+  /** Which of these accounts the follower follows. */
+  async followingAmong(followerId: string, ids: string[]): Promise<Set<string>> {
+    if (!ids.length) return new Set();
+    const rows = await this.follows.find({ followerId, pageId: { $in: ids } }).select('pageId').lean();
+    return new Set(rows.map((row) => row.pageId));
   }
 
   /** The pages someone follows: whose public posts their Following feed shows. */

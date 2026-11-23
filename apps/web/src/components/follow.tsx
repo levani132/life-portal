@@ -34,6 +34,29 @@ function useFollow(pageId: string) {
   return { ...action, set };
 }
 
+/**
+ * Follow or stop following one account. Used where a page meets a person (search, their profile):
+ * a page follows, it does not befriend.
+ */
+export function FollowToggle({ id, following, name }: { id: string; following?: boolean; name: string }) {
+  const follow = useFollow(id);
+  return (
+    <div className="mt-4 space-y-2">
+      <button
+        type="button"
+        className={following ? 'btn-ghost' : 'btn-primary'}
+        disabled={follow.pending}
+        aria-pressed={!!following}
+        aria-label={following ? `Stop following ${name}` : `Follow ${name}`}
+        onClick={() => void follow.set(!following)}
+      >
+        {following ? 'Following' : 'Follow'}
+      </button>
+      {follow.error && <ErrorNote message={follow.error} />}
+    </div>
+  );
+}
+
 /** On a page's profile: how many follow it, and the button to follow or stop. */
 export function PageFollow({ page, own, canMarkOfficial, canMessage }: { page: SocialProfile; own: boolean; canMarkOfficial: boolean; canMessage: boolean }) {
   const follow = useFollow(page.userId);

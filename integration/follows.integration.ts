@@ -60,8 +60,23 @@ describe('following a page', () => {
     const beka = await api.account('beka');
     const mine = await pageOf(ana, 'mine');
     const theirs = await pageOf(beka, 'theirs');
-    // Nobody follows a person, a page does not follow itself, and nonsense is not found.
+    // A person does not follow a person, a page does not follow itself, and nonsense is not found.
     expect((await api.call(ana, 'PUT', `/follows/${beka.id}`, {})).status).toBe(404);
+    // A page may follow a person: their public posts, and only those, reach its Following feed.
+    const open = await api.call<FoodPost>(beka, 'POST', '/posts', text('Beka in public'));
+    const friendsOnly = await api.call<FoodPost>(beka, 'POST', '/posts', text('Beka to friends', 'friends'));
+    expect((await api.call(ana, 'PUT', `/follows/${beka.id}`, {}, as(mine.id))).status).toBe(200);
+    const pageFeed = await following(ana, as(mine.id));
+    expect(pageFeed).toContain(open.body.id);
+    expect(pageFeed).not.toContain(friendsOnly.body.id);
+    await api.call(beka, 'GET', '/social/me');
+    expect((await api.call<SocialProfile>(ana, 'GET', `/social/profiles/${beka.id}?today=${today}`, undefined, as(mine.id))).body).toMatchObject({ following: true });
+    // The person is shown no follower count, and their own profile says nothing of it.
+    const own = (await api.call<SocialProfile>(beka, 'GET', `/social/me?today=${today}`)).body;
+    expect(own.followerCount).toBeUndefined();
+    expect(own.following).toBeUndefined();
+    expect((await api.call(ana, 'DELETE', `/follows/${beka.id}`, undefined, as(mine.id))).status).toBe(200);
+    expect(await following(ana, as(mine.id))).not.toContain(open.body.id);
     expect((await api.call(ana, 'PUT', `/follows/${mine.id}`, {}, as(mine.id))).status).toBe(409);
     expect((await api.call(ana, 'PUT', '/follows/not-an-id', {})).status).toBe(404);
 

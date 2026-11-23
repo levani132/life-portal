@@ -48,7 +48,7 @@ import { api } from '../lib/api';
 import { actingPageId } from '../lib/identity';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { PageMark } from './identity-switcher';
-import { OfficialMark, PageFollow } from './follow';
+import { FollowToggle, OfficialMark, PageFollow } from './follow';
 import { ErrorNote, Input, Spinner } from './ui';
 import { Avatar } from './avatar';
 import { DropdownMenu, type DropdownItem } from './dropdown-menu';
@@ -309,9 +309,13 @@ export function PersonCard({
           No widgets shared with you.
         </p>
       )}
-      {showActions && person.relationship !== 'friends' && (
-        <ConnectionActions person={person} compact />
-      )}
+      {showActions &&
+        (actingPageId() ? (
+          // Spec 040: using the app as a page, the action is Follow. A page has no friends.
+          person.relationship !== 'blocked' && <FollowToggle id={person.userId} following={person.following} name={person.displayName} />
+        ) : (
+          person.relationship !== 'friends' && <ConnectionActions person={person} compact />
+        ))}
     </article>
   );
 }
@@ -471,7 +475,9 @@ export function ProfileView({ userId }: { userId?: string }) {
           )}
           {own ? (
             person.isPage ? null : <OwnStats person={person} />
-          ) : person.isPage || (actingPageId() && person.relationship !== 'blocked') ? null : (
+          ) : person.isPage ? null : actingPageId() && person.relationship !== 'blocked' ? (
+            <FollowToggle id={person.userId} following={person.following} name={person.displayName} />
+          ) : (
             <ProfileActions person={person} />
           )}
         </div>

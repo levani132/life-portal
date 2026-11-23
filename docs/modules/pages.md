@@ -73,7 +73,7 @@ unshared: the `friends` audience is refused (`PAGE_AUDIENCE`). A page cannot be 
 | Collection `follows` | |
 |---|---|
 | `followerId` | A person or a page |
-| `pageId` | Always a page: nobody follows a person |
+| `pageId` | The account followed: a page, or a person when the follower is a page (the field's name is older than that). A person never follows a person |
 | `createdAt` | |
 
 Unique on the pair. Nothing else is stored: a follower count is counted on read, and there is no
@@ -81,7 +81,7 @@ list of followers anywhere in the API.
 
 | Route (as person or page) | What |
 |---|---|
-| `PUT /follows/:pageId` | Follow. No approval. 404 for a person, a missing or suspended page, or a block either way; 409 for a page following itself. Repeating it changes nothing |
+| `PUT /follows/:pageId` | Follow. No approval. Anyone follows a page; **a page may also follow a person** (owner's decision, 2026-11-23) and then sees that person's public posts in its Following feed. 404 for a person following a person, a missing, suspended or switched-off account, or a block either way; 409 for following itself. Repeating it changes nothing. The person is not told and their follower count is shown to nobody |
 | `DELETE /follows/:pageId` | Stop following. Always succeeds |
 | `GET /follows/suggested` | Up to 8 pages to follow: official first, then most followed; never one already followed, managed by the viewer, suspended or blocked. Empty once someone follows 5 |
 | `PUT /pages/:id/official` (person) | `{official}`. The developer only, for any page. Written to `users.official` and copied to `social_profiles.official` |

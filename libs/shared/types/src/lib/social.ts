@@ -47,12 +47,13 @@ export interface SocialPerson {
   official?: true;
   /** Spec 040: a page its manager says is run with AI. */
   aiManaged?: true;
+  /** Whether the viewer follows this account: on a page for anyone, on a person only when the viewer is a page. */
+  following?: boolean;
 }
 export interface SocialProfile extends SocialPerson {
   widgets: SharedWidget[];
   /** A page only: how many follow it, and whether the viewer does (absent on its own profile). */
   followerCount?: number;
-  following?: boolean;
   discoverable?: boolean;
   /** Accepted friends. Only on your own profile: other people's counts are not shown. */
   friendCount?: number;

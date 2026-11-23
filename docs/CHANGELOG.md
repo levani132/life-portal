@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: A page can follow people
+
+- Using the app as a page, people show **Follow** instead of "Add friend", in search and on
+  their profile. The page then sees their public posts in Following.
+- People still befriend people; a person does not follow a person.
+
 ## 2026-11-23: All your pages at a glance
 
 - **Menu → All pages at a glance**: every page you manage, with what the assistant posted today,

@@ -916,7 +916,7 @@ export class PageAssistantService {
       // ---- engaging
       {
         name: 'follow_page',
-        description: 'Follow a page as the acting page.',
+        description: 'Follow a page or a person as the acting page: their public posts then show in get_following. The id may be a page’s or a person’s.',
         shape: { pageId, targetPageId: id },
         run: (personId, args) =>
           this.counted(personId, args, 'follow', 'follow_page', async (page) => {

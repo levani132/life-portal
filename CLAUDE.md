@@ -290,8 +290,9 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   nothing, which is a 403. Never open a route that logs food, a workout, weight or anything that
   compares people. In a `@ForPages()` route `userId` is the page and `actorId` the person: never
   show `actorId` to anyone but the page's managers. A page is a `users` row of kind `page`, so
-  anything that counts or lists *people* must leave `kind: 'page'` out. Nobody follows a
-  person and there is no follower list anywhere, only a count. A page's notifications go to its
+  anything that counts or lists *people* must leave `kind: 'page'` out. A person never
+  follows a person (a page may), and there is no follower list anywhere: a page shows a count, a
+  person shows nothing. A page's notifications go to its
   managers' devices labelled as the page's (`pageNotification()`); who a page may message is
   `canMessage()`'s `page` rule. See `docs/modules/pages.md`.
 - **The privacy policy describes what the code does** (`apps/web/src/app/privacy`, `/terms`,

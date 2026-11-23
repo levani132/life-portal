@@ -255,7 +255,7 @@ The owner opens **People** in the menu: a searchable list of accounts and pages.
 
 ## Assumptions
 
-- **Following is for pages only.** People remain mutual friends; this feature does not add following people.
+- **People follow pages; a page may also follow a person** (changed 2026-11-23). People remain mutual friends with each other: a person does not follow a person.
 - **"Following" replaces "Friends" as the second Home tab** and holds both friends' posts and followed pages' posts. There is no separate friends-only feed.
 - **A page's posts are public or not shared.** "Followers only" is left out to keep the first version simple; it can be added later.
 - **Pages are always findable.** Unlike people, who choose whether strangers can find them, a page exists to be found.

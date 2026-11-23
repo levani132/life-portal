@@ -458,6 +458,11 @@ export class SocialService implements OnModuleInit {
             ...(self ? {} : { following: await this.follows.isFollowing(viewerId, targetId) }),
           }
         : {}),
+      // A page looking at a person sees whether it follows them. A person's follower count is
+      // never shown to anyone.
+      ...(profile.kind !== 'page' && !self && this.follows && (await this.profiles.exists({ userId: viewerId, kind: 'page' }))
+        ? { following: await this.follows.isFollowing(viewerId, targetId) }
+        : {}),
       widgets: await this.shared.forViewer(
         targetId,
         viewer.access,
@@ -522,8 +527,14 @@ export class SocialService implements OnModuleInit {
         return await this.person(p, relationshipFor(connection, userId, p.userId));
       }),
     );
+    const found = people.filter((p): p is SocialPerson => !!p);
+    // Spec 040: a page follows rather than befriends, so its results say whom it follows.
+    if (this.follows && (await this.profiles.exists({ userId, kind: 'page' }))) {
+      const followed = await this.follows.followingAmong(userId, found.map((p) => p.userId));
+      for (const person of found) person.following = followed.has(person.userId);
+    }
     return {
-      people: people.filter((p): p is SocialPerson => !!p),
+      people: found,
       hasMore: rows.length > 20,
       nextSkip: query.skip + 20,
     };
