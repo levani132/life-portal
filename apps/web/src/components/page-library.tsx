@@ -300,38 +300,54 @@ export function RecipeEditor({
           </p>
           <ul className="space-y-3">
             {rows.map((row) => (
-              <li key={row.key} className="flex items-end gap-2">
-                <div className="flex-1">
-                  <FoodCombobox
-                    foods={foods}
-                    selected={row.food}
-                    onSelect={(food) => set(row.key, { food, amount: row.amount || String(food.servingSize) })}
-                    onCreate={(typed) => setMaking({ key: row.key, name: typed })}
-                  />
-                </div>
-                <Input
-                  inputMode="numeric"
-                  aria-label={`Amount${row.food ? ` of ${row.food.name}` : ''}`}
-                  className="w-24"
-                  placeholder={row.food?.unit ?? 'g'}
-                  value={row.amount}
-                  onChange={(event) => set(row.key, { amount: event.target.value.replace(/\D/g, '') })}
+              <li key={row.key} className="space-y-2 rounded-lg border border-border/70 p-2">
+                {/* The picker takes the whole row: beside the amount it had no room for its list. */}
+                <FoodCombobox
+                  foods={foods}
+                  selected={row.food}
+                  onSelect={(food) => set(row.key, { food, amount: row.amount || String(food.servingSize) })}
+                  onCreate={(typed) => setMaking({ key: row.key, name: typed })}
                 />
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  aria-label="Remove this food"
-                  onClick={() => setRows((all) => all.filter((item) => item.key !== row.key))}
-                >
-                  <Trash2 size={16} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <Input
+                    inputMode="numeric"
+                    aria-label={`Amount${row.food ? ` of ${row.food.name}` : ''}`}
+                    className="w-28"
+                    placeholder="Amount"
+                    value={row.amount}
+                    onChange={(event) => set(row.key, { amount: event.target.value.replace(/\D/g, '') })}
+                  />
+                  <span className="text-sm text-ink-faint">{row.food?.unit ?? 'g'}</span>
+                  <button
+                    type="button"
+                    className="btn-ghost ml-auto shrink-0"
+                    aria-label="Remove this food"
+                    onClick={() => setRows((all) => all.filter((item) => item.key !== row.key))}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
           {rows.length < MAX_ROWS && (
-            <button type="button" className="btn-ghost" onClick={() => setRows((all) => [...all, newRow()])}>
-              <Plus size={16} /> Add a food
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="btn-ghost" onClick={() => setRows((all) => [...all, newRow()])}>
+                <Plus size={16} /> Add a food
+              </button>
+              {/* A food that does not exist yet: made here, saved to the foods, and added to the recipe. */}
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => {
+                  const row = newRow();
+                  setRows((all) => [...all, row]);
+                  setMaking({ key: row.key, name: '' });
+                }}
+              >
+                <Plus size={16} /> New food
+              </button>
+            </div>
           )}
         </div>
         <Field label="Other ingredients" hint="One per line, as you would write them: “2 cloves of garlic”. No numbers needed.">
