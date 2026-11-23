@@ -2818,3 +2818,9 @@ is the one upload that does not pass a browser's re-encoding, so the server read
 and does what the browser would have: a real JPEG or nothing, true size, Exif/XMP/IPTC removed
 (`cleanJpeg()`, pure, no image library). JPEG only, because nothing on the server can convert.
 The tools say "media" and take a `kind`, so video can join later.
+
+**The tab bar names only the open tab** (owner's decision, 2026-11-23). Every cell keeps its
+width, because the sliding pill and the swipe between tabs rely on equal cells; the label unfolds
+beneath the icon (`--show` on `.tab-label` in `global.css`, 0 to 1), and during a swipe it follows
+`--tab-swipe`: the open tab's fades as the target's (`data-swipe="next|prev"`) appears. The names
+stay in the page for screen readers. Scrolling down still folds the bar to icons only.

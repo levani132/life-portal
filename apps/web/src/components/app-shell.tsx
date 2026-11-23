@@ -242,6 +242,8 @@ function Portal({ children }: { children: ReactNode }) {
               key={tab.href}
               tab={tab}
               pathname={pathname}
+              // The tab a swipe is heading for: its name appears as the open one's fades.
+              swipe={swipeTarget(bar, barIndex, 1) === tab ? 'next' : swipeTarget(bar, barIndex, -1) === tab ? 'prev' : undefined}
               {...(tab.href === LAST_TAB_HREF.profile
                 ? {
                     // The identity in use is the photo on this tab; two quick taps switch to the other one.
@@ -427,6 +429,13 @@ function swipeCells(bar: (Tab | typeof NEW_POST)[], from: number, direction: 1 |
   return 0;
 }
 
+/** The tab a swipe in `direction` leads to from the open one, if any. */
+function swipeTarget(bar: (Tab | typeof NEW_POST)[], from: number, direction: 1 | -1): Tab | undefined {
+  const cells = swipeCells(bar, from, direction);
+  const target = cells ? bar[from + direction * cells] : undefined;
+  return target && target !== NEW_POST ? target : undefined;
+}
+
 /** The tabs with the New post button in the middle. It is a link, not a tab: swiping skips it. */
 function withNewPost(tabs: Tab[], canPost: boolean): (Tab | typeof NEW_POST)[] {
   if (!canPost) return tabs;
@@ -443,10 +452,13 @@ function TabLink({
   children,
   picture,
   onDoubleTap,
+  swipe,
 }: {
   tab: Tab;
   pathname: string;
   children?: ReactNode;
+  /** This tab is where a swipe forwards (`next`) or back (`prev`) would land. */
+  swipe?: 'next' | 'prev';
   /** Shown in place of the icon: the profile tab carries the photo of the identity in use. */
   picture?: ReactNode;
   /** Two taps within a moment. The first tap has already opened the tab. */
@@ -470,6 +482,7 @@ function TabLink({
         if (href === pathname) window.scrollTo({ top: 0, behavior: 'smooth' });
       }}
       aria-current={active ? 'page' : undefined}
+      data-swipe={swipe}
       className={clsx(
         'tab-cell group relative z-10 flex min-h-[3.25rem] flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors duration-200',
         active ? 'text-ink' : 'text-ink-muted',

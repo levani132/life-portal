@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: A lighter tab bar
+
+- The bottom bar shows **only the open tab's name**; the others are icons. The name unfolds under
+  the icon as a tab opens and follows your finger when you swipe between tabs. No tab changes
+  width.
+
 ## 2026-11-23: Notifications open on the comment
 
 - Tapping a notification about a comment or a reply opens the post with comments showing,
