@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: All your pages at a glance
+
+- **Menu → All pages at a glance**: every page you manage, with what the assistant posted today,
+  what is waiting and what failed in the last day, failures first.
+- The assistant can set a page's profile photo.
+- Admin: one button marks all your pages official.
+
 ## 2026-11-23: Feeds scroll on their own; For You changes on refresh
 
 - **No more "Older posts" button.** Feeds load more as you scroll; what you loaded stays above.

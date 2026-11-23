@@ -40,7 +40,7 @@ import { SocialModule } from '../social/social.module';
 import { TrainingModule } from '../training/training.module';
 import { AssistantSettings, AssistantSettingsSchema, PageScheduledAction, PageScheduledActionSchema, PageAssistantAction, PageAssistantActionSchema, PageAssistantService, parseCaps } from './page-assistant';
 import { PagesService } from '../pages/pages.module';
-import type { AssistantActivity, AssistantCaps } from '@life-portal/shared-types';
+import type { AssistantActivity, AssistantCaps, AssistantOverview } from '@life-portal/shared-types';
 
 /**
  * MCP (Model Context Protocol) server for AI assistants.
@@ -190,6 +190,19 @@ export class PageAssistantController {
   @Put('caps/:personId')
   setPersonCaps(@CurrentUser('userId') userId: string, @Param('personId') personId: string, @Body() body: { caps?: unknown }) {
     return this.pages.setAssistantCaps(userId, personId, body?.caps === null ? null : parseCaps(body?.caps, true));
+  }
+
+  /** Every page the person manages: what the assistant did today, what waits, what failed. */
+  @Get('overview')
+  @Header('Cache-Control', 'no-store')
+  overview(@CurrentUser('userId') userId: string): Promise<AssistantOverview> {
+    return this.assistant.overview(userId);
+  }
+
+  /** The owner marks every page they manage as the app's own, in one go. */
+  @Put('official')
+  officialAll(@CurrentUser('userId') userId: string) {
+    return this.pages.markMineOfficial(userId);
   }
 
   @Get('activity/:pageId')

@@ -21,6 +21,7 @@ import {
   PLAN_TARGET_TYPES,
   type AssistantActionKind,
   type AssistantActivity,
+  type AssistantOverview,
   type AssistantCaps,
   type FoodPost,
 } from '@life-portal/shared-types';
@@ -246,6 +247,52 @@ export class PageAssistantService {
         cap: assistantCap({ kind, defaults, override: own.override, developer: own.developer }),
       })),
       scheduled: waiting.map((row) => this.scheduledDto(row)),
+    };
+  }
+
+  /**
+   * Every page the person manages on one screen: what the assistant published today, what is
+   * waiting, and what failed in the last day. Counts and the tools' own refusals, no content.
+   */
+  async overview(personId: string): Promise<AssistantOverview> {
+    const [mine, allowed] = await Promise.all([this.pages.mine(personId), this.pages.assistantAllowed(personId)]);
+    const ids = mine.pages.map((page) => page.id);
+    if (!ids.length) return { allowed, pages: [] };
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [posted, queued, failed, last] = await Promise.all([
+      this.actions.aggregate<{ _id: string; n: number }>([
+        { $match: { pageId: { $in: ids }, day: utcDay(), tool: { $in: ['create_page_post', 'publish_page_draft'] } } },
+        { $group: { _id: '$pageId', n: { $sum: 1 } } },
+      ]),
+      this.scheduledActions.aggregate<{ _id: string; n: number }>([{ $match: { pageId: { $in: ids }, status: 'pending' } }, { $group: { _id: '$pageId', n: { $sum: 1 } } }]),
+      this.scheduledActions.aggregate<{ _id: string; n: number; error?: string }>([
+        { $match: { pageId: { $in: ids }, status: 'failed', doneAt: { $gte: dayAgo } } },
+        { $sort: { doneAt: 1 } },
+        { $group: { _id: '$pageId', n: { $sum: 1 }, error: { $last: '$error' } } },
+      ]),
+      this.actions.aggregate<{ _id: string; at: Date }>([{ $match: { pageId: { $in: ids } } }, { $group: { _id: '$pageId', at: { $max: '$createdAt' } } }]),
+    ]);
+    const count = (rows: { _id: string; n: number }[]) => new Map(rows.map((row) => [row._id, row.n]));
+    const [postedBy, queuedBy, failedBy] = [count(posted), count(queued), count(failed)];
+    const errorBy = new Map(failed.map((row) => [row._id, row.error]));
+    const lastBy = new Map(last.map((row) => [row._id, row.at]));
+    return {
+      allowed,
+      pages: mine.pages.map((page) => ({
+        id: page.id,
+        name: page.name,
+        username: page.username,
+        ...(page.avatarUrl ? { avatarUrl: page.avatarUrl } : {}),
+        runWithAi: page.aiManaged,
+        official: page.official,
+        suspended: page.suspended,
+        disabled: page.disabled,
+        postsToday: postedBy.get(page.id) ?? 0,
+        queued: queuedBy.get(page.id) ?? 0,
+        failed: failedBy.get(page.id) ?? 0,
+        ...(errorBy.get(page.id) ? { lastError: errorBy.get(page.id) } : {}),
+        ...(lastBy.get(page.id) ? { lastActionAt: (lastBy.get(page.id) as Date).toISOString() } : {}),
+      })),
     };
   }
 

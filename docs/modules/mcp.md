@@ -225,3 +225,13 @@ startedAt?, doneAt?}` and answered `{scheduled, actionId, at}`; a clock in `Page
 - `list_scheduled_actions`, `cancel_scheduled_action`; the page's managers see what is waiting
   in the same panel as the log. Finished rows, with their text, are removed after a week
   (TTL on `doneAt`); deleting the page removes them at once (`ACCOUNT_PLAN`).
+
+### The managers' overview
+
+`GET /page-assistant/overview` (person): every page they manage with `postsToday` (the
+assistant's posts this UTC day, from the log), `queued` (pending scheduled actions), `failed`
+(scheduled actions failed in the last 24 hours) with the latest reason, and `lastActionAt`. Web:
+Menu → **All pages at a glance** (`/settings/pages`), failures first. For the developer the
+screen also offers **Mark all official** (`PUT /page-assistant/official`: every page they
+manage). Changing a post's photos is not supported for anyone; the assistant deletes the post
+and creates it again.

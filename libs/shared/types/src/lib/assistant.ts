@@ -70,3 +70,30 @@ export type AssistantCapOverride = Partial<AssistantCaps>;
 /** Error codes the assistant can relay. */
 export const ASSISTANT_ERROR_CODES = ['ASSISTANT_OFF', 'PAGE_NOT_AI', 'NOT_A_MANAGER', 'CAP_REACHED', 'PAGE_SUSPENDED', 'PAGE_DISABLED'] as const;
 export type AssistantErrorCode = (typeof ASSISTANT_ERROR_CODES)[number];
+
+/** One page on its manager's overview of what the assistant is doing (spec 041). */
+export interface AssistantPageStatus {
+  id: string;
+  name: string;
+  username: string;
+  avatarUrl?: string;
+  runWithAi: boolean;
+  official: boolean;
+  suspended: boolean;
+  disabled: boolean;
+  /** Posts the assistant published as this page today (UTC day). */
+  postsToday: number;
+  /** Actions waiting to be done later. */
+  queued: number;
+  /** Scheduled actions that failed in the last 24 hours, and the latest reason. */
+  failed: number;
+  lastError?: string;
+  /** When the assistant last did anything as this page. */
+  lastActionAt?: string;
+}
+
+export interface AssistantOverview {
+  /** Whether the person lets an assistant manage their pages at all. */
+  allowed: boolean;
+  pages: AssistantPageStatus[];
+}

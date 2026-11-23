@@ -290,6 +290,17 @@ export class PagesService {
     return { pageLimit: limit };
   }
 
+  /** The owner marks every page they manage as the app's own. Developer only. */
+  async markMineOfficial(developerId: string): Promise<{ marked: number }> {
+    this.access.requireDeveloper(developerId);
+    const rows = await this.users.find({ kind: 'page', managers: developerId, official: { $ne: true } }).select('_id').lean();
+    for (const row of rows) {
+      await this.users.updateOne({ _id: row._id }, { $set: { official: true } });
+      await this.social.setOfficial(String(row._id), true);
+    }
+    return { marked: rows.length };
+  }
+
   /** Deletes the page and everything it holds, the way an account is deleted. */
   async remove(personId: string, pageId: string): Promise<{ success: true }> {
     const row = await this.managed(personId, pageId);

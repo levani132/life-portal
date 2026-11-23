@@ -3,6 +3,7 @@
 import type { Identity, MyPages, PageSummary } from '@life-portal/shared-types';
 import { PAGE_BIO_MAX, PAGE_NAME_MAX } from '@life-portal/shared-types';
 import { Check, Megaphone, Plus } from 'lucide-react';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ApiError, api } from '../lib/api';
@@ -91,6 +92,11 @@ export function IdentitySwitcher() {
         <div className="px-5 pb-3">
           <ErrorNote message={error} />
         </div>
+      )}
+      {pages.data.pages.length > 0 && (
+        <Link href="/settings/pages" className="block border-t border-border px-5 py-3 text-sm text-ink-muted hover:bg-surface-raised">
+          All pages at a glance
+        </Link>
       )}
       {pages.data.pages.length > 0 && <ManagePages pages={pages.data.pages} userId={user.id} />}
       <div className="border-t border-border px-5 py-3">

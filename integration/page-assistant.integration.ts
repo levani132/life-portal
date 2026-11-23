@@ -249,5 +249,16 @@ describe('the assistant for pages', () => {
 
     const activity = await api.call<AssistantActivity>(ana, 'GET', `/page-assistant/activity/${pageId}`);
     expect(activity.body.scheduled).toEqual([]);
+
+    // All of the person's pages on one screen: counts and the tool's own refusal, no content.
+    const overview = await api.call<{ allowed: boolean; pages: { id: string; postsToday: number; queued: number; failed: number; lastError?: string }[] }>(ana, 'GET', '/page-assistant/overview');
+    expect(overview.body.allowed).toBe(true);
+    const status = overview.body.pages.find((row) => row.id === pageId);
+    expect(status).toMatchObject({ postsToday: 1, queued: 0, failed: 1 });
+    expect(status?.lastError).toContain('PAGE_DISABLED');
+    expect(JSON.stringify(overview.body)).not.toContain('Published on time');
+    expect((await api.call<{ pages: unknown[] }>(beka, 'GET', '/page-assistant/overview')).body.pages).toHaveLength(1);
+    // Marking every page official at once is the owner's alone.
+    expect((await api.call(ana, 'PUT', '/page-assistant/official', {})).status).toBe(403);
   });
 });

@@ -181,6 +181,8 @@ For each existing page, in this order:
 - If a tool answers PAGE_NOT_AI, PAGE_DISABLED or PAGE_SUSPENDED for a page, skip that page and
   report it at the end.
 - If the same call fails twice, skip it. Do not retry in a loop.
+- A post's photos cannot be changed after it exists. To fix them, delete the post and create it
+  again.
 - Never delete a page. Never use disable_page unless the owner tells you to in this chat.
 
 === REPORT ===
