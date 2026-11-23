@@ -11,3 +11,23 @@ test('a person sees their pages and can open one’s library', async ({ page }) 
   await expect(page.getByText('E2E Kitchen').first()).toBeVisible();
   await snap(page, '06-pages');
 });
+
+test('holding the profile tab opens "Using the app as"', async ({ page }) => {
+  const ana = await account('Ana');
+  await call<{ id: string }>(ana, 'POST', '/pages', { name: 'E2E Bakery', username: `e2e-bakery-${randomUUID().slice(0, 6)}`, bio: '' });
+  await signIn(page, ana);
+  await page.goto('/');
+  const tab = page.getByRole('navigation').getByRole('link', { name: /profile/i });
+  const box = await tab.boundingBox();
+  if (!box) throw new Error('No profile tab');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(700);
+  await page.mouse.up();
+  const sheet = page.getByRole('dialog', { name: 'Using the app as' });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText('E2E Bakery').first()).toBeVisible();
+  // The tab did not open: the long press only opened the sheet.
+  await expect(page).toHaveURL(/localhost:4200\/(\?.*)?$/);
+  await snap(page, '06-identity-sheet');
+});

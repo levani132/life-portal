@@ -1,6 +1,7 @@
 'use client';
 import { Wordmark } from './wordmark';
-import { ActAsLinks, switchToOtherIdentity } from './identity-switcher';
+import { ActAsLinks, IdentitySwitcher, switchToOtherIdentity } from './identity-switcher';
+import { Modal } from './ui';
 import { Avatar } from './avatar';
 import { useSocialApi } from '../lib/social-hooks';
 import type { SocialProfile } from '@life-portal/shared-types';
@@ -10,7 +11,7 @@ import { HealthSyncBridge } from './apple-health';
 import clsx from 'clsx';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import {
   Home,
   Menu,
@@ -91,6 +92,8 @@ function Portal({ children }: { children: ReactNode }) {
     else if (needsSetup && pathname !== '/setup') router.replace('/setup');
   }, [loading, user, needsSetup, pathname, router]);
   const [scrolledDown, revealChrome] = useScrolledDown(pathname);
+  // Long-pressing the profile tab opens "Using the app as" here.
+  const [choosingIdentity, setChoosingIdentity] = useState(false);
   // Only the feed's header gets out of the way; the tab bar shrinks on every page instead.
   const chromeHidden = scrolledDown && pathname === '/';
   // iOS can leave the screen shifted after the keyboard: the bar and header follow it.
@@ -252,6 +255,8 @@ function Portal({ children }: { children: ReactNode }) {
                       void switchToOtherIdentity(user.id).then((problem) => {
                         if (problem) window.alert(problem);
                       }),
+                    // A long press opens "Using the app as": yourself and every page you manage.
+                    onLongPress: () => setChoosingIdentity(true),
                   }
                 : {})}
             >
@@ -277,6 +282,10 @@ function Portal({ children }: { children: ReactNode }) {
           )}
         </div>
       </nav>
+      {/* Always in the tree (the shell's tree never changes shape); open only after a long press. */}
+      <Modal open={choosingIdentity} onClose={() => setChoosingIdentity(false)} title="Using the app as">
+        <IdentitySwitcher inSheet />
+      </Modal>
     </div>
   );
 }
@@ -445,6 +454,8 @@ function withNewPost(tabs: Tab[], canPost: boolean): (Tab | typeof NEW_POST)[] {
 
 /** How close two taps on the profile tab must be to count as a double tap. */
 const DOUBLE_TAP_MS = 350;
+/** How long the profile tab is held to open "Using the app as". */
+const LONG_PRESS_MS = 500;
 
 function TabLink({
   tab: { href, label, icon: Icon, active },
@@ -452,6 +463,7 @@ function TabLink({
   children,
   picture,
   onDoubleTap,
+  onLongPress,
   swipe,
 }: {
   tab: Tab;
@@ -463,14 +475,47 @@ function TabLink({
   picture?: ReactNode;
   /** Two taps within a moment. The first tap has already opened the tab. */
   onDoubleTap?: () => void;
+  /** Held for half a second. The tab is not opened. */
+  onLongPress?: () => void;
 }) {
   const lastTap = useRef(0);
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressed = useRef(false);
+  const cancelPress = () => {
+    if (pressTimer.current) clearTimeout(pressTimer.current);
+    pressTimer.current = null;
+  };
   return (
     <Link
       href={href}
       // Each tab keeps its own scroll position; tapping the open tab goes to its top.
       scroll={false}
+      {...(onLongPress
+        ? {
+            onPointerDown: () => {
+              pressed.current = false;
+              cancelPress();
+              pressTimer.current = setTimeout(() => {
+                pressed.current = true;
+                navigator.vibrate?.(10);
+                onLongPress();
+              }, LONG_PRESS_MS);
+            },
+            onPointerUp: cancelPress,
+            onPointerLeave: cancelPress,
+            onPointerCancel: cancelPress,
+            // No system menu for the link under a held finger.
+            onContextMenu: (event: ReactMouseEvent) => event.preventDefault(),
+            style: { WebkitTouchCallout: 'none' } as CSSProperties,
+          }
+        : {})}
       onClick={(event) => {
+        // The click that ends a long press opens nothing.
+        if (pressed.current) {
+          pressed.current = false;
+          event.preventDefault();
+          return;
+        }
         const now = Date.now();
         if (onDoubleTap && now - lastTap.current < DOUBLE_TAP_MS) {
           lastTap.current = 0;

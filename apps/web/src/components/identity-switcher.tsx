@@ -53,7 +53,7 @@ async function switchTo(pageId: string | null, userId: string): Promise<string |
 }
 
 /** The list at the top of the menu: yourself, the pages you manage, and "Create a page". */
-export function IdentitySwitcher() {
+export function IdentitySwitcher({ inSheet = false }: { inSheet?: boolean } = {}) {
   const { user } = useAuth();
   const pages = useApi<MyPages>('/pages');
   const acting = actingPageId();
@@ -71,8 +71,9 @@ export function IdentitySwitcher() {
   const canCreate = pages.data.remaining === null || pages.data.remaining > 0;
 
   return (
-    <section className="card mb-4" aria-label="Who you are using the app as">
-      <p className="px-5 pt-4 text-xs font-semibold uppercase tracking-wide text-ink-faint">Using the app as</p>
+    <section className={inSheet ? '-mx-5' : 'card mb-4'} aria-label="Who you are using the app as">
+      {/* In the sheet opened from the tab bar, the sheet's own title says it. */}
+      {!inSheet && <p className="px-5 pt-4 text-xs font-semibold uppercase tracking-wide text-ink-faint">Using the app as</p>}
       <ul className="mt-2 divide-y divide-border">
         <Row name={user.name} note="You" avatarUrl={pages.data.personAvatarUrl} active={!acting} onChoose={() => choose(null)} />
         {pages.data.pages.map((page) => (
