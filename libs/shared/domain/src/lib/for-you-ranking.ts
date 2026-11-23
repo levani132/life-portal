@@ -300,6 +300,16 @@ export function rankForYou(input: ForYouRankInput): ForYouRanking {
   };
 }
 
+/**
+ * The order for a refresh: what the viewer has not been shown first, then what they have, each
+ * keeping its place among its own (spec 041). Nothing is dropped.
+ */
+export function unseenFirst<T extends { postId: string }>(entries: readonly T[], seen: readonly string[]): T[] {
+  if (!seen.length) return [...entries];
+  const shown = new Set(seen);
+  return [...entries.filter((entry) => !shown.has(entry.postId)), ...entries.filter((entry) => shown.has(entry.postId))];
+}
+
 /** The words for a reason. `topicLabel` for interest/topic, `authorName` for author. */
 export function forYouReasonText(
   reason: RankedReason,

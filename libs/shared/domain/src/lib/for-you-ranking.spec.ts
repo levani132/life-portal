@@ -4,6 +4,7 @@ import {
   rankForYou,
   scoreCandidate,
   seededOrder,
+  unseenFirst,
   signalSince,
   viewerAffinity,
   type ForYouRankInput,
@@ -169,5 +170,16 @@ describe('people before pages (spec 041)', () => {
     const order = ids({ interactions, candidates: [post('liked-topic', 'p1', ['t1'], 1), post('unmarked', 'u1', [], 1), person('human', 'h1', 20)] });
     expect(order[0]).toBe('human');
     expect(order.indexOf('liked-topic')).toBeLessThan(order.indexOf('unmarked'));
+  });
+});
+
+describe('unseenFirst (spec 041)', () => {
+  const entries = ['a', 'b', 'c', 'd'].map((postId) => ({ postId }));
+  it('leads with what was not shown and keeps the rest behind, in order', () => {
+    expect(unseenFirst(entries, ['a', 'c']).map((entry) => entry.postId)).toEqual(['b', 'd', 'a', 'c']);
+  });
+  it('changes nothing when nothing was seen, and drops nothing when everything was', () => {
+    expect(unseenFirst(entries, []).map((entry) => entry.postId)).toEqual(['a', 'b', 'c', 'd']);
+    expect(unseenFirst(entries, ['d', 'c', 'b', 'a', 'gone']).map((entry) => entry.postId)).toEqual(['a', 'b', 'c', 'd']);
   });
 });

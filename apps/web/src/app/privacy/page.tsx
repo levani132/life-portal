@@ -83,7 +83,7 @@ export default function PrivacyPage() {
           If you also let an assistant manage your pages, it reads what a page can see (public posts, the comments on
           them, profiles, and messages sent to the page) and acts as the page. We keep a list of what it did as each
           page (the time, the kind of action and what it was done to, never the text), which the page’s managers can
-          read; it is deleted with the page. What an assistant asks to be done later (a post or a comment and its
+          read; it is kept for 90 days and deleted with the page. What an assistant asks to be done later (a post or a comment and its
           time) is kept until it is done and for a week after.
         </p>
       </LegalSection>

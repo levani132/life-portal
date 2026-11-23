@@ -57,6 +57,8 @@ export class PageAssistantAction {
 export const PageAssistantActionSchema = SchemaFactory.createForClass(PageAssistantAction);
 PageAssistantActionSchema.index({ pageId: 1, kind: 1, day: 1 });
 PageAssistantActionSchema.index({ pageId: 1, createdAt: -1 });
+// Kept 90 days: long enough to see what happened, short enough not to grow for ever.
+PageAssistantActionSchema.index({ createdAt: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
 
 /**
  * Something an assistant asked to be done later as a page (spec 041). An assistant runs on its

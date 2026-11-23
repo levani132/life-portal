@@ -723,12 +723,15 @@ export class PostsService {
         .lean(),
     ]);
     const reportedIds = new Set(reported.map((row) => row.postId));
-    const authorOk = new Map<string, boolean>();
-    for (const authorId of authorIds) {
-      if (!discoverable.has(authorId)) continue;
-      authorOk.set(authorId, !!(await this.readableAuthor(userId, { userId: authorId, audience: 'public' })));
-    }
-    return candidates.filter((row) => authorOk.get(row.userId) && !reportedIds.has(String(row._id)));
+    // One read for every author's features (spec 041): with a hundred pages in the pool, asking
+    // author by author made opening For You slow. Blocks and mutes are already in `excluded`,
+    // and every card still passes the full `readable()` check when it is served.
+    const access = await this.access.forUsers(authorIds.filter((authorId) => discoverable.has(authorId)));
+    const authorOk = (authorId: string) => {
+      const features = access.get(authorId);
+      return !!features && features.social && features.nutrition && features.foodPosts;
+    };
+    return candidates.filter((row) => authorOk(row.userId) && !reportedIds.has(String(row._id)));
   }
 
   /** A For You card: the full `readable()` check again, then the feed teaser. */

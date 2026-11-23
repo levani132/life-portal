@@ -127,6 +127,10 @@ export class ForYouSessionRecord {
   mode!: 'ranked' | 'chronological';
   @Prop({ type: [Object], default: [] })
   entries!: { postId: string; reasons: { code: ForYouReasonCode; topicId?: string }[] }[];
+  /** How far into `entries` the viewer has been served: everything before it counts as seen. */
+  @Prop({ default: 0 }) served!: number;
+  /** Posts served in earlier sessions, newest last, so a refresh leads with what is new to them. */
+  @Prop({ type: [String], default: [] }) seen!: string[];
   @Prop({ type: Date, required: true }) expiresAt!: Date;
 }
 export const ForYouSessionSchema = SchemaFactory.createForClass(ForYouSessionRecord);

@@ -197,8 +197,8 @@ unliking are not counted.
 
 **The log.** `page_assistant_actions {pageId, personId, kind, tool, targetId?, day, createdAt}`:
 no content. Written after a counted action succeeds; counted for the caps; read by the page's
-managers (`GET /page-assistant/activity/:pageId`, and `get_assistant_activity`). Deleted with
-the page (`ACCOUNT_PLAN`: owned by `pageId`).
+managers (`GET /page-assistant/activity/:pageId`, and `get_assistant_activity`). Kept 90 days
+(TTL on `createdAt`), and deleted with the page (`ACCOUNT_PLAN`: owned by `pageId`).
 
 Pages of the same person are not treated differently: they may follow, like, comment on and
 message each other (owner's decision, 2026-11-23; a refusal was built first and removed).

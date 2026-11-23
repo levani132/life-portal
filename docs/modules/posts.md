@@ -340,6 +340,25 @@ the chronological order; `assemble()` still applies the per-author and per-topic
 pages posting on a schedule cannot push them out of the candidate pool. The unranked feed
 (`forYouRanking` off) is still newest first.
 
+## For You: cheap to open, different on refresh (spec 041)
+
+For You is not fanned out to every viewer when a post is written: every public post is a
+candidate for everyone, so that would store posts × people rows. Instead each viewer has one
+prepared list, `feed_sessions` (300 ranked entries), and opening or scrolling the feed reads
+from it. Building that list is a handful of reads however many authors are in it:
+`forYouEligible()` asks for all authors' features at once (`AccessService.forUsers()`) rather
+than one by one. Every card still passes the full `readable()` check when it is served.
+
+A refresh (a first page with no cursor) builds a new list that leads with what the viewer has
+not been shown: the session records how far they were served (`served`) and carries the last
+600 served ids (`seen`); `unseenFirst()` puts those after everything new, in the same order, so
+the feed changes on refresh and never runs dry.
+
+**Feeds scroll without buttons.** `PostsList` appends the next page as the reader nears the end
+(an `IntersectionObserver` a screen ahead; a "Load more posts" button where that is missing or a
+load failed). Nothing loaded is removed and there is no "newer" control: the Home tab goes to the
+top. A For You page that answers `expired` starts the list again from its new first page.
+
 ## Replies to comments
 
 One level deep. `post_comments.parentId` is the **top-level** comment a reply sits under;

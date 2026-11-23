@@ -99,6 +99,27 @@ describe('feature access resolution', () => {
     expect(Object.values(gone.access).every((on) => on === false)).toBe(true);
   });
 
+  it('answers the same for many accounts at once as for each alone (spec 041)', async () => {
+    const policy = { cohort: 'production', overrides: { social: true, foodPosts: false } };
+    const cases = [
+      { _id: USER, cohort: 'production', featureOverrides: { foodPosts: true } },
+      { _id: 'bbbbbbbbbbbbbbbbbbbbbbbb', cohort: 'production' },
+      { _id: 'cccccccccccccccccccccccc', cohort: 'production', suspendedAt: new Date() },
+      { _id: 'dddddddddddddddddddddddd', kind: 'page' as const, cohort: 'production' },
+      { _id: 'eeeeeeeeeeeeeeeeeeeeeeee', kind: 'page' as const, cohort: 'production', disabledAt: new Date() },
+      { _id: DEV, cohort: 'production' },
+    ];
+    const f = fixture({ policy });
+    f.users.find.mockReturnValue({ select: () => ({ lean: jest.fn().mockResolvedValue(cases) }) });
+    f.policies.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([policy]) });
+    const many = await f.service.forUsers([...cases.map((row) => row._id), 'not-an-id']);
+    expect(many.size).toBe(cases.length);
+    for (const row of cases) {
+      const one = fixture({ user: row as never, policy });
+      expect([row._id, many.get(row._id)]).toEqual([row._id, (await one.service.forUser(row._id)).access]);
+    }
+  });
+
   it('answers 401 for a deleted account and 403 for a module it lacks', async () => {
     await expect(fixture({ user: null }).service.forUser(USER)).rejects.toThrow(
       UnauthorizedException,

@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Feeds scroll on their own; For You changes on refresh
+
+- **No more "Older posts" button.** Feeds load more as you scroll; what you loaded stays above.
+  Tap Home again to go to the top.
+- **Refreshing For You shows what you have not seen first.**
+- For You opens faster with many pages in it.
+- A page run with AI no longer sends its manager a notification for what other pages do to it.
+
 ## 2026-11-23: People first in For You; an assistant can schedule
 
 - **For You shows people's posts first.** A post by a person from the last week comes before

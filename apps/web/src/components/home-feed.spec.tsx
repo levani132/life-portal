@@ -12,6 +12,11 @@ jest.mock('../lib/hooks', () => ({
   },
   revalidate: jest.fn(),
 }));
+// Later pages are fetched directly, not through the cache hook.
+jest.mock('../lib/api', () => ({
+  ...jest.requireActual('../lib/api'),
+  api: { get: jest.fn(async (url: string) => pages[url]?.data ?? { posts: [] }) },
+}));
 // These tests are about the feed, not the card's footer and media.
 jest.mock('./post-engagement', () => ({ PostEngagement: () => null }));
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }));
@@ -56,17 +61,22 @@ it('opens on For You and loads Following only when chosen, keeping both mounted'
   expect(sessionStorage.getItem('home-feed-tab')).toBe('friends');
 });
 
-it('keeps each tab’s own page when switching back and forth', () => {
+it('keeps each tab’s own posts when switching back and forth', async () => {
   pages['/posts/for-you'] = { data: { posts: [post('1', 'Discover 1')], nextCursor: 'c1' } };
   pages['/posts/for-you?cursor=c1'] = { data: { posts: [post('3', 'Discover 2')] } };
   pages['/posts?preview=normal'] = { data: { posts: [post('2', 'Friend 1')] } };
   render(<HomeFeed />);
-  fireEvent.click(screen.getByRole('button', { name: 'Older posts' }));
+  // Further pages are appended below; what was loaded stays.
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Load more posts' }));
+  });
+  expect(screen.getByText('Discover 1')).toBeTruthy();
   expect(screen.getByText('Discover 2')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Load more posts' })).toBeNull();
   fireEvent.click(screen.getByRole('tab', { name: 'Following' }));
   fireEvent.click(screen.getByRole('tab', { name: 'For You' }));
+  expect(screen.getByText('Discover 1')).toBeTruthy();
   expect(screen.getByText('Discover 2')).toBeTruthy();
-  expect(screen.getByRole('button', { name: 'Newer posts' })).toBeTruthy();
 });
 
 it('points an empty For You at Following', () => {

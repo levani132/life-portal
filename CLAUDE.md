@@ -307,6 +307,10 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   one read-only exception: `UsageService` (Menu → Numbers) reads who and which day from the
   collections in `USAGE_SOURCES` and returns counts, never an id or any content. See
   `docs/modules/account.md` and `docs/modules/usage.md`.
+- **The production server is always awake.** Render's free plan would sleep, but the owner keeps
+  it awake with a pinger at all times, so scheduled work (`@Cron`, the assistant's scheduled
+  actions) runs on time. Do not plan around a sleeping server. It still restarts on every push to
+  `main`, so anything in flight must survive that.
 - **The API's port is `API_PORT`, not `PORT`.** `next dev` and `next start` also read `PORT`, so
   a shared value makes whichever app starts second die with `EADDRINUSE`. The web ports are
   pinned to 4200 in `apps/web/project.json` for the same reason. `PORT` remains a fallback for

@@ -107,8 +107,8 @@ export class NotificationsService {
   ) {}
 
   /** Spec 040: who manages a page, set by the pages module. A page has no devices of its own. */
-  private pageOf?: (userId: string) => Promise<{ name: string; managers: string[] } | null>;
-  registerPageResolver(resolver: (userId: string) => Promise<{ name: string; managers: string[] } | null>) {
+  private pageOf?: (userId: string) => Promise<{ name: string; managers: string[]; aiManaged?: boolean } | null>;
+  registerPageResolver(resolver: (userId: string) => Promise<{ name: string; managers: string[]; aiManaged?: boolean } | null>) {
     this.pageOf = resolver;
   }
 
@@ -330,6 +330,10 @@ export class NotificationsService {
     if (def.suppress && (await def.suppress(event))) return;
     // Spec 040: a page's notifications go to its managers' devices, labelled as the page's.
     const page = (await this.pageOf?.(event.recipientId)) ?? null;
+    // A page run with AI hears nothing on its manager's phone about what other pages do to it:
+    // with many such pages reacting to each other that would be hundreds a day. What a person
+    // does still arrives, and the page's Activity lists everything.
+    if (page?.aiManaged && (await this.pageOf?.(event.actorId))) return;
     const holders = page ? page.managers.filter((id) => id !== event.actorId) : [event.recipientId];
     const devices = holders.length ? await this.devices.find({ userId: { $in: holders } }).lean() : [];
     if (!devices.length) return;

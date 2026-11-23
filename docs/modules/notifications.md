@@ -177,4 +177,7 @@ the pages module) says who manages a page; `deliver()` then sends to those manag
 skipping the manager who caused it, with `pageNotification()`'s text ("<page> (page)" as the
 title, the actor in the body) and `?as=<pageId>` on the link. The tag is prefixed with the page
 id, and each device's badge stays its owner's count. Every push still shows a notification.
+A page marked "run with AI" gets no push for what **another page** does to it (the owner's
+decision: with many such pages reacting to each other it would be hundreds a day); what a
+person does still arrives, and the page's Activity lists everything.
 See [pages](pages.md).

@@ -3,7 +3,7 @@ import { APP_NAME } from '../lib/brand';
 import { Avatar } from './avatar';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Apple,
   CalendarDays,
@@ -105,33 +105,40 @@ export function PostsList({
   /** Replaces the default empty-state card. */
   empty?: ReactNode;
 }) {
-  const [cursor, setCursor] = useState<string | undefined>();
-  const [history, setHistory] = useState<(string | undefined)[]>([]);
+  // The feed only grows downwards: the first page comes from the cache below, later pages are
+  // appended here as the reader nears the end. Nothing loaded is ever taken away, and there is
+  // no "newer" button: the Home tab goes back to the top.
+  const [more, setMore] = useState<FoodPost[]>([]);
+  /** Where the next page starts: `undefined` until the first page says, `null` at the end. */
+  const [next, setNext] = useState<string | null | undefined>(undefined);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreError, setMoreError] = useState('');
+  const loading = useRef(false);
+  const sentinel = useRef<HTMLDivElement>(null);
   // For You: an author hidden from one card disappears from the rest of the page too. Maps the
   // author to the card that hid them, which stays as the Undo row.
   const [hiddenAuthors, setHiddenAuthors] = useState<Record<string, string>>({});
   const [scope, setScope] = useState(`${feed}:${authorId ?? ''}:${preview}`);
   const nextScope = `${feed}:${authorId ?? ''}:${preview}`;
+  const reset = () => {
+    setMore([]);
+    setNext(undefined);
+    setMoreError('');
+  };
   if (scope !== nextScope) {
     setScope(nextScope);
-    setCursor(undefined);
-    setHistory([]);
+    reset();
   }
-  const query = new URLSearchParams(
-    feed === 'forYou'
-      ? { ...(cursor ? { cursor } : {}) }
-      : {
-          ...(authorId ? { authorId } : {}),
-          preview,
-          ...(cursor ? { cursor } : {}),
-        },
-  );
+  const base: Record<string, string> = feed === 'forYou' ? {} : { ...(authorId ? { authorId } : {}), preview };
   const path = feed === 'forYou' ? '/posts/for-you' : '/posts';
-  const search = query.toString();
+  const url = (cursor?: string) => {
+    const search = new URLSearchParams({ ...base, ...(cursor ? { cursor } : {}) }).toString();
+    return search ? `${path}?${search}` : path;
+  };
   const result = useApi<PostPage>(
-    search ? `${path}?${search}` : path,
+    url(),
     // A ranked For You first page starts a new session (#9), so polling it would reshuffle the
-    // feed under the reader and expire their "Older posts" link. It refreshes when asked.
+    // feed under the reader and expire the pages below. It refreshes when asked.
     feed === 'forYou' ? FOR_YOU_REFRESH : SOCIAL_REFRESH,
   );
   // For You measurement (#11): only when the API says it is on and not opted out.
@@ -140,6 +147,54 @@ export function PostsList({
     FOR_YOU_REFRESH,
   );
   const tracker = useFeedMetricsTracker(metrics.data?.active === true);
+  // A For You first page that changed is a new session: its later pages belong to the old order.
+  const firstCursor = result.data?.nextCursor;
+  const startedFrom = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (feed === 'forYou' && startedFrom.current !== undefined && startedFrom.current !== firstCursor) {
+      startedFrom.current = undefined;
+      setMore([]);
+      setNext(undefined);
+    }
+  }, [feed, firstCursor]);
+  const cursor = next === undefined ? firstCursor : (next ?? undefined);
+  const mutateFirst = result.mutate;
+  const loadMore = useCallback(async () => {
+    if (!cursor || loading.current) return;
+    loading.current = true;
+    setLoadingMore(true);
+    setMoreError('');
+    try {
+      const page = await api.get<PostPage>(url(cursor));
+      if (page.expired) {
+        // The feed was rebuilt since this page was opened: start again from its new first page.
+        startedFrom.current = undefined;
+        setMore([]);
+        setNext(undefined);
+        await mutateFirst();
+        return;
+      }
+      if (startedFrom.current === undefined) startedFrom.current = firstCursor;
+      setMore((rows) => [...rows, ...page.posts]);
+      setNext(page.nextCursor ?? null);
+    } catch (caught) {
+      setMoreError(caught instanceof Error ? caught.message : 'Could not load more posts.');
+    } finally {
+      loading.current = false;
+      setLoadingMore(false);
+    }
+    // `url` is rebuilt each render from the same inputs as `cursor`.
+  }, [cursor, firstCursor, mutateFirst, path, authorId, preview]);
+  // Load the next page a screen before the reader reaches the end.
+  useEffect(() => {
+    const node = sentinel.current;
+    if (!node || !cursor || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver((entries) => entries.some((entry) => entry.isIntersecting) && void loadMore(), {
+      rootMargin: '800px 0px',
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [cursor, loadMore]);
   if (result.error)
     return <ErrorNote message={(result.error as Error).message} />;
   if (!result.data || result.isLoading)
@@ -152,19 +207,25 @@ export function PostsList({
           type="button"
           className="btn-ghost mt-3"
           onClick={() => {
-            setCursor(undefined);
-            setHistory([]);
+            reset();
+            void mutateFirst();
           }}
         >
           Back to the top
         </button>
       </div>
     );
+  // One list, each post once: a post that moved between pages while reading is not repeated.
+  const shownKeys = new Set<string>();
+  const posts = [...result.data.posts, ...more].filter((post) => {
+    const key = post.repost?.id ?? post.id;
+    return !shownKeys.has(key) && !!shownKeys.add(key);
+  });
   return (
     <FeedMetricsContext.Provider value={tracker}>
     <div className="space-y-5">
       <div className="-mx-4 space-y-0.5 sm:mx-0 sm:space-y-5">
-        {result.data.posts.map((post) => {
+        {posts.map((post) => {
           const key = post.repost?.id ?? post.id;
           const hiddenBy = hiddenAuthors[post.author.userId];
           return (
@@ -186,40 +247,27 @@ export function PostsList({
           );
         })}
       </div>
-      {result.data.posts.length === 0 && history.length === 0 && empty}
-      {result.data.posts.length === 0 && !empty && (
+      {posts.length === 0 && empty}
+      {posts.length === 0 && !empty && (
         <div className="card p-6 text-sm text-ink-muted">
           {authorId
             ? 'No posts shared with this audience yet.'
             : 'No posts here yet. Share something, find friends, or follow a page.'}
         </div>
       )}
-      <div className="flex items-center justify-between gap-3">
-        {history.length > 0 && (
-          <button
-            type="button"
-            className="btn-ghost"
-            onClick={() => {
-              setCursor(history.at(-1));
-              setHistory((h) => h.slice(0, -1));
-            }}
-          >
-            Newer posts
-          </button>
-        )}
-        {result.data.nextCursor && (
-          <button
-            type="button"
-            className="btn-ghost ml-auto"
-            onClick={() => {
-              setHistory((h) => [...h, cursor]);
-              setCursor(result.data!.nextCursor);
-            }}
-          >
-            Older posts
-          </button>
-        )}
-      </div>
+      {moreError && <ErrorNote message={moreError} />}
+      {cursor && (
+        <div ref={sentinel} className="flex justify-center py-2">
+          {loadingMore ? (
+            <Spinner label="Loading more posts…" />
+          ) : (
+            // Shown where the page cannot watch the scroll, and after a failed load.
+            <button type="button" className="btn-ghost" onClick={() => void loadMore()}>
+              Load more posts
+            </button>
+          )}
+        </div>
+      )}
     </div>
     </FeedMetricsContext.Provider>
   );

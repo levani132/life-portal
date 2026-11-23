@@ -8,6 +8,7 @@ import type { FeedPreferences, FoodPost, ForYouReason, PostPage } from '@life-po
 import {
   FOR_YOU_CONFIG,
   forYouReasonText,
+  unseenFirst,
   interestForTopic,
   interestTopicIds,
   interestsProblem,
@@ -31,6 +32,8 @@ const ORIGINAL = { repostOf: { $exists: false } };
 export const FOR_YOU_SESSION_MS = 30 * 60_000;
 /** Newest eligible posts read for one session, before the 300 the ranking keeps. */
 const POOL_SCAN = 400;
+/** How many served posts are remembered per viewer, to keep them out of the lead on a refresh. */
+const SEEN_KEPT = 600;
 /** People's posts from the last week that are always candidates, however many pages posted since. */
 const PEOPLE_SCAN = 100;
 /** At most this many of each kind of the viewer's own interactions are read. */
@@ -170,11 +173,20 @@ export class ForYouService {
       now: now.toISOString(),
       seed,
     });
+    // A refresh leads with what this viewer has not been shown; what they have seen follows, in
+    // the same order, so the feed never runs dry.
+    const previous = await this.sessions.findOne({ userId }).select('entries served seen').lean();
+    const seen = [
+      ...(previous?.seen ?? []),
+      ...(previous?.entries ?? []).slice(0, previous?.served ?? 0).map((entry) => entry.postId),
+    ].slice(-SEEN_KEPT);
     const session = {
       userId,
       seed,
       mode: ranking.mode,
-      entries: ranking.entries,
+      entries: unseenFirst(ranking.entries, seen),
+      served: 0,
+      seen,
       expiresAt: new Date(now.getTime() + FOR_YOU_SESSION_MS),
     };
     // One row per viewer: a new first page replaces the last session.
@@ -281,6 +293,8 @@ export class ForYouService {
         if (posts.length === pageSize) break;
       }
     }
+    // Remember how far they got, for the next refresh.
+    await this.sessions.updateOne({ userId, seed: session.seed }, { $max: { served: index } });
     return {
       posts,
       ...(index < session.entries.length ? { nextCursor: this.encode({ seed: session.seed, offset: index }) } : {}),

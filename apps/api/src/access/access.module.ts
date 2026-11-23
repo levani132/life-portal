@@ -137,6 +137,33 @@ export class AccessService {
     if (user.suspendedAt || user.disabledAt) for (const id of Object.keys(access) as FeatureId[]) access[id] = false;
     return { cohort, access, ...(user.kind === 'page' ? { page: true as const } : {}) };
   }
+  /**
+   * What several accounts have switched on, in two reads however many there are. The same
+   * answer as `forUser()` for each; an account that does not exist is left out.
+   */
+  async forUsers(userIds: string[]): Promise<Map<string, FeatureAccess>> {
+    const ids = [...new Set(userIds)].filter((id) => isValidObjectId(id));
+    if (!ids.length) return new Map();
+    const [users, policies] = await Promise.all([
+      this.users.find({ _id: { $in: ids } }).select('cohort featureOverrides suspendedAt disabledAt kind').lean(),
+      this.policies.find().lean(),
+    ]);
+    const policyOf = new Map(policies.map((policy) => [policy.cohort, policy.overrides]));
+    const out = new Map<string, FeatureAccess>();
+    for (const user of users) {
+      const id = String(user._id);
+      const cohort: UserCohort | 'developer' = id === this.config.developerUserId ? 'developer' : (user.cohort ?? 'internal');
+      const policy = policyOf.get(cohort === 'developer' ? 'internal' : cohort);
+      const overrides =
+        cohort === 'developer'
+          ? Object.fromEntries(DEFAULT_OFF_FEATURES.map((feature) => [feature, policy?.[feature]]))
+          : { ...policy, ...user.featureOverrides };
+      const access = user.kind === 'page' ? pageAccess() : resolveFeatureAccess(cohort, overrides);
+      if (user.suspendedAt || user.disabledAt) for (const feature of Object.keys(access) as FeatureId[]) access[feature] = false;
+      out.set(id, access);
+    }
+    return out;
+  }
   async require(userId: string, module: FeatureId) {
     if (!(await this.forUser(userId)).access[module])
       throw new ForbiddenException(

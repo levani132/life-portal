@@ -108,8 +108,8 @@ export class PagesService {
   onModuleInit() {
     this.notifications.registerPageResolver(async (userId) => {
       if (!isValidObjectId(userId)) return null;
-      const page = await this.users.findOne({ _id: userId, kind: 'page' }).select('name managers').lean();
-      return page ? { name: page.name, managers: page.managers ?? [] } : null;
+      const page = await this.users.findOne({ _id: userId, kind: 'page' }).select('name managers aiManaged').lean();
+      return page ? { name: page.name, managers: page.managers ?? [], aiManaged: page.aiManaged === true } : null;
     });
   }
 
