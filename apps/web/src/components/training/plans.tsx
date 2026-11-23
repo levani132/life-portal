@@ -1,5 +1,6 @@
 'use client';
 
+import { actingPageId } from '../../lib/identity';
 import { useState } from 'react';
 import { mutate } from 'swr';
 import { ChevronLeft, ChevronRight, Copy, Pencil, Play, Plus, Trash2 } from 'lucide-react';
@@ -214,6 +215,8 @@ function PlanView({
   const [startError, setStartError] = useState<string | null>(null);
   const [inProgress, setInProgress] = useState<string | null>(null);
   const { data: current } = useCurrentSession();
+  // Spec 040: a page keeps plans to publish; it never starts a workout.
+  const asPage = !!actingPageId();
 
   const start = async (planWorkoutId: string) => {
     setStarting(planWorkoutId);
@@ -316,7 +319,7 @@ function PlanView({
             </div>
           )}
           {startError && <ErrorNote message={startError} />}
-          {!inProgress && !startError && (
+          {!inProgress && !startError && !asPage && (
             <p className="px-1 text-xs text-ink-faint">
               Start a workout and its sets appear as suggestions. Weights come from your last time, or stay empty
               for you to fill in.
@@ -361,7 +364,7 @@ function PlanView({
                       className="flex h-10 w-9 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-surface hover:text-ink"
                     />
                   )}
-                  <button
+                  {!asPage && <button
                     type="button"
                     className="btn-primary shrink-0"
                     disabled={starting !== null || !workout.exercises.length}
@@ -369,7 +372,7 @@ function PlanView({
                     onClick={() => void start(workout.id)}
                   >
                     <Play className="h-4 w-4" /> {starting === workout.id ? 'Starting…' : 'Start'}
-                  </button>
+                  </button>}
                 </div>
                 {workout.exercises.length ? (
                   <ol className="mt-3 space-y-2">

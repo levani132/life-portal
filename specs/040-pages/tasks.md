@@ -49,7 +49,7 @@ device check before the `pages` switch is turned on for anyone but the owner.
 
 ## Deferred from slice 1
 
-- [ ] T040 A page's library screens in Food and Training (the routes are open; the screens are not built), and attaching food or a plan to a page's post.
+- [x] T040 (spec 041 slice 1) A page's library screens in Food and Training (the routes are open; the screens are not built), and attaching food or a plan to a page's post.
 - [ ] T041 Offline stores kept per identity, so switching need not clear them.
 
 ## Open concerns
@@ -64,7 +64,7 @@ Logged 2026-11-22, after slice 2. Each is closed by the task named, or by a deci
 | The People screen searches by name and username, not email (spec asks for email too). Left out so the screen shows no address. | Open: owner to say whether email search is wanted |
 | A suspended person's pages stay visible: only the person is hidden. Suspend each page too if it should go. | Open: decide whether suspending a person should hide the pages only they manage |
 | Per-identity offline stores (T041): switching identity clears what the device kept for offline use. | Deferred |
-| A page's library screens in Food and Training are not built (T040), so a page cannot yet attach a food or a plan to a post. | Deferred |
+| A page's library screens in Food and Training are not built (T040), so a page cannot yet attach a food or a plan to a post. | Closed 2026-11-23 (spec 041 slice 1) |
 | The "by a person" mark on a post or comment of an AI-run page is not built (T032b). The page-level "run with AI" mark is. | Open: build before any AI-run page posts by hand |
 | A personal notification tapped while acting as a page opens in the page's context (only a page's notification switches identity, with `?as=`). | Open: decide whether personal links should switch back |
 | A notification link for a page does not switch identity while unsent changes wait on the device; it opens as the current identity. | Accepted: same rule as the menu switch |

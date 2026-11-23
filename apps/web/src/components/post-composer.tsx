@@ -719,11 +719,11 @@ export function PostComposer({
         </div>
 
         <div className="flex shrink-0 items-center gap-1 border-t border-border px-2 py-1.5">
+          <ToolButton label={food ? 'Replace the food' : isPage ? 'Add from the library' : 'Add from Food'} onClick={() => setPicking(true)}>
+            <Plus size={22} />
+          </ToolButton>
           {!isPage && (
             <>
-              <ToolButton label={food ? 'Replace the food' : 'Add from Food'} onClick={() => setPicking(true)}>
-                <Plus size={22} />
-              </ToolButton>
               <ToolButton
                 label="New food"
                 pressed={!!newFood}

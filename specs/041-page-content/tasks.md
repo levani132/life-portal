@@ -1,11 +1,11 @@
 # Tasks: Page content and the assistant for pages
 
 ## Slice 1: library screens and attachments
-- [ ] T001 Web: a page's Food tab is its library (foods, recipes): list, create, edit, delete.
-- [ ] T002 Web: a page's Training tab is its library (exercises, plans): list, create, edit, delete.
-- [ ] T003 Composer: a page attaches a food selection or a training plan; preview routes open to pages.
-- [ ] T004 Integration test: page creates a food and a plan, posts each, a person saves and copies.
-- [ ] T005 Docs: pages.md, posts.md, changelog; close T040 in specs/040-pages/tasks.md.
+- [x] T001 Web: a page's Food tab is its library (foods, recipes): list, create, edit, delete.
+- [x] T002 Web: a page's Training tab is its library (exercises, plans): list, create, edit, delete.
+- [x] T003 Composer: a page attaches a food selection or a training plan; preview routes open to pages.
+- [x] T004 Integration test: page creates a food and a plan, posts each, a person saves and copies.
+- [x] T005 Docs: pages.md, posts.md, changelog; close T040 in specs/040-pages/tasks.md.
 
 ## Slice 2: connector for pages
 - [ ] T010 The `pages` consent on a connector grant, chosen per page; acting check (FR-010).

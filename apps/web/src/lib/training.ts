@@ -1,5 +1,6 @@
 'use client';
 
+import { actingPageId } from './identity';
 import { mutate } from 'swr';
 import {
   displayToGrams,
@@ -42,7 +43,8 @@ export const PLANS_KEY = '/training/plans';
 export const planKey = (id: string) => `/training/plans/${id}`;
 
 export function useTrainingProfile(): TrainingProfile & { loaded: boolean } {
-  const { data } = useApi<TrainingProfile>(PROFILE_KEY);
+  // Spec 040: a page has no training profile; it sees the defaults.
+  const { data } = useApi<TrainingProfile>(actingPageId() ? null : PROFILE_KEY);
   return { ...(data ?? { weightUnit: 'kg', defaultRestSeconds: 90 }), loaded: !!data };
 }
 
@@ -56,7 +58,7 @@ export function useWeightUnit(): WeightUnit {
  * profile's day-start hour (default 4, so a 01:00 session counts for the day that is ending).
  */
 export function useWorkoutDay(): () => string {
-  const { data } = useApi<{ profile: { dayStartHour: number } }>('/nutrition/profile', {
+  const { data } = useApi<{ profile: { dayStartHour: number } }>(actingPageId() ? null : '/nutrition/profile', {
     // An account without Food still trains; the default hour applies.
     shouldRetryOnError: false,
   });

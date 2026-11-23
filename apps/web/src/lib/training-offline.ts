@@ -1,5 +1,6 @@
 'use client';
 
+import { actingPageId } from './identity';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type {
@@ -150,7 +151,8 @@ export async function discardRefusedTraining(): Promise<void> {
 
 /** The open workout, with this device's writes applied. */
 export function useCurrentSession(enabled = true) {
-  const result = useApi<SessionDetail | null | undefined>(enabled ? CURRENT_KEY : null, {
+  // Spec 040: a page never has a workout.
+  const result = useApi<SessionDetail | null | undefined>(enabled && !actingPageId() ? CURRENT_KEY : null, {
     // A workout started on another device shows up when this one comes back to the app.
     revalidateOnFocus: true,
   });

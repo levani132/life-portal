@@ -1,6 +1,7 @@
 'use client';
 import { Wordmark } from './wordmark';
 import { ActingBar } from './identity-switcher';
+import { PageLibrary } from './page-library';
 import { HealthSyncBridge } from './apple-health';
 
 import clsx from 'clsx';
@@ -14,6 +15,7 @@ import {
   Plus,
   Search,
   UserRound,
+  LibraryBig,
   type LucideIcon,
 } from 'lucide-react';
 import type { PortalState } from '@life-portal/shared-types';
@@ -127,7 +129,7 @@ function Portal({ children }: { children: ReactNode }) {
     pathname === '/profile' ||
     pathname === '/friends' ||
     pathname === `/people/${user.id}`;
-  const tabs = tabsFor(portal.data.access, pathname, inMenu);
+  const tabs = tabsFor(portal.data.access, pathname, inMenu, isPage);
   const current = tabs.findIndex((tab) => tab.href === pathname);
   // The bar's cells (the tabs, with New post in the middle) and which one the pill sits under.
   const bar = withNewPost(tabs, canPost);
@@ -455,6 +457,7 @@ function tabsFor(
   access: PortalState['access'],
   pathname: string,
   inMenu: boolean,
+  isPage = false,
 ): Tab[] {
   const tab = (
     href: string,
@@ -478,6 +481,7 @@ function tabsFor(
     '/wall',
     '/posts',
     '/messages',
+    '/library',
   ];
   return [
     tab(
@@ -509,6 +513,8 @@ function tabsFor(
           ),
         ]
       : []),
+    // Spec 041: a page's library, where a person has Food and Training on Home.
+    ...(isPage ? [tab('/library', 'Library', LibraryBig, PageLibrary, pathname.startsWith('/library'))] : []),
     access.social
       ? tab(LAST_TAB_HREF.profile, 'Profile', UserRound, OwnProfile, inMenu)
       : tab(LAST_TAB_HREF.menu, 'Menu', Menu, MenuContent, inMenu),

@@ -1,4 +1,5 @@
 'use client';
+import { actingPageId } from '../lib/identity';
 import { useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import {
@@ -56,7 +57,9 @@ export function PostFoodPicker({
   onPick: (picked: PickedFood) => void;
   onClose: () => void;
 }) {
-  const [tab, setTab] = useState<Tab>('diary');
+  // Spec 041: a page has a library and no diary.
+  const asPage = !!actingPageId();
+  const [tab, setTab] = useState<Tab>(asPage ? 'foods' : 'diary');
   const [dayStartHour, setDayStartHour] = useState(4);
   const [today, setToday] = useState<string | null>(null);
   const [day, setDay] = useState<string | null>(null);
@@ -67,12 +70,18 @@ export function PostFoodPicker({
     setDay((current) => current ?? context.day);
   }, [dayStartHour]);
   const overview = useApi<NutritionOverview>(
-    today && day ? `/nutrition?today=${today}&day=${day}` : null,
+    !asPage && today && day ? `/nutrition?today=${today}&day=${day}` : null,
     { keepPreviousData: true },
   );
-  const data = overview.data;
+  const pageFoods = useApi<NutritionOverview['foods']>(asPage ? '/nutrition/foods' : null);
+  const pageMeals = useApi<NutritionOverview['savedMeals']>(asPage ? '/nutrition/meals' : null);
+  const data = asPage
+    ? pageFoods.data && pageMeals.data
+      ? ({ foods: pageFoods.data, savedMeals: pageMeals.data } as NutritionOverview)
+      : undefined
+    : overview.data;
   useEffect(() => {
-    if (data && data.profile.dayStartHour !== dayStartHour)
+    if (data?.profile && data.profile.dayStartHour !== dayStartHour)
       setDayStartHour(data.profile.dayStartHour);
   }, [data, dayStartHour]);
   const foods = useMemo(() => {
@@ -119,7 +128,7 @@ export function PostFoodPicker({
         <span className="h-10 w-10" />
       </header>
       <div className="no-scrollbar flex gap-1 overflow-x-auto border-b border-border px-3 py-2">
-        {TABS.map((item) => (
+        {TABS.filter((item) => !asPage || item.id !== 'diary').map((item) => (
           <button
             key={item.id}
             type="button"

@@ -1,5 +1,6 @@
 'use client';
 
+import { actingPageId } from '../../lib/identity';
 import clsx from 'clsx';
 import { useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -39,7 +40,8 @@ export function ExerciseDetail({
   const portal = useApi<PortalState>('/portal');
   const access = portal.data?.access;
   // The Rank tab holds the tournament too; without ranks there is neither.
-  const tabs: ExerciseDetailTab[] = access?.trainingRanks ? ['about', 'progress', 'rank', 'history'] : ['about', 'progress', 'history'];
+  // Spec 040: a page has an exercise to publish, and no progress or history of its own.
+  const tabs: ExerciseDetailTab[] = actingPageId() ? ['about'] : access?.trainingRanks ? ['about', 'progress', 'rank', 'history'] : ['about', 'progress', 'history'];
   const shown = tabs.includes(tab) ? tab : 'about';
   const { data: exercise, error } = useApi<Exercise>(`/training/exercises/${id}`);
   const [editing, setEditing] = useState(false);

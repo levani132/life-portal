@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: A page's Library
+
+- **Library tab** while using the app as a page: the page's own foods, recipes, training plans
+  and exercises. Recipes are built from the page's foods with amounts.
+- **Post any of it**: "Post" on an item, or "Add from the library" in the composer. People save
+  the food or copy the plan as they do from anyone's post.
+
 ## 2026-11-22: Pages, part four: messages, notifications, blocking
 
 - **Message a page** from its profile; whoever runs it answers as the page. A page cannot write

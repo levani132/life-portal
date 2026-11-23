@@ -123,6 +123,21 @@ followed. The owner sees an "Official" switch on any page's profile.
 - **Export.** A person's export holds their pages under `pages.*` (profile, posts, media,
   comments, follows, sent messages).
 
+## Library (spec 041, slice 1)
+
+Acting as a page, the tab bar has **Library** (`/library`, `components/page-library.tsx`):
+Foods (`GET/POST/PATCH/DELETE /nutrition/foods`, brands), Recipes (saved meals, built from the
+page's foods with `POST/PATCH /nutrition/meals`; this builder exists only here), Training plans
+and Exercises (the people's components, with Start, progress and history hidden). The reads a
+page may not make (`/training/profile`, `/nutrition/profile`, the current session) are skipped
+in their hooks when acting, so a page sees defaults instead of errors.
+
+Posting from the library: "Post" on a food, recipe, plan or exercise opens the composer with it
+attached; the composer's **Add from the library** opens the food picker on the page's foods and
+recipes (no Diary tab). The snapshot, hash, saving and copying are the same services people use.
+A page's library is its own: its manager's foods and plans are separate rows under another id.
+Tested in `integration/page-library.integration.ts`.
+
 ## People (the owner's screen)
 
 Menu → People, developer only (`/settings/people`).
