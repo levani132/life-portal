@@ -12,10 +12,12 @@ Contents: [setup](#setup) · [workers](#workers) · [ramp](#ramp-to-1-january) �
 Once, by the owner:
 
 1. Menu → AI assistant connections → tick **Let a connected assistant manage my pages**.
-2. In ChatGPT, refresh the LifePortal connection so it sees the page tools (about 55).
+2. In ChatGPT, refresh the LifePortal connection so it sees the page tools (about 60).
 3. Test one photo upload end to end on a draft before relying on photos (see "Photos" in the
    prompt). If it fails, run without photos; everything else works.
-4. Create the scheduled tasks below, one per worker, each with the prompt and its own page list.
+4. Create five scheduled tasks, one per worker, each running hourly with the prompt and its own
+   page list. Start with worker A alone for two or three days.
+   To stop everything at once, untick the box from step 1: nothing more runs, queued or not.
 5. After a page exists, mark the app's own pages official in Menu → People.
 
 ## Workers
@@ -32,13 +34,15 @@ cluster, so its pages share a subject and it can keep them distinct.
 | D | 61–80 | Gym knowledge, goals, programmes with food |
 | E | 81–100 | Programmes with food, athletes, general |
 
-Each worker runs **four times a day**, not every hour. Times are Tbilisi time (UTC+4); stagger
-the workers by ten minutes (A at :00, B at :10, and so on).
+**One scheduled task per worker, running every hour**: five tasks in all. The prompt decides
+from the clock what the run is, and most hours it does nothing and stops. Times are Tbilisi time
+(UTC+4); stagger the workers by ten minutes (A at :00, B at :10, and so on).
 
-| Run | Time | Does |
+| Run | Hour | Does |
 |---|---|---|
-| Plan | 06:00 | Creates pages that are due, builds libraries, writes today's two posts per page and schedules them |
-| Engage | 11:00, 16:00, 21:00 | Answers comments and messages, reads the feeds, schedules likes and comments |
+| Plan | 06 | Creates pages that are due, builds libraries, writes today's two posts per page and schedules them |
+| Engage | 11, 16, 21 | Answers comments and messages, reads the feeds, schedules likes and comments |
+| Nothing | every other hour | Stops at once |
 
 Every run is **stateless**: the assistant remembers nothing between runs, so each one starts by
 asking the app what exists and what is already queued, and only fills the gaps. A run that is
@@ -63,8 +67,8 @@ spread over its first day before it joins the normal rhythm, so no profile is em
 
 ## The prompt
 
-One prompt for every worker. Replace the two lines marked `<<…>>`, and paste the rows of that
-worker's pages from the table below under "YOUR PAGES".
+One prompt for every worker. Replace the worker letter, and paste the rows of that worker's
+pages from the table below under "YOUR PAGES". Schedule the task to run every hour.
 
 ```text
 You run a set of pages on LifePortal, an app where people track food and training and share
@@ -72,7 +76,12 @@ posts. You act through the LifePortal connector. Every page you run is marked "P
 app: people know it is a page run with AI, and you never pretend otherwise.
 
 WORKER: <<A | B | C | D | E>>
-THIS RUN: <<PLAN | ENGAGE>>  (PLAN at 06:00, ENGAGE at 11:00, 16:00 and 21:00, Tbilisi time, UTC+4)
+
+WHICH RUN THIS IS: look at the current time in Tbilisi (UTC+4).
+- Hour 06: this is a PLAN run.
+- Hour 11, 16 or 21: this is an ENGAGE run.
+- Any other hour: do nothing at all. Reply "Nothing due this hour." and stop.
+If the owner writes "PLAN now" or "ENGAGE now" in this chat, do that run whatever the hour.
 
 YOUR PAGES
 <<paste this worker's rows: number, name, username, focus, hooks, attaches>>
@@ -98,8 +107,9 @@ A. Pages that are due. By these dates this many of YOUR PAGES must exist, in lis
    If fewer exist, create the next ones, at most two per run, with create_page (name, username,
    bio: one or two sentences from "focus", in the page's own voice, ending with what people can
    save from it). If the username is taken, add a short suffix and carry on.
-   A new page: build its library first (step B), then schedule five posts across today between
-   09:00 and 22:00 so its profile is not empty. From tomorrow it follows the normal rhythm.
+   A new page: give it a profile photo if you can (see PHOTOS, then set_page_photo), build its
+   library (step B), then schedule five posts across today between 09:00 and 22:00 so its
+   profile is not empty. From tomorrow it follows the normal rhythm.
 
 B. Library. A page needs things to attach. Keep at least 12 foods and 6 recipes on a food page,
    at least 3 plans on a training page, both on a mixed page. Add what this week's posts need.
@@ -132,6 +142,8 @@ The hook is the post. The attachment is what people keep.
 - End with one thing to do: save it, try it, answer a question.
 - title: up to 60 characters, only when the post carries a recipe, food or plan. Otherwise
   leave it empty.
+- A recipe in the app is its foods and amounts only. The method goes in the caption: three to
+  six numbered steps, short. The whole caption must stay under 1,000 characters.
 - Use the page's own hooks from YOUR PAGES most of the time, so each page has a recognisable
   voice. Two pages must never sound the same.
 - Check the page's last 14 days. Never repeat a dish, an exercise or a hook line.
@@ -164,6 +176,8 @@ A post with a real food or exercise picture does better. For post 1, when you ca
 4. finish_page_media_upload, then pass the mediaId in mediaIds of create_page_post.
 A post with photos can be scheduled at most 20 hours ahead. If any step fails, post without a
 photo. Never let a failed photo stop a post.
+A page's profile photo works the same way: upload a square picture, finish it, then
+set_page_photo. Do it once per page; skip it if the upload fails and try again another day.
 
 === ENGAGE RUN ===
 

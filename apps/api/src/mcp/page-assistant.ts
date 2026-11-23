@@ -675,6 +675,21 @@ export class PageAssistantService {
         },
       },
 
+      {
+        name: 'set_page_photo',
+        description:
+          'Set the page’s profile photo from an uploaded picture: a mediaId from finish_page_media_upload. Use a square picture that says what the page is about, with no text, logos or recognisable people. It is checked like any profile photo.',
+        shape: { pageId, mediaId: id },
+        run: async (personId, args) => {
+          const page = await this.acting(personId, args);
+          const mediaId = String(args['mediaId']);
+          await this.media.requireAssistantChecked(page, [mediaId]);
+          await this.social.setAvatar(page, { mediaId });
+          await this.record(personId, page, 'media', 'set_page_photo', mediaId);
+          return { photoSet: true };
+        },
+      },
+
       // ---- posts
       {
         name: 'create_page_post',
