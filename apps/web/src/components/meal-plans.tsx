@@ -14,6 +14,7 @@ import {
   type MealEntry,
   type MealPlanInput,
   type MealSlot,
+  type PostImportPreview,
   type PostImportResult,
   type SavedMeal,
 } from '@life-portal/shared-types';
@@ -203,6 +204,8 @@ export function PlannedLines({ plan, lines, slot, day, onChanged }: { plan: Acti
 export function UsePlanFromPost({ postId, title }: { postId: string; title: string }) {
   const action = useAction();
   const [done, setDone] = useState(false);
+  // Foods in the post the reader already has by the same name: they choose theirs or copies.
+  const [asking, setAsking] = useState<string[] | null>(null);
   if (actingPageId()) return null;
   if (done)
     return (
@@ -213,36 +216,64 @@ export function UsePlanFromPost({ postId, title }: { postId: string; title: stri
         </Link>
       </p>
     );
+  const save = async (policy: 'skip' | 'copy') => {
+    // The card may show only the first foods; the plan is saved whole.
+    const full = await api.get<FoodPost>(`/posts/${postId}`);
+    const saved = await api.post<PostImportResult>(`/posts/${postId}/import`, {
+      itemKeys: full.items.map((item) => item.key),
+      duplicatePolicy: policy,
+      saveAsMeal: false,
+      savePlan: true,
+      mealName: title,
+    });
+    if (!saved.mealPlanId) throw new Error('This plan could not be saved.');
+    await api.put(ACTIVE_KEY, { planId: saved.mealPlanId, today: mealContextNow().day });
+    await refreshPlans();
+    setAsking(null);
+    setDone(true);
+  };
+  const start = (policy: 'skip' | 'copy') => void action.run(() => save(policy), { revalidate: false });
+  const begin = () =>
+    void action.run(
+      async () => {
+        const preview = await api.get<PostImportPreview>(`/posts/${postId}/import`);
+        const mine = [...new Set(preview.items.flatMap((item) => (item.duplicateName ? [item.duplicateName] : [])))];
+        if (mine.length) setAsking(mine);
+        else await save('copy');
+      },
+      { revalidate: false },
+    );
   return (
     <div className="mt-3">
-      <button
-        type="button"
-        className="btn-primary w-full justify-center"
-        disabled={action.pending}
-        onClick={() =>
-          void action.run(
-            async () => {
-              // The card may show only the first foods; the plan is copied whole.
-              const full = await api.get<FoodPost>(`/posts/${postId}`);
-              const saved = await api.post<PostImportResult>(`/posts/${postId}/import`, {
-                itemKeys: full.items.map((item) => item.key),
-                duplicatePolicy: 'copy',
-                saveAsMeal: false,
-                savePlan: true,
-                mealName: title,
-              });
-              if (!saved.mealPlanId) throw new Error('This plan could not be saved.');
-              await api.put(ACTIVE_KEY, { planId: saved.mealPlanId, today: mealContextNow().day });
-              await refreshPlans();
-              setDone(true);
-            },
-            { revalidate: false },
-          )
-        }
-      >
-        <CalendarCheck size={16} /> {action.pending ? 'Saving the plan…' : 'Use this plan'}
-      </button>
-      <p className="mt-1 text-center text-xs text-ink-faint">Saves its foods and the plan to your Food, and shows its meals there each day. Nothing is logged.</p>
+      {asking ? (
+        <div className="rounded-xl border border-border p-3">
+          <p className="text-sm font-medium">
+            You already have {asking.length === 1 ? 'a food' : `${asking.length} foods`} with the same name:
+          </p>
+          <p className="mt-1 text-sm text-ink-muted">{asking.join(', ')}</p>
+          <p className="mt-2 text-xs text-ink-faint">
+            Use yours and the plan uses your foods and their numbers, with nothing new in your foods. Or save the post&apos;s foods as new foods, with its numbers.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" className="btn-primary" disabled={action.pending} onClick={() => start('skip')}>
+              Use my foods
+            </button>
+            <button type="button" className="btn-ghost border border-border" disabled={action.pending} onClick={() => start('copy')}>
+              Save the post&apos;s foods
+            </button>
+            <button type="button" className="btn-ghost" disabled={action.pending} onClick={() => setAsking(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <button type="button" className="btn-primary w-full justify-center" disabled={action.pending} onClick={begin}>
+            <CalendarCheck size={16} /> {action.pending ? 'Saving the plan…' : 'Use this plan'}
+          </button>
+          <p className="mt-1 text-center text-xs text-ink-faint">Saves the plan to your Food and shows its meals there each day. Nothing is logged.</p>
+        </>
+      )}
       {action.error && <ErrorNote message={action.error} />}
     </div>
   );

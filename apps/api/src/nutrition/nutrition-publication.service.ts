@@ -268,8 +268,10 @@ export class NutritionPublicationService {
       imported: rows.find(
         (row) => row.postImportKey === this.importKey(postId, item),
       ),
+      // Only a food the reader still has counts as theirs: an archived one cannot be logged or planned.
       duplicate: rows.find(
         (row) =>
+          !row.archived &&
           row.name.trim().toLowerCase() === item.name.trim().toLowerCase() &&
           (row.brand ?? '').trim().toLowerCase() ===
             (item.brand ?? '').trim().toLowerCase() &&
@@ -324,9 +326,10 @@ export class NutritionPublicationService {
       throw new BadRequestException(
         'To save this meal, select every food and choose Copy for matching food names.',
       );
-    // Spec 042: a plan is copied whole or not at all, like a saved meal.
-    if (savePlan && (publication.kind !== 'mealPlan' || selected.length !== publication.items.length || skipped.length))
-      throw new BadRequestException('To save this plan, select every food and choose Copy for matching food names.');
+    // Spec 042: a plan is copied whole or not at all, like a saved meal. With "skip", a food the
+    // reader already has by that name stands in for the post's: their own food, with their numbers.
+    if (savePlan && (publication.kind !== 'mealPlan' || selected.length !== publication.items.length))
+      throw new BadRequestException('To save this plan, select every food.');
     const eligible = rows.filter((r) => !skipped.includes(r));
     const unique = [
       ...new Map(
@@ -418,7 +421,8 @@ export class NutritionPublicationService {
     if (savePlan) {
       // The reader's plan is built from their own copies of the foods; recipes arrive as their foods.
       const copies = await this.foods.find({ userId, postImportKey: { $in: unique.map(([key]) => key) } }).lean();
-      const idOf = (item: PublishedFood) => String(copies.find((food) => food.postImportKey === this.importKey(postId, item))!._id);
+      const own = new Map(skipped.map((row) => [row.item.key, String(row.duplicate!._id)]));
+      const idOf = (item: PublishedFood) => own.get(item.key) ?? String(copies.find((food) => food.postImportKey === this.importKey(postId, item))!._id);
       const days = (publication.days ?? ['Day 1']).map((name, dayIndex) => ({
         name,
         entries: selected

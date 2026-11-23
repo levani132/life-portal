@@ -469,8 +469,10 @@ waiting to be sent.
 with `dayIndex`, `slot`, `amount` and, when it came from a recipe, `group` (the recipe's name);
 `publication.days` holds the day names. Recipes are flattened: only foods, amounts, meals and day
 names leave. A plan with a line that has no numbers cannot be shared (`PLAN_INCOMPLETE`).
-`POST /posts/:id/import` with `savePlan: true` (every food selected, policy `copy`) saves the
-foods and builds the reader's own plan from them (`MealPlansService.saveImported`), once per
+`POST /posts/:id/import` with `savePlan: true` (every food selected) saves the foods and builds
+the reader's own plan from them. With policy `skip`, a food the reader already has (same name,
+brand and unit, not archived) stands in for the post's in the plan, so nothing is copied for it;
+with `copy` every food is copied (`MealPlansService.saveImported`), once per
 post. Nothing is logged.
 
 Web: on any day in Food, the plan's lines not eaten yet sit inside each meal they may be eaten at,

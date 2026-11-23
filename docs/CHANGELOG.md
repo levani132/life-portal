@@ -12,6 +12,8 @@ User-visible changes. Newest first.
   already log.
 - **Look back:** any earlier day shows its plan day and what was eaten, and the plan card shows
   the last seven days.
+- **Use this plan** asks first when you already have foods with the same names: use yours (no
+  duplicates in your foods, your numbers) or save the post's foods as new ones.
 - **A line can be eaten at more than one meal** ("lunch or dinner", or any time). It shows in each
   of them until it is eaten in one.
 - Picking another plan day for a day now carries on from there the next day.

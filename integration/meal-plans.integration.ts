@@ -166,6 +166,29 @@ describe('meal plans', () => {
     expect((await api.call(ana, 'PUT', '/nutrition/meal-plans/active', { planId: plan.id, today: '2026-03-09' }, as(page.id))).status).toBe(403);
   });
 
+  it('lets a reader use their own foods of the same name instead of copies', async () => {
+    const ana = await api.account('ana');
+    const beka = await api.account('beka');
+    const ids = await library(ana);
+    const plan = (await api.call<MealPlan>(ana, 'POST', '/nutrition/meal-plans', planOf(ids))).body;
+    const source = { kind: 'mealPlan', mealPlanId: plan.id };
+    const preview = await api.call<PostPreview>(ana, 'POST', '/posts/preview', { source });
+    const posted = await api.call<FoodPost>(ana, 'POST', '/posts', { requestId: randomUUID(), title: 'Mine', caption: '', audience: 'public', source, previewHash: preview.body.previewHash });
+    // Beka already logs rice of their own, with other numbers.
+    const own = (await api.call<{ id: string }>(beka, 'POST', '/nutrition/foods', food('plan RICE', 150))).body.id;
+    const check = await api.call<{ items: { key: string; duplicateName?: string }[] }>(beka, 'GET', `/posts/${posted.body.id}/import`);
+    expect(check.body.items.map((item) => item.duplicateName)).toEqual([undefined, 'plan RICE', 'plan RICE']);
+
+    const keys = check.body.items.map((item) => item.key);
+    const saved = await api.call<PostImportResult>(beka, 'POST', `/posts/${posted.body.id}/import`, { itemKeys: keys, duplicatePolicy: 'skip', saveAsMeal: false, savePlan: true });
+    expect(saved.status).toBeLessThan(300);
+    const mine = (await api.call<MealPlan[]>(beka, 'GET', '/nutrition/meal-plans')).body.find((each) => each.id === saved.body.mealPlanId);
+    // Both rice lines are Beka's own rice, with Beka's numbers; only the oats were copied.
+    expect(mine?.days.flatMap((day) => day.entries.map((entry) => entry.foodId)).filter((id) => id === own)).toHaveLength(2);
+    expect(mine?.days.map((day) => day.totals.energyKcal)).toEqual([200 + 300, 150]);
+    expect(await api.db.collection('foods').countDocuments({ userId: beka.id })).toBe(2);
+  });
+
   it('lets a line be eaten at more than one meal, logged into the meal chosen', async () => {
     const ana = await api.account('ana');
     const beka = await api.account('beka');
