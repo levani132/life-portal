@@ -1,14 +1,15 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Injectable, NotFoundException, Param, Post, Put } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Injectable, NotFoundException, Param, Post, Put, Query } from '@nestjs/common';
 import { InjectModel, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsIn, IsInt, IsMongoId, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Model, Types, isValidObjectId } from 'mongoose';
-import { MEAL_PLAN_LIMITS, MEAL_SLOTS, type MealPlan, type MealPlanDay, type MealPlanInput, type MealSlot } from '@life-portal/shared-types';
-import { mealPlanProblem, mealPlanView, type PlanFood, type PlanRecipe } from '@life-portal/shared-domain';
+import { MEAL_PLAN_LIMITS, MEAL_SLOTS, type ActiveMealPlan, type MealPlan, type MealPlanDay, type MealPlanInput, type MealSlot } from '@life-portal/shared-types';
+import { activePlanDayIndex, mealPlanProblem, mealPlanView, sumTotals, type PlanFood, type PlanRecipe } from '@life-portal/shared-domain';
 import { RequireModule } from '../access/access.module';
 import { ForPages } from '../auth/acting';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { baseSchemaOptions } from '../common/mongoose';
+import { MealEntry } from './nutrition.schemas';
 import { NutritionService } from './nutrition.service';
 
 /**
@@ -34,6 +35,13 @@ class MealPlanDaySub {
 }
 const MealPlanDaySchema = SchemaFactory.createForClass(MealPlanDaySub);
 
+@Schema({ _id: false })
+class PlanDayChoiceSub {
+  @Prop({ type: String, required: true }) day!: string;
+  @Prop({ type: String, required: true }) dayId!: string;
+}
+const PlanDayChoiceSchema = SchemaFactory.createForClass(PlanDayChoiceSub);
+
 @Schema({ ...baseSchemaOptions, collection: 'meal_plans' })
 export class MealPlanRecord {
   @Prop({ required: true, index: true }) userId!: string;
@@ -42,6 +50,14 @@ export class MealPlanRecord {
   @Prop({ type: [MealPlanDaySchema], default: [] }) days!: MealPlanDaySub[];
   /** A copy saved from a post: one per reader and post, so saving twice makes one plan. */
   @Prop() postImportKey?: string;
+  /**
+   * Spec 042: set while the person is using this plan, to the calendar day they started. One
+   * plan per person has it. A choice, not a derived figure: which of the plan's days is today's
+   * is worked out from it on read.
+   */
+  @Prop({ type: String }) activeSince?: string;
+  /** The plan day the person picked for one calendar day, instead of the one the order gives. */
+  @Prop({ type: PlanDayChoiceSchema }) dayChoice?: PlanDayChoiceSub;
   createdAt!: Date;
   updatedAt!: Date;
 }
@@ -75,6 +91,16 @@ export class LogPlanDayDto {
   @IsOptional() @IsArray() @ArrayMaxSize(MEAL_PLAN_LIMITS.entriesPerDay) @IsString({ each: true }) entryIds?: string[];
 }
 
+export class UsePlanDto {
+  /** The plan to use from today, or null to stop using one. */
+  @IsOptional() @IsMongoId() planId?: string | null;
+  @Matches(DAY) today!: string;
+}
+export class ChoosePlanDayDto {
+  @Matches(DAY) today!: string;
+  @IsString() @MaxLength(40) dayId!: string;
+}
+
 type Row = MealPlanRecord & { _id: Types.ObjectId };
 const newId = () => String(new Types.ObjectId());
 
@@ -82,6 +108,7 @@ const newId = () => String(new Types.ObjectId());
 export class MealPlansService {
   constructor(
     @InjectModel(MealPlanRecord.name) private readonly plans: Model<MealPlanRecord>,
+    @InjectModel(MealEntry.name) private readonly entries: Model<MealEntry>,
     private readonly nutrition: NutritionService,
   ) {}
 
@@ -101,6 +128,7 @@ export class MealPlansService {
       userId: row.userId,
       name: row.name,
       ...(row.description ? { description: row.description } : {}),
+      ...(row.activeSince ? { activeSince: row.activeSince } : {}),
       ...view,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -177,14 +205,72 @@ export class MealPlansService {
     if (!wanted.length) throw new BadRequestException('There is nothing to log.');
     if (wanted.some((entry) => entry.missing))
       throw new BadRequestException({ code: 'PLAN_INCOMPLETE', message: 'Something in this plan has no foods with numbers any more. Edit the plan first.' });
+    // A line already logged into that day is left alone, so a second tap never doubles a meal.
+    const done = await this.loggedLines(userId, dto.day, wanted.map((entry) => entry.id));
     const recipes = (await this.library(userId)).recipes;
-    const lines = wanted.flatMap((entry) =>
-      entry.savedMealId
-        ? (recipes.get(entry.savedMealId)?.components ?? []).map((component) => ({ slot: entry.slot, ...component }))
-        : [{ slot: entry.slot, foodId: entry.foodId as string, amount: entry.amount as number }],
-    );
-    for (const line of lines) await this.nutrition.createEntry(userId, { day: dto.day, slot: line.slot, foodId: line.foodId, amount: line.amount } as never);
+    const lines = wanted
+      .filter((entry) => !done.has(entry.id))
+      .flatMap((entry) =>
+        entry.savedMealId
+          ? (recipes.get(entry.savedMealId)?.components ?? []).map((component) => ({ planEntryId: entry.id, slot: entry.slot, ...component }))
+          : [{ planEntryId: entry.id, slot: entry.slot, foodId: entry.foodId as string, amount: entry.amount as number }],
+      );
+    for (const line of lines)
+      await this.nutrition.createEntry(userId, { day: dto.day, slot: line.slot, foodId: line.foodId, amount: line.amount } as never, { planEntryId: line.planEntryId });
     return { logged: lines.length };
+  }
+
+  /** Which of these plan lines have a meal in the diary on that day. Derived from the diary, never stored. */
+  private async loggedLines(userId: string, day: string, lineIds: string[]): Promise<Set<string>> {
+    if (!lineIds.length) return new Set();
+    const rows = await this.entries.find({ userId, day, planEntryId: { $in: lineIds } }).select('planEntryId').lean();
+    return new Set(rows.map((row) => row.planEntryId as string));
+  }
+
+  /**
+   * The plan the person is using, and its day for today (spec 042). The day follows the plan's
+   * order from the day it was started, unless one was picked for today. What is done is read
+   * from today's diary, so deleting a meal there makes its line loggable again.
+   */
+  async active(userId: string, today: string): Promise<ActiveMealPlan | null> {
+    const row = await this.plans.findOne({ userId, activeSince: { $type: 'string' } }).lean<Row>();
+    if (!row || !row.days.length) return null;
+    const plan = this.dto(row, await this.library(userId));
+    const since = row.activeSince as string;
+    const index = activePlanDayIndex({ dayIds: plan.days.map((day) => day.id), since, today, override: row.dayChoice });
+    const day = plan.days[index];
+    const done = await this.loggedLines(userId, today, day.entries.map((entry) => entry.id));
+    const lines = day.entries.map((entry) => ({ ...entry, logged: done.has(entry.id) }));
+    return {
+      planId: plan.id,
+      name: plan.name,
+      since,
+      days: plan.days.map((each) => ({ id: each.id, name: each.name })),
+      day: { id: day.id, name: day.name, lines, totals: day.totals, loggedTotals: sumTotals(lines.filter((line) => line.logged).map((line) => line.totals)) },
+      chosen: row.dayChoice?.day === today && row.dayChoice.dayId === day.id,
+    };
+  }
+
+  /** Starts using a plan from today, or stops using one. Only one is in use at a time. */
+  async use(userId: string, dto: UsePlanDto): Promise<{ active: ActiveMealPlan | null }> {
+    if (dto.planId) {
+      const row = await this.row(userId, dto.planId);
+      if (!row) throw new NotFoundException('Meal plan not found.');
+      if (!row.days.length) throw new BadRequestException('This plan has no days yet.');
+    }
+    await this.plans.updateMany({ userId, activeSince: { $type: 'string' }, ...(dto.planId ? { _id: { $ne: dto.planId } } : {}) }, { $unset: { activeSince: 1, dayChoice: 1 } });
+    // Using the plan already in use keeps its place: the start day is only set when it starts.
+    if (dto.planId) await this.plans.updateOne({ _id: dto.planId, userId, activeSince: { $exists: false } }, { $set: { activeSince: dto.today }, $unset: { dayChoice: 1 } });
+    return { active: await this.active(userId, dto.today) };
+  }
+
+  /** Picks which of the plan's days today is. Tomorrow follows the plan's order again. */
+  async chooseDay(userId: string, dto: ChoosePlanDayDto): Promise<{ active: ActiveMealPlan | null }> {
+    const row = await this.plans.findOne({ userId, activeSince: { $type: 'string' } }).lean<Row>();
+    if (!row) throw new NotFoundException('You are not using a meal plan.');
+    if (!row.days.some((day) => day.id === dto.dayId)) throw new NotFoundException('That day is not in this plan.');
+    await this.plans.updateOne({ _id: row._id, userId }, { $set: { dayChoice: { day: dto.today, dayId: dto.dayId } } });
+    return { active: await this.active(userId, dto.today) };
   }
 
   /** Spec 042: the reader's own copy of a published plan, built from the foods they just saved. */
@@ -233,6 +319,23 @@ export class MealPlansController {
   @Post()
   create(@CurrentUser('userId') userId: string, @Body() dto: MealPlanDto): Promise<MealPlan> {
     return this.plans.create(userId, dto);
+  }
+
+  /** The plan in use. A person's own diary: no marker, so a page is refused. */
+  @Get('active')
+  async active(@CurrentUser('userId') userId: string, @Query('today') today: string) {
+    if (!DAY.test(today ?? '')) throw new BadRequestException('today must be a day.');
+    return { active: await this.plans.active(userId, today) };
+  }
+
+  @Put('active')
+  use(@CurrentUser('userId') userId: string, @Body() dto: UsePlanDto) {
+    return this.plans.use(userId, dto);
+  }
+
+  @Put('active/day')
+  chooseDay(@CurrentUser('userId') userId: string, @Body() dto: ChoosePlanDayDto) {
+    return this.plans.chooseDay(userId, dto);
   }
 
   @ForPages()

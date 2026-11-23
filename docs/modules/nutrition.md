@@ -428,6 +428,11 @@ web `components/meal-plans.tsx`. For people and pages.
 | `days[]` | 1 to 14, each `{id, name, entries[]}`; names are free ("Training day", "Day 1") |
 | `days[].entries[]` | Up to 20, each `{id, slot, savedMealId}` (a recipe) or `{id, slot, foodId, amount}` (one food, amount in its own unit) |
 | `postImportKey?` | A copy saved from a post: one per reader and post |
+| `activeSince?` | The calendar day the person started using this plan. At most one plan per person has it. A choice, not a derived value |
+| `dayChoice?` | `{day, dayId}`: the plan day the person picked for one calendar day |
+
+`meal_entries.planEntryId?` is the plan line a meal was logged from. The server sets it in
+`logDay`; `CreateEntryDto` has no such field, so a request cannot.
 
 **Nothing derived is stored.** `mealPlanView()` works out each line's name and totals, each day's
 totals, the average day (over days that hold anything) and `complete` from the foods and recipes
@@ -439,7 +444,16 @@ and counts for nothing. `mealPlanProblem()` is the one validity rule, shared by 
 | `GET /nutrition/meal-plans` | person, page | The owner's plans, resolved |
 | `POST /nutrition/meal-plans`, `PUT /:id` | person, page | Create, replace. Only the owner's own foods and recipes |
 | `DELETE /nutrition/meal-plans/:id` | person, page | |
-| `POST /nutrition/meal-plans/:id/days/:dayId/log` | **person only** | `{day, entryIds?}`: logs the day, or those lines, into the diary day the device chose, through `createEntry`, so facts are frozen then. 400 `PLAN_INCOMPLETE` when a line has no numbers. A page gets 403 `NOT_FOR_PAGES` |
+| `POST /nutrition/meal-plans/:id/days/:dayId/log` | **person only** | `{day, entryIds?}`: logs the day, or those lines, into the diary day the device chose, through `createEntry`, so facts are frozen then. A line already logged into that day is skipped, so a second tap never doubles a meal. 400 `PLAN_INCOMPLETE` when a line has no numbers. A page gets 403 `NOT_FOR_PAGES` |
+| `GET /nutrition/meal-plans/active?today=` | **person only** | `{active}`: the plan in use, its day for today with each line's `logged`, `totals` and `loggedTotals`; `null` when none |
+| `PUT /nutrition/meal-plans/active` | **person only** | `{planId \| null, today}`: start using a plan from today (stopping any other), or stop. Using the plan already in use keeps its start day |
+| `PUT /nutrition/meal-plans/active/day` | **person only** | `{today, dayId}`: today is this plan day instead. Tomorrow follows the order again |
+
+**The plan in use.** `activePlanDayIndex()` (pure, tested) decides which plan day a calendar day
+is: the plan's days in order, one per day from `activeSince`, starting again after the last; a
+`dayChoice` for that calendar day wins. Whether a line is logged is **derived**: a diary entry on
+that day with the line's `planEntryId`. Nothing marks a line done, so deleting the meal makes the
+line loggable again, and the same plan day next week starts clean.
 
 **Sharing.** `{kind: 'mealPlan', mealPlanId}` publishes the plan as its foods, in order, each
 with `dayIndex`, `slot`, `amount` and, when it came from a recipe, `group` (the recipe's name);
@@ -449,7 +463,11 @@ names leave. A plan with a line that has no numbers cannot be shared (`PLAN_INCO
 foods and builds the reader's own plan from them (`MealPlansService.saveImported`), once per
 post. Nothing is logged.
 
-Web: Food → Meal plans (with "Log this day today"); a page's Library → Meal plans (no logging).
+Web: Food → Today shows **Planned today** for the plan in use (`ActivePlanCard`): a Log button per
+line, per meal and for everything left, and a picker for which plan day today is. Food → Meal
+plans has Use / Stop using; a meal plan post has **Use this plan** (`UsePlanFromPost`: saves the
+foods and the plan, then starts it). A page's Library → Meal plans has no logging and no use.
+Also: Food → Meal plans (with "Log this day today"); a page's Library → Meal plans (no logging).
 The post card heads each day, shows numbers per day rather than summed, and the save dialog
 offers "Also save it as my own meal plan".
 

@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: A meal plan you are using
+
+- **Use a meal plan.** Food → Meal plans → Use. Today then opens with **Planned today**: the
+  plan's meals for the day, each with its own **Log** button, per meal, or everything left.
+- The plan moves to its next day each morning; pick another day for today if it does not fit.
+- **Use this plan** on someone's meal plan post saves it and starts it in one tap.
+- Logging a planned meal twice by accident no longer doubles it.
+
 ## 2026-11-23: Meal plans
 
 - **Food → Meal plans**: build days of meals from your recipes and foods ("Training day",

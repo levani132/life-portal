@@ -40,6 +40,7 @@ import { PostEngagement } from './post-engagement';
 import { PostMediaCarousel } from './post-media';
 import { METRICS_KEY } from './for-you-preferences';
 import { MacroRings } from './macro-rings';
+import { UsePlanFromPost } from './meal-plans';
 import { CopyTrainingButton, TrainingAttachmentView } from './training/training-post';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { PageMark } from './identity-switcher';
@@ -692,6 +693,7 @@ export function PostCard({
             </li>
           ))}
         </ul>
+        {post.kind === 'mealPlan' && !post.isOwner && post.itemCount > 0 && <UsePlanFromPost postId={post.id} title={post.title || post.contentLabel || 'Meal plan'} />}
         {!detail && post.itemCount > post.items.length && (
           <Link
             href={`/posts/${post.id}`}

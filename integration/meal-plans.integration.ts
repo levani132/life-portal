@@ -4,7 +4,7 @@
  * and posts plans and can never log one.
  */
 import { randomUUID } from 'node:crypto';
-import type { FoodPost, MealPlan, PageSummary, PostImportResult, PostPreview } from '@life-portal/shared-types';
+import type { ActiveMealPlan, FoodPost, MealPlan, PageSummary, PostImportResult, PostPreview } from '@life-portal/shared-types';
 import { startApi, type Account, type TestApi } from './harness';
 
 let api: TestApi;
@@ -60,9 +60,11 @@ describe('meal plans', () => {
     const entries = await api.db.collection('meal_entries').find({ userId: ana.id, day: today }).toArray();
     expect(entries.map((entry) => entry['slot']).sort()).toEqual(['breakfast', 'lunch']);
     expect(entries.every((entry) => !!entry['facts'])).toBe(true);
-    // One line only.
-    const one = await api.call<{ logged: number }>(ana, 'POST', `/nutrition/meal-plans/${made.body.id}/days/${day.id}/log`, { day: today, entryIds: [day.entries[1].id] });
-    expect(one.body).toEqual({ logged: 1 });
+    // A line already in today's diary is not logged twice; once its meal is deleted it can be again.
+    const line = { day: today, entryIds: [day.entries[1].id] };
+    expect((await api.call<{ logged: number }>(ana, 'POST', `/nutrition/meal-plans/${made.body.id}/days/${day.id}/log`, line)).body).toEqual({ logged: 0 });
+    await api.db.collection('meal_entries').deleteOne({ userId: ana.id, day: today, slot: 'lunch' });
+    expect((await api.call<{ logged: number }>(ana, 'POST', `/nutrition/meal-plans/${made.body.id}/days/${day.id}/log`, line)).body).toEqual({ logged: 1 });
 
     // Editing keeps the plan; a food edited later changes the totals, because none are stored.
     await api.call(ana, 'PATCH', `/nutrition/foods/${ids.rice}`, { energyKcal: 100 });
@@ -108,6 +110,59 @@ describe('meal plans', () => {
     expect(mine[0].days.map((day) => [day.name, day.totals.energyKcal])).toEqual([['Training day', 460], ['Rest day', 130]]);
     // Nothing was logged for the reader.
     expect(await api.db.collection('meal_entries').countDocuments({ userId: beka.id })).toBe(0);
+  });
+
+  it('one is in use at a time: today follows its days in order, and its lines are logged one by one', async () => {
+    const ana = await api.account('ana');
+    const ids = await library(ana);
+    const plan = (await api.call<MealPlan>(ana, 'POST', '/nutrition/meal-plans', planOf(ids))).body;
+    const other = (await api.call<MealPlan>(ana, 'POST', '/nutrition/meal-plans', { ...planOf(ids), name: 'Other' })).body;
+    type Active = { active: ActiveMealPlan | null };
+    expect((await api.call<Active>(ana, 'GET', '/nutrition/meal-plans/active?today=2026-03-02')).body).toEqual({ active: null });
+
+    const started = await api.call<Active>(ana, 'PUT', '/nutrition/meal-plans/active', { planId: plan.id, today: '2026-03-02' });
+    expect(started.status).toBeLessThan(300);
+    expect(started.body.active).toMatchObject({ planId: plan.id, since: '2026-03-02', chosen: false, day: { name: 'Training day', totals: { energyKcal: 460 }, loggedTotals: { energyKcal: 0 } } });
+    expect(started.body.active?.day.lines.map((each) => [each.name, each.logged])).toEqual([['Plan porridge', false], ['Plan rice', false]]);
+    const at = async (today: string) => (await api.call<Active>(ana, 'GET', `/nutrition/meal-plans/active?today=${today}`)).body.active;
+    // The next day is the plan's next day, and then it starts again.
+    expect([(await at('2026-03-03'))?.day.name, (await at('2026-03-04'))?.day.name]).toEqual(['Rest day', 'Training day']);
+
+    // One line is logged; the plan knows from the diary, and forgets when the meal is deleted.
+    const day = plan.days[0];
+    await api.call(ana, 'POST', `/nutrition/meal-plans/${plan.id}/days/${day.id}/log`, { day: '2026-03-02', entryIds: [day.entries[0].id] });
+    const after = await at('2026-03-02');
+    expect(after?.day.lines.map((each) => each.logged)).toEqual([true, false]);
+    expect(after?.day.loggedTotals.energyKcal).toBe(200);
+    // Done on one day says nothing about the next time that plan day comes round.
+    expect((await at('2026-03-04'))?.day.lines.map((each) => each.logged)).toEqual([false, false]);
+    await api.db.collection('meal_entries').deleteMany({ userId: ana.id, day: '2026-03-02' });
+    expect((await at('2026-03-02'))?.day.lines.map((each) => each.logged)).toEqual([false, false]);
+    // Where a meal came from is never taken from a request.
+    await api.call(ana, 'POST', '/nutrition/entries', { day: '2026-03-02', slot: 'lunch', foodId: ids.rice, amount: 200, planEntryId: day.entries[1].id });
+    expect((await at('2026-03-02'))?.day.lines.map((each) => each.logged)).toEqual([false, false]);
+
+    // Another day can be picked for today only.
+    const picked = await api.call<Active>(ana, 'PUT', '/nutrition/meal-plans/active/day', { today: '2026-03-02', dayId: plan.days[1].id });
+    expect(picked.body.active).toMatchObject({ chosen: true, day: { name: 'Rest day' } });
+    expect((await at('2026-03-03'))?.day.name).toBe('Rest day');
+    expect((await at('2026-03-04'))?.day.name).toBe('Training day');
+    expect((await api.call(ana, 'PUT', '/nutrition/meal-plans/active/day', { today: '2026-03-02', dayId: 'nope' })).status).toBe(404);
+
+    // Using another plan stops the first; using the one in use keeps its start day.
+    await api.call(ana, 'PUT', '/nutrition/meal-plans/active', { planId: other.id, today: '2026-03-05' });
+    await api.call(ana, 'PUT', '/nutrition/meal-plans/active', { planId: other.id, today: '2026-03-09' });
+    expect(await at('2026-03-09')).toMatchObject({ planId: other.id, since: '2026-03-05' });
+    expect(await api.db.collection('meal_plans').countDocuments({ userId: ana.id, activeSince: { $exists: true } })).toBe(1);
+    const mine = (await api.call<MealPlan[]>(ana, 'GET', '/nutrition/meal-plans')).body;
+    expect(mine.map((each) => [each.name, each.activeSince])).toEqual([['Lean week', undefined], ['Other', '2026-03-05']]);
+    // Stopping.
+    expect((await api.call<Active>(ana, 'PUT', '/nutrition/meal-plans/active', { planId: null, today: '2026-03-09' })).body).toEqual({ active: null });
+
+    // A page has no diary, so it has no plan in use.
+    const page = (await api.call<PageSummary>(ana, 'POST', '/pages', { name: 'Using', username: `using-${randomUUID().slice(0, 6)}`, bio: '' })).body;
+    expect((await api.call(ana, 'GET', '/nutrition/meal-plans/active?today=2026-03-09', undefined, as(page.id))).status).toBe(403);
+    expect((await api.call(ana, 'PUT', '/nutrition/meal-plans/active', { planId: plan.id, today: '2026-03-09' }, as(page.id))).status).toBe(403);
   });
 
   it('are kept and posted by a page, which can never log one', async () => {

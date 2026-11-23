@@ -153,6 +153,8 @@ export class MealEntry {
   @Prop({ index: true }) savedMealId?: string;
   /** Set when the entry came from the cheat-day queue. */
   @Prop({ index: true }) cheatMealId?: string;
+  /** Spec 042: the line of a meal plan this was logged from. Set by the server, never by a request. */
+  @Prop() planEntryId?: string;
   @Prop({ maxlength: 300 }) note?: string;
   /** Spec 030: edits so far (missing = 0), for stale-edit checks (`common/row-version.ts`). */
   @Prop({ type: Number, min: 0 }) version?: number;

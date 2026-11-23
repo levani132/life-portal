@@ -887,6 +887,8 @@ export class NutritionService {
   async createEntry(
     userId: string,
     dto: CreateEntryDto,
+    /** Spec 042: where the server itself is logging from. Never read from a request. */
+    origin?: { planEntryId: string },
   ): Promise<MealEntryDto> {
     const food = await this.findFood(userId, dto.foodId, 'log');
     const amount = this.resolveAmount(dto, food.servingSize);
@@ -903,6 +905,7 @@ export class NutritionService {
       unit: food.unit,
       facts: snapshotFacts(food),
       note: dto.note,
+      ...(origin ? { planEntryId: origin.planEntryId } : {}),
     } as never);
     return this.serializeEntry(created);
   }

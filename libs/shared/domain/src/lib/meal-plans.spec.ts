@@ -1,5 +1,5 @@
 import type { MealPlanDay, MealPlanInput } from '@life-portal/shared-types';
-import { mealPlanProblem, mealPlanView, type PlanFood, type PlanRecipe } from './meal-plans';
+import { activePlanDayIndex, mealPlanProblem, mealPlanView, type PlanFood, type PlanRecipe } from './meal-plans';
 
 const food = (name: string, kcal: number, proteinMg: number, extra: Partial<PlanFood> = {}): PlanFood =>
   ({ name, unit: 'g', energyKcalPer100: kcal, proteinMgPer100: proteinMg, fatMgPer100: 0, carbMgPer100: 0, ...extra }) as PlanFood;
@@ -79,5 +79,24 @@ describe('mealPlanProblem (spec 042)', () => {
     expect(mealPlanProblem({ ...ok, days: [{ name: 'A', entries: [{ slot: 'lunch', foodId: 'oats', amount: 10, savedMealId: 'porridge' }] }] })).toMatch(/one recipe or one food/);
     expect(mealPlanProblem({ ...ok, days: [{ name: 'A', entries: [{ slot: 'brunch' as never, foodId: 'oats', amount: 10 }] }] })).toMatch(/meal for every line/);
     expect(mealPlanProblem({ ...ok, days: Array.from({ length: 15 }, () => ok.days[0]) })).toMatch(/14 days/);
+  });
+});
+
+describe('activePlanDayIndex (spec 042)', () => {
+  const dayIds = ['a', 'b', 'c'];
+  it('walks the plan a day at a time from the day it was started, and starts again', () => {
+    const at = (today: string) => activePlanDayIndex({ dayIds, since: '2026-11-23', today });
+    expect([at('2026-11-23'), at('2026-11-24'), at('2026-11-25'), at('2026-11-26'), at('2026-12-01')]).toEqual([0, 1, 2, 0, 2]);
+  });
+  it('takes the day chosen for today, for today only', () => {
+    const choice = { day: '2026-11-24', dayId: 'c' };
+    expect(activePlanDayIndex({ dayIds, since: '2026-11-23', today: '2026-11-24', override: choice })).toBe(2);
+    expect(activePlanDayIndex({ dayIds, since: '2026-11-23', today: '2026-11-25', override: choice })).toBe(2);
+    expect(activePlanDayIndex({ dayIds, since: '2026-11-23', today: '2026-11-26', override: choice })).toBe(0);
+  });
+  it('falls back to the first day before the start, with a day that is gone, or with none', () => {
+    expect(activePlanDayIndex({ dayIds, since: '2026-11-23', today: '2026-11-20' })).toBe(0);
+    expect(activePlanDayIndex({ dayIds, since: '2026-11-23', today: '2026-11-23', override: { day: '2026-11-23', dayId: 'gone' } })).toBe(0);
+    expect(activePlanDayIndex({ dayIds: [], since: '2026-11-23', today: '2026-11-30' })).toBe(0);
   });
 });

@@ -20,6 +20,10 @@
 - [x] T016 Assistant tools: list, create, delete meal plans; attach to a post.
 - [x] T017 Integration tests; nutrition.md, posts.md, changelog.
 
+## Slice 2b: the plan in use
+- [x] T018 One plan in use per person (`activeSince`), today's plan day from the order or a choice (`activePlanDayIndex`), logged lines derived from the diary (`planEntryId`).
+- [x] T019 Web: "Planned today" in Food with a Log button per line; Use / Stop using; "Use this plan" on a post.
+
 ## Slice 3: programmes
 - [ ] T020 A programme: a meal plan and a training plan under one name.
 - [ ] T021 Publish and copy as one; the reader's copies are linked.

@@ -1,27 +1,223 @@
 'use client';
 
 import Link from 'next/link';
-import { Pencil, Plus, Share2, Trash2 } from 'lucide-react';
+import { CalendarCheck, Check, Pencil, Plus, Share2, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
   MEAL_PLAN_LIMITS,
   MEAL_SLOTS,
+  type ActiveMealPlan,
+  type ActivePlanLine,
+  type FoodPost,
   type FoodWithUsage,
   type MealPlan,
   type MealPlanInput,
   type MealSlot,
+  type PostImportResult,
   type SavedMeal,
 } from '@life-portal/shared-types';
 import { mealPlanProblem, mgToG } from '@life-portal/shared-domain';
 import { api } from '../lib/api';
 import { revalidate, useAction, useApi } from '../lib/hooks';
+import { actingPageId } from '../lib/identity';
 import { mealContextNow } from '../lib/local-day';
 import { newPostHref } from '../lib/new-post';
 import { FoodCombobox } from './food-combobox';
 import { ErrorNote, Field, Input, Modal, Select, Spinner, Textarea } from './ui';
 
 const PLANS_KEY = '/nutrition/meal-plans';
+const ACTIVE_KEY = `${PLANS_KEY}/active`;
 const slotLabel = (slot: MealSlot) => slot.charAt(0).toUpperCase() + slot.slice(1);
+/** Everything a change to plans or to what is logged from one can alter. */
+const refreshPlans = () => Promise.all([revalidate(PLANS_KEY), revalidate('/nutrition?'), revalidate('/dashboard')]);
+
+/**
+ * The plan in use, as today's list of what to eat (spec 042). Each line has its own Log button;
+ * a meal can be logged whole. What is done comes from today's diary, so deleting a meal below
+ * makes its line loggable again. Shown on today only: a plan's day is today's question.
+ */
+export function ActivePlanCard({ today, onChanged }: { today: string; onChanged: () => void }) {
+  const active = useApi<{ active: ActiveMealPlan | null }>(`${ACTIVE_KEY}?today=${today}`);
+  const action = useAction();
+  const [busy, setBusy] = useState<string | null>(null);
+  const plan = active.data?.active;
+  if (!plan) return null;
+  const run = (what: string, work: () => Promise<unknown>) => {
+    setBusy(what);
+    return action
+      .run(
+        async () => {
+          await work();
+          await refreshPlans();
+          onChanged();
+        },
+        { revalidate: false },
+      )
+      .finally(() => setBusy(null));
+  };
+  const log = (what: string, lines: ActivePlanLine[]) =>
+    run(what, () => api.post(`${PLANS_KEY}/${plan.planId}/days/${plan.day.id}/log`, { day: today, entryIds: lines.map((line) => line.id) }));
+  const slots = MEAL_SLOTS.map((slot) => ({ slot, lines: plan.day.lines.filter((line) => line.slot === slot) })).filter((group) => group.lines.length);
+  const left = plan.day.lines.filter((line) => !line.logged && !line.missing);
+  const share = plan.day.totals.energyKcal > 0 ? Math.min(100, Math.round((plan.day.loggedTotals.energyKcal / plan.day.totals.energyKcal) * 100)) : 0;
+
+  return (
+    <section className="card p-4" aria-label="Planned today">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-ink-faint">
+            <CalendarCheck size={12} aria-hidden /> Planned today
+          </p>
+          <p className="truncate font-semibold">{plan.name}</p>
+        </div>
+        {plan.days.length > 1 && (
+          <Select
+            aria-label="Which day of the plan is today"
+            className="w-auto max-w-[11rem] shrink-0"
+            value={plan.day.id}
+            disabled={action.pending}
+            onChange={(event) => void run('day', () => api.put(`${ACTIVE_KEY}/day`, { today, dayId: event.target.value }))}
+          >
+            {plan.days.map((day) => (
+              <option key={day.id} value={day.id}>
+                {day.name}
+              </option>
+            ))}
+          </Select>
+        )}
+      </div>
+      <div className="mt-3">
+        <div className="h-1.5 overflow-hidden rounded-full bg-border">
+          <div className="h-full rounded-full bg-accent-solid transition-[width]" style={{ width: `${share}%` }} />
+        </div>
+        <p className="mt-1 text-xs text-ink-muted">
+          {plan.day.loggedTotals.energyKcal} of {plan.day.totals.energyKcal} kcal logged · P {mgToG(plan.day.loggedTotals.proteinMg)} of {mgToG(plan.day.totals.proteinMg)} g
+        </p>
+      </div>
+      {action.error && <ErrorNote message={action.error} />}
+      {slots.length === 0 ? (
+        <p className="mt-3 text-sm text-ink-muted">Nothing is planned for {plan.day.name}.</p>
+      ) : (
+        <ul className="mt-3 space-y-3">
+          {slots.map((group) => {
+            const open = group.lines.filter((line) => !line.logged && !line.missing);
+            return (
+              <li key={group.slot}>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">{slotLabel(group.slot)}</p>
+                  {open.length > 1 && (
+                    <button type="button" className="text-xs font-medium text-accent" disabled={action.pending} onClick={() => void log(group.slot, open)}>
+                      {busy === group.slot ? 'Logging…' : `Log all ${open.length}`}
+                    </button>
+                  )}
+                </div>
+                <ul className="mt-1 divide-y divide-border/60">
+                  {group.lines.map((line) => (
+                    <li key={line.id} className="flex items-center gap-3 py-2">
+                      <div className="min-w-0 flex-1">
+                        <p className={`truncate text-sm ${line.logged ? 'text-ink-muted line-through' : line.missing ? 'text-danger' : ''}`}>{line.name}</p>
+                        <p className="text-xs text-ink-faint">
+                          {line.missing ? 'No numbers: edit the plan' : `${line.amount ? `${line.amount} ${line.unit ?? ''} · ` : ''}${line.totals.energyKcal} kcal · P ${mgToG(line.totals.proteinMg)} g`}
+                        </p>
+                      </div>
+                      {line.logged ? (
+                        <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-success">
+                          <Check size={14} aria-hidden /> Logged
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn-ghost shrink-0 border border-border"
+                          disabled={action.pending || line.missing}
+                          aria-label={`Log ${line.name}`}
+                          onClick={() => void log(line.id, [line])}
+                        >
+                          {busy === line.id ? 'Logging…' : 'Log'}
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+        {left.length > 1 ? (
+          <button type="button" className="btn-ghost" disabled={action.pending} onClick={() => void log('all', left)}>
+            {busy === 'all' ? 'Logging…' : 'Log everything left'}
+          </button>
+        ) : (
+          <span className="text-xs text-ink-faint">{left.length === 0 && slots.length > 0 ? 'Everything planned is logged.' : ''}</span>
+        )}
+        <button
+          type="button"
+          className="text-xs text-ink-muted underline"
+          disabled={action.pending}
+          onClick={() => {
+            if (window.confirm(`Stop using ${plan.name}? The plan stays in your meal plans.`)) void run('stop', () => api.put(ACTIVE_KEY, { planId: null, today }));
+          }}
+        >
+          Stop using this plan
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * On someone's meal plan post (spec 042): keep the plan as your own and start using it, in one
+ * tap. Every food is saved as your copy first, because your plan can only hold your own foods.
+ * A page has no diary, so it is not offered one.
+ */
+export function UsePlanFromPost({ postId, title }: { postId: string; title: string }) {
+  const action = useAction();
+  const [done, setDone] = useState(false);
+  if (actingPageId()) return null;
+  if (done)
+    return (
+      <p role="status" className="mt-3 rounded-lg bg-success-solid/10 px-3 py-2 text-sm text-success">
+        You are using this plan now.{' '}
+        <Link href="/nutrition" className="font-medium underline">
+          See today in Food
+        </Link>
+      </p>
+    );
+  return (
+    <div className="mt-3">
+      <button
+        type="button"
+        className="btn-primary w-full justify-center"
+        disabled={action.pending}
+        onClick={() =>
+          void action.run(
+            async () => {
+              // The card may show only the first foods; the plan is copied whole.
+              const full = await api.get<FoodPost>(`/posts/${postId}`);
+              const saved = await api.post<PostImportResult>(`/posts/${postId}/import`, {
+                itemKeys: full.items.map((item) => item.key),
+                duplicatePolicy: 'copy',
+                saveAsMeal: false,
+                savePlan: true,
+                mealName: title,
+              });
+              if (!saved.mealPlanId) throw new Error('This plan could not be saved.');
+              await api.put(ACTIVE_KEY, { planId: saved.mealPlanId, today: mealContextNow().day });
+              await refreshPlans();
+              setDone(true);
+            },
+            { revalidate: false },
+          )
+        }
+      >
+        <CalendarCheck size={16} /> {action.pending ? 'Saving the plan…' : 'Use this plan'}
+      </button>
+      <p className="mt-1 text-center text-xs text-ink-faint">Saves its foods and the plan to your Food, and shows its meals there each day. Nothing is logged.</p>
+      {action.error && <ErrorNote message={action.error} />}
+    </div>
+  );
+}
 
 /**
  * Meal plans (spec 042): named days of meals, each line a recipe or a food with an amount. For
@@ -37,7 +233,7 @@ export function MealPlans({ canLog }: { canLog: boolean }) {
     action.run(
       async () => {
         await work();
-        await Promise.all([revalidate(PLANS_KEY), revalidate('/nutrition?'), revalidate('/dashboard')]);
+        await refreshPlans();
       },
       { revalidate: false },
     );
@@ -68,13 +264,26 @@ export function MealPlans({ canLog }: { canLog: boolean }) {
             <li key={plan.id} className="card p-4">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <button type="button" className="min-w-0 flex-1 text-left" aria-expanded={open === plan.id} onClick={() => setOpen(open === plan.id ? null : plan.id)}>
-                  <p className="font-medium">{plan.name}</p>
+                  <p className="font-medium">
+                    {plan.name}
+                    {plan.activeSince && <span className="ml-2 rounded-full bg-accent-solid/15 px-2 py-0.5 text-[11px] font-medium text-accent">In use</span>}
+                  </p>
                   <p className="text-xs text-ink-faint">
                     {plan.days.length} {plan.days.length === 1 ? 'day' : 'days'} · about {plan.dailyAverage.energyKcal} kcal and {mgToG(plan.dailyAverage.proteinMg)} g protein a day
                     {plan.complete ? '' : ' · something in it has no numbers'}
                   </p>
                 </button>
                 <div className="flex shrink-0 items-center gap-1">
+                  {canLog && (
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      disabled={action.pending}
+                      onClick={() => void run(() => api.put(ACTIVE_KEY, { planId: plan.activeSince ? null : plan.id, today: mealContextNow().day }))}
+                    >
+                      {plan.activeSince ? 'Stop using' : 'Use'}
+                    </button>
+                  )}
                   {plan.complete && (
                     <Link href={newPostHref({ kind: 'mealPlan', mealPlanId: plan.id })} className="btn-ghost" aria-label={`Post ${plan.name}`}>
                       <Share2 size={16} /> Post

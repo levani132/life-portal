@@ -617,4 +617,29 @@ export interface MealPlan extends Timestamped {
   dailyAverage: EntryTotals;
   /** Whether every entry still resolves to foods with numbers, so a day can be logged or shared. */
   complete: boolean;
+  /** Spec 042: the day the person started using this plan, while they are using it. */
+  activeSince?: IsoDate;
+}
+
+/** A line of today's planned day, with whether it has been logged today. */
+export interface ActivePlanLine extends MealPlanEntryView {
+  logged: boolean;
+}
+
+/**
+ * The plan a person is using (spec 042): which of its days is today's, and what is done. One
+ * plan is active at a time. Which day is today's follows the plan's own order from the day it
+ * was started, unless the person chose another for today.
+ */
+export interface ActiveMealPlan {
+  planId: Id;
+  name: string;
+  /** The day the plan was started, as the device's calendar day. */
+  since: IsoDate;
+  /** Every day of the plan, to choose from. */
+  days: { id: Id; name: string }[];
+  /** Today's day of the plan. */
+  day: { id: Id; name: string; lines: ActivePlanLine[]; totals: EntryTotals; loggedTotals: EntryTotals };
+  /** Whether today's day was chosen by hand rather than by the plan's order. */
+  chosen: boolean;
 }

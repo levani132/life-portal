@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { Apple, BookmarkPlus, Bot, ChevronDown, Info, Pencil, Plus, Search, Share2, Sparkles, Tags, Trash2, UserRound, Utensils, X, Zap, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { RecipeEditor } from '../../components/page-library';
-import { MealPlans } from '../../components/meal-plans';
+import { ActivePlanCard, MealPlans } from '../../components/meal-plans';
 import type {
   PortalState,
   PostSelection,
@@ -80,7 +80,7 @@ import {
   useUpdatedAfterSync,
 } from '../../lib/nutrition-offline';
 import { unsavedCount } from '../../lib/offline/nutrition-overlay';
-import { useAction, useApi } from '../../lib/hooks';
+import { revalidate, useAction, useApi } from '../../lib/hooks';
 import { mealContextNow } from '../../lib/local-day';
 import { newPostHref } from '../../lib/new-post';
 
@@ -168,7 +168,11 @@ function Nutrition() {
 
   const { targets, dayTotals, profile } = data;
   const viewingToday = day === today;
-  const refresh = () => void mutate();
+  const refresh = () => {
+    void mutate();
+    // What is logged from the plan in use is read from the diary, so it changes with it.
+    void revalidate('/nutrition/meal-plans/active');
+  };
 
   return (
     <>
@@ -252,6 +256,7 @@ function Nutrition() {
 
           <FoodSyncNotes overview={data} />
           <MacroTiles totals={dayTotals.totals} targets={targets} />
+          {viewingToday && <ActivePlanCard today={today} onChanged={refresh} />}
           {targets.available && (
             <p className="text-xs text-ink-faint">
               Goal: {GOAL_PLAN[profile.goal].label}

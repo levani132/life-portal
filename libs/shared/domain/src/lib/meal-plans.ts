@@ -9,6 +9,7 @@ import {
   type MealPlanInput,
   type NutritionFacts,
 } from '@life-portal/shared-types';
+import { diffDays } from './dates';
 import { emptyTotals, entryTotals, sumTotals } from './nutrition';
 
 /** A food as a meal plan needs it: its name, unit and facts per 100. */
@@ -88,4 +89,24 @@ export function mealPlanProblem(input: MealPlanInput): string | undefined {
   }
   if (!input.days.some((day) => day.entries.length)) return 'Add at least one meal or food.';
   return undefined;
+}
+
+/**
+ * Which day of an active plan is today's (spec 042): the plan's days in order, one per calendar
+ * day from the day it was started, round and round. A choice made for today wins, for today
+ * only. Before the start day, or with no days, it is the first.
+ */
+export function activePlanDayIndex(input: {
+  dayIds: readonly string[];
+  since: string;
+  today: string;
+  override?: { day: string; dayId: string } | null;
+}): number {
+  if (!input.dayIds.length) return 0;
+  if (input.override && input.override.day === input.today) {
+    const chosen = input.dayIds.indexOf(input.override.dayId);
+    if (chosen >= 0) return chosen;
+  }
+  const elapsed = diffDays(input.since, input.today);
+  return elapsed > 0 ? elapsed % input.dayIds.length : 0;
 }
