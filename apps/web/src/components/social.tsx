@@ -32,6 +32,7 @@ import type {
 import { useSocialApi } from '../lib/social-hooks';
 export { useSocialApi, SOCIAL_REFRESH } from '../lib/social-hooks';
 import { DailyFoodDiary } from './shared-food-diary';
+import { PhotoViewer } from './photo-viewer';
 import {
   BadgeCollection,
   BadgeDetail,
@@ -336,6 +337,19 @@ function BigAvatar({ name, url }: { name: string; url?: string }) {
     </span>
   );
 }
+/** Someone else's photo: tapping it opens it on the whole screen. */
+function ViewableAvatar({ name, url }: { name: string; url?: string }) {
+  const [open, setOpen] = useState(false);
+  if (!url) return <BigAvatar name={name} url={url} />;
+  return (
+    <>
+      <button type="button" className="inline-flex rounded-full" aria-label={`View ${name}’s photo`} onClick={() => setOpen(true)}>
+        <BigAvatar name={name} url={url} />
+      </button>
+      {open && <PhotoViewer url={url} alt={`${name}’s photo`} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
 /** The round, quiet icon buttons that sit on the profile's header band. */
 const HEADER_ICON =
   'relative flex h-9 w-9 items-center justify-center rounded-full bg-surface/70 text-ink backdrop-blur transition hover:bg-surface';
@@ -446,7 +460,7 @@ export function ProfileView({ userId }: { userId?: string }) {
             {own ? (
               <AvatarEditor person={person} />
             ) : (
-              <BigAvatar name={person.displayName} url={person.avatarUrl} />
+              <ViewableAvatar name={person.displayName} url={person.avatarUrl} />
             )}
           </div>
           <h1 className="mt-3 break-words text-2xl font-semibold leading-tight">
@@ -815,6 +829,7 @@ function AvatarEditor({ person }: { person: SocialProfile }) {
   const [local, setLocal] = useState<string | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [viewing, setViewing] = useState(false);
   useEffect(() => () => {
     if (local) URL.revokeObjectURL(local);
   }, [local]);
@@ -872,6 +887,15 @@ function AvatarEditor({ person }: { person: SocialProfile }) {
           triggerClassName="inline-flex rounded-full"
           trigger={picture}
           items={[
+            ...(person.avatarUrl
+              ? [
+                  {
+                    label: 'View photo',
+                    icon: <Eye size={16} />,
+                    onSelect: () => setViewing(true),
+                  },
+                ]
+              : []),
             {
               label: 'Choose a new photo',
               icon: <ImagePlus size={16} />,
@@ -897,6 +921,7 @@ function AvatarEditor({ person }: { person: SocialProfile }) {
         </button>
       )}
       {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+      {viewing && person.avatarUrl && <PhotoViewer url={person.avatarUrl} alt="Your photo" onClose={() => setViewing(false)} />}
       <input
         ref={input}
         type="file"
