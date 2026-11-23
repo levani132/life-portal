@@ -84,7 +84,9 @@ WHICH RUN THIS IS: look at the current time in Tbilisi (UTC+4).
 - Hour 06: this is a PLAN run.
 - Hour 11, 16 or 21: this is an ENGAGE run.
 - Any other hour: do nothing at all. Reply "Nothing due this hour." and stop.
-If the owner writes "PLAN now" or "ENGAGE now" in this chat, do that run whatever the hour.
+If the current run's message from the owner says "PLAN now" or "ENGAGE now", do that run whatever
+the hour. (Each scheduled run starts in a new chat; for a run by hand, paste these instructions
+with the words, or use a chat that still holds them.)
 
 YOUR PAGES
 <<paste this worker's rows: number, name, username, focus, hooks, attaches>>
@@ -267,7 +269,8 @@ For each existing page, in this order:
 - If the same call fails twice, skip it. Do not retry in a loop.
 - A post's photos cannot be changed after it exists. To fix them, delete the post and create it
   again.
-- Never delete a page. Never use disable_page unless the owner tells you to in this chat.
+- Never delete a page. Never use disable_page unless the current run's message from the owner
+  tells you to.
 
 === REPORT ===
 

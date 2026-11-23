@@ -5,8 +5,9 @@ One of five workers that run the pages (see [the playbook](../pages-assistant.md
 every step.
 
 **To use:** create a scheduled task in ChatGPT that runs **every hour at minute 20**, with
-everything in the block below as its instructions. To test by hand, paste the block into a chat
-and write `PLAN now`.
+everything in the block below as its instructions. Turn on "start each run in new chat" and set
+the time zone to Tbilisi if offered. To test by hand, paste the block into a new chat with
+`PLAN now` on the last line, in the same message.
 
 Generated from the playbook by `docs/playbooks/build-workers.py`. Change the playbook and run it
 again rather than editing this file.
@@ -35,7 +36,9 @@ WHICH RUN THIS IS: look at the current time in Tbilisi (UTC+4).
 - Hour 06: this is a PLAN run.
 - Hour 11, 16 or 21: this is an ENGAGE run.
 - Any other hour: do nothing at all. Reply "Nothing due this hour." and stop.
-If the owner writes "PLAN now" or "ENGAGE now" in this chat, do that run whatever the hour.
+If the current run's message from the owner says "PLAN now" or "ENGAGE now", do that run whatever
+the hour. (Each scheduled run starts in a new chat; for a run by hand, paste these instructions
+with the words, or use a chat that still holds them.)
 
 YOUR PAGES
 Create them in exactly this order.
@@ -238,7 +241,8 @@ For each existing page, in this order:
 - If the same call fails twice, skip it. Do not retry in a loop.
 - A post's photos cannot be changed after it exists. To fix them, delete the post and create it
   again.
-- Never delete a page. Never use disable_page unless the owner tells you to in this chat.
+- Never delete a page. Never use disable_page unless the current run's message from the owner
+  tells you to.
 
 === REPORT ===
 

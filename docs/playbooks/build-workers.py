@@ -120,8 +120,9 @@ One of five workers that run the pages (see [the playbook](../pages-assistant.md
 every step.
 
 **To use:** create a scheduled task in ChatGPT that runs **every hour at minute {minute:02d}**, with
-everything in the block below as its instructions. To test by hand, paste the block into a chat
-and write `PLAN now`.
+everything in the block below as its instructions. Turn on "start each run in new chat" and set
+the time zone to Tbilisi if offered. To test by hand, paste the block into a new chat with
+`PLAN now` on the last line, in the same message.
 
 Generated from the playbook by `docs/playbooks/build-workers.py`. Change the playbook and run it
 again rather than editing this file.
