@@ -23,19 +23,17 @@ export interface SessionFocus {
 }
 
 /**
- * How many sets make a planned exercise done (issue #32): as many as it started with, which is
- * last time's count when there is history, else the plan's, plus the rows the person added to it
- * in this workout (or minus the ones they removed). Adding a fourth set to a three-set exercise
- * makes it a four-set exercise: it is not done at three. 0 for one added by hand (it is done once
- * the person moves on).
+ * How many sets make an exercise done (issue #32): the rows it has. That is as many as it started
+ * with (last time's count when there is history, else the plan's, else one) plus the rows the
+ * person added in this workout, or minus the ones they removed. The rows are the plan: adding a
+ * fourth set to a three-set exercise makes it a four-set exercise, and an exercise added during
+ * the workout with three rows is a three-set exercise, done at three.
  *
  * The added rows are the set table's draft (`training-drafts.ts`). A caller that shows this must
  * re-render when drafts change: `useDraftsVersion()`.
  */
 export const setGoal = (exercise: SessionExercise): number =>
-  exercise.planned
-    ? Math.max(0, startingRowCount(exercise.previous?.sets, exercise.planned.targets) + extraRows(exercise.sessionId, exercise.id))
-    : 0;
+  Math.max(0, startingRowCount(exercise.previous?.sets, exercise.planned?.targets) + extraRows(exercise.sessionId, exercise.id));
 
 /** The rest an exercise asks for: chosen in this workout, else the plan's. Absent: the default. */
 export const exerciseRest = (exercise: SessionExercise): number | undefined =>

@@ -272,14 +272,12 @@ export function WorkoutSession({
     ? Math.max(0, Math.floor((now - Date.parse(session.startedAt)) / 1000))
     : session.durationSeconds;
 
-  // Planned sets done over planned (spec 024): skipped exercises are left out, sets waiting to be
-  // sent count, and extra sets beyond the plan do not overfill the bar.
-  const planned = session.exercises.filter((exercise) => exercise.planned && !exercise.skipped);
-  const plannedTotal = planned.reduce((sum, exercise) => sum + (exercise.planned?.targets.length ?? 0), 0);
-  const plannedDone = planned.reduce((sum, exercise) => {
-    const logged = exercise.sets.length;
-    return sum + Math.min(logged, exercise.planned?.targets.length ?? 0);
-  }, 0);
+  // Sets done over sets planned (spec 024): the planned sets are the rows each exercise has
+  // (`setGoal`), so a row added is a set planned. Skipped exercises are left out, and sets beyond
+  // the rows do not overfill the bar.
+  const planned = session.exercises.filter((exercise) => !exercise.skipped);
+  const plannedTotal = planned.reduce((sum, exercise) => sum + setGoal(exercise), 0);
+  const plannedDone = planned.reduce((sum, exercise) => sum + Math.min(exercise.sets.length, setGoal(exercise)), 0);
   const setCount = session.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0);
 
   return (
@@ -715,16 +713,8 @@ function ExerciseBlock({
         <RestEditor session={session} exercise={exercise} defaultSeconds={defaultRest} onClose={() => setEditingRest(false)} />
       )}
       <LoadHint exerciseId={exercise.exerciseId} />
-      {exercise.planned && (
-        <p className="mb-2 mt-1 text-xs text-ink-faint">
-          {[
-            `Plan: ${exercise.planned.targets.length} sets`,
-            exercise.planned.note ?? '',
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-        </p>
-      )}
+      {/* The rows are the plan's sets; only the plan's note is said here. */}
+      {exercise.planned?.note && <p className="mb-2 mt-1 text-xs text-ink-faint">{exercise.planned.note}</p>}
       {exercise.previous && (
         <p className="mb-2 text-xs text-ink-faint">
           Last time ({formatDay(exercise.previous.day)}):{' '}

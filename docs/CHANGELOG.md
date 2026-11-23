@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Your set rows are the plan
+
+- An exercise's sets are the rows you see. Add a row and it is planned; an exercise you add during
+  a workout with three rows is done after three sets and moves you on, with a 0/3 chip like any
+  other. The separate "Plan: N sets" line is gone.
+- Finished exercises stack closer together, without "Superset with next" under them.
+
 ## 2026-11-23: Meal plans inside your day
 
 - The plan in use is **part of each meal** now: what is planned and not eaten yet sits in

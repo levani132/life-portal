@@ -15,11 +15,21 @@ const exercise = (id: string, logged: number, plan: number, last?: number): Sess
   }) as SessionExercise;
 
 describe('setGoal', () => {
-  it('is last time’s count over the plan’s, the plan’s without history, and 0 when unplanned', () => {
+  it('is last time’s count over the plan’s, the plan’s without history, and one row with neither', () => {
     expect(setGoal(exercise('a', 0, 3, 4))).toBe(4);
     expect(setGoal(exercise('a', 0, 3, 2))).toBe(2);
     expect(setGoal(exercise('a', 0, 3))).toBe(3);
-    expect(setGoal(exercise('a', 0, 0, 4))).toBe(0);
+    expect(setGoal(exercise('a', 0, 0, 4))).toBe(4);
+    expect(setGoal(exercise('a', 0, 0))).toBe(1);
+  });
+
+  it('counts the rows of an exercise added during the workout: three rows, done at three', () => {
+    saveDraft('w1', 'fly', { edits: {}, extra: 2 });
+    expect(setGoal(exercise('fly', 0, 0))).toBe(3);
+    const session = { exercises: [exercise('fly', 3, 0), exercise('curl', 0, 0)] } as unknown as SessionDetail;
+    expect(sessionFocus(session, [], 90).doneIds.has('fly')).toBe(true);
+    expect(sessionFocus(session, [], 90).currentId).toBe('curl');
+    forgetDraftsInMemory();
   });
 
   it('keeps an exercise current until last time’s sets are all logged', () => {

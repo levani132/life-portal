@@ -163,14 +163,15 @@ the `{userId, 'plan.planId', day}` index.
   last time's sets: their count, numbers (only the fields its measure allows) and type, by
   position, so a warm-up stays a warm-up. The plan's targets (`prefillFor`) are used only when
   there is no history; neither gives one empty row. Rows beyond those carry the row above down.
-  The plan caption ("Plan: 3 × 12 @ 80 kg") still shows, so a plan that differs from last time is
-  visible. A planned exercise is done once it has as many sets as it started with, **plus the
-  rows the person added to it in this workout, minus the ones they removed** (`setGoal` in
-  `lib/training-workout.ts`, which reads the kept draft's `extra`). Adding a fourth set to a
-  three-set exercise makes it a four-set exercise: it stays current, and its chip reads 3/4,
-  until the fourth is ticked. Whatever shows this re-reads when a draft changes
-  (`useDraftsVersion`); `openTargets` and the header's "of N planned sets"
-  still count the plan's targets.
+  **The rows are the plan.** There is no separate planned count on screen (only the plan's
+  note). Every exercise, planned or added during the workout, is done once it has as many sets
+  as it has rows: as many as it started with, **plus the rows the person added in this workout,
+  minus the ones they removed** (`setGoal` in `lib/training-workout.ts`, which reads the kept
+  draft's `extra`). Adding a fourth set to a three-set exercise makes it a four-set exercise: it
+  stays current, and its chip reads 3/4, until the fourth is ticked; an exercise added with three
+  rows reads 0/3 and is done at three. Whatever shows this re-reads when a draft changes
+  (`useDraftsVersion`); the header's "of N planned sets" is the sum of `setGoal`, and
+  `openTargets` still counts the plan's targets.
 - **Open rows are kept on the device until the workout ends (issue #32)**,
   `lib/training-drafts.ts`: per workout (`training:draft:<sessionId>` in the training cache, plus
   memory), per workout exercise, the typed fields by row position and `extra` (rows added minus
