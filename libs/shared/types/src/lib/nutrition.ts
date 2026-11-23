@@ -167,6 +167,8 @@ export interface MealEntry extends Timestamped {
   savedMealId?: Id;
   /** Set when the entry came from the cheat-day queue. */
   cheatMealId?: Id;
+  /** Spec 042: the meal plan line it was logged from, set by the server. */
+  planEntryId?: Id;
   note?: string;
   /** Spec 030: how many times it was edited; sent back as `baseVersion` with an edit. */
   version?: number;
@@ -573,7 +575,10 @@ export const MEAL_PLAN_LIMITS = { days: 14, entriesPerDay: 20, name: 80, dayName
  */
 export interface MealPlanEntry {
   id: Id;
+  /** The first of `slots`, or the one meal. */
   slot: MealSlot;
+  /** Spec 042: every meal the line may be eaten at, when more than one ("lunch or dinner"). */
+  slots?: MealSlot[];
   savedMealId?: Id;
   foodId?: Id;
   amount?: number;
@@ -589,7 +594,7 @@ export interface MealPlanDay {
 export interface MealPlanInput {
   name: string;
   description?: string;
-  days: { id?: Id; name: string; entries: { id?: Id; slot: MealSlot; savedMealId?: Id; foodId?: Id; amount?: number }[] }[];
+  days: { id?: Id; name: string; entries: { id?: Id; slot: MealSlot; slots?: MealSlot[]; savedMealId?: Id; foodId?: Id; amount?: number }[] }[];
 }
 
 /** An entry with today's facts resolved. `missing`: its food or recipe is gone, or the recipe has no numbers. */
@@ -621,15 +626,25 @@ export interface MealPlan extends Timestamped {
   activeSince?: IsoDate;
 }
 
-/** A line of today's planned day, with whether it has been logged today. */
+/** A line of the plan day, with whether the diary already has it on that calendar day. */
 export interface ActivePlanLine extends MealPlanEntryView {
   logged: boolean;
 }
 
+/** How closely one calendar day followed its plan day. */
+export interface PlanDayAdherence {
+  day: IsoDate;
+  dayName: string;
+  planned: number;
+  followed: number;
+  plannedKcal: number;
+  eatenKcal: number;
+}
+
 /**
- * The plan a person is using (spec 042): which of its days is today's, and what is done. One
- * plan is active at a time. Which day is today's follows the plan's own order from the day it
- * was started, unless the person chose another for today.
+ * The plan a person is using (spec 042), as it applies to one calendar day. One plan is in use
+ * at a time. Its days run in order from the day it was started; picking another day for a
+ * calendar day re-anchors the order from there.
  */
 export interface ActiveMealPlan {
   planId: Id;
@@ -638,8 +653,12 @@ export interface ActiveMealPlan {
   since: IsoDate;
   /** Every day of the plan, to choose from. */
   days: { id: Id; name: string }[];
-  /** Today's day of the plan. */
-  day: { id: Id; name: string; lines: ActivePlanLine[]; totals: EntryTotals; loggedTotals: EntryTotals };
-  /** Whether today's day was chosen by hand rather than by the plan's order. */
+  /** The calendar day this answer is for. */
+  calendarDay: IsoDate;
+  /** The plan day for that calendar day. */
+  day: { id: Id; name: string; lines: ActivePlanLine[]; totals: EntryTotals };
+  /** Whether that plan day was picked by hand for this calendar day. */
   chosen: boolean;
+  /** The seven calendar days ending at the device's today, oldest first. */
+  recent: PlanDayAdherence[];
 }

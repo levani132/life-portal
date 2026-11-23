@@ -637,14 +637,14 @@ export class PageAssistantService {
             description: plan.description,
             complete: plan.complete,
             dailyAverage: plan.dailyAverage,
-            days: plan.days.map((day) => ({ name: day.name, totals: day.totals, lines: day.entries.map((entry) => ({ meal: entry.slot, name: entry.name, amount: entry.amount })) })),
+            days: plan.days.map((day) => ({ name: day.name, totals: day.totals, lines: day.entries.map((entry) => ({ meal: entry.slot, ...(entry.slots ? { alsoAt: entry.slots.slice(1) } : {}), name: entry.name, amount: entry.amount })) })),
           }));
         },
       },
       {
         name: 'create_page_meal_plan',
         description:
-          'Create a meal plan in a page’s library: one to fourteen named days ("Training day", "Rest day", or "Day 1"), each a list of lines. A line is a meal (breakfast, lunch, dinner, snack) with either a recipe from the library (recipeId) or one food with an amount in its own unit (foodId and amount). Use recipes and foods that have numbers.',
+          'Create a meal plan in a page’s library: one to fourteen named days ("Training day", "Rest day", or "Day 1"), each a list of lines. A line is a meal (breakfast, lunch, dinner, snack), or several in `alsoAt` when it may be eaten at any of them (lunch or dinner; all four for any time), with either a recipe from the library (recipeId) or one food with an amount in its own unit (foodId and amount). Use recipes and foods that have numbers.',
         shape: {
           pageId,
           name: z.string().min(1).max(80),
@@ -654,7 +654,7 @@ export class PageAssistantService {
               z.object({
                 name: z.string().min(1).max(40),
                 lines: z
-                  .array(z.object({ meal: z.enum(MEAL_SLOTS), recipeId: id.optional(), foodId: id.optional(), amount: z.number().int().min(1).max(20_000).optional() }))
+                  .array(z.object({ meal: z.enum(MEAL_SLOTS), alsoAt: z.array(z.enum(MEAL_SLOTS)).max(4).optional(), recipeId: id.optional(), foodId: id.optional(), amount: z.number().int().min(1).max(20_000).optional() }))
                   .max(20),
               }),
             )
@@ -663,9 +663,12 @@ export class PageAssistantService {
         },
         run: (personId, args) =>
           this.counted(personId, args, 'library', 'create_page_meal_plan', async (page) => {
-            const days = (args['days'] as { name: string; lines: { meal: MealSlot; recipeId?: string; foodId?: string; amount?: number }[] }[]).map((day) => ({
+            const days = (args['days'] as { name: string; lines: { meal: MealSlot; alsoAt?: MealSlot[]; recipeId?: string; foodId?: string; amount?: number }[] }[]).map((day) => ({
               name: day.name,
-              entries: day.lines.map((line) => ({ slot: line.meal, ...(line.recipeId ? { savedMealId: line.recipeId } : { foodId: line.foodId, amount: line.amount }) })),
+              entries: day.lines.map((line) => ({
+                slot: line.meal,
+                ...(line.alsoAt?.length ? { slots: [...new Set([line.meal, ...line.alsoAt])] } : {}),
+                ...(line.recipeId ? { savedMealId: line.recipeId } : { foodId: line.foodId, amount: line.amount }) })),
             }));
             const created = await this.mealPlans.create(page, { name: String(args['name']), description: args['description'] as string | undefined, days });
             return { result: { id: created.id, name: created.name, dailyAverage: created.dailyAverage, complete: created.complete }, targetId: created.id };

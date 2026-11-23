@@ -5,10 +5,10 @@ import { MACRO_COLORS, withAlpha } from '../../lib/macro-colors';
 import { useIsIOS } from '../../lib/ios-device';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Apple, BookmarkPlus, Bot, ChevronDown, Info, Pencil, Plus, Search, Share2, Sparkles, Tags, Trash2, UserRound, Utensils, X, Zap, type LucideIcon } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Apple, BookmarkPlus, Bot, CalendarCheck, ChevronDown, Info, Pencil, Plus, Search, Share2, Sparkles, Tags, Trash2, UserRound, Utensils, X, Zap, type LucideIcon } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { RecipeEditor } from '../../components/page-library';
-import { ActivePlanCard, MealPlans } from '../../components/meal-plans';
+import { MealPlans, PlanStrip, PlannedLines, planOnDay, useActivePlan } from '../../components/meal-plans';
 import { Programmes } from '../../components/programmes';
 import type {
   PortalState,
@@ -154,6 +154,8 @@ function Nutrition() {
   }, [dayStartHour]);
 
   const key = today && day ? `/nutrition?today=${today}&day=${day}` : null;
+  // Spec 042: the meal plan in use, as it applies to the day on screen.
+  const plan = useActivePlan(today, day);
   // Spec 029: the day kept on this device, with meals still waiting to be sent applied.
   const { data, error, isLoading, mutate } = useNutritionDay(key);
 
@@ -168,6 +170,8 @@ function Nutrition() {
   if (!data) return null;
 
   const { targets, dayTotals, profile } = data;
+  const allEntries = dayTotals.slots.flatMap((slot) => slot.entries);
+  const planState = planOnDay(plan, allEntries);
   const viewingToday = day === today;
   const refresh = () => {
     void mutate();
@@ -257,7 +261,7 @@ function Nutrition() {
 
           <FoodSyncNotes overview={data} />
           <MacroTiles totals={dayTotals.totals} targets={targets} />
-          {viewingToday && <ActivePlanCard today={today} onChanged={refresh} />}
+          {plan && <PlanStrip plan={plan} entries={allEntries} day={day} onChanged={refresh} />}
           {targets.available && (
             <p className="text-xs text-ink-faint">
               Goal: {GOAL_PLAN[profile.goal].label}
@@ -283,6 +287,18 @@ function Nutrition() {
                   onEdit={(entry) => setLogging({ slot: entry.slot, entry })}
                   onChanged={refresh}
                   onShare={canPost ? setSharing : undefined}
+                  planned={
+                    plan
+                      ? {
+                          marks: planState.marks,
+                          lines: (
+                            <PlannedLines plan={plan} lines={planState.openAt(slot.slot)} slot={slot.slot} day={day} onChanged={refresh} />
+                          ),
+                          count: planState.openAt(slot.slot).length,
+                          kcal: planState.openAt(slot.slot).reduce((sum, line) => sum + line.totals.energyKcal, 0),
+                        }
+                      : undefined
+                  }
                 />
               ))}
               {!viewingToday && (
@@ -507,6 +523,7 @@ function SlotSection({
   onEdit,
   onChanged,
   onShare,
+  planned,
 }: {
   slot: SlotTotals;
   day: string;
@@ -517,6 +534,8 @@ function SlotSection({
   onEdit: (entry: MealEntry) => void;
   onChanged: () => void;
   onShare?: (source: PostSelection) => void;
+  /** Spec 042: the plan in use: meals that count for it, and its lines not eaten yet here. */
+  planned?: { marks: Set<string>; lines: ReactNode; count: number; kcal: number };
 }) {
   const { run, pending } = useAction();
   const [saving, setSaving] = useState(false);
@@ -577,9 +596,10 @@ function SlotSection({
                   {slot.entries.length} item{slot.entries.length === 1 ? '' : 's'}
                 </span>
               )}
+              {collapsed && !!planned?.count && <span className="text-[11px] font-medium text-ink-faint">· {planned.count} planned</span>}
             </span>
             {slot.entries.length === 0 ? (
-              <span className="block text-xs text-ink-faint">Nothing yet</span>
+              <span className="block text-xs text-ink-faint">{planned?.count ? `Planned · ${planned.kcal.toLocaleString()} kcal` : 'Nothing yet'}</span>
             ) : (
               <>
                 <span className="block truncate text-[13px] text-ink-muted">
@@ -664,6 +684,11 @@ function SlotSection({
                   {' · '}
                   <MacroLine totals={entry.totals} />
                 </p>
+                {planned?.marks.has(entry.id) && (
+                  <p className="flex items-center gap-1 text-[11px] font-medium text-success">
+                    <CalendarCheck size={12} aria-hidden /> In your plan
+                  </p>
+                )}
                 {isUnsaved(entry) && (
                   <p className="text-[11px] font-medium text-warning">Not saved yet · on this device</p>
                 )}
@@ -712,6 +737,8 @@ function SlotSection({
           })}
         </ul>
       )}
+
+      {!collapsed && planned?.lines}
 
       {!collapsed && (
         <SlotSuggestions

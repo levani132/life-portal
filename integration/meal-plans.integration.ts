@@ -112,7 +112,7 @@ describe('meal plans', () => {
     expect(await api.db.collection('meal_entries').countDocuments({ userId: beka.id })).toBe(0);
   });
 
-  it('one is in use at a time: today follows its days in order, and its lines are logged one by one', async () => {
+  it('one is in use at a time: its days run in order, a pick re-anchors them, and the diary is matched on read', async () => {
     const ana = await api.account('ana');
     const ids = await library(ana);
     const plan = (await api.call<MealPlan>(ana, 'POST', '/nutrition/meal-plans', planOf(ids))).body;
@@ -122,47 +122,77 @@ describe('meal plans', () => {
 
     const started = await api.call<Active>(ana, 'PUT', '/nutrition/meal-plans/active', { planId: plan.id, today: '2026-03-02' });
     expect(started.status).toBeLessThan(300);
-    expect(started.body.active).toMatchObject({ planId: plan.id, since: '2026-03-02', chosen: false, day: { name: 'Training day', totals: { energyKcal: 460 }, loggedTotals: { energyKcal: 0 } } });
-    expect(started.body.active?.day.lines.map((each) => [each.name, each.logged])).toEqual([['Plan porridge', false], ['Plan rice', false]]);
-    const at = async (today: string) => (await api.call<Active>(ana, 'GET', `/nutrition/meal-plans/active?today=${today}`)).body.active;
-    // The next day is the plan's next day, and then it starts again.
-    expect([(await at('2026-03-03'))?.day.name, (await at('2026-03-04'))?.day.name]).toEqual(['Rest day', 'Training day']);
+    expect(started.body.active).toMatchObject({ planId: plan.id, since: '2026-03-02', calendarDay: '2026-03-02', chosen: false, day: { name: 'Training day', totals: { energyKcal: 460 } } });
+    expect(started.body.active?.recent.map((each) => each.day)).toEqual(['2026-02-24', '2026-02-25', '2026-02-26', '2026-02-27', '2026-02-28', '2026-03-01', '2026-03-02']);
+    const at = async (day: string, today = '2026-03-02') => (await api.call<Active>(ana, 'GET', `/nutrition/meal-plans/active?today=${today}&day=${day}`)).body.active;
+    // The order runs forwards and, for comparing, backwards from the start.
+    expect([(await at('2026-03-03'))?.day.name, (await at('2026-03-04'))?.day.name, (await at('2026-03-01'))?.day.name]).toEqual(['Rest day', 'Training day', 'Rest day']);
 
-    // One line is logged; the plan knows from the diary, and forgets when the meal is deleted.
+    // Rice eaten the day before, logged by hand before the plan was in use, counts for that day.
+    await api.call(ana, 'POST', '/nutrition/entries', { day: '2026-03-01', slot: 'dinner', foodId: ids.rice, amount: 120 });
+    expect((await at('2026-03-01'))?.day.lines.map((each) => each.logged)).toEqual([true]);
+    const yesterday = (await at('2026-03-02'))?.recent.find((each) => each.day === '2026-03-01');
+    expect(yesterday).toMatchObject({ dayName: 'Rest day', planned: 1, followed: 1, plannedKcal: 130, eatenKcal: 156 });
+
+    // Today: the porridge from the plan's button; then the rice, logged by hand, also counts.
     const day = plan.days[0];
     await api.call(ana, 'POST', `/nutrition/meal-plans/${plan.id}/days/${day.id}/log`, { day: '2026-03-02', entryIds: [day.entries[0].id] });
-    const after = await at('2026-03-02');
-    expect(after?.day.lines.map((each) => each.logged)).toEqual([true, false]);
-    expect(after?.day.loggedTotals.energyKcal).toBe(200);
-    // Done on one day says nothing about the next time that plan day comes round.
-    expect((await at('2026-03-04'))?.day.lines.map((each) => each.logged)).toEqual([false, false]);
-    await api.db.collection('meal_entries').deleteMany({ userId: ana.id, day: '2026-03-02' });
-    expect((await at('2026-03-02'))?.day.lines.map((each) => each.logged)).toEqual([false, false]);
-    // Where a meal came from is never taken from a request.
-    await api.call(ana, 'POST', '/nutrition/entries', { day: '2026-03-02', slot: 'lunch', foodId: ids.rice, amount: 200, planEntryId: day.entries[1].id });
-    expect((await at('2026-03-02'))?.day.lines.map((each) => each.logged)).toEqual([false, false]);
+    expect((await at('2026-03-02'))?.day.lines.map((each) => each.logged)).toEqual([true, false]);
+    await api.call(ana, 'POST', '/nutrition/entries', { day: '2026-03-02', slot: 'lunch', foodId: ids.rice, amount: 180 });
+    expect((await at('2026-03-02'))?.day.lines.map((each) => each.logged)).toEqual([true, true]);
+    // So logging the whole day now adds nothing twice.
+    expect((await api.call<{ logged: number }>(ana, 'POST', `/nutrition/meal-plans/${plan.id}/days/${day.id}/log`, { day: '2026-03-02' })).body).toEqual({ logged: 0 });
+    // A meal's origin is never taken from a request.
+    expect((await api.call(ana, 'POST', '/nutrition/entries', { day: '2026-03-02', slot: 'lunch', foodId: ids.rice, amount: 10, planEntryId: 'x' })).status).toBe(400);
 
-    // Another day can be picked for today only.
-    const picked = await api.call<Active>(ana, 'PUT', '/nutrition/meal-plans/active/day', { today: '2026-03-02', dayId: plan.days[1].id });
-    expect(picked.body.active).toMatchObject({ chosen: true, day: { name: 'Rest day' } });
-    expect((await at('2026-03-03'))?.day.name).toBe('Rest day');
-    expect((await at('2026-03-04'))?.day.name).toBe('Training day');
-    expect((await api.call(ana, 'PUT', '/nutrition/meal-plans/active/day', { today: '2026-03-02', dayId: 'nope' })).status).toBe(404);
+    // Picking a day re-anchors the order from there; earlier days keep theirs.
+    const picked = await api.call<Active>(ana, 'PUT', '/nutrition/meal-plans/active/day', { day: '2026-03-03', dayId: plan.days[0].id });
+    expect(picked.body.active).toMatchObject({ calendarDay: '2026-03-03', chosen: true, day: { name: 'Training day' } });
+    expect([(await at('2026-03-02'))?.day.name, (await at('2026-03-04'))?.day.name, (await at('2026-03-05'))?.day.name]).toEqual(['Training day', 'Rest day', 'Training day']);
+    expect((await api.call(ana, 'PUT', '/nutrition/meal-plans/active/day', { day: '2026-03-02', dayId: 'nope' })).status).toBe(404);
 
     // Using another plan stops the first; using the one in use keeps its start day.
     await api.call(ana, 'PUT', '/nutrition/meal-plans/active', { planId: other.id, today: '2026-03-05' });
     await api.call(ana, 'PUT', '/nutrition/meal-plans/active', { planId: other.id, today: '2026-03-09' });
-    expect(await at('2026-03-09')).toMatchObject({ planId: other.id, since: '2026-03-05' });
+    expect(await at('2026-03-09', '2026-03-09')).toMatchObject({ planId: other.id, since: '2026-03-05' });
     expect(await api.db.collection('meal_plans').countDocuments({ userId: ana.id, activeSince: { $exists: true } })).toBe(1);
     const mine = (await api.call<MealPlan[]>(ana, 'GET', '/nutrition/meal-plans')).body;
     expect(mine.map((each) => [each.name, each.activeSince])).toEqual([['Lean week', undefined], ['Other', '2026-03-05']]);
-    // Stopping.
     expect((await api.call<Active>(ana, 'PUT', '/nutrition/meal-plans/active', { planId: null, today: '2026-03-09' })).body).toEqual({ active: null });
 
     // A page has no diary, so it has no plan in use.
     const page = (await api.call<PageSummary>(ana, 'POST', '/pages', { name: 'Using', username: `using-${randomUUID().slice(0, 6)}`, bio: '' })).body;
     expect((await api.call(ana, 'GET', '/nutrition/meal-plans/active?today=2026-03-09', undefined, as(page.id))).status).toBe(403);
     expect((await api.call(ana, 'PUT', '/nutrition/meal-plans/active', { planId: plan.id, today: '2026-03-09' }, as(page.id))).status).toBe(403);
+  });
+
+  it('lets a line be eaten at more than one meal, logged into the meal chosen', async () => {
+    const ana = await api.account('ana');
+    const beka = await api.account('beka');
+    const ids = await library(ana);
+    const plan = await api.call<MealPlan>(ana, 'POST', '/nutrition/meal-plans', {
+      name: 'Loose',
+      days: [{ name: 'Any day', entries: [{ slot: 'lunch', slots: ['lunch', 'dinner'], foodId: ids.rice, amount: 200 }, { slot: 'snack', slots: ['breakfast', 'lunch', 'dinner', 'snack'], foodId: ids.oats, amount: 40 }] }],
+    });
+    expect(plan.status).toBeLessThan(300);
+    const [rice, oats] = plan.body.days[0].entries;
+    expect([rice.slot, rice.slots, oats.slot]).toEqual(['lunch', ['lunch', 'dinner'], 'snack']);
+    const log = (body: Record<string, unknown>) => api.call<{ logged: number }>(ana, 'POST', `/nutrition/meal-plans/${plan.body.id}/days/${plan.body.days[0].id}/log`, { day: '2026-04-01', ...body });
+    // Not a meal it is planned for.
+    expect((await log({ entryIds: [rice.id], slot: 'breakfast' })).status).toBe(400);
+    expect((await log({ entryIds: [rice.id], slot: 'dinner' })).body).toEqual({ logged: 1 });
+    const entry = await api.db.collection('meal_entries').findOne({ userId: ana.id, day: '2026-04-01' });
+    expect([entry?.['slot'], entry?.['planEntryId']]).toEqual(['dinner', rice.id]);
+
+    // Shared, the choice of meals goes with it.
+    const source = { kind: 'mealPlan', mealPlanId: plan.body.id };
+    const preview = await api.call<PostPreview>(ana, 'POST', '/posts/preview', { source });
+    const posted = await api.call<FoodPost>(ana, 'POST', '/posts', { requestId: randomUUID(), title: 'Loose', caption: '', audience: 'public', source, previewHash: preview.body.previewHash });
+    const read = await api.call<FoodPost>(beka, 'GET', `/posts/${posted.body.id}`);
+    expect(read.body.items.map((item) => item.slots)).toEqual([['lunch', 'dinner'], ['breakfast', 'lunch', 'dinner', 'snack']]);
+    const saved = await api.call<PostImportResult>(beka, 'POST', `/posts/${posted.body.id}/import`, { itemKeys: read.body.items.map((item) => item.key), duplicatePolicy: 'copy', saveAsMeal: false, savePlan: true });
+    const copy = (await api.call<MealPlan[]>(beka, 'GET', '/nutrition/meal-plans')).body.find((each) => each.id === saved.body.mealPlanId);
+    expect(copy?.days[0].entries.map((each) => each.slots)).toEqual([['lunch', 'dinner'], ['breakfast', 'lunch', 'dinner', 'snack']]);
   });
 
   it('are kept and posted by a page, which can never log one', async () => {

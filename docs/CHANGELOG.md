@@ -2,6 +2,18 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: Meal plans inside your day
+
+- The plan in use is **part of each meal** now: what is planned and not eaten yet sits in
+  Breakfast, Lunch and so on, with a Log button, instead of a separate list on top.
+- **What you already logged counts.** The same food or recipe counts for the plan however it was
+  logged, even before you started the plan. Meals that count say "In your plan".
+- **Look back:** any earlier day shows its plan day and what was eaten, and the plan card shows
+  the last seven days.
+- **A line can be eaten at more than one meal** ("lunch or dinner", or any time). It shows in each
+  of them until it is eaten in one.
+- Picking another plan day for a day now carries on from there the next day.
+
 ## 2026-11-23: Programmes
 
 - **Food → Programmes**: pair a meal plan with a training plan under one name. Pick plans you

@@ -2830,3 +2830,13 @@ built on honest numbers, and this lets a recipe be shared with none: ingredients
 method. It is the owner's call that a reader can ask for the macros, and a recipe people cannot
 post at all is worse than one that says "no nutrition numbers". Such a recipe is never logged and
 offers no foods to save, so no invented figure enters anyone's diary.
+
+## 2026-11-23: A plan's "eaten" is matched from the diary, not marked
+
+Spec 042. Whether a meal plan line was eaten is worked out on read by `matchPlanDay()`: meals
+logged from the plan, then the same recipe, then the same food, at one of the line's meals first.
+Marking lines done (or only trusting `planEntryId`) missed what people actually do: log the same
+chicken from search or a suggestion, or log before starting the plan. Matching by food keeps it
+derived (principle 3), lets deleting a meal reopen its line, and lets any past day be compared
+with the plan. The cost is that a food eaten for other reasons can count for the plan; that is the
+more honest error for a plan the person chose.

@@ -40,6 +40,8 @@ export interface PublishedFood extends NutritionFacts {
   attribution?: FoodAttribution;
   /** Spec 042, in a published meal plan: which day (an index into `days`), and the recipe this food came from. */
   dayIndex?: number;
+  /** Spec 042, in a published meal plan: every meal the line may be eaten at, when more than one. */
+  slots?: MealSlot[];
   group?: string;
 }
 export interface PublishedMacros {

@@ -30,6 +30,7 @@ import {
   PublishedNutritionSummary,
 } from './published-nutrition';
 import { api } from '../lib/api';
+import { planSlotsLabel } from '@life-portal/shared-domain';
 import {
   PostAudienceControl,
   PostDateLink,
@@ -669,7 +670,7 @@ export function PostCard({
                   {food.amount === undefined
                     ? `Per 100 ${food.unit}`
                     : `${food.amount} ${food.unit}`}
-                  {food.slot ? ` · ${food.slot}` : ''}
+                  {food.slots && food.slots.length > 1 ? ` · ${planSlotsLabel(food.slots).toLowerCase()}` : food.slot ? ` · ${food.slot}` : ''}
                   {food.group ? ` · ${food.group}` : ''}
                 </span>
               </div>

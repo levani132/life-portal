@@ -24,6 +24,8 @@
 - [x] T018 One plan in use per person (`activeSince`), today's plan day from the order or a choice (`activePlanDayIndex`), logged lines derived from the diary (`planEntryId`).
 - [x] T019 Web: "Planned today" in Food with a Log button per line; Use / Stop using; "Use this plan" on a post.
 
+- [x] T019a Planned lines inside each meal of the Food day; the diary matched to the plan on read (`matchPlanDay`), any day, with a seven-day comparison; lines at several meals (`slots`); a picked day re-anchors the order.
+
 ## Slice 3: programmes
 - [x] T020 A programme: a meal plan and a training plan under one name (`programmes`, ids only).
 - [x] T021 Posted as one post with both plans. The reader uses the meal plan and copies the training plan, each on its own.

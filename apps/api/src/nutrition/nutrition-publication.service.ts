@@ -165,18 +165,19 @@ export class NutritionPublicationService {
       const recipes = recipeIds.length ? await this.meals.find({ userId, _id: { $in: recipeIds }, archived: false }).lean() : [];
       const lines = plan.days.flatMap((day, dayIndex) =>
         day.entries.flatMap((entry) => {
-          if (!entry.savedMealId) return [{ dayIndex, slot: entry.slot, foodId: entry.foodId as string, amount: entry.amount as number, group: undefined as string | undefined }];
+          const slots = entry.slots && entry.slots.length > 1 ? entry.slots : undefined;
+          if (!entry.savedMealId) return [{ dayIndex, slot: entry.slot, slots, foodId: entry.foodId as string, amount: entry.amount as number, group: undefined as string | undefined }];
           const recipe = recipes.find((meal) => String(meal._id) === entry.savedMealId);
           if (!recipe || !recipe.components.length)
             throw new BadRequestException({ code: 'PLAN_INCOMPLETE', message: 'A recipe in this plan has no foods with numbers. Edit the plan before sharing it.' });
-          return recipe.components.map((component) => ({ dayIndex, slot: entry.slot, foodId: component.foodId, amount: component.amount, group: recipe.name as string | undefined }));
+          return recipe.components.map((component) => ({ dayIndex, slot: entry.slot, slots, foodId: component.foodId, amount: component.amount, group: recipe.name as string | undefined }));
         }),
       );
       const rows = await this.foods.find({ userId, archived: false, _id: { $in: lines.map((line) => line.foodId) } }).lean();
       const items = lines.map((line, index) => {
         const food = rows.find((row) => String(row._id) === line.foodId);
         if (!food) throw new BadRequestException({ code: 'PLAN_INCOMPLETE', message: 'A food in this plan is no longer available. Edit the plan before sharing it.' });
-        return { ...this.fromFood(food, String(index), line.amount), slot: line.slot, dayIndex: line.dayIndex, ...(line.group ? { group: line.group } : {}) };
+        return { ...this.fromFood(food, String(index), line.amount), slot: line.slot, ...(line.slots ? { slots: line.slots } : {}), dayIndex: line.dayIndex, ...(line.group ? { group: line.group } : {}) };
       });
       publication = { kind: 'mealPlan', label: plan.name, items, days: plan.days.map((day) => day.name) };
     } else if (source.kind === 'food' || source.kind === 'database') {
@@ -349,7 +350,7 @@ export class NutritionPublicationService {
     let createdCount = 0;
     // Upserts are independent/idempotent. A retry resumes an interrupted collection import.
     for (const [key, { item }] of unique) {
-      const { key: _key, amount: _amount, slot: _slot, dayIndex: _dayIndex, group: _group, ...facts } = item;
+      const { key: _key, amount: _amount, slot: _slot, slots: _slots, dayIndex: _dayIndex, group: _group, ...facts } = item;
       try {
         const result = await this.foods.updateOne(
           { userId, postImportKey: key },
@@ -422,7 +423,7 @@ export class NutritionPublicationService {
         name,
         entries: selected
           .filter((item) => (item.dayIndex ?? 0) === dayIndex)
-          .map((item) => ({ slot: item.slot ?? ('uncategorized' as const), foodId: idOf(item), amount: item.amount ?? item.servingSize })),
+          .map((item) => ({ slot: item.slot ?? ('uncategorized' as const), ...(item.slots ? { slots: item.slots } : {}), foodId: idOf(item), amount: item.amount ?? item.servingSize })),
       }));
       mealPlanId = await this.mealPlans.saveImported(userId, postId, mealName?.trim() || publication.label, days);
     }

@@ -888,7 +888,7 @@ export class NutritionService {
     userId: string,
     dto: CreateEntryDto,
     /** Spec 042: where the server itself is logging from. Never read from a request. */
-    origin?: { planEntryId: string },
+    origin?: { planEntryId: string; savedMealId?: string },
   ): Promise<MealEntryDto> {
     const food = await this.findFood(userId, dto.foodId, 'log');
     const amount = this.resolveAmount(dto, food.servingSize);
@@ -905,7 +905,7 @@ export class NutritionService {
       unit: food.unit,
       facts: snapshotFacts(food),
       note: dto.note,
-      ...(origin ? { planEntryId: origin.planEntryId } : {}),
+      ...(origin ? { planEntryId: origin.planEntryId, ...(origin.savedMealId ? { savedMealId: origin.savedMealId } : {}) } : {}),
     } as never);
     return this.serializeEntry(created);
   }
