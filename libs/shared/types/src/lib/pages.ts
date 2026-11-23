@@ -43,6 +43,8 @@ export interface MyPages {
   pages: PageSummary[];
   /** How many more this person may create; `null` when there is no limit. */
   remaining: number | null;
+  /** Spec 041: whether a linked AI assistant may act as the pages marked "run with AI". */
+  assistant: boolean;
 }
 
 export interface CreatePageRequest {
@@ -71,6 +73,8 @@ export interface AdminAccount {
   /** A person: the limit set for them (`-1`: none), absent for the default; and how many they created. */
   pageLimit?: number;
   pagesCreated?: number;
+  /** Spec 041: the owner's override of the assistant's daily caps for this person. */
+  assistantCaps?: Record<string, number>;
   developer?: true;
   /** A page: its marks, its followers and who manages it. */
   official?: boolean;

@@ -4,7 +4,10 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Headers,
+  Param,
+  Put,
   Module,
   Post,
   Query,
@@ -29,6 +32,14 @@ import { NutritionService } from '../nutrition/nutrition.service';
 import { McpService } from './mcp.service';
 import { McpToolCallDto } from './mcp.dto';
 import { handleMcpRequest } from './mcp-protocol';
+import { AsPerson } from '../auth/acting';
+import { MessagesModule } from '../messages/messages.module';
+import { PostsModule } from '../posts/posts.module';
+import { SocialModule } from '../social/social.module';
+import { TrainingModule } from '../training/training.module';
+import { AssistantSettings, AssistantSettingsSchema, PageAssistantAction, PageAssistantActionSchema, PageAssistantService, parseCaps } from './page-assistant';
+import { PagesService } from '../pages/pages.module';
+import type { AssistantActivity, AssistantCaps } from '@life-portal/shared-types';
 
 /**
  * MCP (Model Context Protocol) server for AI assistants.
@@ -44,6 +55,7 @@ export class McpController {
     private readonly access: AccessService,
     private readonly nutrition: NutritionService,
     private readonly oauth: McpOAuthService,
+    private readonly pageAssistant: PageAssistantService,
   ) {}
 
   /** Generate a long-lived MCP token for AI assistants. Requires normal JWT auth. */
@@ -133,6 +145,7 @@ export class McpController {
         return userId;
       },
       this.oauth.enabled ? this.oauth.metadataUrl : undefined,
+      this.pageAssistant.tools(),
     );
   }
   private async verifyCredential(token: string | undefined): Promise<string> {
@@ -148,18 +161,61 @@ export class McpController {
   }
 }
 
+/**
+ * Spec 041: the assistant's caps (the owner's defaults and one person's override) and what the
+ * assistant did as a page, for its managers. Signed-in routes; the assistant itself has tools.
+ */
+@AsPerson()
+@Controller('page-assistant')
+export class PageAssistantController {
+  constructor(
+    private readonly assistant: PageAssistantService,
+    private readonly pages: PagesService,
+    private readonly access: AccessService,
+  ) {}
+
+  @Get('caps')
+  caps(@CurrentUser('userId') userId: string): Promise<AssistantCaps> {
+    this.access.requireDeveloper(userId);
+    return this.assistant.defaults();
+  }
+
+  @Put('caps')
+  setCaps(@CurrentUser('userId') userId: string, @Body() body: { caps?: unknown }): Promise<AssistantCaps> {
+    return this.assistant.setDefaults(userId, parseCaps(body?.caps, false) as AssistantCaps);
+  }
+
+  /** `caps: null` returns the person to the defaults; a partial object overrides only those kinds. */
+  @Put('caps/:personId')
+  setPersonCaps(@CurrentUser('userId') userId: string, @Param('personId') personId: string, @Body() body: { caps?: unknown }) {
+    return this.pages.setAssistantCaps(userId, personId, body?.caps === null ? null : parseCaps(body?.caps, true));
+  }
+
+  @Get('activity/:pageId')
+  @Header('Cache-Control', 'no-store')
+  activity(@CurrentUser('userId') userId: string, @Param('pageId') pageId: string): Promise<AssistantActivity> {
+    return this.assistant.activity(userId, pageId);
+  }
+}
+
 @Module({
   imports: [
     NutritionModule,
     AuthModule,
+    PostsModule,
+    TrainingModule,
+    MessagesModule,
+    SocialModule,
     MongooseModule.forFeature([
+      { name: PageAssistantAction.name, schema: PageAssistantActionSchema },
+      { name: AssistantSettings.name, schema: AssistantSettingsSchema },
       { name: McpOAuthClient.name, schema: McpOAuthClientSchema },
       { name: McpOAuthCredential.name, schema: McpOAuthCredentialSchema },
     ]),
     JwtModule.register({ secret: loadConfig().jwtSecret }),
   ],
-  controllers: [McpController],
-  providers: [McpService, McpOAuthService],
+  controllers: [McpController, PageAssistantController],
+  providers: [McpService, McpOAuthService, PageAssistantService],
   exports: [McpService, McpOAuthService],
 })
 export class McpModule {}

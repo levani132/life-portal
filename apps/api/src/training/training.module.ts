@@ -477,6 +477,6 @@ export class TrainingController {
   ],
   controllers: [TrainingController],
   providers: [CatalogueSeeder, PlanSeeder, PlansService, PlanDayUpdateService, CatalogueService, ProgressService, TrainingProfileService, SessionsService, TrainingSummaryService, RestAlarmService, TrainingLevelService, TrainingRankService, TrainingRecapService, TrainingPublicationService],
-  exports: [SessionsService, TrainingSummaryService, TrainingRankService, TrainingProfileService, TrainingPublicationService],
+  exports: [PlansService, CatalogueService, SessionsService, TrainingSummaryService, TrainingRankService, TrainingProfileService, TrainingPublicationService],
 })
 export class TrainingModule {}

@@ -6,6 +6,7 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { toDay } from '@life-portal/shared-domain';
 import type { NutritionService } from '../nutrition/nutrition.service';
+import type { AssistantTool } from './page-assistant';
 
 /** Session tracking for stateful MCP connections. */
 interface McpSession {
@@ -33,10 +34,22 @@ setInterval(() => {
   }
 }, 60_000).unref();
 
+/** A refusal as the assistant should read it: the code and the sentence, never a stack. */
+function toolError(error: unknown): { error: string; code?: string } {
+  const response = (error as { getResponse?: () => unknown }).getResponse?.();
+  if (response && typeof response === 'object') {
+    const body = response as { message?: unknown; code?: unknown };
+    const message = Array.isArray(body.message) ? body.message.join('; ') : String(body.message ?? 'Refused.');
+    return { error: message, ...(typeof body.code === 'string' ? { code: body.code } : {}) };
+  }
+  if (typeof response === 'string') return { error: response };
+  return { error: 'Something went wrong.' };
+}
+
 /**
  * Creates an MCP server instance with all nutrition tools registered.
  */
-function createMcpServer(userId: string, nutrition: NutritionService): McpServer {
+function createMcpServer(userId: string, nutrition: NutritionService, pageTools: AssistantTool[] = []): McpServer {
   const server = new McpServer(
     {
       name: 'life-portal',
@@ -343,6 +356,22 @@ function createMcpServer(userId: string, nutrition: NutritionService): McpServer
     },
   );
 
+  // Spec 041: the tools for pages. Each checks for itself that the person allowed assistants
+  // and that the page is marked "run with AI"; a refusal is an answer the assistant can relay.
+  for (const tool of pageTools) {
+    server.registerTool(
+      tool.name,
+      { _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['nutrition'] }] }, description: tool.description, inputSchema: tool.shape },
+      async (args: Record<string, unknown>) => {
+        try {
+          return { content: [{ type: 'text' as const, text: JSON.stringify(await tool.run(userId, args ?? {})) }] };
+        } catch (error) {
+          return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify(toolError(error)) }] };
+        }
+      },
+    );
+  }
+
   return server;
 }
 
@@ -367,6 +396,7 @@ export async function handleMcpRequest(
   nutrition: NutritionService,
   verifyToken: (token: string) => Promise<string>,
   metadataUrl?: string,
+  pageTools: AssistantTool[] = [],
 ): Promise<void> {
   const method = req.method?.toUpperCase();
   const sessionId = req.headers['mcp-session-id'] as string | undefined;
@@ -414,7 +444,7 @@ export async function handleMcpRequest(
           if (sid) sessions.delete(sid);
         };
 
-        const server = createMcpServer(userId, nutrition);
+        const server = createMcpServer(userId, nutrition, pageTools);
         await server.connect(transport);
         await transport.handleRequest(req, res, body);
         return;

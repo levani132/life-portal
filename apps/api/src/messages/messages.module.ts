@@ -109,5 +109,6 @@ export class MessagesController {
   ],
   controllers: [MessagesController],
   providers: [MessagesService],
+  exports: [MessagesService],
 })
 export class MessagesModule {}

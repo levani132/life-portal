@@ -76,6 +76,12 @@ export default function TermsPage() {
           start it, you can end it in the app at any time, and what that assistant or app does with what it reads is
           between you and its provider.
         </p>
+        <p>
+          You can also let an assistant manage your pages. It may act only as a page marked “run with AI”, there are
+          daily limits on what it may do, and it may not make one person’s pages like, follow, comment on or message
+          each other. What an assistant does as your page is done by you: you answer for it as for anything else the
+          page posts.
+        </p>
       </LegalSection>
 
       <LegalSection title="7. Price">

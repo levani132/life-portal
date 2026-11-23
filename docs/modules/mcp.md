@@ -136,3 +136,52 @@ The AI translates these into tool calls using the schema from `GET /mcp/tools`.
   are independently revoked from Settings → AI Assistant. Legacy manual tokens are unchanged.
 - Rate limits are process-local, appropriate for the existing single free-tier API instance;
   horizontally scaled deployments need a shared rate-limit store.
+
+## Pages (spec 041)
+
+`apps/api/src/mcp/page-assistant.ts`. An assistant can act as a page its person manages. The
+tools are defined once (`PageAssistantService.tools()`, zod shapes) and offered by both
+endpoints; a refusal comes back with a `code` the assistant can relay.
+
+**Consent, checked on every call (`PagesService.assistantActingAs`):**
+
+1. the person switched on "Let a connected assistant manage my pages" (`users.assistantPages`,
+   `PUT /pages/assistant`, shown in `GET /pages` as `assistant`); otherwise `ASSISTANT_OFF`;
+2. they still manage the page (`NOT_A_MANAGER`) and it is not suspended (`PAGE_SUSPENDED`);
+3. the page is marked "run with AI" (`PAGE_NOT_AI`). A page made with `create_page` is marked.
+
+This is a switch on the account, not an OAuth scope: every connection the person made gets it
+together. A separate `pages` scope on the grant is the stricter design and is not built.
+
+**Tools.** Every one but `list_my_pages` and `create_page` takes `pageId`.
+
+| Group | Tools |
+| --- | --- |
+| Pages | `list_my_pages`, `create_page`, `update_page`, `get_assistant_activity` |
+| Library | `list_page_foods`, `create_page_food`, `update_page_food`, `delete_page_food`, `list_page_recipes`, `create_page_recipe`, `delete_page_recipe`, `list_page_exercises`, `create_page_exercise`, `list_page_plans`, `get_page_plan`, `create_page_plan`, `delete_page_plan` |
+| Posts | `create_page_post` (text, one library item, `draft`), `publish_page_draft`, `update_page_post`, `delete_page_post`, `list_page_posts` |
+| Reading | `get_for_you`, `get_following`, `get_post`, `get_post_comments`, `get_account_profile`, `get_suggested_pages` |
+| Engaging | `follow_page`, `unfollow_page`, `like_post`, `unlike_post`, `comment_on_post`, `list_page_conversations`, `get_conversation_messages`, `reply_in_conversation` |
+
+A draft is a post with audience `private`; publishing sets it to `public`. There is no tool to
+delete a page, to upload a photo, or to open a conversation.
+
+**Caps.** `assistantCap()` in `libs/shared/domain`: per page, per UTC day, per kind (`post`,
+`comment`, `like`, `follow`, `message`, `library`). Defaults 10/30/100/30/30/200, stored by the
+owner in `assistant_settings` (`GET/PUT /page-assistant/caps`); one person's override in
+`users.assistantCaps` (`PUT /page-assistant/caps/:personId`, `null` clears); `-1` is no cap; the
+owner's own account has none. A capped call answers 429 `CAP_REACHED`. Reading, unfollowing and
+unliking are not counted.
+
+**The log.** `page_assistant_actions {pageId, personId, kind, tool, targetId?, day, createdAt}`:
+no content. Written after a counted action succeeds; counted for the caps; read by the page's
+managers (`GET /page-assistant/activity/:pageId`, and `get_assistant_activity`). Deleted with
+the page (`ACCOUNT_PLAN`: owned by `pageId`).
+
+**Never a crowd.** `sharesManager()`: following, liking, commenting on or messaging an account
+that shares a manager with the acting page is refused (`SAME_MANAGER`). A page may comment on
+its own posts.
+
+Everything else is the ordinary services run as the page, so moderation, blocks, audiences and
+the messaging rule (`page-first`) apply unchanged. Tested in
+`integration/page-assistant.integration.ts`.

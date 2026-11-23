@@ -79,6 +79,12 @@ export default function PrivacyPage() {
           If you connect an AI assistant or another app to your account, it reads what you allow it to. That is your
           choice, you can end it in the app, and its provider’s own privacy policy applies to what it does with it.
         </p>
+        <p>
+          If you also let an assistant manage your pages, it reads what a page can see (public posts, the comments on
+          them, profiles, and messages sent to the page) and acts as the page. We keep a list of what it did as each
+          page (the time, the kind of action and what it was done to, never the text), which the page’s managers can
+          read; it is deleted with the page.
+        </p>
       </LegalSection>
 
       <LegalSection title="6. What we never do">

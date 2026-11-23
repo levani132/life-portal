@@ -102,6 +102,14 @@ export class User {
   @Prop()
   pageLimit?: number;
 
+  /** Spec 041, on a person: whether a linked AI assistant may act as the pages they marked "run with AI". */
+  @Prop()
+  assistantPages?: boolean;
+
+  /** Spec 041, on a person: the owner's override of the assistant's daily caps, per kind. Absent: the defaults. */
+  @Prop({ type: Object })
+  assistantCaps?: Record<string, number>;
+
   /**
    * When the person agreed to the terms, privacy policy and community rules, and to their health
    * information being stored, and which dated version (`LEGAL_VERSION`). Absent on accounts made

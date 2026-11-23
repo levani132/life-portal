@@ -348,6 +348,6 @@ class PublicPostsController {
   controllers: [PostsController, PublicPostsController],
   providers: [PostsService, PostEngagementService, ForYouService, FeedMetricsService, PostModerationService],
   // Messages renders shared posts through the same read authorization as opening one.
-  exports: [PostsService],
+  exports: [PostsService, PostEngagementService, ForYouService],
 })
 export class PostsModule {}

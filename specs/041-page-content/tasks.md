@@ -8,19 +8,19 @@
 - [x] T005 Docs: pages.md, posts.md, changelog; close T040 in specs/040-pages/tasks.md.
 
 ## Slice 2: connector for pages
-- [ ] T010 The `pages` consent on a connector grant, chosen per page; acting check (FR-010).
-- [ ] T011 Tools: list_pages, create_page (run with AI), update_page.
-- [ ] T012 Tools: page library (foods, recipes, exercises, plans).
-- [ ] T013 Tools: create_post, save_draft, publish_draft, update_post, delete_post, list_page_posts.
-- [ ] T014 Tools: get_for_you, get_following, get_post, get_comments, get_page_profile, suggested_pages.
-- [ ] T015 Privacy policy and docs/modules/mcp.md; LEGAL_VERSION.
+- [x] T010 Consent: a switch on the account plus the page's "run with AI" mark; acting check (FR-010). A `pages` OAuth scope on the grant is not built (see Open).
+- [x] T011 Tools: list_pages, create_page (run with AI), update_page.
+- [x] T012 Tools: page library (foods, recipes, exercises, plans).
+- [x] T013 Tools: create_post, save_draft, publish_draft, update_post, delete_post, list_page_posts.
+- [x] T014 Tools: get_for_you, get_following, get_post, get_comments, get_page_profile, suggested_pages.
+- [x] T015 Privacy policy and docs/modules/mcp.md; LEGAL_VERSION.
 
 ## Slice 3: engaging, caps, log
-- [ ] T020 Domain: caps (defaults, override, none), the same-manager rule; tests.
-- [ ] T021 `page_assistant_actions` log and daily counts; in ACCOUNT_PLAN.
-- [ ] T022 Tools: follow, unfollow, like, unlike, comment, reply_message.
-- [ ] T023 People screen: caps per person; defaults for everyone.
-- [ ] T024 Web: "What the assistant did" on a page, for its managers.
+- [x] T020 Domain: caps (defaults, override, none), the same-manager rule; tests.
+- [x] T021 `page_assistant_actions` log and daily counts; in ACCOUNT_PLAN.
+- [x] T022 Tools: follow, unfollow, like, unlike, comment, reply_message.
+- [x] T023 People screen: caps per person; defaults for everyone.
+- [x] T024 Web: "What the assistant did" on a page, for its managers.
 
 ## Slice 4: disabling a page
 - [ ] T030 `users.disabledAt` for a page; hidden everywhere; enable/delete in the app; tool disable_page.
@@ -39,3 +39,12 @@
 
 ## Later (on the roadmap)
 - Co-managers. Verification of real businesses. Challenges. Images from a web address.
+
+## Open
+
+- The pages consent is one switch on the account, shared by every assistant connection the
+  person made. A separate OAuth scope chosen per connection is stricter and not built.
+- The assistant cannot upload photos (slice 7: the photo shelf).
+- `create_page_plan` covers workouts, exercises and planned sets; supersets and edits to an
+  existing plan are not offered.
+- Caps reset at midnight UTC, not the person's midnight.

@@ -68,6 +68,10 @@ export class CreatePageDto implements CreatePageRequest {
   @IsOptional() @IsString() @MaxLength(PAGE_BIO_MAX) bio?: string;
 }
 
+export class AssistantDto {
+  @IsBoolean() enabled!: boolean;
+}
+
 export class UpdatePageDto implements UpdatePageRequest {
   @IsString() @MinLength(1) @MaxLength(PAGE_NAME_MAX) name!: string;
   @Matches(/^[a-z0-9][a-z0-9_-]{2,29}$/, { message: 'Use 3–30 lowercase letters, numbers, underscores or hyphens.' })
@@ -129,19 +133,20 @@ export class PagesService {
   /** The pages this person manages, and how many more they may create. */
   async mine(personId: string): Promise<MyPages> {
     const { access } = await this.access.forUser(personId);
-    if (!access.pages) return { pages: [], remaining: 0 };
+    if (!access.pages) return { pages: [], remaining: 0, assistant: false };
     const [rows, person, created] = await Promise.all([
       this.users.find({ kind: 'page', managers: personId }).sort({ createdAt: 1 }).lean<PageRow[]>(),
-      this.users.findById(personId).select('pageLimit').lean(),
+      this.users.findById(personId).select('pageLimit assistantPages').lean(),
       this.users.countDocuments({ kind: 'page', createdBy: personId }),
     ]);
     return {
       pages: await this.summaries(rows),
       remaining: pagesRemaining({ pageLimit: person?.pageLimit, developer: personId === this.config.developerUserId, created }),
+      assistant: person?.assistantPages === true,
     };
   }
 
-  async create(personId: string, dto: CreatePageDto): Promise<PageSummary> {
+  async create(personId: string, dto: CreatePageDto, options: { aiManaged?: boolean } = {}): Promise<PageSummary> {
     await this.requireOn(personId);
     const name = dto.name.trim();
     if (!name) throw new BadRequestException('Give the page a name.');
@@ -165,9 +170,11 @@ export class PagesService {
       cohort: 'production',
       managers: [personId],
       createdBy: personId,
+      ...(options.aiManaged ? { aiManaged: true } : {}),
     });
     try {
       await this.social.createPageProfile(String(id), { displayName: name, username: dto.username, bio: (dto.bio ?? '').trim() });
+      if (options.aiManaged) await this.social.setAiManaged(String(id), true);
     } catch (error) {
       // Lost the race for the username: no half-made page is left behind.
       await this.users.deleteOne({ _id: id });
@@ -226,7 +233,7 @@ export class PagesService {
       .sort({ createdAt: -1 })
       .skip(query.skip ?? 0)
       .limit(ADMIN_PAGE_SIZE + 1)
-      .select('name kind suspendedAt pageLimit official aiManaged managers')
+      .select('name kind suspendedAt pageLimit official aiManaged managers assistantCaps')
       .lean<PageRow[]>();
     const shown = rows.slice(0, ADMIN_PAGE_SIZE);
     const ids = shown.map((row) => String(row._id));
@@ -257,6 +264,7 @@ export class PagesService {
               ...base,
               kind: 'person',
               ...(typeof row.pageLimit === 'number' ? { pageLimit: row.pageLimit } : {}),
+              ...(row.assistantCaps ? { assistantCaps: row.assistantCaps } : {}),
               pagesCreated: createdBy.get(id) ?? 0,
               ...(id === this.config.developerUserId ? { developer: true as const } : {}),
             },
@@ -294,6 +302,60 @@ export class PagesService {
     if (!page || !access.pages) throw notManager();
     if (page.suspendedAt) throw new ForbiddenException({ code: 'PAGE_SUSPENDED', message: 'This page has been suspended.' });
     return String(page._id);
+  }
+
+  /** Spec 041: the person lets a linked AI assistant act as their pages marked "run with AI", or stops it. */
+  async setAssistant(personId: string, enabled: boolean): Promise<{ assistant: boolean }> {
+    await this.requireOn(personId);
+    await this.users.updateOne({ _id: personId, kind: { $ne: 'page' } }, enabled ? { $set: { assistantPages: true } } : { $unset: { assistantPages: '' } });
+    return { assistant: enabled };
+  }
+
+  /** Whether the person let an assistant manage pages at all (spec 041). */
+  async assistantAllowed(personId: string): Promise<boolean> {
+    if (!isValidObjectId(personId)) return false;
+    const [person, { access }] = await Promise.all([this.users.findById(personId).select('assistantPages kind').lean(), this.access.forUser(personId)]);
+    return !!person && person.kind !== 'page' && person.assistantPages === true && access.pages;
+  }
+
+  /**
+   * The check behind everything an assistant does as a page (spec 041): the person allowed
+   * assistants, still manages the page, the page is marked "run with AI", and it is not
+   * suspended. Each failure has its own code, so the assistant can say what to change.
+   */
+  async assistantActingAs(personId: string, pageId: string): Promise<string> {
+    if (!(await this.assistantAllowed(personId)))
+      throw new ForbiddenException({ code: 'ASSISTANT_OFF', message: 'Assistants are not allowed to manage this account’s pages. The person turns that on in the app: Menu → AI assistant connections.' });
+    if (!isValidObjectId(pageId)) throw notManager();
+    const page = await this.users.findOne({ _id: pageId, kind: 'page', managers: personId }).select('suspendedAt aiManaged').lean();
+    if (!page) throw notManager();
+    if (page.suspendedAt) throw new ForbiddenException({ code: 'PAGE_SUSPENDED', message: 'This page has been suspended.' });
+    if (!page.aiManaged)
+      throw new ForbiddenException({ code: 'PAGE_NOT_AI', message: 'This page is not marked "run with AI", so an assistant cannot act as it. Its manager turns the mark on from the page’s profile in the app.' });
+    return String(page._id);
+  }
+
+  /** Who answers for an account: a page's managers, or the person themselves. */
+  async managersOf(accountId: string): Promise<string[]> {
+    if (!isValidObjectId(accountId)) return [];
+    const row = await this.users.findById(accountId).select('kind managers').lean();
+    if (!row) return [];
+    return row.kind === 'page' ? (row.managers ?? []) : [accountId];
+  }
+
+  /** The owner's override of the assistant's caps for one person; `null` returns them to the defaults. */
+  async setAssistantCaps(developerId: string, personId: string, caps: Record<string, number> | null): Promise<{ caps: Record<string, number> | null }> {
+    this.access.requireDeveloper(developerId);
+    if (!isValidObjectId(personId)) throw new NotFoundException('Account not found.');
+    const changed = await this.users.updateOne({ _id: personId, kind: { $ne: 'page' } }, caps === null ? { $unset: { assistantCaps: '' } } : { $set: { assistantCaps: caps } });
+    if (!changed.matchedCount) throw new NotFoundException('Account not found.');
+    return { caps };
+  }
+
+  /** A person's cap override and whether they are the owner, for the cap rule. */
+  async assistantCapsOf(personId: string): Promise<{ override?: Record<string, number>; developer: boolean }> {
+    const person = isValidObjectId(personId) ? await this.users.findById(personId).select('assistantCaps').lean() : null;
+    return { ...(person?.assistantCaps ? { override: person.assistantCaps } : {}), developer: personId === this.config.developerUserId };
   }
 
   /** Who the request is made as, for the web app's shell. */
@@ -351,6 +413,12 @@ export class PagesController {
   @Patch(':id')
   update(@CurrentUser('userId') personId: string, @Param('id') id: string, @Body() dto: UpdatePageDto): Promise<PageSummary> {
     return this.pages.update(personId, id, dto);
+  }
+
+  /** Spec 041: let a linked AI assistant act as this person's "run with AI" pages, or stop it. */
+  @Put('assistant')
+  assistant(@CurrentUser('userId') personId: string, @Body() dto: AssistantDto) {
+    return this.pages.setAssistant(personId, dto.enabled);
   }
 
   @Delete(':id')

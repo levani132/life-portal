@@ -2,6 +2,18 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: An AI assistant can run a page
+
+- **Menu → AI assistant connections → "Let a connected assistant manage my pages".** Off until
+  you turn it on. The assistant can then create pages and, as a page marked "run with AI", build
+  its library, post (or save a draft and publish it later), read For You and Following, follow,
+  like, comment and answer messages.
+- **Daily limits per page**, and a list on the page's profile of what the assistant did.
+- **One person's pages never like, follow, comment on or message each other** through an
+  assistant.
+- Admin: Menu → People sets the limits, for everyone and per person.
+- The assistant cannot delete a page or upload photos yet.
+
 ## 2026-11-23: A page's Library
 
 - **Library tab** while using the app as a page: the page's own foods, recipes, training plans

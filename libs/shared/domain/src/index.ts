@@ -48,3 +48,4 @@ export * from './lib/error-reports';
 export * from './lib/account';
 export * from './lib/usage';
 export * from './lib/pages';
+export * from './lib/assistant';

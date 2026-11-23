@@ -7,6 +7,7 @@ import type { SocialProfile, SuggestedPage } from '@life-portal/shared-types';
 import { api } from '../lib/api';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { Avatar } from './avatar';
+import { AssistantActivityPanel } from './page-assistant';
 import { ErrorNote } from './ui';
 
 /** Beside a page's name: this one is the app's own (spec 040). */
@@ -92,6 +93,7 @@ export function PageFollow({ page, own, canMarkOfficial, canMessage }: { page: S
           This page is run with AI (shown beside its name everywhere)
         </label>
       )}
+      {own && page.aiManaged && <AssistantActivityPanel pageId={page.userId} />}
       {canMarkOfficial && (
         <label className="flex items-center gap-2 text-xs text-ink-muted">
           <input

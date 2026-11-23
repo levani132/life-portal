@@ -14,6 +14,7 @@ import {
 import { AppShell, PageHeader } from '../../../components/app-shell';
 import { OfficialMark } from '../../../components/follow';
 import { PageMark } from '../../../components/identity-switcher';
+import { AssistantCapsEditor } from '../../../components/page-assistant';
 import { ErrorNote, Input, Spinner } from '../../../components/ui';
 import { api } from '../../../lib/api';
 import { revalidate, useAction, useApi } from '../../../lib/hooks';
@@ -82,6 +83,9 @@ function People() {
             {value === 'people' ? 'People' : 'Pages'}
           </button>
         ))}
+      </div>
+      <div className="mb-3">
+        <AssistantCapsEditor />
       </div>
       <Input
         type="search"
@@ -174,7 +178,10 @@ function Row({ account, pending, act }: { account: AdminAccount; pending: boolea
       ) : account.developer ? (
         <p className="text-xs text-ink-faint">No page limit.</p>
       ) : (
-        <PageLimit account={account} pending={pending} act={act} />
+        <>
+          <PageLimit account={account} pending={pending} act={act} />
+          <AssistantCapsEditor personId={account.id} current={account.assistantCaps} />
+        </>
       )}
     </li>
   );

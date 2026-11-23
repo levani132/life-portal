@@ -4,6 +4,8 @@ import { JwtService } from '@nestjs/jwt';
 import { toDay } from '@life-portal/shared-domain';
 import { CONFIG, type AppConfig } from '../config/configuration';
 import { NutritionService } from '../nutrition/nutrition.service';
+import { z } from 'zod';
+import { PageAssistantService } from './page-assistant';
 
 /** MCP token payload. */
 interface McpPayload {
@@ -34,6 +36,7 @@ export class McpService {
     private readonly jwt: JwtService,
     private readonly nutrition: NutritionService,
     @Inject(CONFIG) private readonly config: AppConfig,
+    private readonly pageAssistant: PageAssistantService,
   ) {}
 
   /** Generate a long-lived MCP token for AI assistants. */
@@ -61,7 +64,7 @@ export class McpService {
 
   /** List all available tools for AI discovery. */
   listTools(): { tools: McpTool[] } {
-    return {
+    const own: { tools: McpTool[] } = {
       tools: [
         {
           name: 'get_nutrition_day',
@@ -245,6 +248,11 @@ export class McpService {
         },
       ],
     };
+    const forPages: McpTool[] = this.pageAssistant.tools().map((tool) => {
+      const schema = z.toJSONSchema(z.object(tool.shape)) as { properties?: Record<string, unknown>; required?: string[] };
+      return { name: tool.name, description: tool.description, inputSchema: { type: 'object', properties: schema.properties ?? {}, ...(schema.required?.length ? { required: schema.required } : {}) } };
+    });
+    return { tools: [...own.tools, ...forPages] };
   }
 
   /** OpenAPI 3.1 schema for ChatGPT Actions. */
@@ -357,6 +365,10 @@ export class McpService {
     args: Record<string, unknown>,
   ): Promise<{ result: unknown }> {
     const today = toDay(new Date().toISOString());
+
+    // Spec 041: the tools for pages check their own consent.
+    const forPage = await this.pageAssistant.call(userId, tool, args);
+    if (forPage) return forPage;
 
     await this.access.require(userId, 'nutrition');
     switch (tool) {

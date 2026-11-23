@@ -77,7 +77,7 @@ describe('PagesService', () => {
   it('is closed while the feature is off for the person', async () => {
     const w = await world({ pagesOff: [BEKA] });
     await expect(w.service.create(BEKA, { name: 'X', username: 'beka-x' })).rejects.toMatchObject({ response: { code: 'PAGES_OFF' } });
-    expect(await w.service.mine(BEKA)).toEqual({ pages: [], remaining: 0 });
+    expect(await w.service.mine(BEKA)).toEqual({ pages: [], remaining: 0, assistant: false });
   });
 
   it('lets only a manager edit, delete or act as a page, with one answer for not-yours and not-there', async () => {

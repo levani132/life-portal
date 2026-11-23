@@ -138,6 +138,12 @@ recipes (no Diary tab). The snapshot, hash, saving and copying are the same serv
 A page's library is its own: its manager's foods and plans are separate rows under another id.
 Tested in `integration/page-library.integration.ts`.
 
+## The assistant for pages (spec 041)
+
+See [mcp](mcp.md#pages-spec-041): the consent switch, the tools, the daily caps, the log and
+the same-manager rule. In the app: the switch is in Menu → AI assistant connections; a page's
+own profile lists what the assistant did; Menu → People edits the caps (defaults and per person).
+
 ## People (the owner's screen)
 
 Menu → People, developer only (`/settings/people`).

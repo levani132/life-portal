@@ -5,6 +5,7 @@ import { AppShell, PageHeader } from '../../../components/app-shell';
 import { ErrorNote, Panel, Spinner } from '../../../components/ui';
 import { api, externalApiUrl } from '../../../lib/api';
 import { useAction, useApi } from '../../../lib/hooks';
+import { AssistantPagesConsent } from '../../../components/page-assistant';
 
 export default function McpPage() {
   return (
@@ -54,6 +55,8 @@ function McpSetup() {
       />
 
       {error && <ErrorNote message={error} />}
+
+      <AssistantPagesConsent />
 
       <div className="grid gap-6">
         {oauth?.enabled && (

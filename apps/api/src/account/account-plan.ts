@@ -92,6 +92,8 @@ export const ACCOUNT_PLAN: Record<string, CollectionRule> = {
   // ---- social
   social_profiles: owned,
   social_connections: { kind: 'custom', how: 'A row joins two people: every row naming the account is deleted.' },
+  page_assistant_actions: { kind: 'owned', field: 'pageId', export: false },
+  assistant_settings: noPerson('One row of app configuration: the assistant’s default caps.'),
   follows: { kind: 'custom', how: 'A row joins a follower and a page: every row naming the account, as either, is deleted.' },
   food_posts: { kind: 'custom', how: 'Own posts and reposts are deleted, with other people’s reposts, likes, comments and reports of them.' },
   post_likes: owned,
