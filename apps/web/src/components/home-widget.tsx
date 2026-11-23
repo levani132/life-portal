@@ -270,8 +270,11 @@ export function HomeWidget({
           </span>
           <span className="widget-title truncate">{card.title}</span>
           {card.key === 'nutrition' && (
-            <span className="widget-today shrink-0 text-xs font-normal text-ink-faint">
-              Today
+            <span
+              className="widget-today shrink-0 text-xs font-normal text-ink-faint"
+              title={nutrition?.fromPlans?.length ? `Targets from ${nutrition.fromPlans.join(', ')}` : undefined}
+            >
+              Today{nutrition?.fromPlans?.length ? ' · your plan' : ''}
             </span>
           )}
         </Link>

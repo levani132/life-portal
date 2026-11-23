@@ -20,6 +20,7 @@ import { GOAL_PLAN } from '@life-portal/shared-domain';
 import { api } from '../lib/api';
 import { useAction } from '../lib/hooks';
 import { Field, Input, Panel, Select } from './ui';
+import { todayLocal } from '../lib/local-day';
 
 const WEEKDAYS = [
   { value: 1, label: 'Mon' },
@@ -38,9 +39,12 @@ const WEEKDAYS = [
 export function NutritionSettings({
   profile,
   onSaved,
+  targetPlans = [],
 }: {
   profile: NutritionProfile;
   onSaved?: () => void;
+  /** Spec 043: followed plans whose daily rules set the targets. Choosing an app goal stops them. */
+  targetPlans?: { planId: string; name: string }[];
 }) {
   const { run, pending, error } = useAction();
 
@@ -120,6 +124,14 @@ export function NutritionSettings({
 
   const save = (updateExistingFoods = false) =>
     void run(async () => {
+      // Spec 043: the app's goal and a plan's daily targets cannot both apply. Choosing a goal is
+      // choosing the app's targets, so the plans that set them stop being followed, after asking.
+      if (goal !== profile.goal && targetPlans.length) {
+        const names = targetPlans.map((plan) => plan.name).join(', ');
+        if (!window.confirm(`Your daily targets come from ${names}. Choosing the app's goal stops following ${targetPlans.length === 1 ? 'it' : 'them'}; ${targetPlans.length === 1 ? 'it stays' : 'they stay'} in your meal plans. Go ahead?`))
+          return;
+        for (const plan of targetPlans) await api.delete(`/nutrition/meal-plans/${plan.planId}/follow?today=${todayLocal()}`);
+      }
       await api.put('/nutrition/profile', {
         sex: sex || null,
         heightCm: int(heightCm),
@@ -412,6 +424,11 @@ export function NutritionSettings({
             shown as recorded rather than estimated, and the modelled figure
             stays visible beside it.
           </p>
+          {targetPlans.length > 0 && (
+            <p className="mt-2 text-xs text-warning">
+              {targetPlans.map((plan) => plan.name).join(', ')} {targetPlans.length === 1 ? 'sets' : 'set'} your daily targets now; a plan’s number takes the place of an override here.
+            </p>
+          )}
           <div className="mt-3 grid gap-3 sm:grid-cols-4">
             <Field label="Calories">
               <Input

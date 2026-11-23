@@ -479,6 +479,19 @@ brand and unit, not archived) stands in for the post's in the plan, so nothing i
 with `copy` every food is copied (`MealPlansService.saveImported`), once per
 post. Nothing is logged.
 
+**Plans set the targets (spec 043, slice 2).** `NutritionService.withActivity`, the one funnel for
+targets (Food, the profile, Home's summary, sharing, the assistant), applies followed plans after
+activity: `followedRulesOn` (each plan's rules and its plan day's) → `combinePlanRules` →
+`applyPlanTargets`, which replaces the app's calories, protein, fat or carbs with what a daily rule
+aims at (recorded; an estimate when it rests on the weigh-in), works carbs out as the calories left
+when the plans moved the others but not carbs, makes targets available even when the app lacks
+inputs, and keeps the app's own numbers in `targets.plan.app`. A manual override yields to a plan.
+The week's history (`foodDays`) applies a plan only from the day it was followed. Food → You lists
+the plan rules and what the app would suggest; choosing an app goal while such a plan is followed
+asks, then stops following it. Home's card says "your plan" (`NutritionSummary.fromPlans`).
+`NutritionService` reads `meal_plans` by model name (`'MealPlanRecord'`), as the class import would
+be circular.
+
 **Rules (spec 043).** A rule is `{metric, scope, kind, basis, value | low+high, tolerancePct?}`:
 calories, protein, carbs or fat; the day or one meal; at least, at most, between or about (±%,
 default 10); an amount (kcal, mg), per kg of current weight, per kg of target weight

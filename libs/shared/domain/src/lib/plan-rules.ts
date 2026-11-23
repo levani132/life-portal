@@ -5,6 +5,8 @@ import {
   PLAN_RULE_METRICS,
   PLAN_RULE_SCOPES,
   type EntryTotals,
+  type NutritionTargets,
+  type TargetFigure,
   type PlanRule,
   type PlanRuleInput,
   type PlanRuleMetric,
@@ -277,4 +279,58 @@ export function planRuleConflicts(
     }
   }
   return found;
+}
+
+/**
+ * Daily targets with followed plans' rules applied (spec 043, slice 2). A plan's daily rule on
+ * calories or a macro replaces the app's number for it, as the number the rule aims at (its target,
+ * the middle of its range, else its one bound). When calories, protein or fat came from a plan and
+ * carbs did not, carbs are the calories left, as the app works them out. Rules that could not be
+ * resolved (no weigh-in, no target weight) leave the app's number. `plan.app` keeps the app's own.
+ */
+export function applyPlanTargets(targets: NutritionTargets, combined: readonly CombinedRule[]): NutritionTargets {
+  const daily = combined.filter((rule) => rule.scope === 'day' && !rule.missing && (rule.low !== undefined || rule.high !== undefined));
+  if (!daily.length) return targets;
+  const byMetric = new Map(daily.map((rule) => [rule.metric, rule]));
+  const names = (rule: CombinedRule) => [...new Set(rule.rules.map((each) => each.planName))];
+  const figure = (rule: CombinedRule, value: number): TargetFigure =>
+    rule.estimated ? { value, basis: `From ${names(rule).join(' and ')}, using your latest weigh-in or calorie estimate` } : { value, recorded: true };
+  const out: NutritionTargets = { ...targets };
+  const grams = (mg: number) => Math.round(mg / 1000);
+  const energy = byMetric.get('energy');
+  if (energy) out.energyKcal = figure(energy, Math.round(referenceOf(energy) as number));
+  for (const [metric, key] of [['protein', 'proteinG'], ['fat', 'fatG'], ['carb', 'carbG']] as const) {
+    const rule = byMetric.get(metric);
+    if (rule) out[key] = figure(rule, grams(referenceOf(rule) as number));
+  }
+  // Carbs as the calories left, when the plans moved the others and said nothing about carbs.
+  let carbFromRest = false;
+  if (!byMetric.has('carb') && (energy || byMetric.has('protein') || byMetric.has('fat')) && out.energyKcal && out.proteinG && out.fatG) {
+    const rest = Math.max(0, Math.round((out.energyKcal.value - 4 * out.proteinG.value - 9 * out.fatG.value) / 4));
+    out.carbG = { value: rest, basis: 'The calories left after protein and fat, under the plans you follow' };
+    carbFromRest = true;
+  }
+  out.available = true;
+  out.plan = {
+    rules: daily.map((rule) => {
+      const unit = (n: number | undefined) => (n === undefined ? undefined : rule.metric === 'energy' ? Math.round(n) : grams(n));
+      return {
+        metric: rule.metric,
+        ...(rule.low !== undefined ? { low: unit(rule.low) } : {}),
+        ...(rule.high !== undefined ? { high: unit(rule.high) } : {}),
+        ...(rule.target !== undefined ? { target: unit(rule.target) } : {}),
+        planNames: names(rule),
+        conflict: rule.conflict,
+        estimated: rule.estimated,
+      };
+    }),
+    app: {
+      ...(targets.energyKcal ? { energyKcal: Math.round(targets.energyKcal.value) } : {}),
+      ...(targets.proteinG ? { proteinG: Math.round(targets.proteinG.value) } : {}),
+      ...(targets.fatG ? { fatG: Math.round(targets.fatG.value) } : {}),
+      ...(targets.carbG ? { carbG: Math.round(targets.carbG.value) } : {}),
+    },
+    ...(carbFromRest ? { carbFromRest } : {}),
+  };
+  return out;
 }

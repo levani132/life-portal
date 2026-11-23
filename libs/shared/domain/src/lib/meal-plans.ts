@@ -13,9 +13,10 @@ import {
   type MealSlot,
   MEAL_PLAN_OPTIONS_MAX,
   type NutritionFacts,
+  type PlanRule,
 } from '@life-portal/shared-types';
 import { diffDays } from './dates';
-import { planRuleProblem } from './plan-rules';
+import { planRuleProblem, type SourcedRule } from './plan-rules';
 import { emptyTotals, entryTotals, sumTotals } from './nutrition';
 
 /** A food as a meal plan needs it: its name, unit and facts per 100. */
@@ -251,4 +252,30 @@ export function planDayAdherence(
     plannedKcal: counted.reduce((sum, line) => sum + line.totals.energyKcal, 0),
     eatenKcal: entries.filter((entry) => eaten.has(entry.id)).reduce((sum, entry) => sum + entry.totals.energyKcal, 0),
   };
+}
+
+/** A followed plan as the rules of a calendar day need it. */
+export interface FollowedPlanRules {
+  id: string;
+  name: string;
+  rules?: readonly PlanRule[];
+  days: readonly { id: string; rules?: readonly PlanRule[] }[];
+  activeSince: string;
+  dayChoices?: readonly { day: string; dayId: string }[] | null;
+}
+
+/**
+ * The rules that apply on a calendar day from the plans followed (spec 043): each plan's own,
+ * plus those of its plan day for that calendar day. With `fromStart`, a plan counts only from the
+ * day it was followed (for past days' targets); without, every followed plan counts.
+ */
+export function followedRulesOn(plans: readonly FollowedPlanRules[], day: string, fromStart = false): SourcedRule[] {
+  return plans
+    .filter((plan) => !fromStart || plan.activeSince <= day)
+    .flatMap((plan) => {
+      const planDay = plan.days.length
+        ? plan.days[activePlanDayIndex({ dayIds: plan.days.map((each) => each.id), since: plan.activeSince, day, choices: plan.dayChoices })]
+        : undefined;
+      return [...(plan.rules ?? []), ...(planDay?.rules ?? [])].map((rule) => ({ rule, planId: plan.id, planName: plan.name }));
+    });
 }

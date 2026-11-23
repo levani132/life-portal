@@ -12,7 +12,7 @@
 - [x] T020 Food options: a line may have up to five other options; any one meets it; logged by choice; shared and copied (a recipe option becomes the reader's recipe); the assistant can write them.
 
 ## Slice 2
-- [ ] T010 Daily rules override the app's targets everywhere; You says so; choosing an app goal warns and stops following.
+- [x] T010 Daily rules override the app's targets everywhere; You says so; choosing an app goal warns and stops following.
 
 ## Notes on slice 1 (built 2026-11-23)
 - Rules on posts and the assistant's `create_page_meal_plan` were brought forward from slice 5:

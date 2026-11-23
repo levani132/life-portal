@@ -2,6 +2,15 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-23: A plan's targets are your targets
+
+- When a plan you follow sets daily calories or macros, **those are your targets everywhere**:
+  Food, Home's card ("Today · your plan"), Food → You and what you share. Carbs fill the
+  calories left when a plan sets the others.
+- Food → You shows which plan each number comes from and what the app would suggest.
+- Choosing one of the app's goals while such a plan is followed asks first, then stops following
+  it. Stop following the plan to go back to the app's targets.
+
 ## 2026-11-23: Food options in plans
 
 - **"This, or that"**: a plan line can have up to five options ("chicken, or pork, or tofu"),

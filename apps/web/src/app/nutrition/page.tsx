@@ -350,6 +350,9 @@ function Nutrition() {
               key={profile.updatedAt}
               profile={profile}
               onSaved={refresh}
+              targetPlans={plans
+                .filter((plan) => plan.rules.some((rule) => rule.scope === 'day'))
+                .map((plan) => ({ planId: plan.planId, name: plan.name }))}
             />
             <WeighInPanel
               weighIns={data.weighIns}
@@ -1491,11 +1494,43 @@ function TargetsPanel({ targets }: { targets: NutritionTargets }) {
     { label: 'Fibre', figure: targets.fibreG, unit: 'g' },
   ];
 
+  const plan = targets.plan;
+  const metricLabel = { energy: 'Calories', protein: 'Protein', carb: 'Carbs', fat: 'Fat' } as const;
+  const appValue = { energy: plan?.app.energyKcal, protein: plan?.app.proteinG, carb: plan?.app.carbG, fat: plan?.app.fatG } as const;
+  const limit = (rule: NonNullable<typeof plan>['rules'][number]) => {
+    const unit = rule.metric === 'energy' ? 'kcal' : 'g';
+    const f = (n: number) => `${n.toLocaleString('en-GB')} ${unit}`;
+    if (rule.target !== undefined) return `about ${f(rule.target)}`;
+    if (rule.low !== undefined && rule.high !== undefined) return rule.conflict ? `at least ${f(rule.low)} and at most ${f(rule.high)}` : `${rule.low}–${f(rule.high)}`;
+    return rule.low !== undefined ? `at least ${f(rule.low)}` : `at most ${f(rule.high as number)}`;
+  };
   return (
     <Panel
       title="Your targets"
       description="Every figure says where it came from. Hover the mark to see the equation and its inputs."
     >
+      {/* Spec 043: daily rules from followed plans replace the app's own numbers. */}
+      {plan && (
+        <div className="mb-3 rounded-xl border border-accent/30 bg-accent-solid/5 p-3">
+          <p className="text-sm font-semibold">From plans you follow</p>
+          <ul className="mt-1 space-y-1 text-sm">
+            {plan.rules.map((rule) => (
+              <li key={rule.metric} className={rule.conflict ? 'text-danger' : undefined}>
+                {metricLabel[rule.metric]}: {limit(rule)} <span className="text-ink-faint">· {rule.planNames.join(', ')}</span>
+                {appValue[rule.metric] !== undefined && (
+                  <span className="text-ink-faint">
+                    {' '}
+                    (the app would suggest {appValue[rule.metric]?.toLocaleString('en-GB')} {rule.metric === 'energy' ? 'kcal' : 'g'})
+                  </span>
+                )}
+                {rule.conflict && <span> · your plans disagree here</span>}
+              </li>
+            ))}
+          </ul>
+          {plan.carbFromRest && <p className="mt-1 text-xs text-ink-faint">Carbs are the calories left after protein and fat.</p>}
+          <p className="mt-1 text-xs text-ink-faint">Stop following them in Food → Today to go back to the app’s targets.</p>
+        </div>
+      )}
       <dl className="divide-y divide-border">
         {rows.map((row) =>
           row.figure == null ? null : (

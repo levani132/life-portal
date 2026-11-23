@@ -1,5 +1,5 @@
 import type { PlanRule } from '@life-portal/shared-types';
-import { combinePlanRules, describePlanRule, planRuleConflicts, planRuleProblem, planRuleStatus, resolvePlanRule } from './plan-rules';
+import { applyPlanTargets, combinePlanRules, describePlanRule, planRuleConflicts, planRuleProblem, planRuleStatus, resolvePlanRule } from './plan-rules';
 
 const rule = (over: Partial<PlanRule>): PlanRule => ({ id: 'r', metric: 'protein', scope: 'day', kind: 'atLeast', basis: 'amount', value: 150_000, ...over });
 
@@ -85,5 +85,44 @@ describe('planRuleConflicts', () => {
     expect(planRuleConflicts(followed, next, {})).toEqual([
       { metric: 'energy', scope: 'day', ours: 'At least 2,000 kcal a day', theirs: 'At most 1,000 kcal a day', theirPlan: 'Cut' },
     ]);
+  });
+});
+
+describe('applyPlanTargets (spec 043)', () => {
+  const app = {
+    available: true,
+    missingInputs: [],
+    energyKcal: { value: 2400, basis: 'app' },
+    proteinG: { value: 160, basis: 'app' },
+    fatG: { value: 70, basis: 'app' },
+    carbG: { value: 282, basis: 'app' },
+  };
+  const sourced = (planName: string, over: Partial<PlanRule>) => ({ planId: planName, planName, rule: rule(over) });
+  it('leaves the app’s targets alone with no daily rule', () => {
+    expect(applyPlanTargets(app, combinePlanRules([sourced('A', { scope: 'breakfast', value: 30_000 })], {}))).toBe(app);
+  });
+  it('replaces what a plan sets, works carbs out as the rest, and keeps the app’s numbers', () => {
+    const out = applyPlanTargets(app, combinePlanRules([sourced('Cut', { metric: 'energy', kind: 'atMost', value: 2000 }), sourced('Protein', { value: 180_000 })], {}));
+    expect(out.energyKcal).toEqual({ value: 2000, recorded: true });
+    expect(out.proteinG).toEqual({ value: 180, recorded: true });
+    expect(out.fatG).toEqual(app.fatG);
+    // 2,000 − 4 × 180 − 9 × 70 = 650 kcal = 162.5 g.
+    expect(out.carbG?.value).toBe(163);
+    expect(out.plan).toMatchObject({
+      rules: [
+        { metric: 'energy', high: 2000, planNames: ['Cut'], conflict: false },
+        { metric: 'protein', low: 180, planNames: ['Protein'] },
+      ],
+      app: { energyKcal: 2400, proteinG: 160, fatG: 70, carbG: 282 },
+      carbFromRest: true,
+    });
+  });
+  it('labels a number worked out from a weigh-in as an estimate', () => {
+    const out = applyPlanTargets(app, combinePlanRules([sourced('Per kg', { basis: 'perKg', value: 2000 })], { weightGrams: 80_000 }));
+    expect(out.proteinG).toMatchObject({ value: 160, basis: expect.stringContaining('Per kg') });
+  });
+  it('makes targets available from plans even when the app has too little to go on', () => {
+    const out = applyPlanTargets({ available: false, missingInputs: ['sex'] }, combinePlanRules([sourced('A', { metric: 'energy', kind: 'about', value: 1800 })], {}));
+    expect([out.available, out.energyKcal?.value]).toEqual([true, 1800]);
   });
 });

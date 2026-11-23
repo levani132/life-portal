@@ -253,6 +253,49 @@ describe('meal plans', () => {
     expect(copied?.options?.[1].savedMealId).toBeTruthy();
   });
 
+  it('lets followed plans’ daily rules replace the app’s targets everywhere (spec 043, slice 2)', async () => {
+    const ana = await api.account('ana');
+    // Enough for the app to work out its own targets.
+    await api.call(ana, 'PUT', '/nutrition/profile', { sex: 'male', heightCm: 180, birthDate: '1990-01-01', goal: 'maintain' });
+    await api.call(ana, 'PUT', '/nutrition/weigh-ins?today=2026-07-02', { day: '2026-07-01', weightGrams: 80_000 });
+    type Targets = { targets: { energyKcal?: { value: number; recorded?: true; basis?: string }; proteinG?: { value: number }; carbG?: { value: number; basis?: string }; plan?: { rules: { metric: string; planNames: string[] }[]; app: { energyKcal?: number }; carbFromRest?: boolean } } };
+    const targets = async () => (await api.call<Targets>(ana, 'GET', '/nutrition/profile?today=2026-07-02')).body.targets;
+    const before = await targets();
+    expect(before.plan).toBeUndefined();
+    const appKcal = before.energyKcal?.value as number;
+    expect(appKcal).toBeGreaterThan(0);
+
+    const plan = (
+      await api.call<MealPlan>(ana, 'POST', '/nutrition/meal-plans', {
+        name: 'Cut',
+        rules: [
+          { metric: 'energy', scope: 'day', kind: 'atMost', basis: 'amount', value: 1900 },
+          { metric: 'protein', scope: 'day', kind: 'atLeast', basis: 'perKg', value: 2000 },
+          { metric: 'protein', scope: 'breakfast', kind: 'atLeast', basis: 'amount', value: 30_000 },
+        ],
+        days: [],
+      })
+    ).body;
+    await api.call(ana, 'PUT', `/nutrition/meal-plans/${plan.id}/follow`, { today: '2026-07-02' });
+    const after = await targets();
+    expect(after.energyKcal).toEqual({ value: 1900, recorded: true });
+    // 2 g per kg of the 80 kg weigh-in: an estimate, because it rests on the weigh-in.
+    expect(after.proteinG?.value).toBe(160);
+    expect(after.carbG?.basis).toMatch(/calories left/);
+    expect(after.plan).toMatchObject({ app: { energyKcal: Math.round(appKcal) }, carbFromRest: true });
+    expect(after.plan?.rules.map((rule) => [rule.metric, rule.planNames])).toEqual([['energy', ['Cut']], ['protein', ['Cut']]]);
+
+    // The same numbers on Home and in Food.
+    const summary = (await api.call<{ targetKcal?: number; proteinTargetG?: number; fromPlans?: string[] }>(ana, 'GET', '/nutrition/summary?today=2026-07-02')).body;
+    expect(summary).toMatchObject({ targetKcal: 1900, proteinTargetG: 160, fromPlans: ['Cut'] });
+    const overview = (await api.call<{ targets: { energyKcal?: { value: number } } }>(ana, 'GET', '/nutrition?today=2026-07-02')).body;
+    expect(overview.targets.energyKcal?.value).toBe(1900);
+
+    // Stopping goes back to the app's own.
+    await api.call(ana, 'DELETE', `/nutrition/meal-plans/${plan.id}/follow?today=2026-07-02`);
+    expect((await targets()).energyKcal?.value).toBe(appKcal);
+  });
+
   it('keeps a target weight on the profile', async () => {
     const ana = await api.account('ana');
     expect((await api.call(ana, 'PUT', '/nutrition/profile', { targetWeightGrams: 75_000 })).status).toBeLessThan(300);

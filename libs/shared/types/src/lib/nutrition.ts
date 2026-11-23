@@ -406,6 +406,29 @@ export interface NutritionTargets {
   goalNote?: string;
   weightGrams?: number;
   weighInDay?: IsoDate;
+  /**
+   * Spec 043: present when followed plans set daily targets. Their numbers replace the app's in
+   * `energyKcal`, `proteinG`, `fatG` and `carbG`; `app` keeps what the app worked out.
+   */
+  plan?: PlanTargets;
+}
+
+/** Daily targets that come from followed plans (spec 043). */
+export interface PlanTargets {
+  rules: {
+    metric: PlanRuleMetric;
+    /** In kcal, or g for a macro. */
+    low?: number;
+    high?: number;
+    target?: number;
+    planNames: string[];
+    conflict: boolean;
+    estimated: boolean;
+  }[];
+  /** The app's own targets, for "the app would suggest". */
+  app: { energyKcal?: number; proteinG?: number; fatG?: number; carbG?: number };
+  /** Carbs were not set by a plan and were worked out as the calories left. */
+  carbFromRest?: boolean;
 }
 
 // ------------------------------------------------------------------ week and cheat day
@@ -525,6 +548,8 @@ export interface NutritionSummary {
   goal: NutritionGoal;
   nextCheatDay?: IsoDate;
   daysUntilCheat?: number;
+  /** Spec 043: the plans the targets come from, when any. */
+  fromPlans?: string[];
 }
 
 /** Everything the detail page renders, in one round trip. */

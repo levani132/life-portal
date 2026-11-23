@@ -1,5 +1,5 @@
 import type { MealPlanDay, MealPlanInput } from '@life-portal/shared-types';
-import { activePlanDayIndex, matchPlanDay, mealPlanProblem, planDayAdherence, planLineSlots, planSlotsLabel, mealPlanView, type PlanFood, type PlanRecipe } from './meal-plans';
+import { activePlanDayIndex, followedRulesOn, matchPlanDay, mealPlanProblem, planDayAdherence, planLineSlots, planSlotsLabel, mealPlanView, type PlanFood, type PlanRecipe } from './meal-plans';
 
 const food = (name: string, kcal: number, proteinMg: number, extra: Partial<PlanFood> = {}): PlanFood =>
   ({ name, unit: 'g', energyKcalPer100: kcal, proteinMgPer100: proteinMg, fatMgPer100: 0, carbMgPer100: 0, ...extra }) as PlanFood;
@@ -190,5 +190,18 @@ describe('matchPlanDay (spec 042)', () => {
     ];
     const entries = [{ ...entry('e1', 'lunch', 'rice'), totals: { energyKcal: 300 } }, { ...entry('e2', 'lunch', 'cake'), totals: { energyKcal: 400 } }];
     expect(planDayAdherence(lines, entries)).toEqual({ planned: 2, followed: 1, plannedKcal: 410, eatenKcal: 300 });
+  });
+});
+
+describe('followedRulesOn (spec 043)', () => {
+  const rule = (id: string) => ({ id, metric: 'protein' as const, scope: 'day' as const, kind: 'atLeast' as const, basis: 'amount' as const, value: 1000 });
+  const plan = { id: 'p', name: 'P', activeSince: '2026-11-23', rules: [rule('every')], days: [{ id: 'a', rules: [rule('a')] }, { id: 'b' }] };
+  it('takes the plan’s rules and its plan day’s', () => {
+    expect(followedRulesOn([plan], '2026-11-23').map((each) => each.rule.id)).toEqual(['every', 'a']);
+    expect(followedRulesOn([plan], '2026-11-24').map((each) => each.rule.id)).toEqual(['every']);
+  });
+  it('counts a plan only from the day it was followed, when asked to', () => {
+    expect(followedRulesOn([plan], '2026-11-20', true)).toEqual([]);
+    expect(followedRulesOn([plan], '2026-11-20')).toHaveLength(1);
   });
 });

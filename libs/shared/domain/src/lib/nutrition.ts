@@ -1148,6 +1148,8 @@ export function summariseNutrition(input: {
   ] as const) {
     if (figure && !isRecorded(figure)) summary.targetBasis[key] = figure.basis;
   }
+  // Spec 043: say which plans the targets come from.
+  if (input.targets.plan) summary.fromPlans = [...new Set(input.targets.plan.rules.flatMap((rule) => rule.planNames))];
   if (input.cheat?.nextDay) {
     summary.nextCheatDay = input.cheat.nextDay;
     summary.daysUntilCheat = input.cheat.daysUntil;

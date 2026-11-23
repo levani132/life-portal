@@ -1,5 +1,15 @@
 import { HealthService } from './health.service';
-import { activityTargets } from '@life-portal/shared-domain';
+import { activityTargets, applyPlanTargets, combinePlanRules, followedRulesOn, type FollowedPlanRules } from '@life-portal/shared-domain';
+import type { PlanRule } from '@life-portal/shared-types';
+
+/** The fields of a followed meal plan these targets read. */
+interface FollowedPlanRow {
+  name: string;
+  rules?: PlanRule[];
+  days?: { id: string; rules?: PlanRule[] }[];
+  activeSince?: string;
+  dayChoices?: { day: string; dayId: string }[];
+}
 import type { SharedFoodDiary, SharedStat } from '@life-portal/shared-types';
 import { SocialGraphService } from '../social-graph/social-graph.module';
 import {
@@ -57,6 +67,7 @@ import {
   weekBalance,
   weekEnd,
   weekStart,
+  isRecorded,
 } from '@life-portal/shared-domain';
 import { BrandsService } from './brands';
 import { OpenFoodFactsProvider } from './openfoodfacts.provider';
@@ -136,7 +147,45 @@ export class NutritionService {
     private readonly media: MediaService,
     // Optional so the many tests that build this service by hand need not supply it.
     @Optional() private readonly brands?: BrandsService,
+    /**
+     * Spec 043: followed meal plans, read for their daily rules. By name, not by class: the meal
+     * plans file imports this service, and the class would make the import circular.
+     */
+    @Optional() @InjectModel('MealPlanRecord') private readonly mealPlans?: Model<FollowedPlanRow>,
   ) {}
+
+  /** The plans followed, as their rules need them. */
+  private async followedPlans(userId: string): Promise<FollowedPlanRules[]> {
+    if (!this.mealPlans) return [];
+    const rows = await this.mealPlans
+      .find({ userId, activeSince: { $type: 'string' } })
+      .select('name rules days.id days.rules activeSince dayChoices')
+      .lean();
+    return rows.map((row) => ({
+      id: String(row._id),
+      name: row.name,
+      rules: row.rules ?? [],
+      days: row.days ?? [],
+      activeSince: row.activeSince as string,
+      dayChoices: row.dayChoices,
+    }));
+  }
+
+  /**
+   * Spec 043: targets with the daily rules of followed plans applied. A plan's number replaces the
+   * app's for what it sets; shares of the day are taken of the plans' calories, else the app's.
+   */
+  private applyPlans(targets: NutritionTargets, profile: NutritionProfileDto, plans: FollowedPlanRules[], day: string, fromStart = false): NutritionTargets {
+    const sourced = followedRulesOn(plans, day, fromStart);
+    if (!sourced.length) return targets;
+    const combined = combinePlanRules(sourced, {
+      weightGrams: targets.weightGrams,
+      targetWeightGrams: profile.targetWeightGrams,
+      dayEnergyKcal: targets.energyKcal?.value,
+      dayEnergyEstimated: !!targets.energyKcal && !isRecorded(targets.energyKcal),
+    });
+    return applyPlanTargets(targets, combined);
+  }
 
   /** A food's brand as it is stored: an existing brand's own name, or a new brand of the person's. */
   private brandFor(userId: string, text: string | undefined): Promise<string | undefined> {
@@ -708,17 +757,22 @@ export class NutritionService {
         (eaten.get(row.day) ?? 0) + entryTotals(row.amount, row.facts).energyKcal,
       );
     }
-    const [profile, weighIns] = await Promise.all([
+    const [profile, weighIns, plans] = await Promise.all([
       this.profile(userId),
       this.listWeighIns(userId),
+      this.followedPlans(userId),
     ]);
     const cache = new Map<string, number | undefined>();
     let pointer = -1;
     const days = [...eaten.keys()].sort().map((day): FoodDayFacts => {
       while (pointer + 1 < weighIns.length && weighIns[pointer + 1].day <= day) pointer += 1;
-      const key = `${pointer}|${profile.birthDate ? ageOn(profile.birthDate, day) : ''}`;
+      // Spec 043: a plan counts for a past day only from the day it was followed, and its plan
+      // day depends on the date, so days under plans are not shared through the cache.
+      const planned = followedRulesOn(plans, day, true).length > 0;
+      const key = planned ? `plan|${day}` : `${pointer}|${profile.birthDate ? ageOn(profile.birthDate, day) : ''}`;
       if (!cache.has(key)) {
-        const targets = nutritionTargets({ profile, weighIns, today: day });
+        const app = nutritionTargets({ profile, weighIns, today: day });
+        const targets = planned ? this.applyPlans(app, profile, plans, day, true) : app;
         cache.set(key, targets.available ? targets.energyKcal?.value : undefined);
       }
       const targetKcal = cache.get(key);
@@ -828,8 +882,8 @@ export class NutritionService {
     profile: NutritionProfileDto,
     day: string,
   ) {
-    const health = await this.health.data(userId, day);
-    return activityTargets(
+    const [health, plans] = await Promise.all([this.health.data(userId, day), this.followedPlans(userId)]);
+    const withActivity = activityTargets(
       targets,
       profile,
       day,
@@ -837,6 +891,8 @@ export class NutritionService {
       new Date().toISOString(),
       health?.lastSync,
     );
+    // Spec 043: followed plans' daily rules replace the app's numbers, after activity.
+    return this.applyPlans(withActivity, profile, plans, day);
   }
 
   async targets(userId: string, today: string): Promise<NutritionTargets> {
