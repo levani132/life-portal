@@ -17,7 +17,8 @@
     "test:integration": "jest -c integration/jest.config.cjs --runInBand",
     "lint": "npx nx run-many -t lint",
     "typecheck": "npx tsc -p apps/api/tsconfig.app.json --noEmit && npx tsc -p apps/web/tsconfig.json --noEmit && npx tsc -p integration/tsconfig.json",
-    "check": "npm run typecheck && npm run lint && npm test"
+    "check": "npm run typecheck && npm run lint && npm test",
+    "test:e2e": "cd e2e && npx playwright test"
   },
   "private": true,
   "// engines": "Pinned to 22 LTS and duplicated in .node-version. Node 24 ships OpenSSL 3.5, whose stricter default security level makes the TLS handshake against a MongoDB Atlas shared-tier cluster fail with `tlsv1 alert internal error` (SSL alert 80). Render defaults to the newest Node when nothing pins it.",
@@ -40,6 +41,7 @@
     "@nx/web": "22.3.1",
     "@nx/webpack": "22.3.1",
     "@nx/workspace": "22.3.1",
+    "@playwright/test": "^1.63.0",
     "@swc-node/register": "~1.9.1",
     "@swc/cli": "~0.6.0",
     "@swc/core": "~1.5.7",

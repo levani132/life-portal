@@ -52,3 +52,8 @@ out
 # Secrets
 .env
 .env.local
+
+# Screen tests (e2e/): outputs of a run
+e2e/screenshots/
+e2e/report/
+e2e/results/
