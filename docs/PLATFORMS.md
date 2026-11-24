@@ -17,7 +17,7 @@ Last reviewed: 2026-11-22.
 |---|---|---|---|---|
 | **Vercel** | Web hosting | Serves the web app at `lifeportal.one` and forwards `/api` to the server | Hobby, free (does not allow commercial use: upgrade before charging money) | `apps/web/vercel.json`, `docs/runbooks/web-api-proxy.md` |
 | **Vercel Domains** | Domain registrar and DNS | Owns `lifeportal.one` (and `life-portal.one`, if bought, as a redirect) and holds every DNS record | About $21 a year per domain, auto-renew on | Vercel → Domains |
-| **Render** | Server hosting | Runs the API (`life-portal.onrender.com`, Frankfurt). All server settings and keys are in its Environment page | Free (sleeps when idle) | `render.yaml`, `.env.example` |
+| **Render** | Server hosting | Runs the API (`life-portal.onrender.com`, Frankfurt), plan `0.5c-512mb`. All server settings and keys are in its Environment page. `NODE_OPTIONS=--max-old-space-size=400` lets Node use most of the 512 MB (its default stopped at about 256 MB, where it crashed on 2026-11-23) | Free (sleeps when idle) | `render.yaml`, `.env.example` |
 | **MongoDB Atlas** | Database | Every record the app stores | M0, free, 512 MB | `MONGODB_URI` on Render |
 | **Cloudflare R2** | File storage | Photos and videos, private, read through expiring links | Free tier | `R2_*` on Render; the bucket's CORS rule lists the web addresses (`docs/modules/posts.md`) |
 | **GitHub** | Code and checks | The repository, and the checks that run on every push | Free | `.github/workflows` |
