@@ -266,11 +266,19 @@ its own (`handleStateless`: a server and transport for that request, closed with
 mid-run. A session that belongs to another account is still a 404. Tools keep no session state,
 so nothing is lost.
 
-### A full session table (2026-11-23)
+### A small session table (2026-11-23)
 
-The server holds at most 100 sessions. It used to refuse a new one with 503 `Too many sessions`
-once full, and a session only left the table after 30 idle minutes with no stream open. ChatGPT
-keeps a listening stream (GET) open, so its sessions never left, and with five workers the table
-filled during a day: every new connection was refused, which ChatGPT shows as `-32603`, for
-every worker at once. Now a new session evicts the longest-idle one (sessions with no open stream
-first). A later call on the evicted session is answered statelessly, as after a restart.
+Each session holds its own MCP server with every tool registered: about 3 MB of heap, measured.
+The table used to hold up to 100 sessions, cleared only after 30 idle minutes with no stream open,
+and ChatGPT keeps a listening stream (GET) open, so its sessions never left. With five workers
+that is up to 300 MB on a 512 MB instance: the server ran out of memory and restarted, and when
+the table was full it refused new sessions with 503. Either way ChatGPT showed `-32603` to every
+worker at once.
+
+Now the table holds at most `MAX_SESSIONS` (10), idle ones leave after 5 minutes, and a new
+session evicts the longest-idle one (sessions with no open stream first). A request for a
+session the server does not hold, from a signed-in account, is answered statelessly: a POST runs
+on a server made for it, a GET gets 405 (no listening stream, which clients accept) and a DELETE
+200. Another account's session is still a 404. Checked with fifteen simulated workers on one
+account through the real API: every call answered.
+

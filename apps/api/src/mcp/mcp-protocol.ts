@@ -17,8 +17,13 @@ interface McpSession {
   lastActive: number;
 }
 
-const IDLE_MS = 30 * 60_000; // 30 minutes
-const MAX_SESSIONS = 100;
+const IDLE_MS = 5 * 60_000; // 5 minutes
+/**
+ * Each session holds its own server with every tool registered: about 3 MB. The production
+ * instance has 512 MB, and 100 sessions (the old cap) crashed it while five workers ran. A call on
+ * a session that is not held is answered on its own, so a small table costs nothing.
+ */
+export const MAX_SESSIONS = 10;
 
 /** Active sessions by session ID. */
 const sessions = new Map<string, McpSession>();
@@ -535,7 +540,19 @@ export async function handleMcpRequest(
       }
 
       const session = sessions.get(sessionId);
-      if (!session || session.userId !== userId) {
+      if (!session) {
+        // A session this server no longer holds (evicted or restarted), for a signed-in caller:
+        // there is no stream to resume and nothing to end. Answer as a stateless server does
+        // (GET: no listening stream, 405), so the client carries on with its calls.
+        if (method === 'GET') {
+          res.writeHead(405, { Allow: 'POST, DELETE', 'Content-Type': 'text/plain' });
+          res.end('No listening stream for this session');
+        } else {
+          res.writeHead(200).end();
+        }
+        return;
+      }
+      if (session.userId !== userId) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32001, message: 'Session not found' }, id: null }));
         return;

@@ -1,7 +1,7 @@
 import type { Server } from 'node:http';
 import express from 'express';
 import type { NutritionService } from '../nutrition/nutrition.service';
-import { handleMcpRequest, mcpSessionCount } from './mcp-protocol';
+import { handleMcpRequest, MAX_SESSIONS, mcpSessionCount } from './mcp-protocol';
 
 // Use the real Streamable HTTP transport to verify session IDs cannot bypass authentication.
 describe('MCP transport authentication', () => {
@@ -80,14 +80,18 @@ describe('MCP transport authentication', () => {
     expect(profile).toHaveBeenCalledWith('owner-1');
     // Still never without a credential.
     expect((await rpc(call, undefined, 'a-session-from-before-a-restart')).status).toBe(401);
+    // No listening stream to resume, and nothing to end: answered like a stateless server.
+    expect((await rpc({}, 'owner-token', 'a-session-from-before-a-restart', 'GET')).status).toBe(405);
+    expect((await rpc({}, 'owner-token', 'a-session-from-before-a-restart', 'DELETE')).status).toBe(200);
+    expect((await rpc({}, undefined, 'a-session-from-before-a-restart', 'GET')).status).toBe(401);
   });
   it('makes room when full instead of refusing a new session, and still answers the evicted one', async () => {
     const first = await session();
-    for (let i = mcpSessionCount(); i < 100; i++) await session();
-    expect(mcpSessionCount()).toBe(100);
+    for (let i = mcpSessionCount(); i < MAX_SESSIONS; i++) await session();
+    expect(mcpSessionCount()).toBe(MAX_SESSIONS);
     // One more: answered, not 503, and the oldest session made room.
     await session();
-    expect(mcpSessionCount()).toBe(100);
+    expect(mcpSessionCount()).toBe(MAX_SESSIONS);
     const call = await rpc({ jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'get_profile', arguments: {} } }, 'owner-token', first);
     expect(call.status).toBe(200);
     expect(await call.text()).toContain('maintain');
