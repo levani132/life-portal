@@ -31,3 +31,24 @@ test('holding the profile tab opens "Using the app as"', async ({ page }) => {
   await expect(page).toHaveURL(/localhost:4200\/(\?.*)?$/);
   await snap(page, '06-identity-sheet');
 });
+
+test('Menu → Pages shows when the assistant will post', async ({ page }) => {
+  const ana = await account('Ana');
+  await call(ana, 'PUT', '/pages/assistant', { enabled: true });
+  const { token } = await call<{ token: string }>(ana, 'POST', '/mcp/token');
+  const tool = async (name: string, args: Record<string, unknown>) => {
+    const response = await fetch('http://localhost:3333/api/mcp/call', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, tool: name, arguments: args }) });
+    return (await response.json()) as { result: Record<string, unknown> };
+  };
+  const pageId = String((await tool('create_page', { name: 'E2E Robot Kitchen', username: `e2e-robot-${randomUUID().slice(0, 6)}` })).result['id']);
+  const at = (hours: number) => new Date(Date.now() + hours * 3_600_000).toISOString();
+  await tool('create_page_post', { pageId, title: 'Greek yogurt and oat bowl', caption: 'A breakfast that keeps you full until lunch.', at: at(2) });
+  await tool('create_page_post', { pageId, caption: 'Three mistakes people make with lentils, and the fix for each.', at: at(26) });
+  await signIn(page, ana);
+  await page.goto('/settings/pages');
+  await expect(page.getByText('Coming up')).toBeVisible();
+  await expect(page.getByText('Greek yogurt and oat bowl')).toBeVisible();
+  await expect(page.getByText(/Three mistakes people make/)).toBeVisible();
+  await page.getByText('Coming up').scrollIntoViewIfNeeded();
+  await snap(page, '06-coming-up');
+});

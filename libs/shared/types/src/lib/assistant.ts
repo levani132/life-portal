@@ -55,6 +55,28 @@ export interface AssistantScheduledAction {
   error?: string;
 }
 
+/**
+ * One waiting (or recently failed) action on the managers' timeline: which page, when, what, and
+ * the first words of a post, comment or reply. Only ever shown to that page's managers.
+ */
+export interface AssistantUpcomingItem extends AssistantScheduledAction {
+  pageId: string;
+  pageName: string;
+  pageUsername: string;
+  avatarUrl?: string;
+  /** Title or text, cut to 140 characters. Absent for likes, reposts and follows. */
+  preview?: string;
+  /** How many photos a post carries. */
+  photos?: number;
+  /** What a post carries from the library: food, recipe, meal plan, training plan. */
+  attaches?: ('food' | 'recipe' | 'meal plan' | 'training plan')[];
+}
+
+export interface AssistantUpcoming {
+  /** Pending and running, soonest first, then failed in the last day. */
+  items: AssistantUpcomingItem[];
+}
+
 /** How far ahead an action may be scheduled, and how far when it carries photos. */
 export const ASSISTANT_SCHEDULE_MAX_DAYS = 7;
 export const ASSISTANT_SCHEDULE_MEDIA_MAX_HOURS = 20;

@@ -5,7 +5,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { ObjectId } from 'mongodb';
-import type { AssistantActivity, MyPages, PageSummary } from '@life-portal/shared-types';
+import type { AssistantActivity, AssistantUpcoming, MyPages, PageSummary } from '@life-portal/shared-types';
 import { startApi, type Account, type TestApi } from './harness';
 
 let api: TestApi;
@@ -223,6 +223,20 @@ describe('the assistant for pages', () => {
     expect(await api.db.collection('food_posts').countDocuments({ userId: pageId })).toBe(0);
     expect((await call('cancel_scheduled_action', { pageId, actionId: dropped.body.result?.['actionId'] })).status).toBeLessThan(300);
 
+    // The managers' timeline: soonest first, with the first words; nobody else sees or cancels it.
+    const timeline = await api.call<AssistantUpcoming>(ana, 'GET', '/page-assistant/upcoming');
+    expect(timeline.body.items.map((item) => [item.tool, item.pageName, item.preview])).toEqual([
+      ['create_page_post', 'Robot later', 'Published on time'],
+      ['like_post', 'Robot later', undefined],
+      ['comment_on_post', 'Robot later', 'Later comment'],
+    ]);
+    expect((await api.call<AssistantUpcoming>(beka, 'GET', '/page-assistant/upcoming')).body.items.some((item) => item.pageId === pageId)).toBe(false);
+    const likeId = String(like.body.result?.['actionId']);
+    expect((await api.call(beka, 'DELETE', `/page-assistant/scheduled/${likeId}`)).status).toBe(404);
+    expect((await api.call(ana, 'DELETE', `/page-assistant/scheduled/${String(dropped.body.result?.['actionId'])}`)).status).toBe(409);
+    const extra = await call('like_post', { pageId, postId: theirs, at: inMinutes(46) });
+    expect((await api.call(ana, 'DELETE', `/page-assistant/scheduled/${String(extra.body.result?.['actionId'])}`)).status).toBe(200);
+
     const { PageAssistantService } = await import('../apps/api/src/mcp/page-assistant');
     const assistant = api.app.get(PageAssistantService);
     // Nothing is due yet; half an hour on, only the post is.
@@ -245,7 +259,7 @@ describe('the assistant for pages', () => {
     const listed = (await call('list_scheduled_actions', { pageId })).body.result as unknown as { tool: string; status: string; error?: string }[];
     expect(listed.filter((row) => row.status === 'done')).toHaveLength(3);
     expect(listed.find((row) => row.status === 'failed')?.error).toContain('PAGE_DISABLED');
-    expect(listed.find((row) => row.status === 'cancelled')?.tool).toBe('follow_page');
+    expect(listed.filter((row) => row.status === 'cancelled').map((row) => row.tool).sort()).toEqual(['follow_page', 'like_post']);
     expect(await api.db.collection('food_posts').countDocuments({ userId: pageId })).toBe(1);
 
     const activity = await api.call<AssistantActivity>(ana, 'GET', `/page-assistant/activity/${pageId}`);

@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-24: When your pages will post
+
+- Menu → All pages at a glance now has **Coming up**: everything the assistant has scheduled across
+  your pages, by day and time, with the first words of each post or comment, its photos and what
+  it attaches. Anything waiting can be cancelled, and what failed in the last day is listed below.
+
 ## 2026-11-23: Many assistants at once
 
 - Several workers running at the same time no longer start failing with "Internal error" after a

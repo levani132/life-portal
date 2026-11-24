@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import type { AssistantOverview, AssistantPageStatus, PortalState } from '@life-portal/shared-types';
+import { useState } from 'react';
+import type { AssistantOverview, AssistantPageStatus, AssistantUpcoming, AssistantUpcomingItem, PortalState } from '@life-portal/shared-types';
 import { AppShell, PageHeader } from '../../../components/app-shell';
 import { Avatar } from '../../../components/avatar';
 import { OfficialMark } from '../../../components/follow';
@@ -71,6 +72,8 @@ function PagesOverview() {
         </div>
       )}
       {action.error && <ErrorNote message={action.error} />}
+      <ComingUp />
+      <h2 className="mb-2 text-sm font-semibold">Pages</h2>
       {pages.length === 0 ? (
         <p className="text-sm text-ink-muted">You have no pages yet.</p>
       ) : (
@@ -112,5 +115,120 @@ function Figure({ label, value, bad = false }: { label: string; value: number; b
       <p className="text-xs text-ink-muted">{label}</p>
       <p className={`text-xl font-semibold ${bad ? 'text-danger' : 'text-ink'}`}>{value.toLocaleString()}</p>
     </div>
+  );
+}
+
+/** What each waiting action will do, in words. */
+const DOES: Record<string, string> = {
+  create_page_post: 'Post',
+  publish_page_draft: 'Publish a draft',
+  comment_on_post: 'Comment',
+  reply_in_conversation: 'Message reply',
+  like_post: 'Like a post',
+  repost_post: 'Repost',
+  follow_page: 'Follow a page',
+};
+
+const dayLabel = (at: Date, now: Date) => {
+  const day = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const diff = Math.round((day(at) - day(now)) / 86_400_000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Tomorrow';
+  return at.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+};
+const clock = (at: Date) => at.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+/**
+ * Everything the assistant has queued across your pages, by day and time, with the first words
+ * of each post or comment; then what failed in the last day. Anything waiting can be called off.
+ */
+function ComingUp() {
+  const upcoming = useApi<AssistantUpcoming>('/page-assistant/upcoming', { refreshInterval: 60_000, revalidateOnFocus: true });
+  const action = useAction();
+  const [showAll, setShowAll] = useState(false);
+  if (!upcoming.data) return upcoming.error ? <ErrorNote message={(upcoming.error as Error).message} /> : null;
+  const waiting = upcoming.data.items.filter((item) => item.status !== 'failed');
+  const failed = upcoming.data.items.filter((item) => item.status === 'failed');
+  const now = new Date();
+  const shown = showAll ? waiting : waiting.slice(0, 30);
+  const days: { label: string; items: AssistantUpcomingItem[] }[] = [];
+  for (const item of shown) {
+    const label = dayLabel(new Date(item.at), now);
+    if (days.at(-1)?.label !== label) days.push({ label, items: [] });
+    days.at(-1)?.items.push(item);
+  }
+  const cancel = (item: AssistantUpcomingItem) =>
+    void action.run(
+      async () => {
+        await api.delete(`/page-assistant/scheduled/${item.id}`);
+        await Promise.all([revalidate('/page-assistant/upcoming'), revalidate('/page-assistant/overview')]);
+      },
+      { revalidate: false },
+    );
+  return (
+    <section className="mb-4">
+      <h2 className="mb-2 text-sm font-semibold">Coming up</h2>
+      {waiting.length === 0 ? (
+        <p className="card p-4 text-sm text-ink-muted">Nothing is waiting. Posts the assistant schedules appear here with their time.</p>
+      ) : (
+        <div className="card divide-y divide-border">
+          {days.map((day) => (
+            <div key={day.label} className="px-4 py-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">{day.label}</p>
+              <ul className="space-y-3">
+                {day.items.map((item) => (
+                  <UpcomingRow key={item.id} item={item} onCancel={item.status === 'pending' ? () => cancel(item) : undefined} pending={action.pending} />
+                ))}
+              </ul>
+            </div>
+          ))}
+          {waiting.length > shown.length && (
+            <button type="button" className="btn-ghost w-full justify-center py-2 text-sm" onClick={() => setShowAll(true)}>
+              Show all {waiting.length}
+            </button>
+          )}
+        </div>
+      )}
+      {action.error && <ErrorNote message={action.error} />}
+      {failed.length > 0 && (
+        <>
+          <h2 className="mb-2 mt-4 text-sm font-semibold text-danger">Failed in the last day</h2>
+          <ul className="card space-y-3 px-4 py-3">
+            {failed.map((item) => (
+              <UpcomingRow key={item.id} item={item} />
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
+
+function UpcomingRow({ item, onCancel, pending = false }: { item: AssistantUpcomingItem; onCancel?: () => void; pending?: boolean }) {
+  const at = new Date(item.at);
+  const extras = [...(item.photos ? [`${item.photos} ${item.photos === 1 ? 'photo' : 'photos'}`] : []), ...(item.attaches ?? [])];
+  return (
+    <li className="flex items-start gap-3 text-sm">
+      <span className="w-16 shrink-0 whitespace-nowrap pt-0.5 text-xs font-semibold tabular text-ink-muted">{clock(at)}</span>
+      <Avatar name={item.pageName} url={item.avatarUrl} size={28} />
+      <div className="flex-1">
+        <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-ink-faint">
+          <Link href={`/people/${item.pageId}`} className="font-medium text-ink hover:text-accent-hover">
+            {item.pageName}
+          </Link>
+          <span>· {DOES[item.tool] ?? item.tool.replace(/_/g, ' ')}</span>
+          {item.status === 'running' && <span className="text-accent">· happening now</span>}
+          {item.status === 'failed' && <span>· was due {at.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}</span>}
+        </p>
+        {item.preview && <p className="mt-0.5 line-clamp-2">{item.preview}</p>}
+        {extras.length > 0 && <p className="mt-0.5 text-xs text-ink-muted">With {extras.join(', ')}</p>}
+        {item.error && <p className="mt-0.5 text-xs text-danger">{item.error}</p>}
+      </div>
+      {onCancel && (
+        <button type="button" className="shrink-0 rounded-full border border-border px-2.5 py-1 text-xs text-ink-muted hover:text-danger" disabled={pending} onClick={onCancel}>
+          Cancel
+        </button>
+      )}
+    </li>
   );
 }

@@ -234,7 +234,15 @@ assistant's posts this UTC day, from the log), `queued` (pending scheduled actio
 (scheduled actions failed in the last 24 hours) with the latest reason, and `lastActionAt`. Web:
 Menu → **All pages at a glance** (`/settings/pages`), failures first. For the developer the
 screen also offers **Mark all official** (`PUT /page-assistant/official`: every page they
-manage). Changing a post's photos is not supported for anyone; the assistant deletes the post
+manage).
+
+**Coming up** on the same screen (`GET /page-assistant/upcoming`, person): every pending or
+running scheduled action across the pages they manage, soonest first, then those failed in the
+last 24 hours, each with the page, the time, what it does and `preview` (the post's title or
+caption, or the comment's text, cut to 140 characters), its photo count and what it attaches
+from the library. Grouped by day in the browser's time zone. A manager can call one off with
+`DELETE /page-assistant/scheduled/:id` (404 for anyone who does not manage the page, 409
+`NOT_WAITING` once it ran or was cancelled), the same as the assistant's `cancel_scheduled_action`. Changing a post's photos is not supported for anyone; the assistant deletes the post
 and creates it again.
 
 ### Parity with the app (2026-11-23)

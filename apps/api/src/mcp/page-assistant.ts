@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BadRequestException, ForbiddenException, HttpException, Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, HttpException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { CONFIG, type AppConfig } from '../config/configuration';
 import { InjectModel, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
@@ -29,6 +29,7 @@ import {
   type AssistantActionKind,
   type AssistantActivity,
   type AssistantOverview,
+  type AssistantUpcoming,
   type AssistantCaps,
   type FoodPost,
 } from '@life-portal/shared-types';
@@ -308,6 +309,62 @@ export class PageAssistantService {
         ...(lastBy.get(page.id) ? { lastActionAt: (lastBy.get(page.id) as Date).toISOString() } : {}),
       })),
     };
+  }
+
+  /**
+   * Every action waiting across the person's pages, soonest first, then what failed in the last
+   * day: when each will happen and the first words of what will be said.
+   */
+  async upcoming(personId: string): Promise<AssistantUpcoming> {
+    const mine = await this.pages.mine(personId);
+    const byId = new Map(mine.pages.map((page) => [page.id, page]));
+    if (!byId.size) return { items: [] };
+    const ids = [...byId.keys()];
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    type Row = PageScheduledAction & { _id: Types.ObjectId };
+    const [waiting, failed] = await Promise.all([
+      this.scheduledActions.find({ pageId: { $in: ids }, status: { $in: ['pending', 'running'] } }).sort({ runAt: 1 }).limit(500).lean<Row[]>(),
+      this.scheduledActions.find({ pageId: { $in: ids }, status: 'failed', doneAt: { $gte: dayAgo } }).sort({ doneAt: -1 }).limit(100).lean<Row[]>(),
+    ]);
+    const text = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : undefined);
+    return {
+      items: [...waiting, ...failed].map((row) => {
+        const page = byId.get(row.pageId);
+        const args = row.args ?? {};
+        const said = text(args['title']) ?? text(args['caption']) ?? text(args['text']);
+        const photos = Array.isArray(args['mediaIds']) ? args['mediaIds'].length : 0;
+        const attaches = (
+          [
+            ['foodId', 'food'],
+            ['recipeId', 'recipe'],
+            ['mealPlanId', 'meal plan'],
+            ['planId', 'training plan'],
+          ] as const
+        )
+          .filter(([key]) => text(args[key]))
+          .map(([, label]) => label);
+        return {
+          ...this.scheduledDto(row),
+          pageId: row.pageId,
+          pageName: page?.name ?? '',
+          pageUsername: page?.username ?? '',
+          ...(page?.avatarUrl ? { avatarUrl: page.avatarUrl } : {}),
+          ...(said ? { preview: said.length > 140 ? `${said.slice(0, 139)}…` : said } : {}),
+          ...(photos ? { photos } : {}),
+          ...(attaches.length ? { attaches: [...attaches] } : {}),
+        };
+      }),
+    };
+  }
+
+  /** A manager calls off something waiting, as the assistant's own cancel tool does. */
+  async cancelScheduled(personId: string, actionId: string): Promise<{ cancelled: boolean }> {
+    if (!isValidObjectId(actionId)) throw new NotFoundException('That action is not waiting.');
+    const row = await this.scheduledActions.findById(actionId).select('pageId status').lean();
+    if (!row || !(await this.pages.managersOf(row.pageId)).includes(personId)) throw new NotFoundException('That action is not waiting.');
+    const result = await this.scheduledActions.updateOne({ _id: actionId, status: 'pending' }, { $set: { status: 'cancelled', doneAt: new Date() } });
+    if (!result.modifiedCount) throw new ConflictException({ code: 'NOT_WAITING', message: 'It has already run or been cancelled.' });
+    return { cancelled: true };
   }
 
   // ------------------------------------------------------------------ doing things later

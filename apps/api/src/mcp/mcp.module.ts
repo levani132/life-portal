@@ -3,6 +3,7 @@ import {
   All,
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Headers,
@@ -41,7 +42,7 @@ import { SocialModule } from '../social/social.module';
 import { TrainingModule } from '../training/training.module';
 import { AssistantSettings, AssistantSettingsSchema, PageScheduledAction, PageScheduledActionSchema, PageAssistantAction, PageAssistantActionSchema, PageAssistantService, parseCaps } from './page-assistant';
 import { PagesService } from '../pages/pages.module';
-import type { AssistantActivity, AssistantCaps, AssistantOverview } from '@life-portal/shared-types';
+import type { AssistantActivity, AssistantCaps, AssistantOverview, AssistantUpcoming } from '@life-portal/shared-types';
 
 /**
  * MCP (Model Context Protocol) server for AI assistants.
@@ -198,6 +199,19 @@ export class PageAssistantController {
   @Header('Cache-Control', 'no-store')
   overview(@CurrentUser('userId') userId: string): Promise<AssistantOverview> {
     return this.assistant.overview(userId);
+  }
+
+  /** Everything the assistant has waiting across the person's pages, soonest first. */
+  @Get('upcoming')
+  @Header('Cache-Control', 'no-store')
+  upcoming(@CurrentUser('userId') userId: string): Promise<AssistantUpcoming> {
+    return this.assistant.upcoming(userId);
+  }
+
+  /** A manager calls off one waiting action. */
+  @Delete('scheduled/:id')
+  cancelScheduled(@CurrentUser('userId') userId: string, @Param('id') id: string) {
+    return this.assistant.cancelScheduled(userId, id);
   }
 
   /** The owner marks every page they manage as the app's own, in one go. */
