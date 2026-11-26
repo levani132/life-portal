@@ -52,3 +52,17 @@ test('Menu → Pages shows when the assistant will post', async ({ page }) => {
   await page.getByText('Coming up').scrollIntoViewIfNeeded();
   await snap(page, '06-coming-up');
 });
+
+test('Menu starts with who you are, folded, and the menu right under it', async ({ page }) => {
+  const ana = await account('Ana');
+  await call(ana, 'POST', '/pages', { name: 'E2E Folded Page', username: `e2e-folded-${randomUUID().slice(0, 6)}`, bio: '' });
+  await signIn(page, ana);
+  await page.goto('/menu');
+  const fold = page.getByRole('button', { name: /Using the app as/ });
+  await expect(fold).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByText('E2E Folded Page')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Menu' })).toHaveCount(0);
+  await snap(page, '06-menu-folded');
+  await fold.click();
+  await expect(page.getByText('E2E Folded Page').filter({ visible: true }).first()).toBeVisible();
+});

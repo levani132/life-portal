@@ -17,12 +17,11 @@ import {
   Database,
 } from 'lucide-react';
 import { MODULES, type PortalState } from '@life-portal/shared-types';
-import { PageHeader } from './page-header';
 import { useAuth } from '../lib/auth-context';
 import { useApi } from '../lib/hooks';
 import { IdentitySwitcher } from './identity-switcher';
 export function MenuContent() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const { data } = useApi<PortalState>('/portal');
   const requests = useApi<{ count: number; more: boolean }>(
     data?.access.social ? '/social/requests/count' : null,
@@ -89,7 +88,6 @@ export function MenuContent() {
   if (data?.page) {
     return (
       <div className="mx-auto max-w-2xl">
-        <PageHeader title="Menu" subtitle="You are using the app as a page" />
         <IdentitySwitcher />
         <div className="card divide-y divide-border">
           <Link href="/settings/profile" className="flex min-h-16 items-center gap-3 px-5 py-4 hover:bg-surface-raised">
@@ -111,7 +109,6 @@ export function MenuContent() {
   }
   return (
     <div className="mx-auto max-w-2xl">
-      <PageHeader title="Menu" subtitle={user?.name} />
       <IdentitySwitcher />
       <div className="card divide-y divide-border">
         {links.map(({ href, label, icon: Icon, badge }) => (

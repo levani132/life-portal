@@ -2,7 +2,7 @@
 
 import type { Identity, MyPages, PageSummary } from '@life-portal/shared-types';
 import { PAGE_BIO_MAX, PAGE_NAME_MAX } from '@life-portal/shared-types';
-import { Check, Megaphone, Plus } from 'lucide-react';
+import { Check, ChevronDown, Megaphone, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -52,6 +52,8 @@ async function switchTo(pageId: string | null, userId: string): Promise<string |
   return null;
 }
 
+const OPEN_KEY = 'lp.menu.identityOpen';
+
 /** The list at the top of the menu: yourself, the pages you manage, and "Create a page". */
 export function IdentitySwitcher({ inSheet = false }: { inSheet?: boolean } = {}) {
   const { user } = useAuth();
@@ -59,6 +61,25 @@ export function IdentitySwitcher({ inSheet = false }: { inSheet?: boolean } = {}
   const acting = actingPageId();
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // In Menu the list folds into one row (who you are now), so the rest of the menu shows first.
+  // Remembered on this device only; the sheet from the tab bar is always open.
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    try {
+      setOpen(localStorage.getItem(OPEN_KEY) === '1');
+    } catch {
+      // No storage: start folded.
+    }
+  }, []);
+  const toggle = () =>
+    setOpen((now) => {
+      try {
+        localStorage.setItem(OPEN_KEY, now ? '0' : '1');
+      } catch {
+        // Not remembered; it still opens.
+      }
+      return !now;
+    });
   if (!user || !pages.data) return null;
   // Nothing to show for an account without the feature and without pages.
   if (!pages.data.pages.length && pages.data.remaining === 0) return null;
@@ -69,12 +90,29 @@ export function IdentitySwitcher({ inSheet = false }: { inSheet?: boolean } = {}
     void switchTo(pageId, user.id).then(setError);
   };
   const canCreate = pages.data.remaining === null || pages.data.remaining > 0;
+  const current = pages.data.pages.find((page) => page.id === acting);
+  const expanded = inSheet || open;
 
   return (
     <section className={inSheet ? '-mx-5' : 'card mb-4'} aria-label="Who you are using the app as">
       {/* In the sheet opened from the tab bar, the sheet's own title says it. */}
-      {!inSheet && <p className="px-5 pt-4 text-xs font-semibold uppercase tracking-wide text-ink-faint">Using the app as</p>}
-      <ul className="mt-2 divide-y divide-border">
+      {!inSheet && (
+        <button type="button" aria-expanded={open} onClick={toggle} className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-surface-raised">
+          <Avatar name={current?.name ?? user.name} url={current ? current.avatarUrl : pages.data.personAvatarUrl} size={36} />
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-semibold uppercase tracking-wide text-ink-faint">Using the app as</span>
+            <span className="flex items-center gap-1.5">
+              <span className="truncate font-medium">{current?.name ?? user.name}</span>
+              {current && <PageMark />}
+            </span>
+          </span>
+          {pages.data.pages.length > 0 && !open && <span className="shrink-0 text-xs text-ink-faint">{pages.data.pages.length} {pages.data.pages.length === 1 ? 'page' : 'pages'}</span>}
+          <ChevronDown size={18} aria-hidden="true" className={`shrink-0 text-ink-faint transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+      )}
+      {expanded && (
+      <>
+      <ul className={`${inSheet ? 'mt-2' : 'border-t border-border'} divide-y divide-border`}>
         <Row name={user.name} note="You" avatarUrl={pages.data.personAvatarUrl} active={!acting} onChoose={() => choose(null)} />
         {pages.data.pages.map((page) => (
           <Row
@@ -110,6 +148,8 @@ export function IdentitySwitcher({ inSheet = false }: { inSheet?: boolean } = {}
           <p className="text-xs text-ink-faint">You have created as many pages as your account allows. Write to support if you need more.</p>
         )}
       </div>
+      </>
+      )}
       {creating && (
         <CreatePage
           onClose={() => setCreating(false)}
