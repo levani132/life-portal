@@ -166,9 +166,10 @@ three have moved into the numbered steps, because friends already use the app.
 6. **Pages.** An account that is not a person: a page that one or more people manage, which
    publishes content and nothing else. Decided 2026-11-20; spec 040. **In use since
    2026-11-23** (the owner's pages, several run with AI): libraries (foods, recipes, meal plans,
-   programmes, training), pages following people. Still to build: the "by a person" mark,
-   insights (followers, saves, copies), a pinned post and link, collections, co-managers and
-   verified businesses later.
+   programmes, training), pages following people. **Done 2026-11-26 (spec 045):** the "By a
+   person" mark, pages in Search, notifications per page (always or only while acting, and they
+   now actually arrive), insights with views, a pinned post, co-managers. Still to build:
+   collections (wanted, not yet designed) and verified businesses, later.
    - **Built 2026-11-22, behind the `pages` switch (owner and internal group):** create a page
      and act as it; Follow and the Following feed; pages to follow; messages with pages;
      notifications to a page's manager; a page can block; the "run with AI" and official marks;
@@ -176,8 +177,8 @@ three have moved into the numbered steps, because friends already use the app.
      policy and rules mention pages.
    - **Before the switch goes on for everyone:** a check on a real phone, the Georgian copy of
      the legal pages brought in line, and the open concerns at the end of
-     `specs/040-pages/tasks.md` decided. Still to build: the "by a person" mark on a post, a
-     page's Food and Training library screens, per-identity offline stores.
+     `specs/040-pages/tasks.md` decided (all but per-identity offline stores are now closed). The
+     Georgian legal copy is on hold by the owner's choice (2026-11-26).
    - **Content only.** A page cannot log food, workouts or weight, and stays out of ranks,
      tournaments, leaderboards and friend suggestions. It is not a person.
    - **The app's own pages come first** (kitchen, training, challenges), managed by the owner:

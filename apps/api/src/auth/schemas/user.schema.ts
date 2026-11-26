@@ -134,6 +134,10 @@ export class User {
 
   @Prop({ maxlength: 200 })
   suspendedReason?: string;
+
+  /** Spec 045: a page suspended because none of its managers can act; restored with one of them. */
+  @Prop()
+  suspendedForManagers?: boolean;
 }
 
 export type UserDocument = HydratedDocument<User>;

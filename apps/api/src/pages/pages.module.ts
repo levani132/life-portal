@@ -21,7 +21,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { InjectModel, MongooseModule } from '@nestjs/mongoose';
+import { InjectModel, MongooseModule, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
 import { Model, Types, isValidObjectId } from 'mongoose';
@@ -37,11 +37,14 @@ import {
   type CreatePageRequest,
   type Identity,
   type MyPages,
+  type PageInvite,
+  type PageManagers,
   type PageSummary,
   type SuggestedPage,
   type UpdatePageRequest,
 } from '@life-portal/shared-types';
-import { mayCreatePage, pagesRemaining } from '@life-portal/shared-domain';
+import { mayCreatePage, mayRemoveManager, pagesRemaining } from '@life-portal/shared-domain';
+import { SocialGraphService } from '../social-graph/social-graph.module';
 import { AccessService, RequireModule } from '../access/access.module';
 import { FollowsService } from '../follows/follows.module';
 import { AccountModule } from '../account/account.module';
@@ -69,6 +72,32 @@ export class CreatePageDto implements CreatePageRequest {
   @Matches(/^[a-z0-9][a-z0-9_-]{2,29}$/, { message: 'Use 3–30 lowercase letters, numbers, underscores or hyphens.' })
   username!: string;
   @IsOptional() @IsString() @MaxLength(PAGE_BIO_MAX) bio?: string;
+}
+
+/**
+ * Spec 045: an invitation to help run a page. Only the invited person can accept it; any manager
+ * can cancel it. Accepting adds them to `users.managers`; nothing else is copied. Gone after 30
+ * days unanswered.
+ */
+@Schema({ collection: 'page_invites', versionKey: false })
+export class PageInviteRecord {
+  @Prop({ required: true }) pageId!: string;
+  @Prop({ required: true, index: true }) personId!: string;
+  @Prop({ required: true }) invitedBy!: string;
+  @Prop({ required: true }) createdAt!: Date;
+  @Prop({ type: Date, required: true }) expiresAt!: Date;
+}
+export const PageInviteSchema = SchemaFactory.createForClass(PageInviteRecord);
+PageInviteSchema.index({ pageId: 1, personId: 1 }, { unique: true });
+PageInviteSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+const INVITE_DAYS = 30;
+const PAGE_MANAGERS_MAX = 10;
+
+export class InviteManagerDto {
+  @IsString() @MinLength(1) @MaxLength(40) username!: string;
+}
+export class AnswerInviteDto {
+  @IsBoolean() accept!: boolean;
 }
 
 export class DisabledDto {
@@ -102,10 +131,14 @@ export class PagesService {
     @Inject(CONFIG) private readonly config: AppConfig,
     private readonly follows: FollowsService,
     private readonly notifications: NotificationsService,
+    @InjectModel(PageInviteRecord.name) private readonly invites: Model<PageInviteRecord>,
+    private readonly graph: SocialGraphService,
   ) {}
 
   /** A page has no devices: its notifications go to its managers' (docs/modules/notifications.md). */
   onModuleInit() {
+    // Spec 045: someone asks you to help run a page. It opens Menu, where you answer.
+    this.notifications.register({ type: 'pageInvite', windowMs: 0, requires: ['pages'], collapseKey: (event) => event.targetId, url: () => '/menu' });
     this.notifications.registerPageResolver(async (userId) => {
       if (!isValidObjectId(userId)) return null;
       const page = await this.users.findOne({ _id: userId, kind: 'page' }).select('name managers aiManaged').lean();
@@ -394,6 +427,131 @@ export class PagesService {
     return { ...(person?.assistantCaps ? { override: person.assistantCaps } : {}), developer: personId === this.config.developerUserId };
   }
 
+  // ------------------------------------------------------------------ co-managers (spec 045)
+
+  /** A page's managers and pending invitations, for one of its managers. */
+  async managerList(personId: string, pageId: string): Promise<PageManagers> {
+    const page = await this.managed(personId, pageId);
+    const managers = page.managers ?? [];
+    const invites = await this.invites.find({ pageId }).sort({ createdAt: 1 }).lean();
+    const profiles = await this.social.summaries([...managers, ...invites.map((row) => row.personId)]);
+    const card = (id: string) => {
+      const profile = profiles.get(id);
+      return { userId: id, name: profile?.displayName ?? 'Former member', username: profile?.username ?? '', ...(profile?.avatarUrl ? { avatarUrl: profile.avatarUrl } : {}) };
+    };
+    return {
+      managers: managers.map((id) => ({
+        ...card(id),
+        creator: id === page.createdBy,
+        you: id === personId,
+        mayRemove: mayRemoveManager({ requester: personId, target: id, managers, createdBy: page.createdBy }),
+      })),
+      invites: invites.map((row) => ({ id: String(row._id), ...card(row.personId), createdAt: row.createdAt.toISOString() })),
+    };
+  }
+
+  /**
+   * Invites a person, by username, to help run the page. A page cannot be invited; neither can
+   * someone already managing it, someone blocked either way with the page or the inviter, or
+   * anyone once the page has `PAGE_MANAGERS_MAX` managers. Inviting again changes nothing.
+   */
+  async invite(personId: string, pageId: string, username: string): Promise<PageManagers> {
+    await this.requireOn(personId);
+    const page = await this.managed(personId, pageId);
+    const target = await this.social.personIdByUsername(username);
+    const nobody = () => new NotFoundException({ code: 'NO_SUCH_PERSON', message: 'Nobody has that username.' });
+    if (!target) throw nobody();
+    if ((page.managers ?? []).includes(target)) throw new BadRequestException({ code: 'ALREADY_MANAGER', message: 'They already help run this page.' });
+    if ((page.managers ?? []).length >= PAGE_MANAGERS_MAX) throw new BadRequestException({ code: 'TOO_MANY_MANAGERS', message: `A page can have at most ${PAGE_MANAGERS_MAX} managers.` });
+    const person = await this.users.findById(target).select('kind suspendedAt').lean();
+    if (!person || person.kind === 'page' || person.suspendedAt) throw nobody();
+    if ((await this.graph.isBlocked(target, personId)) || (await this.graph.isBlocked(target, pageId))) throw nobody();
+    const now = new Date();
+    const result = await this.invites.updateOne(
+      { pageId, personId: target },
+      { $setOnInsert: { pageId, personId: target, invitedBy: personId, createdAt: now, expiresAt: new Date(now.getTime() + INVITE_DAYS * 86_400_000) } },
+      { upsert: true },
+    );
+    if (result.upsertedCount) {
+      const inviter = await this.social.summaries([personId]);
+      void this.notifications.notify({
+        type: 'pageInvite',
+        recipientId: target,
+        actorId: personId,
+        actorName: inviter.get(personId)?.displayName ?? 'Someone',
+        targetId: pageId,
+        pageName: page.name,
+      });
+    }
+    return this.managerList(personId, pageId);
+  }
+
+  /** A manager calls off an invitation. */
+  async cancelInvite(personId: string, pageId: string, inviteId: string): Promise<PageManagers> {
+    await this.managed(personId, pageId);
+    if (isValidObjectId(inviteId)) await this.invites.deleteOne({ _id: inviteId, pageId });
+    return this.managerList(personId, pageId);
+  }
+
+  /** The invitations waiting for this person. */
+  async myInvites(personId: string): Promise<PageInvite[]> {
+    const rows = await this.invites.find({ personId }).sort({ createdAt: -1 }).limit(20).lean();
+    if (!rows.length) return [];
+    const pages = new Map(
+      (await this.users.find({ _id: { $in: rows.map((row) => row.pageId) }, kind: 'page', suspendedAt: { $exists: false } }).select('_id').lean()).map((row) => [String(row._id), true]),
+    );
+    const profiles = await this.social.summaries([...rows.map((row) => row.pageId), ...rows.map((row) => row.invitedBy)]);
+    return rows
+      .filter((row) => pages.has(row.pageId))
+      .map((row) => {
+        const page = profiles.get(row.pageId);
+        return {
+          id: String(row._id),
+          page: { id: row.pageId, name: page?.displayName ?? '', username: page?.username ?? '', ...(page?.avatarUrl ? { avatarUrl: page.avatarUrl } : {}) },
+          invitedBy: profiles.get(row.invitedBy)?.displayName ?? 'Someone',
+          createdAt: row.createdAt.toISOString(),
+        };
+      });
+  }
+
+  /** The invited person accepts (they become a manager) or declines. Either way the invitation goes. */
+  async answerInvite(personId: string, inviteId: string, accept: boolean): Promise<MyPages> {
+    const gone = () => new NotFoundException({ code: 'INVITE_GONE', message: 'That invitation is no longer there.' });
+    const row = isValidObjectId(inviteId) ? await this.invites.findOne({ _id: inviteId, personId }).lean() : null;
+    if (!row) throw gone();
+    await this.invites.deleteOne({ _id: row._id });
+    if (accept) {
+      await this.requireOn(personId);
+      const changed = await this.users.updateOne(
+        { _id: row.pageId, kind: 'page', suspendedAt: { $exists: false }, [`managers.${PAGE_MANAGERS_MAX - 1}`]: { $exists: false } },
+        { $addToSet: { managers: personId } },
+      );
+      if (!changed.matchedCount) throw gone();
+    }
+    return this.mine(personId);
+  }
+
+  /**
+   * Takes a manager off a page: yourself (leaving), or someone else if you created the page (or
+   * its creator no longer manages it). Never the last manager. The removed person's devices stop
+   * acting as the page on their next request (`NOT_A_MANAGER`).
+   */
+  async removeManager(personId: string, pageId: string, targetId: string): Promise<PageManagers | { left: true }> {
+    const page = await this.managed(personId, pageId);
+    const managers = page.managers ?? [];
+    if (!mayRemoveManager({ requester: personId, target: targetId, managers, createdBy: page.createdBy })) {
+      throw new ForbiddenException(
+        managers.length < 2 && targetId === personId
+          ? { code: 'LAST_MANAGER', message: 'You are the only manager. Invite someone first, or delete the page.' }
+          : { code: 'CANNOT_REMOVE', message: 'Only the page’s creator can remove another manager.' },
+      );
+    }
+    // Guarded on the count, so two managers leaving at once cannot leave the page with none.
+    const changed = await this.users.updateOne({ _id: page._id, managers: targetId, 'managers.1': { $exists: true } }, { $pull: { managers: targetId } });
+    if (!changed.modifiedCount) throw new ForbiddenException({ code: 'LAST_MANAGER', message: 'A page always keeps one manager.' });
+    return targetId === personId ? { left: true } : this.managerList(personId, pageId);
+  }
+
   /** Who the request is made as, for the web app's shell. */
   async identity(user: AuthenticatedUser): Promise<Identity> {
     const personId = user.actorId ?? user.userId;
@@ -467,6 +625,42 @@ export class PagesController {
   @HttpCode(200)
   remove(@CurrentUser('userId') personId: string, @Param('id') id: string) {
     return this.pages.remove(personId, id);
+  }
+
+  /** Spec 045: invitations waiting for me. */
+  @Get('invites/mine')
+  @Header('Cache-Control', 'no-store')
+  myInvites(@CurrentUser('userId') personId: string) {
+    return this.pages.myInvites(personId);
+  }
+
+  @Put('invites/:inviteId')
+  answer(@CurrentUser('userId') personId: string, @Param('inviteId') inviteId: string, @Body() dto: AnswerInviteDto) {
+    return this.pages.answerInvite(personId, inviteId, dto.accept);
+  }
+
+  /** Spec 045: a page's managers and invitations (managers only). */
+  @Get(':id/managers')
+  @Header('Cache-Control', 'no-store')
+  managers(@CurrentUser('userId') personId: string, @Param('id') id: string) {
+    return this.pages.managerList(personId, id);
+  }
+
+  @Post(':id/managers')
+  invite(@CurrentUser('userId') personId: string, @Param('id') id: string, @Body() dto: InviteManagerDto) {
+    return this.pages.invite(personId, id, dto.username);
+  }
+
+  @Delete(':id/managers/:personId')
+  @HttpCode(200)
+  removeManager(@CurrentUser('userId') personId: string, @Param('id') id: string, @Param('personId') target: string) {
+    return this.pages.removeManager(personId, id, target);
+  }
+
+  @Delete(':id/invites/:inviteId')
+  @HttpCode(200)
+  cancelInvite(@CurrentUser('userId') personId: string, @Param('id') id: string, @Param('inviteId') inviteId: string) {
+    return this.pages.cancelInvite(personId, id, inviteId);
   }
 }
 
@@ -566,7 +760,7 @@ export class IdentityController {
 
 @Global()
 @Module({
-  imports: [MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]), SocialModule, AccountModule],
+  imports: [MongooseModule.forFeature([{ name: User.name, schema: UserSchema }, { name: PageInviteRecord.name, schema: PageInviteSchema }]), SocialModule, AccountModule],
   controllers: [PagesController, PageOfficialController, PeopleAdminController, IdentityController, FollowsController],
   providers: [PagesService, ActingGuard],
   exports: [PagesService, ActingGuard],

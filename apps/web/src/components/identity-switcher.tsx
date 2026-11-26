@@ -1,6 +1,6 @@
 'use client';
 
-import type { Identity, MyPages, PageSummary } from '@life-portal/shared-types';
+import type { Identity, MyPages, PageInvite, PageSummary } from '@life-portal/shared-types';
 import { PAGE_BIO_MAX, PAGE_NAME_MAX } from '@life-portal/shared-types';
 import { Check, ChevronDown, Megaphone, Plus, UserRound } from 'lucide-react';
 import Link from 'next/link';
@@ -70,6 +70,43 @@ async function switchTo(pageId: string | null, userId: string): Promise<string |
 
 const OPEN_KEY = 'lp.menu.identityOpen';
 
+/** Spec 045: "Ana invited you to help run Georgian Table": accept or decline. */
+function InviteRow({ invite }: { invite: PageInvite }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const answer = async (accept: boolean) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.put(`/pages/invites/${invite.id}`, { accept });
+      await Promise.all([revalidate('/pages/invites/mine'), revalidate('/pages')]);
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'That did not work. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <li className="px-5 py-3">
+      <div className="flex items-center gap-3">
+        <Avatar name={invite.page.name} url={invite.page.avatarUrl} size={36} />
+        <p className="min-w-0 flex-1 text-sm">
+          <span className="font-medium">{invite.invitedBy}</span> invited you to help run <span className="font-medium">{invite.page.name}</span>
+        </p>
+      </div>
+      <div className="mt-2 flex gap-2 pl-12">
+        <button type="button" className="btn-primary" disabled={busy} onClick={() => void answer(true)}>
+          Accept
+        </button>
+        <button type="button" className="btn-ghost" disabled={busy} onClick={() => void answer(false)}>
+          Decline
+        </button>
+      </div>
+      {error && <p className="mt-1 text-xs text-danger" role="alert">{error}</p>}
+    </li>
+  );
+}
+
 /** The list at the top of the menu: yourself, the pages you manage, and "Create a page". */
 export function IdentitySwitcher({ inSheet = false }: { inSheet?: boolean } = {}) {
   const { user } = useAuth();
@@ -96,6 +133,7 @@ export function IdentitySwitcher({ inSheet = false }: { inSheet?: boolean } = {}
       }
       return !now;
     });
+  const invites = useApi<PageInvite[]>(user && !inSheet ? '/pages/invites/mine' : null);
   if (!user || !pages.data) return null;
   // Nothing to show for an account without the feature and without pages.
   if (!pages.data.pages.length && pages.data.remaining === 0) return null;
@@ -111,6 +149,14 @@ export function IdentitySwitcher({ inSheet = false }: { inSheet?: boolean } = {}
 
   return (
     <section className={inSheet ? '-mx-5' : 'card mb-4'} aria-label="Who you are using the app as">
+      {/* Spec 045: invitations to help run a page, answered here even while the list is folded. */}
+      {!inSheet && invites.data && invites.data.length > 0 && (
+        <ul className="divide-y divide-border border-b border-border">
+          {invites.data.map((invite) => (
+            <InviteRow key={invite.id} invite={invite} />
+          ))}
+        </ul>
+      )}
       {/* In the sheet opened from the tab bar, the sheet's own title says it. */}
       {!inSheet && (
         <button type="button" aria-expanded={open} onClick={toggle} className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-surface-raised">

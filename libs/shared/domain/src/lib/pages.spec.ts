@@ -1,4 +1,4 @@
-import { followingAuthors, mayCreatePage, pageAccess, pageLimitFor, pagesRemaining } from './pages';
+import { followingAuthors, mayCreatePage, mayRemoveManager, pageAccess, pageHasNoActiveManager, pageLimitFor, pagesRemaining } from './pages';
 
 describe('pages rules (spec 040)', () => {
   it('gives a page everything social and the two libraries, and nothing personal', () => {
@@ -32,5 +32,27 @@ describe('followingAuthors', () => {
   it('names nobody twice, and is just you when you follow nobody', () => {
     expect(followingAuthors({ self: 'me', friends: ['f1'], followedPages: ['f1', 'me'] })).toEqual(['me', 'f1']);
     expect(followingAuthors({ self: 'me', friends: [], followedPages: [] })).toEqual(['me']);
+  });
+});
+
+describe('co-managers (spec 045)', () => {
+  const managers = ['creator', 'b', 'c'];
+  it('lets anyone leave, the creator remove anyone, and nobody remove the last manager', () => {
+    expect(mayRemoveManager({ requester: 'b', target: 'b', managers, createdBy: 'creator' })).toBe(true);
+    expect(mayRemoveManager({ requester: 'creator', target: 'c', managers, createdBy: 'creator' })).toBe(true);
+    expect(mayRemoveManager({ requester: 'b', target: 'c', managers, createdBy: 'creator' })).toBe(false);
+    expect(mayRemoveManager({ requester: 'b', target: 'creator', managers, createdBy: 'creator' })).toBe(false);
+    expect(mayRemoveManager({ requester: 'creator', target: 'creator', managers: ['creator'], createdBy: 'creator' })).toBe(false);
+    expect(mayRemoveManager({ requester: 'x', target: 'b', managers, createdBy: 'creator' })).toBe(false);
+    expect(mayRemoveManager({ requester: 'creator', target: 'x', managers, createdBy: 'creator' })).toBe(false);
+  });
+  it('lets any manager remove others once the creator has left', () => {
+    expect(mayRemoveManager({ requester: 'b', target: 'c', managers: ['b', 'c'], createdBy: 'creator' })).toBe(true);
+    expect(mayRemoveManager({ requester: 'b', target: 'c', managers: ['b', 'c'] })).toBe(true);
+  });
+  it('suspends a page only when every manager is suspended', () => {
+    expect(pageHasNoActiveManager(['a', 'b'], new Set(['a']))).toBe(false);
+    expect(pageHasNoActiveManager(['a', 'b'], new Set(['a', 'b']))).toBe(true);
+    expect(pageHasNoActiveManager([], new Set(['a']))).toBe(false);
   });
 });

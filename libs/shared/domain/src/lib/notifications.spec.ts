@@ -376,3 +376,12 @@ describe('tournament reminders (#12)', () => {
     }
   });
 });
+
+describe('an invitation to run a page (spec 045)', () => {
+  it('names the page', () => {
+    expect(notificationText({ type: 'pageInvite', actorName: 'Ana', pageName: 'Georgian Table' }, { showCommentPreviews: false })).toEqual({
+      title: 'Ana',
+      body: 'invited you to help run Georgian Table',
+    });
+  });
+});

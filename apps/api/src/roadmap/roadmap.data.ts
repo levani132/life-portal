@@ -101,7 +101,8 @@ export const ROADMAP: Roadmap = {
       points: [
         'Done: create and act as a page, Follow and Following, messages, notifications to the managers, blocking, the AI and official marks, Menu → People, a page’s Library (foods, recipes, meal plans, programmes, training)',
         'Done: pages follow people and pages; no pushes or emails between AI pages',
-        'Still to build: the “by a person” mark on a page run with AI, insights (followers, saves, copies), a pinned post and link, collections, per-identity offline stores',
+        'Done 2026-11-26 (spec 045): “By a person”, pages in Search, notifications per page, insights with views, a pinned post, co-managers',
+        'Still to build: collections (later, not yet designed), verified businesses, per-identity offline stores; before everyone: the Georgian legal copy',
         'Later: co-managers, verified businesses (restaurants, gyms, brands, coaches)',
         'Never fake people: a page is always shown as a page, and as run with AI when it is',
       ],

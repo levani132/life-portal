@@ -202,6 +202,8 @@ export class AccountService {
     await this.store.deleteMany('food_posts', { userId });
     await this.store.deleteMany('social_connections', { $or: [{ lowId: userId }, { highId: userId }] });
     await this.store.deleteMany('follows', { $or: [{ followerId: userId }, { pageId: userId }] });
+    // Spec 045: invitations to or from the account, and those of a page being deleted.
+    await this.store.deleteMany('page_invites', { $or: [{ personId: userId }, { invitedBy: userId }, { pageId: userId }] });
     const conversationIds = (await this.store.find('conversations', { memberIds: userId })).map((row) => String(row['_id']));
     if (conversationIds.length) {
       await this.store.deleteMany('messages', { conversationId: { $in: conversationIds } });

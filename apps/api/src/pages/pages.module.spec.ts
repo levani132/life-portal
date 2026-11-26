@@ -38,7 +38,7 @@ async function world(options: { pagesOff?: string[] } = {}) {
     summaries: async (ids: string[]) => new Map(ids.flatMap((id) => (profiles.has(id) ? [[id, profiles.get(id)!] as const] : []))),
   };
   const accounts = { erase: async (id: string) => { erased.push(id); } };
-  const service = new PagesService(users as never, access as never, social as never, accounts as never, { developerUserId: DEV } as AppConfig, { followerCount: async () => 0 } as never, { registerPageResolver: () => undefined } as never);
+  const service = new PagesService(users as never, access as never, social as never, accounts as never, { developerUserId: DEV } as AppConfig, { followerCount: async () => 0 } as never, { registerPageResolver: () => undefined, register: () => undefined } as never, {} as never, {} as never);
   return { service, users, profiles, erased };
 }
 

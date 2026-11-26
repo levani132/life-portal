@@ -1,11 +1,13 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import { useState } from 'react';
 import Link from 'next/link';
 import { Bookmark, Eye, Heart, MessageCircle, Repeat2 } from 'lucide-react';
-import type { MyPages, NotificationPreferences, PageInsights } from '@life-portal/shared-types';
+import type { MyPages, NotificationPreferences, PageInsights, PageManagers } from '@life-portal/shared-types';
 import { AppShell, PageHeader } from '../../../../components/app-shell';
-import { ErrorNote, Spinner } from '../../../../components/ui';
+import { Avatar } from '../../../../components/avatar';
+import { ErrorNote, Input, Spinner } from '../../../../components/ui';
 import { api } from '../../../../lib/api';
 import { revalidate, useAction, useApi } from '../../../../lib/hooks';
 
@@ -32,6 +34,7 @@ function ManagePage() {
     <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader title={page.name} subtitle={`@${page.username}`} />
       <Insights pageId={page.id} />
+      <Managers pageId={page.id} name={page.name} />
       <PageNotifications pageId={page.id} name={page.name} />
     </div>
   );
@@ -131,6 +134,90 @@ function Insights({ pageId }: { pageId: string }) {
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+/** Spec 045: who runs the page with you, invitations, and leaving. */
+function Managers({ pageId, name }: { pageId: string; name: string }) {
+  const key = `/pages/${pageId}/managers`;
+  const data = useApi<PageManagers>(key);
+  const action = useAction();
+  const router = useRouter();
+  const [username, setUsername] = useState('');
+  if (!data.data) return data.error ? <ErrorNote message={(data.error as Error).message} /> : null;
+  const run = (work: () => Promise<unknown>, after?: () => void) =>
+    void action
+      .run(
+        async () => {
+          await work();
+          await Promise.all([revalidate(key), revalidate('/pages')]);
+        },
+        { revalidate: false },
+      )
+      .then((ok) => ok && after?.());
+  return (
+    <section className="card p-4">
+      <h2 className="text-sm font-semibold">Managers</h2>
+      <p className="text-xs text-ink-muted">Everyone here can post, answer and invite as {name}. Only the page’s creator can remove someone; anyone can leave.</p>
+      <ul className="mt-2 divide-y divide-border">
+        {data.data.managers.map((manager) => (
+          <li key={manager.userId} className="flex items-center gap-3 py-2.5">
+            <Avatar name={manager.name} url={manager.avatarUrl} size={32} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">
+                {manager.name}
+                {manager.you && <span className="ml-1 text-ink-faint">(you)</span>}
+              </span>
+              <span className="block truncate text-xs text-ink-faint">{manager.creator ? 'Created the page' : manager.username ? `@${manager.username}` : ''}</span>
+            </span>
+            {manager.mayRemove && (
+              <button
+                type="button"
+                className="shrink-0 rounded-full border border-border px-2.5 py-1 text-xs text-ink-muted hover:text-danger"
+                disabled={action.pending}
+                onClick={() => {
+                  if (!window.confirm(manager.you ? `Leave ${name}? You will no longer be able to use the app as it.` : `Remove ${manager.name} from ${name}?`)) return;
+                  run(() => api.delete(`${key.replace('/managers', '')}/managers/${manager.userId}`), manager.you ? () => router.replace('/menu') : undefined);
+                }}
+              >
+                {manager.you ? 'Leave' : 'Remove'}
+              </button>
+            )}
+          </li>
+        ))}
+        {data.data.invites.map((invite) => (
+          <li key={invite.id} className="flex items-center gap-3 py-2.5">
+            <Avatar name={invite.name} url={invite.avatarUrl} size={32} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">{invite.name}</span>
+              <span className="block truncate text-xs text-ink-faint">Invited, waiting for an answer</span>
+            </span>
+            <button
+              type="button"
+              className="shrink-0 rounded-full border border-border px-2.5 py-1 text-xs text-ink-muted hover:text-danger"
+              disabled={action.pending}
+              onClick={() => run(() => api.delete(`/pages/${pageId}/invites/${invite.id}`))}
+            >
+              Cancel
+            </button>
+          </li>
+        ))}
+      </ul>
+      <form
+        className="mt-2 flex gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const value = username.trim().replace(/^@/, '');
+          if (value) run(() => api.post(key, { username: value }), () => setUsername(''));
+        }}
+      >
+        <Input aria-label="Username to invite" placeholder="Invite by username" value={username} onChange={(event) => setUsername(event.target.value)} autoCapitalize="none" autoCorrect="off" />
+        <button type="submit" className="btn-primary shrink-0" disabled={action.pending || !username.trim()}>
+          Invite
+        </button>
+      </form>
+      {action.error && <ErrorNote message={action.error} />}
     </section>
   );
 }

@@ -227,6 +227,7 @@ const TYPE_LABELS: { type: NotificationType; label: string; hint: string }[] = [
   { type: 'postComment', label: 'Comments', hint: 'On your posts' },
   { type: 'commentReply', label: 'Replies', hint: 'To your comments' },
   { type: 'commentLike', label: 'Comment likes', hint: 'On your comments and replies, grouped' },
+  { type: 'pageInvite', label: 'Page invitations', hint: 'Someone asks you to help run a page' },
   {
     type: 'postLike',
     label: 'Likes',
@@ -441,6 +442,8 @@ function activityText(item: ActivityItem): string {
       return `${who} replied to your comment`;
     case 'commentLike':
       return `${who} liked your comment`;
+    case 'pageInvite':
+      return `${who} invited you to help run a page`;
     case 'postLike':
       return `${who} liked ${post}`;
     case 'postRepost':

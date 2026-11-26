@@ -16,7 +16,7 @@ finds a page's name, features and suspension the way it finds a person's.
 | Field on `users` | Meaning |
 |---|---|
 | `kind: 'page'` | Absent for a person |
-| `managers: string[]` | The people who may act as it. One for now |
+| `managers: string[]` | The people who may act as it (spec 045: up to 10, by invitation) |
 | `createdBy` | Who created it; what that person's limit counts |
 | `official`, `aiManaged` | The app's own page; run with AI (shown from slices 2 and 3) |
 | `pageLimit` (on a person) | How many pages they may create. Absent: 3. `-1`: no limit |
@@ -162,7 +162,8 @@ Menu → People, developer only (`/settings/people`).
 Suspend and restore use the existing `POST /auth/accounts/:id/suspend|unsuspend`, which work on
 a page as on a person: a suspended page cannot be acted as (`PAGE_SUSPENDED`), its features are
 all off so its posts are hidden, and its managers (not the page's unreachable address) get the
-email. The manager's own account is untouched. Suspending a person does not suspend their pages.
+email. The manager's own account is untouched. Suspending a person does not suspend their pages,
+unless none of a page's managers can act any more (spec 045, below).
 
 Open concerns for this feature are listed at the end of `specs/040-pages/tasks.md`.
 
@@ -223,4 +224,31 @@ another clears the old one. `GET /posts?authorId=<page>` (first page, no cursor)
 post first and does not repeat it; every post answer carries `pinned`. The web says "Pinned" on a
 profile only; "Pin to profile" is in a page's own post menu. The assistant has `pin_page_post`
 and `unpin_page_post`. Tested in `integration/pinned-post.integration.ts`.
+
+## Co-managers (spec 045, slice 6)
+
+`page_invites {pageId, personId, invitedBy, createdAt, expiresAt}` (unique per page and person,
+gone after 30 days). All routes are person routes (`@AsPerson()`):
+
+| Route | Who | What |
+|---|---|---|
+| `GET /pages/:id/managers` | a manager | Managers (`creator`, `you`, `mayRemove`) and pending invitations |
+| `POST /pages/:id/managers {username}` | a manager | Invites a person by exact username. 404 `NO_SUCH_PERSON` for no such person, a page, a suspended account or a block either way with the page or the inviter (one answer, so nothing leaks); 400 `ALREADY_MANAGER`, `TOO_MANY_MANAGERS` (10). Repeating changes nothing; a new invitation sends `pageInvite` |
+| `DELETE /pages/:id/invites/:inviteId` | a manager | Cancels an invitation |
+| `GET /pages/invites/mine` | anyone | Invitations waiting for me (pages not suspended) |
+| `PUT /pages/invites/:id {accept}` | the invited person | Accept (joins `managers`) or decline; either way it goes. 404 `INVITE_GONE` |
+| `DELETE /pages/:id/managers/:personId` | a manager | `mayRemoveManager()`: anyone leaves; the creator removes anyone; once the creator no longer manages it, any manager removes others. Never the last manager (403 `LAST_MANAGER`); guarded on the count, so two leaving at once cannot empty it |
+
+Every manager is equal otherwise: they post, answer, invite, see insights and get the page's
+notifications. The page limit still counts `createdBy` only. A removed manager's next request as
+the page is refused (`NOT_A_MANAGER`), which ends acting on that device.
+
+**Suspension.** Suspending a person suspends a page they manage only when every manager of it is
+then suspended (`pageHasNoActiveManager()`): the page gets `suspendedForManagers`. Restoring any
+of its managers restores such a page. A page suspended for itself stays suspended. Deleting a
+person still deletes the pages only they manage (what account deletion promises).
+
+Web: Menu → Manage pages → the page, "Managers" (invite by username, remove, leave); invitations
+show at the top of Menu with Accept and Decline. No assistant tools: managing who runs a page is
+a person's act, not the page's. Tested in `integration/co-managers.integration.ts`.
 

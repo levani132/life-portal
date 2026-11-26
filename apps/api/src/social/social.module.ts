@@ -271,6 +271,11 @@ export class SocialService implements OnModuleInit {
     const rows = await this.profiles.find({ userId: { $in: userIds }, kind: 'page' }).select('userId').lean();
     return new Set(rows.map((row) => row.userId));
   }
+  /** Spec 045: a person (never a page) by their exact username, for a page's invitation. */
+  async personIdByUsername(username: string): Promise<string | null> {
+    const row = await this.profiles.findOne({ username: username.trim().toLowerCase().replace(/^@/, ''), kind: { $ne: 'page' } }).select('userId').lean();
+    return row?.userId ?? null;
+  }
   /** Whether a username is free, for a page being created. */
   async usernameFree(username: string): Promise<boolean> {
     return !(await this.profiles.exists({ username: username.toLowerCase() }));

@@ -9,6 +9,7 @@ export const NOTIFICATION_TYPES = [
   'postComment',
   'commentReply',
   'commentLike',
+  'pageInvite',
   'postLike',
   'postRepost',
   'message',
@@ -40,6 +41,8 @@ export interface NotificationEvent {
   /** For `message`: what was sent, and its text (shown only with message previews on). */
   messageKind?: 'text' | 'post';
   messageText?: string;
+  /** For `pageInvite` (targetId is the page): its name. */
+  pageName?: string;
   /** For `badgeEarned` (targetId is the badge id): its tier, and how many awards arrived together. */
   badgeTier?: number;
   count?: number;

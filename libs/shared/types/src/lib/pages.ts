@@ -133,3 +133,17 @@ export interface PageInsights {
   /** The page's 30 newest posts, newest first, with counts since they were posted. */
   posts: PageInsightsPost[];
 }
+
+/** Spec 045: a page's managers and pending invitations, for its managers only. */
+export interface PageManagers {
+  managers: { userId: string; name: string; username: string; avatarUrl?: string; creator: boolean; you: boolean; mayRemove: boolean }[];
+  invites: { id: string; userId: string; name: string; username: string; avatarUrl?: string; createdAt: string }[];
+}
+
+/** Spec 045: an invitation to help run a page, as the invited person sees it. */
+export interface PageInvite {
+  id: string;
+  page: { id: string; name: string; username: string; avatarUrl?: string };
+  invitedBy: string;
+  createdAt: string;
+}

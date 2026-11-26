@@ -36,3 +36,25 @@ export function mayCreatePage(input: { pageLimit?: number; developer: boolean; c
 export function followingAuthors(input: { self: string; friends: readonly string[]; followedPages: readonly string[] }): string[] {
   return [...new Set([input.self, ...input.friends, ...input.followedPages])];
 }
+
+/**
+ * Spec 045: whether `requester` may take `target` off a page's managers. Anyone may leave; the
+ * page's creator may remove anyone else; when the creator no longer manages it, any manager may.
+ * Never the last manager: the page would have nobody to answer for it (delete it instead).
+ */
+export function mayRemoveManager(input: { requester: string; target: string; managers: readonly string[]; createdBy?: string }): boolean {
+  const { requester, target, managers, createdBy } = input;
+  if (!managers.includes(requester) || !managers.includes(target) || managers.length < 2) return false;
+  if (requester === target) return true;
+  if (requester === createdBy) return true;
+  return !createdBy || !managers.includes(createdBy) ? target !== createdBy : false;
+}
+
+/**
+ * Spec 045: a page is suspended for its managers only when none of them can act any more: it
+ * has managers and every one of them is suspended. Suspending one manager of several leaves the
+ * page alone: a page is its own account.
+ */
+export function pageHasNoActiveManager(managers: readonly string[], suspended: ReadonlySet<string>): boolean {
+  return managers.length > 0 && managers.every((id) => suspended.has(id));
+}

@@ -82,3 +82,27 @@ test('a page’s insights show its posts with views and likes', async ({ page })
   await expect(page.getByText('+1 new')).toBeVisible();
   await snap(page, '06-page-insights');
 });
+
+test('a co-manager is invited by username and accepts in Menu', async ({ page }) => {
+  const ana = await account('Ana');
+  const beka = await account('Beka');
+  const bekaName = `beka-${randomUUID().slice(0, 6)}`;
+  await call(beka, 'PUT', '/social/me', { username: bekaName, displayName: 'Beka', bio: '', discoverable: true });
+  const made = await call<{ id: string }>(ana, 'POST', '/pages', { name: 'E2E Team Page', username: `e2e-team-${randomUUID().slice(0, 6)}`, bio: '' });
+
+  await signIn(page, ana);
+  await page.goto(`/settings/pages/${made.id}`);
+  await page.getByLabel('Username to invite').fill(bekaName);
+  await page.getByRole('button', { name: 'Invite', exact: true }).click();
+  await expect(page.getByText('Invited, waiting for an answer')).toBeVisible();
+  await page.getByRole('heading', { name: 'Managers' }).scrollIntoViewIfNeeded();
+  await snap(page, '06-page-managers');
+
+  await signIn(page, beka);
+  await page.goto('/menu');
+  await expect(page.getByText('invited you to help run')).toBeVisible();
+  await snap(page, '06-page-invite');
+  await page.getByRole('button', { name: 'Accept' }).click();
+  await expect(page.getByText('invited you to help run')).toHaveCount(0);
+  await expect.poll(async () => (await call<{ pages: { id: string }[] }>(beka, 'GET', '/pages')).pages.map((row) => row.id)).toContain(made.id);
+});

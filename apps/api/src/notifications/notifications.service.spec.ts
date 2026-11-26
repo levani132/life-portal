@@ -315,6 +315,7 @@ describe('NotificationsService preferences and activity', () => {
       postComment: true,
       commentReply: true,
       commentLike: true,
+      pageInvite: true,
       postLike: false,
       postRepost: true,
       message: true,

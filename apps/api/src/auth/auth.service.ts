@@ -12,6 +12,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { randomBytes, randomUUID } from 'node:crypto';
 import * as bcrypt from 'bcryptjs';
+import { pageHasNoActiveManager } from '@life-portal/shared-domain';
 import { LEGAL_VERSION, type SuspendedAccount, type AuthSession, type AuthTokens, type JwtPayload, type RefreshRefusal, type User as UserDto } from '@life-portal/shared-types';
 import { CONFIG, type AppConfig } from '../config/configuration';
 import { User, type UserDocument } from './schemas/user.schema';
@@ -220,6 +221,8 @@ export class AuthService {
     await this.sessions.revokeAll(userId, 'suspended');
     await this.security.record('account_suspended', ctx, userId);
     const user = await this.userModel.findById(userId).select('email name kind managers').lean();
+    // Spec 045: a page stays up while any of its managers can act; with none left it is suspended too.
+    if (user && user.kind !== 'page') await this.suspendOrphanedPages(userId);
     if (this.mailer && user) {
       const rules = this.config.webBaseUrl ? `${this.config.webBaseUrl}/rules` : undefined;
       const support = supportAddress(this.config.mail?.from);
@@ -250,9 +253,27 @@ export class AuthService {
     }));
   }
 
+  /** Spec 045: pages this person manages whose every manager is now suspended. */
+  private async suspendOrphanedPages(personId: string): Promise<void> {
+    const pages = await this.userModel.find({ kind: 'page', managers: personId, suspendedAt: { $exists: false } }).select('managers').lean();
+    for (const page of pages) {
+      const managers = page.managers ?? [];
+      const suspended = new Set(
+        (await this.userModel.find({ _id: { $in: managers.filter((id) => Types.ObjectId.isValid(id)) }, suspendedAt: { $exists: true } }).select('_id').lean()).map((row) => String(row._id)),
+      );
+      if (pageHasNoActiveManager(managers, suspended))
+        await this.userModel.updateOne(
+          { _id: page._id, suspendedAt: { $exists: false } },
+          { $set: { suspendedAt: new Date(), suspendedReason: 'None of its managers can act for it.', suspendedForManagers: true } },
+        );
+    }
+  }
+
   async unsuspend(userId: string, ctx: RequestContext = {}): Promise<{ success: true }> {
     if (!Types.ObjectId.isValid(userId)) throw new BadRequestException('Unknown account.');
     await this.userModel.updateOne({ _id: userId }, { $unset: { suspendedAt: 1, suspendedReason: 1 } });
+    // Spec 045: a page suspended only for want of a manager comes back with one.
+    await this.userModel.updateMany({ kind: 'page', managers: userId, suspendedForManagers: true }, { $unset: { suspendedAt: 1, suspendedReason: 1, suspendedForManagers: 1 } });
     await this.security.record('account_restored', ctx, userId);
     return { success: true };
   }

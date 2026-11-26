@@ -2917,3 +2917,13 @@ asked for a per-page choice: always (the default), or only while a device is usi
 that page, so a manager of many pages is not flooded. The device reports its identity when it
 re-registers on start; switching identity reloads the app, so that is enough.
 
+## 2026-11-26: A page is its own account, with up to ten equal managers
+
+The owner: a page should not go down because one person who runs it was suspended, and it should
+have several managers. So suspending a person leaves their pages alone, and a page is suspended
+only when every one of its managers is (restored when one is). Managers join by invitation,
+accepted by the invited person; all are equal except that the page's creator can remove others
+(anyone can leave, never the last one). Ten at most, so an invitation cannot be used to spray a
+page's notifications across many phones. Deletion is unchanged: deleting a person deletes the
+pages only they manage, because the privacy policy promises deletion removes everything.
+

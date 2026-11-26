@@ -107,6 +107,7 @@ export function notificationText(
     NotificationEvent,
     'type' | 'actorName' | 'postTitle' | 'commentText' | 'messageKind' | 'messageText'
   > &
+    Partial<Pick<NotificationEvent, 'pageName'>> &
     Partial<Pick<NotificationEvent, 'targetId' | 'badgeTier' | 'count'>>,
   options: {
     showCommentPreviews: boolean;
@@ -143,6 +144,8 @@ export function notificationText(
     }
     case 'postRepost':
       return { title, body: `reposted ${postName(event.postTitle)}` };
+    case 'pageInvite':
+      return { title, body: `invited you to help run ${clip(event.pageName ?? 'a page', PREVIEW_LIMIT)}` };
     case 'commentLike': {
       const preview = options.showCommentPreviews && event.commentText ? clip(event.commentText, PREVIEW_LIMIT) : '';
       const who = others > 0 ? `and ${others} ${others === 1 ? 'other' : 'others'} liked` : 'liked';
