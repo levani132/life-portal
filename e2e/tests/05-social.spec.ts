@@ -125,6 +125,7 @@ test('Training shows on your portal and opens into the week, records and workout
   await page.goto('/profile');
   const training = page.getByRole('button', { name: 'Open Training' }).filter({ visible: true }).first();
   await expect(training).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Who sees your portal' }).filter({ visible: true }).first()).toHaveAttribute('href', '/settings/privacy');
   await snap(page, '05-portal-training');
   // Posts follow the widgets on the same tab.
   await expect(page.getByText('New best on squats.').filter({ visible: true }).first()).toBeVisible();

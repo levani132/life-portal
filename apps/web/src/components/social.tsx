@@ -10,6 +10,7 @@ import {
   Camera,
   Check,
   Eye,
+  Lock,
   ImagePlus,
   LockKeyhole,
   Menu,
@@ -568,8 +569,17 @@ export function ProfileView({ userId }: { userId?: string }) {
               <PortalGrid widgets={person.widgets} arrangeable={own && viewAs === 'normal' && !actingPageId()} ownerId={person.userId} viewAs={viewAs} />
             </>
           ) : own ? (
-            <div className="card p-6 text-sm text-ink-muted">Your portal shows no widgets to this audience yet. Choose who sees each module in Privacy and sharing.</div>
+            <div className="card p-6 text-sm text-ink-muted">Your portal shows no widgets to this audience yet. Choose who sees each module below.</div>
           ) : null}
+          {/* Spec 046: on your own portal, the way to who sees each widget and what it shows. */}
+          {own && viewAs === 'normal' && !actingPageId() && (
+            <div className="mt-3 flex justify-center">
+              <Link href="/settings/privacy" className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-muted hover:text-ink">
+                <Lock size={13} aria-hidden="true" />
+                Who sees your portal
+              </Link>
+            </div>
+          )}
           {posts && (
             <div className={person.widgets.length || own ? 'mt-5' : ''}>
               <PostsList authorId={person.userId} preview={viewAs} />
