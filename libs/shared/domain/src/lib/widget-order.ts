@@ -1,3 +1,4 @@
+import type { PortalWidgetSize } from '@life-portal/shared-types';
 /**
  * Dashboard arrangement.
  *
@@ -108,3 +109,26 @@ export function withWidgetSize(
   if (size !== 'wide') kept.push([id, size]);
   return Object.fromEntries(kept.slice(-WIDGET_SIZES_MAX));
 }
+
+/** Spec 046: what an older portal stored, before sizes were measured in squares. */
+const LEGACY_PORTAL_SIZES: Record<string, PortalWidgetSize> = { small: '2x2', medium: '4x2', large: '4x4' };
+
+/**
+ * Spec 046: a portal widget's size, from what is stored (or nothing), as `{ w, h }` squares and its
+ * name. An unknown value gets the module's default: Food `4x2`, the rest `2x2`. A widget one
+ * square wide is always one square tall: a narrow tower would hold nothing readable.
+ */
+export function portalSize(stored: string | undefined, module: string): { w: number; h: number; size: PortalWidgetSize } {
+  const raw = stored && LEGACY_PORTAL_SIZES[stored] ? LEGACY_PORTAL_SIZES[stored] : stored;
+  const match = raw ? /^([1-4])x([1-4])$/.exec(raw) : null;
+  const fallback = module === 'nutrition' ? '4x2' : '2x2';
+  const [w, h] = match ? [Number(match[1]), Number(match[2])] : fallback.split('x').map(Number);
+  const height = w === 1 ? 1 : h;
+  return { w, h: height, size: `${w}x${height}` as PortalWidgetSize };
+}
+
+/** Spec 046: whether a value may be stored as a portal widget's size. */
+export function isPortalSize(value: unknown): value is PortalWidgetSize {
+  return typeof value === 'string' && /^([1-4])x([1-4])$/.test(value) && !(value.startsWith('1x') && value !== '1x1');
+}
+

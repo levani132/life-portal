@@ -48,7 +48,7 @@ Settings fields:
 - `selectedModules`: absent means all currently available modules; `[]` is intentionally empty.
 - `moduleVisibility`: per-module private/friends/public, missing values always private.
 - `portalOrder`, `portalSizes` (spec 046): the portal's own arrangement of module ids and each one's
-  size (`small`, `medium`, `large`), written only by `PUT /portal/arrangement`. Absent: Home's
+  size in squares (`"4x2"`), written only by `PUT /portal/arrangement`. Absent: Home's
   order and each module's default size.
 - `completedSetupSteps`: stable step IDs; legacy completion migrates to modules/privacy/home/ready only.
 - `setupStep`, `setupCompleted`, `setupDismissed`: legacy/resume controls; completion is derived from required step IDs, with nutrition steps required only when selected and available, and `interests-v1` only for accounts with For You (forYou, social, foodPosts and nutrition). Migration clears old dismissal once. Writes union completed steps so stale forms cannot erase progress.

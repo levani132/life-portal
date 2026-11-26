@@ -563,12 +563,7 @@ export function ProfileView({ userId }: { userId?: string }) {
           {person.widgets.length ? (
             <>
               {/* Spec 046: the portal's widgets, read only; arranged only by its owner, as themselves. */}
-              <PortalGrid widgets={person.widgets} arrangeable={own && viewAs === 'normal' && !actingPageId()} />
-              {person.widgets.some((widget) => widget.hasDiary) && (
-                <section className="card mt-3 p-4">
-                  <DailyFoodDiary key={`${person.userId}:${viewAs}`} userId={person.userId} preview={viewAs} />
-                </section>
-              )}
+              <PortalGrid widgets={person.widgets} arrangeable={own && viewAs === 'normal' && !actingPageId()} ownerId={person.userId} viewAs={viewAs} />
             </>
           ) : (
             <div className="card p-6 text-sm text-ink-muted">

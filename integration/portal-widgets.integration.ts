@@ -36,7 +36,7 @@ describe('a portal’s widgets', () => {
     expect(meals?.food?.week).toMatchObject({ daysLogged: 1, avgKcal: 380 });
     expect(meals?.food?.week?.days).toHaveLength(7);
     expect(meals?.food?.targets).toBeUndefined();
-    expect(meals?.size).toBe('large');
+    expect(meals?.size).toBe('4x2');
 
     // Targets only: targets, and nothing about what was eaten.
     await api.call(ana, 'PUT', '/nutrition/profile', { shareMeals: false, shareTargets: true });
@@ -46,10 +46,10 @@ describe('a portal’s widgets', () => {
     expect(targets?.food?.week).toBeUndefined();
 
     // The portal's own arrangement: sizes are the portal's, not Home's.
-    expect((await api.call(ana, 'PUT', '/portal/arrangement', { order: ['nutrition'], sizes: { nutrition: 'small' } })).status).toBe(200);
-    expect((await portal()).widgets[0].size).toBe('small');
+    expect((await api.call(ana, 'PUT', '/portal/arrangement', { order: ['nutrition'], sizes: { nutrition: '2x3' } })).status).toBe(200);
+    expect((await portal()).widgets[0].size).toBe('2x3');
     const home = await api.call<{ widgetSizes?: Record<string, string>; portalSizes?: Record<string, string> }>(ana, 'GET', '/settings');
     expect(home.body.widgetSizes?.['nutrition']).toBeUndefined();
-    expect((await api.call(ana, 'PUT', '/portal/arrangement', { order: ['nutrition'], sizes: { nutrition: 'huge' } })).status).toBe(400);
+    expect((await api.call(ana, 'PUT', '/portal/arrangement', { order: ['nutrition'], sizes: { nutrition: '1x3' } })).status).toBe(400);
   });
 });

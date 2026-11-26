@@ -1,4 +1,4 @@
-import { WIDGET_SIZES_MAX, arrangeWidgets, moveWidget, sizeWidgets, withWidgetSize } from './widget-order';
+import { WIDGET_SIZES_MAX, arrangeWidgets, isPortalSize, moveWidget, portalSize, sizeWidgets, withWidgetSize } from './widget-order';
 
 const cards = [
   { id: 'loans', order: 1 },
@@ -129,5 +129,22 @@ describe('widget sizes', () => {
     expect(Object.keys(next)).toHaveLength(WIDGET_SIZES_MAX);
     expect(next['new']).toBe('full');
     expect(next['c0']).toBeUndefined();
+  });
+});
+
+describe('portalSize (spec 046)', () => {
+  it('reads squares, the old names, and falls back to the module default', () => {
+    expect(portalSize('3x2', 'stocks')).toEqual({ w: 3, h: 2, size: '3x2' });
+    expect(portalSize('large', 'nutrition')).toEqual({ w: 4, h: 4, size: '4x4' });
+    expect(portalSize('small', 'stocks').size).toBe('2x2');
+    expect(portalSize(undefined, 'nutrition').size).toBe('4x2');
+    expect(portalSize('9x9', 'stocks').size).toBe('2x2');
+  });
+  it('keeps a one-square-wide widget one square tall', () => {
+    expect(portalSize('1x3', 'stocks')).toEqual({ w: 1, h: 1, size: '1x1' });
+    expect(isPortalSize('1x1')).toBe(true);
+    expect(isPortalSize('1x2')).toBe(false);
+    expect(isPortalSize('4x4')).toBe(true);
+    expect(isPortalSize('large')).toBe(false);
   });
 });

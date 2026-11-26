@@ -134,15 +134,18 @@ Posts and Badges; a page's opens on its posts. The tab bar says "Portal". A port
   sign-up come back to the portal (`lib/next-path.ts`, same-app paths only).
 - Tested in `integration/public-portal.integration.ts` and the screen test.
 
-**Widgets (slice 2).** The Portal tab and the visitor's view draw each shared module as a
-read-only widget in Home's look (`components/portal-grid.tsx`), on an iOS-like grid: two cells
-wide on a phone (four on a wide screen), each widget `small` (one cell), `medium` (a row) or
-`large` (two rows), packed densely. Nothing on a widget acts. Each `SharedWidget` carries its
-`size` (`settings.portalSizes`, default Food `large`, others `medium`) and arrives in the portal's
-own order (`settings.portalOrder`, else Home's `widgetOrder`). Food adds `food`
-(`NutritionService.portalFood`): today's totals and the last seven days (`portalFoodWeek()`) only
-with meals shared, targets only with targets shared, weight still its own stat. On your own
-portal, seen as yourself, holding a widget starts arranging (drag; tap to cycle its size); `PUT
-/portal/arrangement {order, sizes}` saves both, never touching Home. Tested in
-`integration/portal-widgets.integration.ts`.
-
+**Widgets (slice 2, reworked the same day).** The Portal tab and the visitor's view draw each
+shared module as a read-only widget in Home's glass look (`components/portal-grid.tsx`). The grid
+is four squares wide and each row one square tall (`100cqw` on the grid's container), so a widget
+`w`×`h` (`portalSize()`: 1 to 4 each; one wide is always `1x1`, drawn as an app icon) is exactly
+that many squares, packed densely. Its content follows its size: one square tall shows one
+figure; Food shows Home's calories ring and macro bars, and the week from three squares tall.
+Tapping a widget opens it like an iOS folder: a full-width window grown out of the widget, with
+everything the module shares (Food: today's four rings, the week, the shared diary day by day).
+A visitor without an account is asked to join instead. On your own portal, seen as yourself,
+holding a widget arranges: drag to move; its size badge opens a 4×4 board of squares to pick a
+size. `PUT /portal/arrangement {order, sizes}` saves both (sizes `"<w>x<h>"`; the older
+`small`/`medium`/`large` read as `2x2`/`4x2`/`4x4`), never touching Home. Each `SharedWidget`
+carries `size` and arrives in the portal's own order (`portalOrder`, else Home's). Food adds
+`food` (`NutritionService.portalFood`): today and the week (`portalFoodWeek()`) only with meals
+shared, targets only with targets shared. Tested in `integration/portal-widgets.integration.ts`.

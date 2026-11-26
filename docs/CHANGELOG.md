@@ -4,10 +4,11 @@ User-visible changes. Newest first.
 
 ## 2026-11-26: My Portal, part two
 
-- Your portal shows what you share as widgets, in the look of Home's but read only, on a grid like
-  an iPhone's home screen: small, medium and large. Hold a widget on your own portal to move it,
-  and tap it while arranging to change its size. The portal's arrangement is its own; Home's
-  stays as it is.
+- Your portal shows what you share as widgets in Home's look, on a grid of squares like an
+  iPhone's home screen: each widget 1 to 4 squares wide and tall, a one-square widget just its
+  icon. Hold a widget to arrange; its size badge opens a board of squares to pick a size. Tap a
+  widget to open it like a folder, with everything you share from that module. The portal's
+  arrangement is its own; Home's stays as it is.
 - Food on a portal shows today's rings and the week (calories a day, days logged) with meals
   shared, and against your targets when those are shared.
 

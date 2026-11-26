@@ -36,11 +36,11 @@ export type WidgetSize = (typeof WIDGET_SIZES)[number];
 export const DEFAULT_WIDGET_SIZE: WidgetSize = 'wide';
 
 /**
- * Spec 046: a widget's size on a portal, as on an iOS home screen: `small` is one cell of a
- * two-wide grid, `medium` a row, `large` two rows. The portal's own choice, never Home's.
+ * Spec 046: a widget's size on a portal, `<width>x<height>` in squares of a grid four squares
+ * wide (`4x2` is the full width, half as tall). A one-square-wide widget is always `1x1`: an
+ * icon, like an app. The portal's own choice, never Home's.
  */
-export const PORTAL_WIDGET_SIZES = ['small', 'medium', 'large'] as const;
-export type PortalWidgetSize = (typeof PORTAL_WIDGET_SIZES)[number];
+export type PortalWidgetSize = `${1 | 2 | 3 | 4}x${1 | 2 | 3 | 4}`;
 
 /** Severity of the card's headline, used for the accent and the sort. */
 export type WidgetTone = 'neutral' | 'good' | 'warn' | 'bad';

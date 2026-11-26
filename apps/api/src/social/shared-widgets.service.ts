@@ -7,6 +7,7 @@ import type {
 } from '@life-portal/shared-types';
 import {
   formatCentsCompact,
+  portalSize,
   selectedAvailableModules,
   sharedModuleOrder,
 } from '@life-portal/shared-domain';
@@ -181,7 +182,7 @@ export class SharedWidgetsService {
           audience: settings.moduleVisibility![id]!,
           stats,
           ...(hasDiary ? { hasDiary: true } : {}),
-          size: settings.portalSizes?.[id] ?? (id === 'nutrition' ? 'large' : 'medium'),
+          size: portalSize(settings.portalSizes?.[id], id).size,
           ...(food ? { food } : {}),
         });
       if (widgets.length >= limit) break;

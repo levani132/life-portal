@@ -99,7 +99,7 @@ export function PublicPortalView({ username }: { username: string }) {
             </div>
             {portal.data.widgets.length > 0 && (
               <div className="mt-4">
-                <PortalGrid widgets={portal.data.widgets} />
+                <PortalGrid widgets={portal.data.widgets} onLocked={() => setGate(true)} />
               </div>
             )}
             {portal.data.posts.length > 0 && (

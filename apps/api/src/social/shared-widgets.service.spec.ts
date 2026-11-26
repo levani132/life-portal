@@ -82,8 +82,8 @@ describe('daily diary audience and module checks', () => {
         audience: 'friends',
         stats: [],
         hasDiary: true,
-        // Spec 046: Food is a large widget on a portal until its owner resizes it.
-        size: 'large',
+        // Spec 046: Food is a full-width, two-square-tall widget until its owner resizes it.
+        size: '4x2',
       },
     ]);
   });

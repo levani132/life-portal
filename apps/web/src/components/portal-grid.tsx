@@ -1,46 +1,63 @@
 'use client';
 
 import clsx from 'clsx';
-import { useEffect, useState } from 'react';
-import { type PortalWidgetSize, type SharedWidget, type WidgetCard } from '@life-portal/shared-types';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
+import { X } from 'lucide-react';
+import type { PortalWidgetSize, SharedWidget, WidgetCard } from '@life-portal/shared-types';
+import { portalSize } from '@life-portal/shared-domain';
 import { api } from '../lib/api';
 import { revalidate } from '../lib/hooks';
 import { MACRO_COLORS } from '../lib/macro-colors';
 import { MacroBar, NutritionRing, WIDGET_HUES, WIDGET_ICONS, type NutritionMetric } from './home-widget';
+import { DailyFoodDiary } from './shared-food-diary';
 import { SortableGrid, type SortableState } from './sortable-grid';
 import { EstimateMark, ErrorNote } from './ui';
 
 /** A module's widget look: Money is drawn as Home's cash-flow card. */
 const keyOf = (module: string): WidgetCard['key'] => (module === 'money' ? 'cashflow' : (module as WidgetCard['key']));
-const sizeOf = (widget: SharedWidget): PortalWidgetSize => widget.size ?? (widget.module === 'nutrition' ? 'large' : 'medium');
-const SPAN: Record<PortalWidgetSize, string> = {
-  small: 'col-span-1 row-span-1',
-  medium: 'col-span-2 row-span-1',
-  large: 'col-span-2 row-span-2',
-};
-const NEXT_SIZE: Record<PortalWidgetSize, PortalWidgetSize> = { small: 'medium', medium: 'large', large: 'small' };
+const GAP = '0.625rem';
+
+type Viewer = 'normal' | 'friend' | 'stranger';
 
 /**
- * Spec 046: a portal's widgets, laid out like an iOS home screen: a grid two cells wide on a
- * phone, each widget small (one cell), medium (a row) or large (two rows), packed densely. The
- * widgets look like Home's but only show; nothing on them acts. On your own portal (seen as
- * yourself), holding a widget lets you drag it and tap it to change its size; the arrangement is
- * the portal's alone.
+ * Spec 046: a portal's widgets, laid out like an iOS home screen. The grid is four squares wide
+ * and every row is one square tall, so a widget `w`×`h` is exactly that many squares; they pack
+ * densely, as if dropped and arranged by hand. A 1×1 widget is just the module's icon, like an
+ * app. Widgets look like Home's, show only, and open like an iOS folder into everything that
+ * module shares. On your own portal (seen as yourself), holding a widget arranges: drag it, and
+ * its size button opens a picker of squares.
  */
-export function PortalGrid({ widgets, arrangeable = false }: { widgets: SharedWidget[]; arrangeable?: boolean }) {
+export function PortalGrid({
+  widgets,
+  arrangeable = false,
+  ownerId,
+  viewAs = 'normal',
+  onLocked,
+}: {
+  widgets: SharedWidget[];
+  arrangeable?: boolean;
+  /** Whose portal, for what a widget opens into (the shared diary). Absent for a visitor. */
+  ownerId?: string;
+  viewAs?: Viewer;
+  /** A visitor without an account: opening a widget asks them to join instead. */
+  onLocked?: () => void;
+}) {
   const [editing, setEditing] = useState(false);
   const [order, setOrder] = useState(() => widgets.map((widget) => widget.module as string));
-  const [sizes, setSizes] = useState<Record<string, PortalWidgetSize>>(() => Object.fromEntries(widgets.map((widget) => [widget.module, sizeOf(widget)])));
+  const [sizes, setSizes] = useState<Record<string, PortalWidgetSize>>(() => Object.fromEntries(widgets.map((widget) => [widget.module, portalSize(widget.size, widget.module).size])));
   const [error, setError] = useState<string | null>(null);
-  const shownKey = widgets.map((widget) => `${widget.module}:${sizeOf(widget)}`).join(',');
-  // A fresh read from the server (another device, a new share) replaces what is held, unless arranging.
+  const [open, setOpen] = useState<{ widget: SharedWidget; from: DOMRect } | null>(null);
+  const shownKey = widgets.map((widget) => `${widget.module}:${widget.size}`).join(',');
+  // A fresh read (another device, a new share) replaces what is held, unless arranging now.
   useEffect(() => {
     if (editing) return;
     setOrder(widgets.map((widget) => widget.module));
-    setSizes(Object.fromEntries(widgets.map((widget) => [widget.module, sizeOf(widget)])));
+    setSizes(Object.fromEntries(widgets.map((widget) => [widget.module, portalSize(widget.size, widget.module).size])));
   }, [shownKey]);
   const byModule = new Map(widgets.map((widget) => [widget.module as string, widget]));
   const items = order.map((id) => byModule.get(id)).filter((widget): widget is SharedWidget => !!widget);
+  const sizeOf = (widget: SharedWidget) => portalSize(sizes[widget.module] ?? widget.size, widget.module);
 
   const save = async (nextOrder: string[], nextSizes: Record<string, PortalWidgetSize>) => {
     setError(null);
@@ -51,137 +68,215 @@ export function PortalGrid({ widgets, arrangeable = false }: { widgets: SharedWi
       setError(caught instanceof Error ? caught.message : 'The arrangement was not saved.');
     }
   };
-  const resize = (module: string) => {
-    const next = { ...sizes, [module]: NEXT_SIZE[sizes[module] ?? 'medium'] };
+  const resize = (module: string, size: PortalWidgetSize) => {
+    const next = { ...sizes, [module]: size };
     setSizes(next);
     void save(order, next);
   };
+  const openWidget = (widget: SharedWidget, from: DOMRect) => (onLocked ? onLocked() : setOpen({ widget, from }));
 
-  const grid = 'grid grid-flow-row-dense grid-cols-2 gap-3 [grid-auto-rows:9.75rem] sm:grid-cols-4';
-  if (!arrangeable)
-    return (
-      <div className={grid}>
-        {items.map((widget) => (
-          <div key={widget.module} className={SPAN[sizes[widget.module] ?? sizeOf(widget)]}>
-            <PortalWidget widget={widget} size={sizes[widget.module] ?? sizeOf(widget)} />
-          </div>
-        ))}
-      </div>
-    );
+  const gridStyle: CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+    gridAutoRows: `calc((100cqw - 3 * ${GAP}) / 4)`,
+    gridAutoFlow: 'row dense',
+    gap: GAP,
+  };
+  const span = (widget: SharedWidget): CSSProperties => {
+    const { w, h } = sizeOf(widget);
+    return { gridColumn: `span ${w}`, gridRow: `span ${h}` };
+  };
+
   return (
-    <div>
+    <div className="[container-type:inline-size]">
       {editing && (
         <div className="mb-3 flex items-center justify-between gap-3 text-xs text-ink-muted">
-          <span>Drag to move. Tap a widget to change its size.</span>
+          <span>Drag to move. Tap a size to change it.</span>
           <button type="button" className="btn-primary" onClick={() => setEditing(false)}>
             Done
           </button>
         </div>
       )}
-      <SortableGrid
-        items={items}
-        getId={(widget) => widget.module}
-        getLabel={(widget) => widget.title}
-        editing={editing}
-        onEditingChange={setEditing}
-        onOrderChange={setOrder}
-        onCommit={(next) => {
-          setOrder(next);
-          void save(next, sizes);
-        }}
-        className={grid}
-        getItemStyle={(widget) => {
-          const size = sizes[widget.module] ?? sizeOf(widget);
-          return { gridColumn: size === 'small' ? 'span 1' : 'span 2', gridRow: size === 'large' ? 'span 2' : 'span 1' };
-        }}
-      >
-        {(widget, state) => (
-          <PortalWidget widget={widget} size={sizes[widget.module] ?? sizeOf(widget)} state={state} onResize={state.editing ? () => resize(widget.module) : undefined} />
-        )}
-      </SortableGrid>
-      {!editing && items.length > 1 && <p className="mt-2 text-center text-[11px] text-ink-faint">Hold a widget to arrange your portal.</p>}
+      {arrangeable ? (
+        <SortableGrid
+          items={items}
+          getId={(widget) => widget.module}
+          getLabel={(widget) => widget.title}
+          editing={editing}
+          onEditingChange={setEditing}
+          onOrderChange={setOrder}
+          onCommit={(next) => {
+            setOrder(next);
+            void save(next, sizes);
+          }}
+          style={gridStyle}
+          getItemStyle={span}
+        >
+          {(widget, state) => (
+            <PortalWidget
+              widget={widget}
+              size={sizeOf(widget)}
+              state={state}
+              onResize={(size) => resize(widget.module, size)}
+              onOpen={(from) => openWidget(widget, from)}
+            />
+          )}
+        </SortableGrid>
+      ) : (
+        <div style={gridStyle}>
+          {items.map((widget) => (
+            <div key={widget.module} style={span(widget)}>
+              <PortalWidget widget={widget} size={sizeOf(widget)} onOpen={(from) => openWidget(widget, from)} />
+            </div>
+          ))}
+        </div>
+      )}
+      {arrangeable && !editing && <p className="mt-2 text-center text-[11px] text-ink-faint">Tap a widget to open it. Hold one to arrange your portal.</p>}
       {error && <ErrorNote message={error} />}
+      {open && <PortalFolder widget={open.widget} from={open.from} ownerId={ownerId} viewAs={viewAs} onClose={() => setOpen(null)} />}
     </div>
   );
 }
 
-/** One read-only widget, in the look of Home's card. */
-function PortalWidget({ widget, size, state, onResize }: { widget: SharedWidget; size: PortalWidgetSize; state?: SortableState; onResize?: () => void }) {
+/** One read-only widget, in the look of Home's glass card, laid out for its size. */
+function PortalWidget({
+  widget,
+  size,
+  state,
+  onResize,
+  onOpen,
+}: {
+  widget: SharedWidget;
+  size: { w: number; h: number; size: PortalWidgetSize };
+  state?: SortableState;
+  onResize?: (size: PortalWidgetSize) => void;
+  onOpen: (from: DOMRect) => void;
+}) {
+  const ref = useRef<HTMLElement>(null);
+  const [picking, setPicking] = useState<DOMRect | null>(null);
   const key = keyOf(widget.module);
   const Icon = WIDGET_ICONS[key] ?? WIDGET_ICONS.projects;
   const hue = WIDGET_HUES[key] ?? WIDGET_HUES.projects;
+  const editing = !!state?.editing;
+  const icon = size.w === 1;
   return (
     <article
+      ref={ref}
       className={clsx(
-        'card flex h-full flex-col overflow-hidden rounded-2xl px-3 pb-2.5 pt-2.5',
-        state?.editing && !state.dragging && 'widget-jiggle',
+        'card home-widget relative flex h-full flex-col overflow-hidden rounded-2xl',
+        icon ? 'items-center justify-center p-1.5' : 'px-3 pb-2.5 pt-2.5',
+        editing && !state?.dragging && 'widget-jiggle',
         state?.dragging && 'border-accent shadow-xl',
+        !editing && 'cursor-pointer active:scale-[0.98] transition-transform',
       )}
-      style={state?.editing && !state.dragging ? { animationDelay: `${(state.index % 4) * 90}ms` } : undefined}
-      onClick={onResize}
+      style={editing && !state?.dragging ? { animationDelay: `${(state!.index % 4) * 90}ms` } : undefined}
+      role={editing ? undefined : 'button'}
+      tabIndex={editing ? -1 : 0}
+      aria-label={editing ? undefined : `Open ${widget.title}`}
+      onClick={() => {
+        if (!editing && ref.current) onOpen(ref.current.getBoundingClientRect());
+      }}
+      onKeyDown={(event) => {
+        if (!editing && (event.key === 'Enter' || event.key === ' ') && ref.current) {
+          event.preventDefault();
+          onOpen(ref.current.getBoundingClientRect());
+        }
+      }}
     >
-      <header className="mb-1.5 flex items-center gap-2">
-        <span className={clsx('flex h-7 w-7 shrink-0 items-center justify-center rounded-lg', hue.tile)}>
-          <Icon size={15} aria-hidden />
-        </span>
-        <h3 className="truncate text-sm font-semibold">{widget.title}</h3>
-        <span className="ml-auto shrink-0 text-[10px] text-ink-faint">{onResize ? sizeLabel(size) : widget.audience === 'friends' ? 'Friends' : 'Everyone'}</span>
-      </header>
-      {widget.food ? <FoodBody widget={widget} size={size} /> : <Stats widget={widget} size={size} />}
+      {icon ? (
+        <>
+          <span className={clsx('flex aspect-square w-3/5 items-center justify-center rounded-[28%]', hue.tile)}>
+            <Icon className="h-1/2 w-1/2" aria-hidden />
+          </span>
+          <span className="mt-1 max-w-full truncate text-[10px] leading-none text-ink-muted">{widget.title}</span>
+        </>
+      ) : (
+        <>
+          <header className="mb-1.5 flex items-center gap-2 pr-7">
+            <span className={clsx('widget-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-lg', hue.tile)}>
+              <Icon size={15} aria-hidden />
+            </span>
+            <h3 className="widget-title truncate text-sm font-semibold">{widget.title}</h3>
+            {size.w >= 3 && !editing && <span className="ml-auto shrink-0 text-[10px] text-ink-faint">{widget.audience === 'friends' ? 'Friends' : 'Everyone'}</span>}
+          </header>
+          <WidgetBody widget={widget} w={size.w} h={size.h} />
+        </>
+      )}
+      {editing && onResize && (
+        <button
+          type="button"
+          aria-label={`Size of ${widget.title}: ${size.w} by ${size.h}. Change it`}
+          className="absolute right-1.5 top-1.5 z-10 rounded-full bg-ink/80 px-1.5 py-0.5 text-[10px] font-semibold tabular text-surface shadow"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            setPicking(event.currentTarget.getBoundingClientRect());
+          }}
+        >
+          {size.w}×{size.h}
+        </button>
+      )}
+      {picking && onResize && (
+        <SizePicker
+          anchor={picking}
+          current={size}
+          onPick={(next) => {
+            setPicking(null);
+            if (next !== size.size) onResize(next);
+          }}
+          onClose={() => setPicking(null)}
+        />
+      )}
     </article>
   );
 }
 
-/** M, T, W… for a `YYYY-MM-DD` day. */
-const weekday = (day: string) => 'SMTWTFS'[new Date(`${day}T12:00:00Z`).getUTCDay()];
-
-const sizeLabel = (size: PortalWidgetSize) => ({ small: 'Small', medium: 'Medium', large: 'Large' })[size];
-
-function Stats({ widget, size }: { widget: SharedWidget; size: PortalWidgetSize }) {
-  const stats = size === 'small' ? widget.stats.slice(0, 2) : widget.stats;
+/** What fills a widget, by its size: a figure when it is one square tall, more as it grows. */
+function WidgetBody({ widget, w, h }: { widget: SharedWidget; w: number; h: number }) {
+  if (widget.food?.today) return <FoodBody widget={widget} w={w} h={h} />;
+  const stats = h === 1 ? widget.stats.slice(0, w >= 3 ? 2 : 1) : w === 2 ? widget.stats.slice(0, h >= 3 ? 3 : 2) : widget.stats;
   return (
-    <dl className={clsx('mt-auto grid gap-2', size === 'small' ? 'grid-cols-1' : 'grid-cols-3')}>
+    <dl className={clsx('mt-auto grid gap-x-3 gap-y-2', w === 2 || h === 1 ? (h === 1 && w >= 3 ? 'grid-cols-2' : 'grid-cols-1') : 'grid-cols-3')}>
       {stats.map((stat) => (
         <div key={stat.label} className="min-w-0">
-          <dd className="truncate text-base font-bold leading-tight tabular">
+          <dd className="widget-stat-value truncate font-bold leading-tight tabular">
             {stat.value}
             {stat.estimated && <EstimateMark />}
           </dd>
-          <dt className="mt-0.5 truncate text-[11px] text-ink-faint">{stat.label}</dt>
+          <dt className="widget-stat-label mt-0.5 text-ink-faint">{stat.label}</dt>
         </div>
       ))}
     </dl>
   );
 }
 
-/** Food: today's rings (against targets when those are shared), then the week, then any weight. */
-function FoodBody({ widget, size }: { widget: SharedWidget; size: PortalWidgetSize }) {
-  const food = widget.food!;
-  const today = food.today;
-  const targets = food.targets;
-  const metrics: NutritionMetric[] | undefined = today && [
+function foodMetrics(widget: SharedWidget): NutritionMetric[] {
+  const today = widget.food!.today!;
+  const targets = widget.food?.targets;
+  return [
     { label: 'Calories', value: today.eatenKcal, target: targets?.kcal, unit: 'kcal', color: MACRO_COLORS.kcal, ...(targets?.estimated ? { basis: 'estimated' } : {}) },
     { label: 'Protein', value: today.proteinG, target: targets?.proteinG, unit: 'g', color: MACRO_COLORS.protein },
     { label: 'Carbs', value: today.carbG, target: targets?.carbG, unit: 'g', color: MACRO_COLORS.carbs },
     { label: 'Fat', value: today.fatG, target: targets?.fatG, unit: 'g', color: MACRO_COLORS.fat },
   ];
-  const weight = widget.stats.find((stat) => stat.label === 'Weight');
-  if (!metrics) return <Stats widget={widget} size={size} />;
-  if (size === 'small')
+}
+
+/** Food, as on Home: the calories ring with the macros beside it; the week below when it is tall. */
+function FoodBody({ widget, w, h }: { widget: SharedWidget; w: number; h: number }) {
+  const metrics = foodMetrics(widget);
+  const today = widget.food!.today!;
+  const target = widget.food?.targets?.kcal;
+  if (h === 1)
     return (
-      <div className="mt-auto flex items-center gap-2">
-        <div className="w-14 shrink-0">
-          <NutritionRing metric={metrics[0]} />
-        </div>
-        <p className="min-w-0 text-[11px] leading-tight text-ink-muted">Today</p>
-      </div>
+      <p className="mt-auto truncate text-sm">
+        <strong className="text-lg tabular">{today.eatenKcal.toLocaleString('en-GB')}</strong>
+        <span className="text-ink-muted"> {target ? `/ ${target.toLocaleString('en-GB')} kcal` : 'kcal today'}</span>
+      </p>
     );
-  // Bars against the larger of the week's highest day and the daily target, so a full day reads full.
-  const most = Math.max(1, ...(food.week?.days.map((day) => day.kcal) ?? [0]), targets?.kcal ?? 0);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2.5">
-        <div className="w-[62px] shrink-0">
+        <div className={clsx('shrink-0', w >= 3 ? 'w-[72px]' : 'w-[58px]')}>
           <NutritionRing metric={metrics[0]} />
         </div>
         <ul className="min-w-0 flex-1 space-y-1.5">
@@ -190,31 +285,208 @@ function FoodBody({ widget, size }: { widget: SharedWidget; size: PortalWidgetSi
           ))}
         </ul>
       </div>
-      {size === 'large' && food.week && (
-        <div className="mt-4 flex min-h-0 flex-1 flex-col">
-          <p className="mb-1 flex justify-between text-[11px] text-ink-muted">
-            <span className="font-medium">This week</span>
-            <span className="tabular">
-              {food.week.avgKcal !== undefined ? `${food.week.avgKcal.toLocaleString('en-GB')} kcal a day · ` : ''}
-              {food.week.daysLogged}/7 days
-            </span>
-          </p>
-          <div className="flex min-h-0 flex-1 items-end gap-1.5" aria-label={`Calories each day this week; ${food.week.daysLogged} of 7 days logged`}>
-            {food.week.days.map((day) => (
-              <div key={day.day} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
-                <span
-                  title={`${day.day}: ${day.kcal} kcal`}
-                  className={clsx('w-full rounded-md', day.kcal ? 'bg-accent-solid/70' : 'bg-border')}
-                  style={{ height: day.kcal ? `${Math.max(12, (day.kcal / most) * 100)}%` : '4px' }}
-                />
-                <span className="text-[10px] leading-none text-ink-faint">{weekday(day.day)}</span>
-              </div>
-            ))}
-          </div>
-          {weight && <p className="mt-1 text-[11px] text-ink-muted">Weight {weight.value}</p>}
-        </div>
-      )}
+      {h >= 3 && widget.food?.week && <WeekBars widget={widget} />}
     </div>
   );
 }
 
+/** The last seven days of calories, against the larger of the best day and the target. */
+function WeekBars({ widget, tall = false }: { widget: SharedWidget; tall?: boolean }) {
+  const week = widget.food!.week!;
+  const most = Math.max(1, ...week.days.map((day) => day.kcal), widget.food?.targets?.kcal ?? 0);
+  const weight = widget.stats.find((stat) => stat.label === 'Weight');
+  return (
+    <div className={clsx('mt-3 flex min-h-0 flex-1 flex-col', tall && 'min-h-40')}>
+      <p className="mb-1 flex justify-between gap-2 text-[11px] text-ink-muted">
+        <span className="font-medium">This week</span>
+        <span className="truncate tabular">
+          {week.avgKcal !== undefined ? `${week.avgKcal.toLocaleString('en-GB')} kcal a day · ` : ''}
+          {week.daysLogged}/7 days
+        </span>
+      </p>
+      <div className="flex min-h-0 flex-1 items-end gap-1.5" aria-label={`Calories each day this week; ${week.daysLogged} of 7 days logged`}>
+        {week.days.map((day) => (
+          <div key={day.day} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+            <span
+              title={`${day.day}: ${day.kcal} kcal`}
+              className={clsx('w-full rounded-md', day.kcal ? 'bg-accent-solid/70' : 'bg-border')}
+              style={{ height: day.kcal ? `${Math.max(12, (day.kcal / most) * 100)}%` : '4px' }}
+            />
+            <span className="text-[10px] leading-none text-ink-faint">{'SMTWTFS'[new Date(`${day.day}T12:00:00Z`).getUTCDay()]}</span>
+          </div>
+        ))}
+      </div>
+      {weight && <p className="mt-1 text-[11px] text-ink-muted">Weight {weight.value}</p>}
+    </div>
+  );
+}
+
+/**
+ * The size picker: a 4×4 board of squares that grows out of the size button. Pointing at a square
+ * shows the widget that size; tapping picks it. A one-wide widget is an icon, so it stays 1×1.
+ */
+function SizePicker({ anchor, current, onPick, onClose }: { anchor: DOMRect; current: { w: number; h: number }; onPick: (size: PortalWidgetSize) => void; onClose: () => void }) {
+  const [hover, setHover] = useState(current);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const away = (event: PointerEvent) => {
+      if (!box.current?.contains(event.target as Node)) onClose();
+    };
+    const esc = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
+    document.addEventListener('pointerdown', away);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('pointerdown', away);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [onClose]);
+  const width = 4 * 34 + 3 * 5 + 24;
+  const left = Math.max(8, Math.min(anchor.right - width, window.innerWidth - width - 8));
+  const top = Math.min(anchor.bottom + 6, window.innerHeight - 220);
+  const pick = (w: number, h: number) => ({ w, h: w === 1 ? 1 : h });
+  return createPortal(
+    <div
+      ref={box}
+      role="dialog"
+      aria-label="Widget size"
+      className="portal-pop fixed z-[60] rounded-2xl border border-border bg-surface p-3 shadow-2xl"
+      style={{ left, top, width, transformOrigin: `${anchor.right - left - 12}px -6px` }}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <div className="grid grid-cols-4 gap-[5px]" onPointerLeave={() => setHover(current)}>
+        {Array.from({ length: 16 }, (_, index) => {
+          const col = (index % 4) + 1;
+          const row = Math.floor(index / 4) + 1;
+          const on = col <= hover.w && row <= hover.h;
+          return (
+            <button
+              key={index}
+              type="button"
+              aria-label={`${col} by ${col === 1 ? 1 : row}`}
+              className={clsx('h-[34px] w-[34px] rounded-lg border transition-colors', on ? 'border-transparent bg-accent-solid' : 'border-border bg-ink/5')}
+              onPointerEnter={() => setHover(pick(col, row))}
+              onFocus={() => setHover(pick(col, row))}
+              onClick={() => {
+                const size = pick(col, row);
+                onPick(`${size.w}x${size.h}` as PortalWidgetSize);
+              }}
+            />
+          );
+        })}
+      </div>
+      <p className="mt-2 text-center text-xs font-medium tabular">
+        {hover.w} × {hover.h}
+        {hover.w === 1 && <span className="font-normal text-ink-muted"> · icon</span>}
+      </p>
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * A widget opened, like an iOS folder: a window that grows out of the widget, the width of the
+ * screen, with everything that module shares. Closed by its button, a tap outside or Escape.
+ */
+function PortalFolder({ widget, from, ownerId, viewAs, onClose }: { widget: SharedWidget; from: DOMRect; ownerId?: string; viewAs: Viewer; onClose: () => void }) {
+  const panel = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(false);
+  const key = keyOf(widget.module);
+  const Icon = WIDGET_ICONS[key] ?? WIDGET_ICONS.projects;
+  const hue = WIDGET_HUES[key] ?? WIDGET_HUES.projects;
+  // Starts as the widget it came from, then grows into place.
+  useLayoutEffect(() => {
+    const node = panel.current;
+    if (!node) return;
+    const to = node.getBoundingClientRect();
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!reduce) {
+      node.style.transformOrigin = 'top left';
+      node.style.transform = `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})`;
+      node.getBoundingClientRect();
+    }
+    requestAnimationFrame(() => {
+      node.style.transition = 'transform 320ms cubic-bezier(0.2, 0.9, 0.3, 1), opacity 200ms';
+      node.style.transform = '';
+      setShown(true);
+    });
+  }, [from]);
+  useEffect(() => {
+    const esc = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
+    document.addEventListener('keydown', esc);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', esc);
+      document.body.style.overflow = overflow;
+    };
+  }, [onClose]);
+  return createPortal(
+    <div className="fixed inset-0 z-[55]" role="dialog" aria-modal="true" aria-label={widget.title}>
+      <button
+        type="button"
+        aria-label="Close"
+        className={clsx('absolute inset-0 bg-surface/50 backdrop-blur-xl transition-opacity duration-300', shown ? 'opacity-100' : 'opacity-0')}
+        onClick={onClose}
+      />
+      <div
+        ref={panel}
+        className="card home-widget absolute inset-x-3 top-[max(4rem,calc(var(--top-chrome,0px)+3rem))] mx-auto flex max-h-[78vh] max-w-2xl flex-col overflow-hidden rounded-3xl shadow-2xl"
+      >
+        <header className="flex items-center gap-2.5 px-4 pb-2 pt-4">
+          <span className={clsx('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', hue.tile)}>
+            <Icon size={18} aria-hidden />
+          </span>
+          <h2 className="min-w-0 flex-1 truncate text-lg font-semibold">{widget.title}</h2>
+          <span className="shrink-0 text-xs text-ink-faint">{widget.audience === 'friends' ? 'Friends' : 'Everyone'}</span>
+          <button type="button" aria-label="Close" className="ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink/5 text-ink-muted" onClick={onClose}>
+            <X size={16} />
+          </button>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-5">
+          <FolderBody widget={widget} ownerId={ownerId} viewAs={viewAs} />
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** Everything one module shares, opened. */
+function FolderBody({ widget, ownerId, viewAs }: { widget: SharedWidget; ownerId?: string; viewAs: Viewer }) {
+  const food = widget.food;
+  // With today's rings shown, the figures that repeat them are left out.
+  const stats = food?.today ? widget.stats.filter((stat) => !['Eaten today', 'Protein', 'Logged foods'].includes(stat.label)) : widget.stats;
+  return (
+    <div className="space-y-4">
+      {food?.today && (
+        <section>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">Today</p>
+          <div className="grid grid-cols-4 gap-2">
+            {foodMetrics(widget).map((metric) => (
+              <NutritionRing key={metric.label} metric={metric} />
+            ))}
+          </div>
+        </section>
+      )}
+      {food?.week && (
+        <section className="flex flex-col" style={{ height: '11rem' }}>
+          <WeekBars widget={widget} tall />
+        </section>
+      )}
+      {stats.length > 0 && (
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {stats.map((stat) => (
+            <div key={stat.label} className="rounded-xl bg-ink/5 px-3 py-2">
+              <dd className="text-lg font-bold tabular">
+                {stat.value}
+                {stat.estimated && <EstimateMark />}
+              </dd>
+              <dt className="text-xs text-ink-muted">{stat.label}</dt>
+            </div>
+          ))}
+        </dl>
+      )}
+      {widget.hasDiary && ownerId && <DailyFoodDiary key={`${ownerId}:${viewAs}`} userId={ownerId} preview={viewAs} />}
+    </div>
+  );
+}

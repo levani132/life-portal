@@ -78,6 +78,30 @@ test('your portal shows Food as a large widget, and you can arrange it', async (
   await signIn(page, ana);
   await page.goto('/profile');
   await expect(page.getByRole('tab', { name: 'Portal' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByText('This week', { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open Food' }).filter({ visible: true }).first()).toBeVisible();
   await snap(page, '05-own-portal');
+  // Opens like a folder, with the week.
+  await page.getByRole('button', { name: 'Open Food' }).filter({ visible: true }).first().click();
+  const folder = page.getByRole('dialog', { name: 'Food' });
+  await expect(folder.getByText('This week', { exact: true })).toBeVisible();
+  await page.waitForTimeout(400);
+  await snap(page, '05-portal-folder');
+  await folder.getByRole('button', { name: 'Close' }).last().click();
+  await expect(folder).toHaveCount(0);
+  // Hold to arrange; the size button opens the board of squares.
+  const widget = page.getByRole('button', { name: 'Open Food' }).filter({ visible: true }).first();
+  const box = await widget.boundingBox();
+  if (!box) throw new Error('No widget');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(700);
+  await page.mouse.up();
+  // The widgets jiggle while arranging, which a finger does not mind.
+  await page.getByRole('button', { name: /Size of Food: 4 by 2/ }).click({ force: true });
+  await expect(page.getByRole('dialog', { name: 'Widget size' })).toBeVisible();
+  await page.waitForTimeout(300);
+  await snap(page, '05-portal-size-picker');
+  await page.getByRole('button', { name: '4 by 4' }).click();
+  await expect(page.getByRole('button', { name: /Size of Food: 4 by 4/ })).toBeVisible();
+  await expect.poll(async () => (await call<{ portalSizes?: Record<string, string> }>(ana, 'GET', '/settings')).portalSizes?.['nutrition']).toBe('4x4');
 });

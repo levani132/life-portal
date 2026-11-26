@@ -1,7 +1,8 @@
 import { Body, Controller, Get, Module, Put, Req } from '@nestjs/common';
 import type { ProxiedRequest } from '../app/web-proxy';
 import { ArrayMaxSize, IsArray, IsIn, IsObject, Matches, Validate, ValidatorConstraint, type ValidatorConstraintInterface } from 'class-validator';
-import { PORTAL_WIDGET_SIZES, WIDGET_SIZES, type DashboardResponse, type PortalWidgetSize, type UserSettings, type WidgetSize } from '@life-portal/shared-types';
+import { isPortalSize } from '@life-portal/shared-domain';
+import { WIDGET_SIZES, type DashboardResponse, type PortalWidgetSize, type UserSettings, type WidgetSize } from '@life-portal/shared-types';
 import { CurrentUser, Public } from '../auth/current-user.decorator';
 import { Today } from '../common/today';
 import { BoardsModule } from '../boards/boards.module';
@@ -44,10 +45,10 @@ class PortalSizes implements ValidatorConstraintInterface {
   validate(value: unknown) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     const entries = Object.entries(value as Record<string, unknown>);
-    return entries.length <= 32 && entries.every(([id, size]) => /^[a-z]{2,32}$/.test(id) && (PORTAL_WIDGET_SIZES as readonly unknown[]).includes(size));
+    return entries.length <= 32 && entries.every(([id, size]) => /^[a-z]{2,32}$/.test(id) && isPortalSize(size));
   }
   defaultMessage() {
-    return 'sizes must map module ids to small, medium or large';
+    return 'sizes must map module ids to a size in squares, like 4x2 (a one-wide widget is 1x1)';
   }
 }
 
