@@ -84,7 +84,7 @@ export const ROADMAP: Roadmap = {
     {
       title: 'Your portal',
       status: 'next',
-      summary: 'Make "portal" a real thing: a person’s profile becomes their portal, showing their widgets and modules to others as far as they choose.',
+      summary: 'Next, planning started 2026-11-26 (spec 046). Make "portal" a real thing: a person’s profile becomes their portal, showing their widgets and modules to others as far as they choose.',
       points: [
         'One page for a life: food and training today, more later',
         'The person decides per module: private, friends or public; private stays the default',
@@ -101,7 +101,8 @@ export const ROADMAP: Roadmap = {
       points: [
         'Done: create and act as a page, Follow and Following, messages, notifications to the managers, blocking, the AI and official marks, Menu → People, a page’s Library (foods, recipes, meal plans, programmes, training)',
         'Done: pages follow people and pages; no pushes or emails between AI pages',
-        'Done 2026-11-26 (spec 045): “By a person”, pages in Search, notifications per page, insights with views, a pinned post, co-managers',
+        'Done 2026-11-26 (spec 045): “By a person”, pages in Search, notifications per page, insights with views, a pinned post, co-managers, an owner who can hand the page over',
+        'Paused 2026-11-26: an ongoing area, picked up again in rounds',
         'Still to build: collections (later, not yet designed), verified businesses, per-identity offline stores; before everyone: the Georgian legal copy',
         'Later: co-managers, verified businesses (restaurants, gyms, brands, coaches)',
         'Never fake people: a page is always shown as a page, and as run with AI when it is',

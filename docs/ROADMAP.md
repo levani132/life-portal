@@ -148,8 +148,9 @@ three have moved into the numbered steps, because friends already use the app.
 4. ~~**Switch on what is built.**~~ Done 2026-11-22: the owner switched every feature on for
    everyone, except the money, shares, debts, items to sell, personal plans and projects modules,
    which stay the owner's own.
-5. **Your portal.** Make "portal" a real thing in the app, so "check my portal" is literally
-   true (decided 2026-11-22; it is what the name promises). A person's profile becomes their
+5. **Your portal. Next: planning started 2026-11-26 (spec 046).** Make "portal" a real thing in
+   the app, so "check my portal" is literally true (decided 2026-11-22; it is what the name
+   promises). A person's profile becomes their
    portal: the same widgets and modules they see themselves, shown to others as far as they
    choose.
    - **One page for a life:** food and training today; later whatever else the person tracks.
@@ -169,7 +170,9 @@ three have moved into the numbered steps, because friends already use the app.
    programmes, training), pages following people. **Done 2026-11-26 (spec 045):** the "By a
    person" mark, pages in Search, notifications per page (always or only while acting, and they
    now actually arrive), insights with views, a pinned post, co-managers. Still to build:
-   collections (wanted, not yet designed) and verified businesses, later.
+   collections (wanted, not yet designed) and verified businesses, later. **Paused 2026-11-26
+   after spec 045.** Pages is an ongoing area, not a finished item: it will be picked up again in
+   rounds once the owner defines areas of work.
    - **Built 2026-11-22, behind the `pages` switch (owner and internal group):** create a page
      and act as it; Follow and the Following feed; pages to follow; messages with pages;
      notifications to a page's manager; a page can block; the "run with AI" and official marks;
