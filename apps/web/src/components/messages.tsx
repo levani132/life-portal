@@ -29,7 +29,7 @@ import { useApi } from '../lib/hooks';
 import { postTimeLabel } from '../lib/post-time';
 import { useSocialApi } from '../lib/social-hooks';
 import { actingPageId } from '../lib/identity';
-import { PageMark } from './identity-switcher';
+import { ByPersonMark, PageMark } from './identity-switcher';
 import { EmptyState, ErrorNote, Modal, Spinner } from './ui';
 
 /** While a conversation is on screen and the app is visible (research R1). */
@@ -722,6 +722,11 @@ function Bubble({
           title={new Date(message.createdAt).toLocaleString()}
         >
           {message.text}
+          {message.byPerson && (
+            <span className="mt-1 block">
+              <ByPersonMark />
+            </span>
+          )}
         </span>
       )}
     </div>

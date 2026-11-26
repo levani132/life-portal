@@ -18,6 +18,7 @@ import { api, NetworkError } from '../lib/api';
 import { revalidate, useApi } from '../lib/hooks';
 import { PostRelativeTime } from './post-header-controls';
 import { ErrorNote } from './ui';
+import { ByPersonMark } from './identity-switcher';
 import { requestNotificationOffer } from './notifications';
 import { messagingAvailable } from './messages';
 import { PostShareSheet } from './post-share-sheet';
@@ -422,6 +423,7 @@ function PostComments({
         ) : (
           <span className="text-xs font-semibold">{comment.author.displayName}</span>
         )}
+        {comment.byPerson && <ByPersonMark className="ml-1.5" />}
         <p className="whitespace-pre-wrap break-words text-sm">{comment.text}</p>
         <span className="mt-1 flex items-center gap-3 text-[10px] text-ink-faint">
           {comment.unsent ? <span className="text-warning">Not sent yet</span> : <PostRelativeTime date={comment.createdAt} />}

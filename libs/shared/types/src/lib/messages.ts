@@ -37,6 +37,8 @@ export interface ChatMessage {
   kind: 'text' | 'post' | 'unsent';
   text?: string;
   post?: SharedPostCard;
+  /** Spec 045: written by a person on a page run with AI, not by its assistant. */
+  byPerson?: boolean;
   createdAt: string;
 }
 

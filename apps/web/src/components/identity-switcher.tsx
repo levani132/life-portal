@@ -2,7 +2,7 @@
 
 import type { Identity, MyPages, PageSummary } from '@life-portal/shared-types';
 import { PAGE_BIO_MAX, PAGE_NAME_MAX } from '@life-portal/shared-types';
-import { Check, ChevronDown, Megaphone, Plus } from 'lucide-react';
+import { Check, ChevronDown, Megaphone, Plus, UserRound } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -23,6 +23,22 @@ export function PageMark({ className = '', ai = false }: { className?: string; a
     >
       <Megaphone size={10} aria-hidden="true" />
       {ai ? 'Page · AI' : 'Page'}
+    </span>
+  );
+}
+
+/**
+ * Spec 045: on a page run with AI, this post, comment or message was written by a person, not by
+ * the assistant. Reactions (likes, reposts, follows) carry no mark.
+ */
+export function ByPersonMark({ className = '' }: { className?: string }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-0.5 rounded-full bg-success-solid/10 px-1.5 py-px align-middle text-[10px] font-semibold uppercase tracking-wide text-success ${className}`}
+      title="Written by a person who runs this page, not by its AI"
+    >
+      <UserRound size={10} aria-hidden="true" />
+      By a person
     </span>
   );
 }

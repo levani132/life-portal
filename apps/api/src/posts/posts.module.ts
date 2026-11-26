@@ -68,6 +68,7 @@ import {
   FeedMetricsService,
 } from './feed-metrics.service';
 import { ForPages } from '../auth/acting';
+import type { AuthenticatedUser } from '../auth/jwt.strategy';
 @RequireModule('foodPosts')
 @UseInterceptors(SocialNoStore)
 @ForPages()
@@ -89,10 +90,11 @@ class PostsController {
     return this.posts.preview(userId, dto);
   }
   @Post() create(
-    @CurrentUser('userId') userId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreatePostDto,
   ) {
-    return this.posts.create(userId, dto);
+    // Through the app as a page: a person's hand (spec 045). The assistant calls the service.
+    return this.posts.create(user.userId, dto, { byHand: !!user.actorId && user.actorId !== user.userId });
   }
   @Get() list(
     @CurrentUser('userId') userId: string,
@@ -232,11 +234,11 @@ class PostsController {
     return this.engagement.replies(userId, id, commentId, before, limit ? Number(limit) : undefined);
   }
   @Post(':id/comments') addComment(
-    @CurrentUser('userId') userId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: AddPostCommentDto,
   ) {
-    return this.engagement.add(userId, id, dto.text, dto.requestId, dto.id, dto.parentId);
+    return this.engagement.add(user.userId, id, dto.text, dto.requestId, dto.id, dto.parentId, { byHand: !!user.actorId && user.actorId !== user.userId });
   }
   @Put(':id/comments/:commentId/like') likeComment(
     @CurrentUser('userId') userId: string,

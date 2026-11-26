@@ -208,6 +208,7 @@ export class PostsService {
       // From the whole publication, never the feed teaser, and from published content only.
       topics: postTopics({ caption: row.caption, publication: p }),
       isOwner: row.userId === viewerId,
+      ...(row.byPerson ? { byPerson: true as const } : {}),
       // Spec 039: only its author ever learns a post is held.
       ...(row.heldAt && row.userId === viewerId ? { held: row.heldReason === 'checking' ? ('checking' as const) : ('review' as const) } : {}),
       ...(await this.trainingPart(row, viewerId)),
@@ -262,7 +263,7 @@ export class PostsService {
       (row.media ?? []).map((m) => m.id).join() === (dto.mediaIds ?? []).join()
     );
   }
-  async create(userId: string, dto: CreatePostDto): Promise<FoodPost> {
+  async create(userId: string, dto: CreatePostDto, options: { byHand?: boolean } = {}): Promise<FoodPost> {
     await this.requireEnabled(userId);
     await this.refuseFriendsAudienceForPages(userId, dto.audience);
     const mediaIds = dto.mediaIds ?? [];
@@ -315,6 +316,8 @@ export class PostsService {
     }
     const media = await this.media.reserve(userId, dto.requestId, mediaIds);
     await this.social.own(userId);
+    // Spec 045: a person writing as a page run with AI is marked, so nobody takes it for the AI.
+    const byPerson = !!options.byHand && (await this.social.postAuthor(userId))?.aiManaged === true;
     try {
       await this.posts.updateOne(
         { userId, requestId: dto.requestId },
@@ -332,6 +335,7 @@ export class PostsService {
             title: dto.title.trim(),
             caption: dto.caption.trim(),
             audience: dto.audience,
+            ...(byPerson ? { byPerson: true } : {}),
             // Link-only is a private post with a secret key; any other audience has no key.
             ...(dto.linkOnly && dto.audience === 'private' ? { linkKey: randomBytes(16).toString('base64url') } : {}),
             // Spec 039: photos others can reach are checked first; until then only the author sees the post.

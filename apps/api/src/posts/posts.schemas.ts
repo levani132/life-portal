@@ -58,6 +58,11 @@ export class FoodPostRecord {
    */
   @Prop() repostOf?: string;
   /**
+   * Spec 045: written by a person on a page run with AI (not by its assistant), so it carries the
+   * "by a person" mark. Set once, when the post is created, and only on such a page.
+   */
+  @Prop() byPerson?: boolean;
+  /**
    * Spec 039: while set, only the author can read the post. `heldReason` says why: its photos
    * are waiting for the automatic check, the check flagged them, or people reported it.
    */

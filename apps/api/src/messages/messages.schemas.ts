@@ -50,6 +50,8 @@ export class Message {
   @Prop({ maxlength: 2000 }) text?: string;
   @Prop() postId?: string;
   @Prop() unsentAt?: Date;
+  /** Spec 045: written by a person on a page run with AI, not by its assistant. */
+  @Prop() byPerson?: boolean;
   @Prop({ required: true }) createdAt!: Date;
 }
 export const MessageSchema = SchemaFactory.createForClass(Message);

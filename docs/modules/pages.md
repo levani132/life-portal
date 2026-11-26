@@ -205,3 +205,12 @@ manage.
 open), `libs/shared/domain/src/lib/pages.spec.ts`, `access.module.spec.ts`,
 `account.service.spec.ts` (pages go with their manager), and `integration/pages.integration.ts`
 and `integration/follows.integration.ts` against a real database.
+
+## By a person (spec 045, slice 1)
+
+On a page run with AI, a post, comment or message a person writes through the app is stored with
+`byPerson: true` and shows **By a person** (`ByPersonMark`). It is decided at creation: the
+request was made acting as the page (`actorId !== userId`) and the page is `aiManaged` then. The
+assistant calls the services directly, so what it writes is never marked. Likes, reposts and
+follows carry no mark. Tested in `integration/by-person.integration.ts`.
+

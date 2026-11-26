@@ -44,7 +44,7 @@ import { MacroRings } from './macro-rings';
 import { UsePlanFromPost } from './meal-plans';
 import { CopyTrainingButton, TrainingAttachmentView } from './training/training-post';
 import { revalidate, useAction, useApi } from '../lib/hooks';
-import { PageMark } from './identity-switcher';
+import { ByPersonMark, PageMark } from './identity-switcher';
 import { OfficialMark } from './follow';
 import { SOCIAL_REFRESH } from '../lib/social-hooks';
 import {
@@ -527,6 +527,7 @@ export function PostCard({
           </Link>
           {post.author.official && <OfficialMark className="ml-1" />}
           {post.author.isPage && <PageMark className="ml-1.5" ai={post.author.aiManaged} />}
+          {post.byPerson && <ByPersonMark className="ml-1" />}
           <div className="flex items-center gap-1 text-[11px] leading-tight text-ink-faint">
             <PostDateLink id={post.id} date={post.createdAt} />
             {hasFood && (

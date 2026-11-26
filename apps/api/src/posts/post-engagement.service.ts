@@ -48,6 +48,8 @@ export class PostCommentRecord {
    */
   @Prop() parentId?: string;
   @Prop() parentUserId?: string;
+  /** Spec 045: written by a person on a page run with AI, not by its assistant. */
+  @Prop() byPerson?: boolean;
   createdAt!: Date;
 }
 export const PostCommentSchema =
@@ -284,6 +286,7 @@ export class PostEngagementService implements OnModuleInit {
       },
       canDelete: owner || row.userId === viewerId,
       ...(row.parentId ? { parentId: row.parentId } : {}),
+      ...(row.byPerson ? { byPerson: true } : {}),
     };
   }
   /** Comments the viewer may see: not from someone blocked either way. */
@@ -354,7 +357,7 @@ export class PostEngagementService implements OnModuleInit {
       ...(rows.length > size ? { nextCursor: String(page[page.length - 1]._id) } : {}),
     };
   }
-  async add(userId: string, postId: string, text: string, requestId: string, id?: string, parentId?: string) {
+  async add(userId: string, postId: string, text: string, requestId: string, id?: string, parentId?: string, options: { byHand?: boolean } = {}) {
     const post = await this.posts.detail(userId, postId);
     // A reply answers a comment on this post that is still there. Answering a reply lands under
     // the same top-level comment: one level, never a tree.
@@ -373,6 +376,8 @@ export class PostEngagementService implements OnModuleInit {
     if (!value || value.length > 1000)
       throw new BadRequestException('Write a comment of 1–1,000 characters.');
     const actor = await this.social.own(userId);
+    // Spec 045: a person writing as a page run with AI is marked as such.
+    const byPerson = !!options.byHand && (await this.social.postAuthor(userId))?.aiManaged === true;
     const filter = { postId, userId, requestId };
     let created = false;
     // Spec 031: a comment written offline carries the id the device gave it. A retry finds its
@@ -381,7 +386,7 @@ export class PostEngagementService implements OnModuleInit {
     try {
       const result = await this.comments.updateOne(
         filter,
-        { $setOnInsert: { ...filter, ...withId(id), text: value, deleted: false, ...(parent ? { parentId: parent.id, parentUserId: parent.userId } : {}) } },
+        { $setOnInsert: { ...filter, ...withId(id), text: value, deleted: false, ...(byPerson ? { byPerson: true } : {}), ...(parent ? { parentId: parent.id, parentUserId: parent.userId } : {}) } },
         { upsert: true },
       );
       // A retried requestId returns the original comment and must not notify again.

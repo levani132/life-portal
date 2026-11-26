@@ -239,6 +239,7 @@ export class MessagesService implements OnModuleInit {
       id: String(row._id),
       ...(mine ? { requestId: row.requestId } : {}),
       mine,
+      ...(row.byPerson ? { byPerson: true } : {}),
       createdAt: row.createdAt.toISOString(),
     };
     if (row.unsentAt) return { ...base, kind: 'unsent' };
@@ -309,6 +310,7 @@ export class MessagesService implements OnModuleInit {
     userId: string,
     id: string,
     dto: { requestId: string; text?: string; postId?: string },
+    options: { byHand?: boolean } = {},
   ): Promise<ChatMessage> {
     const row = await this.mine(userId, id);
     const filter = { conversationId: id, senderId: userId, requestId: dto.requestId };
@@ -335,6 +337,7 @@ export class MessagesService implements OnModuleInit {
       await this.posts.shareWith(userId, dto.postId, otherId);
     }
     const text = dto.text?.trim();
+    const byPerson = !!options.byHand && (await this.social.postAuthor(userId))?.aiManaged === true;
     const result = await this.messages
       .updateOne(
         filter,
@@ -343,6 +346,7 @@ export class MessagesService implements OnModuleInit {
             ...filter,
             kind: dto.postId ? 'post' : 'text',
             ...(dto.postId ? { postId: dto.postId } : { text }),
+            ...(byPerson ? { byPerson: true } : {}),
             createdAt: now,
           },
         },

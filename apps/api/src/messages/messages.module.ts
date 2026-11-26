@@ -31,6 +31,7 @@ import {
 } from './messages.schemas';
 import { MessagesService } from './messages.service';
 import { ForPages } from '../auth/acting';
+import type { AuthenticatedUser } from '../auth/jwt.strategy';
 
 /** Every route needs `messages`; every response is private and uncached (spec FR-025). */
 @RequireModule('messages')
@@ -76,11 +77,12 @@ export class MessagesController {
     return this.messages.sync(userId, id, dto.after, dto.since);
   }
   @Post('conversations/:id/messages') send(
-    @CurrentUser('userId') userId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: SendMessageDto,
   ) {
-    return this.messages.send(userId, id, dto);
+    // Through the app as a page: a person's hand (spec 045). The assistant calls the service.
+    return this.messages.send(user.userId, id, dto, { byHand: !!user.actorId && user.actorId !== user.userId });
   }
   @Delete('conversations/:id/messages/:messageId') unsend(
     @CurrentUser('userId') userId: string,
