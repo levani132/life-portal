@@ -528,9 +528,10 @@ export class FollowsController {
     private readonly social: SocialService,
   ) {}
 
+  /** `?all=1`: Search's list of pages to follow (spec 045): 30, whatever the viewer follows. */
   @Get('suggested')
-  async suggested(@CurrentUser('userId') userId: string): Promise<SuggestedPage[]> {
-    const ids = await this.follows.suggested(userId);
+  async suggested(@CurrentUser('userId') userId: string, @Query('all') all?: string): Promise<SuggestedPage[]> {
+    const ids = all === '1' ? await this.follows.suggested(userId, 30, true) : await this.follows.suggested(userId);
     const profiles = await this.social.pageCards(ids);
     const out: SuggestedPage[] = [];
     for (const id of ids) {

@@ -118,6 +118,19 @@ describe('following a page', () => {
     expect((await api.call(ana, 'PUT', `/pages/${plain.id}/official`, { official: true })).status).toBe(403);
   });
 
+  it('stops offering pages on Home after five follows, but Search keeps listing them (spec 045)', async () => {
+    const ana = await api.account('ana');
+    const zura = await api.account('zura');
+    await api.db.collection('users').updateOne({ _id: new (await import('mongodb')).ObjectId(ana.id) }, { $set: { pageLimit: 10 } });
+    const pages = [];
+    for (let i = 0; i < 6; i++) pages.push(await pageOf(ana, `many${i}`));
+    for (const page of pages.slice(0, 5)) await api.call(zura, 'PUT', `/follows/${page.id}`, {});
+    expect((await api.call<SuggestedPage[]>(zura, 'GET', '/follows/suggested')).body).toEqual([]);
+    const always = (await api.call<SuggestedPage[]>(zura, 'GET', '/follows/suggested?all=1')).body.map((row) => row.userId);
+    expect(always).toContain(pages[5].id);
+    expect(always).not.toContain(pages[0].id);
+  });
+
   it('ends with a block, and leaves nothing when either side is deleted', async () => {
     const ana = await api.account('ana');
     const beka = await api.account('beka');

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import type { PeoplePage } from '@life-portal/shared-types';
 import { PersonCard, useSocialApi } from './social';
+import { SuggestedPages } from './follow';
 import { ErrorNote, Input, Spinner } from './ui';
 export function PeopleSearch() {
   const [text, setText] = useState('');
@@ -31,10 +32,8 @@ export function PeopleSearch() {
       />
       <div className="mt-5 space-y-4">
         {query.length < 2 ? (
-          <div className="card p-6 text-sm text-ink-muted">
-            Find a friend to start sharing the things you choose. Enter at least
-            two characters.
-          </div>
+          // Before anything is typed: pages to follow, for good (spec 045).
+          <SuggestedPages always />
         ) : result.error ? (
           <ErrorNote message={(result.error as Error).message} />
         ) : result.isLoading ? (

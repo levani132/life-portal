@@ -166,9 +166,12 @@ function SuggestedRow({ page }: { page: SuggestedPage }) {
   );
 }
 
-/** Pages worth following, for a Following feed with nothing in it yet. Nothing when there are none. */
-export function SuggestedPages({ title = 'Pages to follow' }: { title?: string }) {
-  const pages = useApi<SuggestedPage[]>('/follows/suggested');
+/**
+ * Pages worth following. On Home, only until someone follows five; with `always` (Search, spec
+ * 045) for good, 30 of them. Nothing when there are none.
+ */
+export function SuggestedPages({ title = 'Pages to follow', always = false }: { title?: string; always?: boolean }) {
+  const pages = useApi<SuggestedPage[]>(always ? '/follows/suggested?all=1' : '/follows/suggested');
   if (!pages.data?.length) return null;
   return (
     <section className="card p-4" aria-label={title}>

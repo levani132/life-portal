@@ -59,7 +59,7 @@ Logged 2026-11-22, after slice 2. Each is closed by the task named, or by a deci
 | Concern | State |
 |---|---|
 | A page cannot block a person; only a person can block a page. A harassed page has no defence of its own. | Closed 2026-11-22 (T029): a page can block and unblock; Menu → Blocked accounts |
-| Pages to follow disappear once someone follows five (`SUGGEST_UNTIL_FOLLOWING`). The number was picked without the owner; after that there is no place to browse pages except search and For You. | Open: owner to say whether to keep, change the number, or add a permanent "Pages" list (e.g. on Friends) |
+| Pages to follow disappear once someone follows five (`SUGGEST_UNTIL_FOLLOWING`). The number was picked without the owner; after that there is no place to browse pages except search and For You. | Closed 2026-11-26 (spec 045 slice 2): Home's card keeps the cut-off; Search lists pages for good |
 | The privacy policy, terms and rules do not mention pages or follows (who you follow is stored). | Closed 2026-11-22 (T037) in English. **Open:** the Georgian review copy does not have these paragraphs yet |
 | The People screen searches by name and username, not email (spec asks for email too). Left out so the screen shows no address. | Open: owner to say whether email search is wanted |
 | A suspended person's pages stay visible: only the person is hidden. Suspend each page too if it should go. | Open: decide whether suspending a person should hide the pages only they manage |

@@ -83,7 +83,7 @@ list of followers anywhere in the API.
 |---|---|
 | `PUT /follows/:pageId` | Follow. No approval. Anyone follows a page; **a page may also follow a person** (owner's decision, 2026-11-23) and then sees that person's public posts in its Following feed. 404 for a person following a person, a missing, suspended or switched-off account, or a block either way; 409 for following itself. Repeating it changes nothing. The person is not told and their follower count is shown to nobody |
 | `DELETE /follows/:pageId` | Stop following. Always succeeds |
-| `GET /follows/suggested` | Up to 8 pages to follow: official first, then most followed; never one already followed, managed by the viewer, suspended or blocked. Empty once someone follows 5 |
+| `GET /follows/suggested` | Up to 8 pages to follow: official first, then most followed; never one already followed, managed by the viewer, suspended or blocked. Empty once someone follows 5. `?all=1` (Search, spec 045): up to 30, with no cut-off |
 | `PUT /pages/:id/official` (person) | `{official}`. The developer only, for any page. Written to `users.official` and copied to `social_profiles.official` |
 
 - **The Following feed** is the wall (`GET /posts` with no author): `followingAuthors()` in

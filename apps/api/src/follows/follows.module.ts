@@ -91,9 +91,10 @@ export class FollowsService {
 
   /**
    * Pages to offer someone who follows fewer than `SUGGEST_UNTIL_FOLLOWING`: the app's own first, then the most followed, never
-   * one they already follow, their own, a suspended one or one blocked either way.
+   * one they already follow, their own, a suspended one or one blocked either way. With
+   * `always` (Search's list, spec 045) the cut-off does not apply.
    */
-  async suggested(viewerId: string, limit = SUGGESTED_PAGES): Promise<string[]> {
+  async suggested(viewerId: string, limit = SUGGESTED_PAGES, always = false): Promise<string[]> {
     const [already, pages] = await Promise.all([
       this.followedPageIds(viewerId),
       this.users
@@ -102,7 +103,7 @@ export class FollowsService {
         .limit(500)
         .lean<{ _id: Types.ObjectId; official?: boolean }[]>(),
     ]);
-    if (already.length >= SUGGEST_UNTIL_FOLLOWING) return [];
+    if (!always && already.length >= SUGGEST_UNTIL_FOLLOWING) return [];
     const skip = new Set([...already, viewerId]);
     const candidates = pages.filter((page) => !skip.has(String(page._id)));
     if (!candidates.length) return [];
