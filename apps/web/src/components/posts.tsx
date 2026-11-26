@@ -671,7 +671,10 @@ export function PostCard({
           </ul>
         )}
         <ul
-          className={`mt-3 divide-y divide-border/70 ${detail ? 'max-h-[32rem] overflow-y-auto' : ''}`}
+          // On the post page the list scrolls in a box that fits between the top bar and the floating
+          // tab bar with room left for Like / Comment / Share under it: the screen's height, less the
+          // header (--header-offset), the tab bar with the home indicator, and the bar under the list.
+          className={`mt-3 divide-y divide-border/70 ${detail ? 'max-h-[max(14rem,calc(100dvh_-_var(--header-offset,4rem)_-_env(safe-area-inset-bottom)_-_15rem))] overflow-y-auto overscroll-contain' : ''}`}
         >
           {post.items.map((food, index) => (
             <li key={food.key} className="py-3 text-sm">

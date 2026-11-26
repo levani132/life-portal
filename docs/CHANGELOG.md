@@ -10,6 +10,8 @@ User-visible changes. Newest first.
 - Search, a post, Activity and Friends no longer start with a title and a line explaining the
   screen. A post opens edge to edge on a phone, without a frame around it.
 - Every screen that is not a tab has a back arrow at the top left.
+- On a post's own page, a long food list (a whole food database, a meal plan) scrolls in a box
+  sized to the phone's screen, so the box and Like / Comment / Share fit above the tab bar.
 
 ## 2026-11-24: When your pages will post
 
