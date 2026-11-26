@@ -1,4 +1,4 @@
-import { followingAuthors, mayCreatePage, mayRemoveManager, pageAccess, pageHasNoActiveManager, pageLimitFor, pagesRemaining } from './pages';
+import { followingAuthors, mayCreatePage, mayRemoveManager, nextOwner, pageAccess, pageHasNoActiveManager, pageLimitFor, pageOwner, pagesRemaining } from './pages';
 
 describe('pages rules (spec 040)', () => {
   it('gives a page everything social and the two libraries, and nothing personal', () => {
@@ -36,19 +36,29 @@ describe('followingAuthors', () => {
 });
 
 describe('co-managers (spec 045)', () => {
-  const managers = ['creator', 'b', 'c'];
-  it('lets anyone leave, the creator remove anyone, and nobody remove the last manager', () => {
-    expect(mayRemoveManager({ requester: 'b', target: 'b', managers, createdBy: 'creator' })).toBe(true);
-    expect(mayRemoveManager({ requester: 'creator', target: 'c', managers, createdBy: 'creator' })).toBe(true);
-    expect(mayRemoveManager({ requester: 'b', target: 'c', managers, createdBy: 'creator' })).toBe(false);
-    expect(mayRemoveManager({ requester: 'b', target: 'creator', managers, createdBy: 'creator' })).toBe(false);
-    expect(mayRemoveManager({ requester: 'creator', target: 'creator', managers: ['creator'], createdBy: 'creator' })).toBe(false);
-    expect(mayRemoveManager({ requester: 'x', target: 'b', managers, createdBy: 'creator' })).toBe(false);
-    expect(mayRemoveManager({ requester: 'creator', target: 'x', managers, createdBy: 'creator' })).toBe(false);
+  const managers = ['owner', 'b', 'c'];
+  it('lets a manager leave and the owner remove anyone, but never the owner or the last one', () => {
+    expect(mayRemoveManager({ requester: 'b', target: 'b', managers, owner: 'owner' })).toBe(true);
+    expect(mayRemoveManager({ requester: 'owner', target: 'c', managers, owner: 'owner' })).toBe(true);
+    expect(mayRemoveManager({ requester: 'b', target: 'c', managers, owner: 'owner' })).toBe(false);
+    expect(mayRemoveManager({ requester: 'b', target: 'owner', managers, owner: 'owner' })).toBe(false);
+    // The owner hands over first: they cannot simply leave.
+    expect(mayRemoveManager({ requester: 'owner', target: 'owner', managers, owner: 'owner' })).toBe(false);
+    expect(mayRemoveManager({ requester: 'b', target: 'b', managers: ['b'], owner: 'b' })).toBe(false);
+    expect(mayRemoveManager({ requester: 'x', target: 'b', managers, owner: 'owner' })).toBe(false);
+    expect(mayRemoveManager({ requester: 'owner', target: 'x', managers, owner: 'owner' })).toBe(false);
   });
-  it('lets any manager remove others once the creator has left', () => {
-    expect(mayRemoveManager({ requester: 'b', target: 'c', managers: ['b', 'c'], createdBy: 'creator' })).toBe(true);
+  it('lets any manager remove others when there is no owner', () => {
     expect(mayRemoveManager({ requester: 'b', target: 'c', managers: ['b', 'c'] })).toBe(true);
+  });
+  it('finds the owner: handed over, else the creator, while they still manage it', () => {
+    expect(pageOwner({ createdBy: 'a', managers: ['a', 'b'] })).toBe('a');
+    expect(pageOwner({ createdBy: 'a', ownerId: 'b', managers: ['a', 'b'] })).toBe('b');
+    expect(pageOwner({ createdBy: 'a', managers: ['b'] })).toBeUndefined();
+  });
+  it('passes ownership to the longest-serving other manager', () => {
+    expect(nextOwner(['a', 'b', 'c'], 'a')).toBe('b');
+    expect(nextOwner(['a'], 'a')).toBeUndefined();
   });
   it('suspends a page only when every manager is suspended', () => {
     expect(pageHasNoActiveManager(['a', 'b'], new Set(['a']))).toBe(false);

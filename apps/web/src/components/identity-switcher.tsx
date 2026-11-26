@@ -311,17 +311,19 @@ function ManagePages({ pages, userId }: { pages: PageSummary[]; userId: string }
               >
                 {page.disabled ? 'Switch on' : 'Switch off'}
               </button>
-              <button
-                type="button"
-                className="btn-danger"
-                disabled={busy}
-                onClick={() => {
-                  if (window.prompt(`Delete ${page.name} and everything it posted? This cannot be undone. Type the page’s username (${page.username}) to confirm.`) === page.username)
-                    void run(() => api.delete(`/pages/${page.id}`), page.id);
-                }}
-              >
-                Delete
-              </button>
+              {page.youOwn !== false && (
+                <button
+                  type="button"
+                  className="btn-danger"
+                  disabled={busy}
+                  onClick={() => {
+                    if (window.prompt(`Delete ${page.name} and everything it posted? This cannot be undone. Type the page’s username (${page.username}) to confirm.`) === page.username)
+                      void run(() => api.delete(`/pages/${page.id}`), page.id);
+                  }}
+                >
+                  Delete
+                </button>
+              )}
             </span>
           </li>
         ))}

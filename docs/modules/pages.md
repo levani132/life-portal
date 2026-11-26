@@ -17,7 +17,8 @@ finds a page's name, features and suspension the way it finds a person's.
 |---|---|
 | `kind: 'page'` | Absent for a person |
 | `managers: string[]` | The people who may act as it (spec 045: up to 10, by invitation) |
-| `createdBy` | Who created it; what that person's limit counts |
+| `createdBy` | Who created it; what that person's limit counts, even after a handover |
+| `ownerId` | Spec 045: the owner after a handover. Absent: the creator. `pageOwner()` answers who owns it |
 | `official`, `aiManaged` | The app's own page; run with AI (shown from slices 2 and 3) |
 | `pageLimit` (on a person) | How many pages they may create. Absent: 3. `-1`: no limit |
 
@@ -232,15 +233,21 @@ gone after 30 days). All routes are person routes (`@AsPerson()`):
 
 | Route | Who | What |
 |---|---|---|
-| `GET /pages/:id/managers` | a manager | Managers (`creator`, `you`, `mayRemove`) and pending invitations |
+| `GET /pages/:id/managers` | a manager | Managers (`owner`, `you`, `mayRemove`) and pending invitations |
 | `POST /pages/:id/managers {username}` | a manager | Invites a person by exact username. 404 `NO_SUCH_PERSON` for no such person, a page, a suspended account or a block either way with the page or the inviter (one answer, so nothing leaks); 400 `ALREADY_MANAGER`, `TOO_MANY_MANAGERS` (10). Repeating changes nothing; a new invitation sends `pageInvite` |
 | `DELETE /pages/:id/invites/:inviteId` | a manager | Cancels an invitation |
 | `GET /pages/invites/mine` | anyone | Invitations waiting for me (pages not suspended) |
 | `PUT /pages/invites/:id {accept}` | the invited person | Accept (joins `managers`) or decline; either way it goes. 404 `INVITE_GONE` |
-| `DELETE /pages/:id/managers/:personId` | a manager | `mayRemoveManager()`: anyone leaves; the creator removes anyone; once the creator no longer manages it, any manager removes others. Never the last manager (403 `LAST_MANAGER`); guarded on the count, so two leaving at once cannot empty it |
+| `DELETE /pages/:id/managers/:personId` | a manager | `mayRemoveManager()`: a manager leaves; the owner removes anyone else but cannot leave (403 `OWNER_MUST_HAND_OVER`); with no owner left, any manager removes others. Never the last manager (403 `LAST_MANAGER`); guarded on the count, so two leaving at once cannot empty it |
+| `PUT /pages/:id/owner {personId}` | the owner | Makes another current manager the owner (`ownerId`); the old owner stays a manager. 403 `OWNER_ONLY`, 400 `NOT_A_MANAGER_YET`. Guarded on the current owner |
 
-Every manager is equal otherwise: they post, answer, invite, see insights and get the page's
-notifications. The page limit still counts `createdBy` only. A removed manager's next request as
+**Two roles** (owner's decision, 2026-11-26): the **owner** removes managers, deletes the page
+(`DELETE /pages/:id`, 403 `OWNER_ONLY` for anyone else) and hands ownership over; resigning in
+favour of someone is the same handover. **Managers** post, answer, invite, see insights, switch
+the page off and get its notifications. More roles may come with money. The page limit still
+counts `createdBy` only, so receiving a page never takes someone over their limit. When an owner
+deletes their account, a page others also manage goes to the longest-serving other manager
+(`nextOwner()`). A removed manager's next request as
 the page is refused (`NOT_A_MANAGER`), which ends acting on that device.
 
 **Suspension.** Suspending a person suspends a page they manage only when every manager of it is

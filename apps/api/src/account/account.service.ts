@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, No
 import { Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import type { AccountExport, DeleteAccountRequest } from '@life-portal/shared-types';
-import { exportRecord, storageKeysIn } from '@life-portal/shared-domain';
+import { exportRecord, storageKeysIn, nextOwner, pageOwner } from '@life-portal/shared-domain';
 import { CONFIG, type AppConfig } from '../config/configuration';
 import { MAILER, type Mailer } from '../mail/mailer';
 import { accountDeletedEmail } from '../auth/emails';
@@ -134,8 +134,14 @@ export class AccountService {
     // Spec 040: the pages only this person manages go first, each erased like an account.
     const pages = await this.store.find('users', { kind: 'page', managers: userId });
     for (const page of pages) {
-      if ((page['managers'] as unknown[] | undefined)?.length === 1) await this.erase(String(page['_id']));
-      else await this.store.updateMany('users', { _id: page['_id'] }, { $pull: { managers: userId } });
+      const managers = (page['managers'] as string[] | undefined) ?? [];
+      if (managers.length === 1) await this.erase(String(page['_id']));
+      else {
+        // Spec 045: an owner leaving hands the page to the longest-serving other manager.
+        const owner = pageOwner({ ownerId: page['ownerId'] as string | undefined, createdBy: page['createdBy'] as string | undefined, managers });
+        const heir = owner === userId ? nextOwner(managers, userId) : undefined;
+        await this.store.updateMany('users', { _id: page['_id'] }, { $pull: { managers: userId }, ...(heir ? { $set: { ownerId: heir } } : {}) });
+      }
     }
     await this.erase(userId);
 

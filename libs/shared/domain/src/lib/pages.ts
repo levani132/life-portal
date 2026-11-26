@@ -38,16 +38,30 @@ export function followingAuthors(input: { self: string; friends: readonly string
 }
 
 /**
- * Spec 045: whether `requester` may take `target` off a page's managers. Anyone may leave; the
- * page's creator may remove anyone else; when the creator no longer manages it, any manager may.
- * Never the last manager: the page would have nobody to answer for it (delete it instead).
+ * Spec 045: a page's owner. `ownerId` once ownership was handed over; before that, its creator.
+ * `undefined` when neither manages it any more (an older page whose creator left).
  */
-export function mayRemoveManager(input: { requester: string; target: string; managers: readonly string[]; createdBy?: string }): boolean {
-  const { requester, target, managers, createdBy } = input;
+export function pageOwner(page: { ownerId?: string; createdBy?: string; managers?: readonly string[] }): string | undefined {
+  const owner = page.ownerId ?? page.createdBy;
+  return owner && (page.managers ?? []).includes(owner) ? owner : undefined;
+}
+
+/**
+ * Spec 045: whether `requester` may take `target` off a page's managers. A manager may leave; the
+ * owner may remove anyone else, but cannot leave (they hand ownership over first, or delete the
+ * page). With no owner left, any manager may remove others. Never the last manager.
+ */
+export function mayRemoveManager(input: { requester: string; target: string; managers: readonly string[]; owner?: string }): boolean {
+  const { requester, target, managers, owner } = input;
   if (!managers.includes(requester) || !managers.includes(target) || managers.length < 2) return false;
-  if (requester === target) return true;
-  if (requester === createdBy) return true;
-  return !createdBy || !managers.includes(createdBy) ? target !== createdBy : false;
+  if (target === owner) return false;
+  if (requester === target || requester === owner) return true;
+  return !owner;
+}
+
+/** Spec 045: who becomes owner when the owner's account goes: the longest-serving other manager. */
+export function nextOwner(managers: readonly string[], leaving: string): string | undefined {
+  return managers.find((id) => id !== leaving);
 }
 
 /**

@@ -28,6 +28,8 @@ export interface PageSummary {
   suspended: boolean;
   /** Spec 041: switched off by its manager; hidden everywhere until switched on again. */
   disabled: boolean;
+  /** Spec 045: whether the person asking owns it (may delete it and hand it over). */
+  youOwn?: boolean;
 }
 
 /** A page offered to follow. */
@@ -136,7 +138,8 @@ export interface PageInsights {
 
 /** Spec 045: a page's managers and pending invitations, for its managers only. */
 export interface PageManagers {
-  managers: { userId: string; name: string; username: string; avatarUrl?: string; creator: boolean; you: boolean; mayRemove: boolean }[];
+  /** `owner`: the one who can remove managers, delete the page and hand ownership over. */
+  managers: { userId: string; name: string; username: string; avatarUrl?: string; owner: boolean; you: boolean; mayRemove: boolean }[];
   invites: { id: string; userId: string; name: string; username: string; avatarUrl?: string; createdAt: string }[];
 }
 

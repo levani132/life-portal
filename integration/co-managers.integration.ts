@@ -1,6 +1,6 @@
 /**
  * Spec 045: co-managers through the real API and Mongo. A manager invites a person by username;
- * they accept or decline; the creator removes, anyone leaves, the last manager stays. A page is
+ * they accept or decline; the owner removes and hands over, managers leave, the last stays. A page is
  * suspended only when none of its managers can act.
  */
 import { randomUUID } from 'node:crypto';
@@ -23,7 +23,7 @@ async function usernameOf(who: Account): Promise<string> {
 }
 
 describe('co-managers', () => {
-  it('invites, accepts, posts as the page, leaves; the creator removes; the last one stays', async () => {
+  it('invites, accepts, posts as the page; the owner removes; the last one stays', async () => {
     const ana = await api.account('ana');
     const beka = await api.account('beka');
     const gio = await api.account('gio');
@@ -48,11 +48,11 @@ describe('co-managers', () => {
     expect((await api.call(beka, 'POST', '/posts', { requestId: randomUUID(), title: '', caption: 'From Beka', audience: 'public' }, as(page.id))).status).toBe(201);
 
     const list = (await api.call<PageManagers>(beka, 'GET', `/pages/${page.id}/managers`)).body;
-    expect(list.managers.map((row) => [row.userId, row.creator, row.you, row.mayRemove])).toEqual([
+    expect(list.managers.map((row) => [row.userId, row.owner, row.you, row.mayRemove])).toEqual([
       [ana.id, true, false, false],
       [beka.id, false, true, true],
     ]);
-    // Beka cannot remove the creator; Ana (the creator) can remove Beka.
+    // Beka cannot remove the owner; Ana (the owner) can remove Beka.
     expect((await api.call<{ code?: string }>(beka, 'DELETE', `/pages/${page.id}/managers/${ana.id}`)).body.code).toBe('CANNOT_REMOVE');
     expect((await api.call(ana, 'DELETE', `/pages/${page.id}/managers/${beka.id}`)).status).toBe(200);
     expect((await api.call(beka, 'POST', '/posts', { requestId: randomUUID(), title: '', caption: 'Again', audience: 'public' }, as(page.id))).status).toBe(403);
@@ -85,5 +85,45 @@ describe('co-managers', () => {
     expect(await suspended()).toBe(true);
     await auth.unsuspend(beka.id);
     expect(await suspended()).toBe(false);
+  });
+
+  it('hands ownership over: the owner cannot leave until then, and only the owner deletes', async () => {
+    const ana = await api.account('ana');
+    const beka = await api.account('beka');
+    const page = (await api.call<PageSummary>(ana, 'POST', '/pages', { name: 'Handover', username: `hand-${randomUUID().slice(0, 6)}`, bio: '' })).body;
+    await api.call(ana, 'POST', `/pages/${page.id}/managers`, { username: await usernameOf(beka) });
+    const invite = (await api.call<PageInvite[]>(beka, 'GET', '/pages/invites/mine')).body[0];
+    await api.call(beka, 'PUT', `/pages/invites/${invite.id}`, { accept: true });
+
+    expect((await api.call<{ code?: string }>(ana, 'DELETE', `/pages/${page.id}/managers/${ana.id}`)).body.code).toBe('OWNER_MUST_HAND_OVER');
+    expect((await api.call<{ code?: string }>(beka, 'DELETE', `/pages/${page.id}`)).body.code).toBe('OWNER_ONLY');
+    expect((await api.call<{ code?: string }>(beka, 'PUT', `/pages/${page.id}/owner`, { personId: beka.id })).body.code).toBe('OWNER_ONLY');
+    expect((await api.call<MyPages>(beka, 'GET', '/pages')).body.pages.find((row) => row.id === page.id)?.youOwn).toBe(false);
+
+    // Ana makes Beka the owner and stays a manager; now Ana may leave, and Beka may delete.
+    const handed = await api.call<PageManagers>(ana, 'PUT', `/pages/${page.id}/owner`, { personId: beka.id });
+    expect(handed.body.managers.map((row) => [row.userId, row.owner])).toEqual([
+      [ana.id, false],
+      [beka.id, true],
+    ]);
+    expect((await api.call<MyPages>(beka, 'GET', '/pages')).body.pages.find((row) => row.id === page.id)?.youOwn).toBe(true);
+    expect((await api.call<{ code?: string }>(ana, 'DELETE', `/pages/${page.id}`)).body.code).toBe('OWNER_ONLY');
+    expect((await api.call(ana, 'DELETE', `/pages/${page.id}/managers/${ana.id}`)).status).toBe(200);
+    expect((await api.call(beka, 'DELETE', `/pages/${page.id}`)).status).toBe(200);
+  });
+
+  it('passes ownership on when the owner deletes their account', async () => {
+    const ana = await api.account('ana');
+    const beka = await api.account('beka');
+    const page = (await api.call<PageSummary>(ana, 'POST', '/pages', { name: 'Heir', username: `heir-${randomUUID().slice(0, 6)}`, bio: '' })).body;
+    await api.call(ana, 'POST', `/pages/${page.id}/managers`, { username: await usernameOf(beka) });
+    const invite = (await api.call<PageInvite[]>(beka, 'GET', '/pages/invites/mine')).body[0];
+    await api.call(beka, 'PUT', `/pages/invites/${invite.id}`, { accept: true });
+    // Ana deletes her account (as a Google account would: by typing her email).
+    const { ObjectId } = await import('mongodb');
+    await api.db.collection('users').updateOne({ _id: new ObjectId(ana.id) }, { $unset: { passwordHash: '' } });
+    expect((await api.call(ana, 'POST', '/account/delete', { confirmEmail: ana.email })).status).toBe(200);
+    const row = await api.db.collection('users').findOne({ _id: new ObjectId(page.id) });
+    expect(row).toMatchObject({ managers: [beka.id], ownerId: beka.id });
   });
 });

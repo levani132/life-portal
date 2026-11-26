@@ -2927,3 +2927,10 @@ accepted by the invited person; all are equal except that the page's creator can
 page's notifications across many phones. Deletion is unchanged: deleting a person deletes the
 pages only they manage, because the privacy policy promises deletion removes everything.
 
+Changed the same day: two roles. The page has one **owner** (its creator until they hand it
+over), who removes managers, deletes the page and makes another manager the owner; everyone else
+is a manager. The owner cannot leave without handing over, so a page always has someone
+answerable for it; if the owner's account is deleted, the longest-serving other manager becomes
+the owner. Ownership is a separate field (`ownerId`) from `createdBy`, because the page limit
+counts pages a person created and a handover must not push the receiver over theirs.
+

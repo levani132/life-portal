@@ -47,3 +47,9 @@ Every manager can post as the page and invite. The page's creator can remove a m
 can leave, except the last manager, who deletes the page instead. A page is suspended only when
 none of its managers can act (all of them suspended), and is restored when one is. Suspending a
 person otherwise leaves their pages alone: a page is its own account.
+
+**Amended 2026-11-26: owner and managers.** The creator is the page's owner until they make
+another manager the owner (they stay a manager). Only the owner removes managers, deletes the
+page and hands it over; the owner cannot leave without handing over. An owner deleting their
+account passes the page to the longest-serving other manager.
+

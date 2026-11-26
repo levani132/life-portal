@@ -146,6 +146,7 @@ function Managers({ pageId, name }: { pageId: string; name: string }) {
   const router = useRouter();
   const [username, setUsername] = useState('');
   if (!data.data) return data.error ? <ErrorNote message={(data.error as Error).message} /> : null;
+  const youOwn = data.data.managers.some((manager) => manager.you && manager.owner);
   const run = (work: () => Promise<unknown>, after?: () => void) =>
     void action
       .run(
@@ -159,7 +160,9 @@ function Managers({ pageId, name }: { pageId: string; name: string }) {
   return (
     <section className="card p-4">
       <h2 className="text-sm font-semibold">Managers</h2>
-      <p className="text-xs text-ink-muted">Everyone here can post, answer and invite as {name}. Only the page’s creator can remove someone; anyone can leave.</p>
+      <p className="text-xs text-ink-muted">
+        Everyone here can post, answer and invite as {name}. The owner can also remove managers, delete the page and make someone else the owner.
+      </p>
       <ul className="mt-2 divide-y divide-border">
         {data.data.managers.map((manager) => (
           <li key={manager.userId} className="flex items-center gap-3 py-2.5">
@@ -169,8 +172,21 @@ function Managers({ pageId, name }: { pageId: string; name: string }) {
                 {manager.name}
                 {manager.you && <span className="ml-1 text-ink-faint">(you)</span>}
               </span>
-              <span className="block truncate text-xs text-ink-faint">{manager.creator ? 'Created the page' : manager.username ? `@${manager.username}` : ''}</span>
+              <span className="block truncate text-xs text-ink-faint">{manager.owner ? 'Owner' : manager.username ? `@${manager.username}` : 'Manager'}</span>
             </span>
+            {youOwn && !manager.you && (
+              <button
+                type="button"
+                className="shrink-0 rounded-full border border-border px-2.5 py-1 text-xs text-ink-muted hover:text-ink"
+                disabled={action.pending}
+                onClick={() => {
+                  if (!window.confirm(`Make ${manager.name} the owner of ${name}? You stay a manager, but only they can then remove managers, delete the page or hand it on.`)) return;
+                  run(() => api.put(`/pages/${pageId}/owner`, { personId: manager.userId }));
+                }}
+              >
+                Make owner
+              </button>
+            )}
             {manager.mayRemove && (
               <button
                 type="button"
@@ -204,6 +220,7 @@ function Managers({ pageId, name }: { pageId: string; name: string }) {
           </li>
         ))}
       </ul>
+      {youOwn && data.data.managers.length > 1 && <p className="mt-1 text-xs text-ink-faint">To leave, make another manager the owner first.</p>}
       <form
         className="mt-2 flex gap-2"
         onSubmit={(event) => {

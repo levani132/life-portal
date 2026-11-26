@@ -43,7 +43,7 @@ import {
   type SuggestedPage,
   type UpdatePageRequest,
 } from '@life-portal/shared-types';
-import { mayCreatePage, mayRemoveManager, pagesRemaining } from '@life-portal/shared-domain';
+import { mayCreatePage, mayRemoveManager, pageOwner, pagesRemaining } from '@life-portal/shared-domain';
 import { SocialGraphService } from '../social-graph/social-graph.module';
 import { AccessService, RequireModule } from '../access/access.module';
 import { FollowsService } from '../follows/follows.module';
@@ -95,6 +95,9 @@ const PAGE_MANAGERS_MAX = 10;
 
 export class InviteManagerDto {
   @IsString() @MinLength(1) @MaxLength(40) username!: string;
+}
+export class TransferOwnerDto {
+  @Matches(/^[0-9a-f]{24}$/) personId!: string;
 }
 export class AnswerInviteDto {
   @IsBoolean() accept!: boolean;
@@ -185,7 +188,7 @@ export class PagesService {
     const personAvatarUrl = own.get(personId)?.avatarUrl;
     return {
       ...(personAvatarUrl ? { personAvatarUrl } : {}),
-      pages: await this.summaries(rows),
+      pages: (await this.summaries(rows)).map((page, index) => ({ ...page, youOwn: pageOwner(rows[index]) === personId })),
       remaining: pagesRemaining({ pageLimit: person?.pageLimit, developer: personId === this.config.developerUserId, created }),
       assistant: person?.assistantPages === true,
     };
@@ -341,6 +344,9 @@ export class PagesService {
   /** Deletes the page and everything it holds, the way an account is deleted. */
   async remove(personId: string, pageId: string): Promise<{ success: true }> {
     const row = await this.managed(personId, pageId);
+    // Spec 045: deleting the page is the owner's (a page with no owner left: any manager's).
+    const owner = pageOwner(row);
+    if (owner && owner !== personId) throw new ForbiddenException({ code: 'OWNER_ONLY', message: 'Only the page’s owner can delete it.' });
     await this.accounts.erase(String(row._id));
     return { success: true };
   }
@@ -433,6 +439,7 @@ export class PagesService {
   async managerList(personId: string, pageId: string): Promise<PageManagers> {
     const page = await this.managed(personId, pageId);
     const managers = page.managers ?? [];
+    const owner = pageOwner(page);
     const invites = await this.invites.find({ pageId }).sort({ createdAt: 1 }).lean();
     const profiles = await this.social.summaries([...managers, ...invites.map((row) => row.personId)]);
     const card = (id: string) => {
@@ -442,9 +449,9 @@ export class PagesService {
     return {
       managers: managers.map((id) => ({
         ...card(id),
-        creator: id === page.createdBy,
+        owner: id === owner,
         you: id === personId,
-        mayRemove: mayRemoveManager({ requester: personId, target: id, managers, createdBy: page.createdBy }),
+        mayRemove: mayRemoveManager({ requester: personId, target: id, managers, owner }),
       })),
       invites: invites.map((row) => ({ id: String(row._id), ...card(row.personId), createdAt: row.createdAt.toISOString() })),
     };
@@ -532,24 +539,45 @@ export class PagesService {
   }
 
   /**
-   * Takes a manager off a page: yourself (leaving), or someone else if you created the page (or
-   * its creator no longer manages it). Never the last manager. The removed person's devices stop
+   * Takes a manager off a page: yourself (leaving), or someone else if you own the page. The owner
+   * hands ownership over before leaving; never the last manager. The removed person's devices stop
    * acting as the page on their next request (`NOT_A_MANAGER`).
    */
   async removeManager(personId: string, pageId: string, targetId: string): Promise<PageManagers | { left: true }> {
     const page = await this.managed(personId, pageId);
     const managers = page.managers ?? [];
-    if (!mayRemoveManager({ requester: personId, target: targetId, managers, createdBy: page.createdBy })) {
+    const owner = pageOwner(page);
+    if (!mayRemoveManager({ requester: personId, target: targetId, managers, owner })) {
       throw new ForbiddenException(
         managers.length < 2 && targetId === personId
           ? { code: 'LAST_MANAGER', message: 'You are the only manager. Invite someone first, or delete the page.' }
-          : { code: 'CANNOT_REMOVE', message: 'Only the page’s creator can remove another manager.' },
+          : targetId === owner && targetId === personId
+            ? { code: 'OWNER_MUST_HAND_OVER', message: 'Make another manager the owner first, then you can leave.' }
+            : { code: 'CANNOT_REMOVE', message: 'Only the page’s owner can remove another manager.' },
       );
     }
     // Guarded on the count, so two managers leaving at once cannot leave the page with none.
     const changed = await this.users.updateOne({ _id: page._id, managers: targetId, 'managers.1': { $exists: true } }, { $pull: { managers: targetId } });
     if (!changed.modifiedCount) throw new ForbiddenException({ code: 'LAST_MANAGER', message: 'A page always keeps one manager.' });
     return targetId === personId ? { left: true } : this.managerList(personId, pageId);
+  }
+
+  /**
+   * Spec 045: the owner hands the page to another of its managers, who becomes the owner; the
+   * old owner stays a manager. Only the owner may. Resigning in favour of someone is this.
+   */
+  async transferOwnership(personId: string, pageId: string, targetId: string): Promise<PageManagers> {
+    const page = await this.managed(personId, pageId);
+    if (pageOwner(page) !== personId) throw new ForbiddenException({ code: 'OWNER_ONLY', message: 'Only the page’s owner can do that.' });
+    if (targetId === personId || !(page.managers ?? []).includes(targetId))
+      throw new BadRequestException({ code: 'NOT_A_MANAGER_YET', message: 'Ownership goes to someone who already helps run the page.' });
+    // Guarded on the current owner, so two handovers at once cannot both win.
+    const changed = await this.users.updateOne(
+      { _id: page._id, managers: targetId, $or: [{ ownerId: personId }, { ownerId: { $exists: false }, createdBy: personId }] },
+      { $set: { ownerId: targetId } },
+    );
+    if (!changed.modifiedCount) throw new ForbiddenException({ code: 'OWNER_ONLY', message: 'Only the page’s owner can do that.' });
+    return this.managerList(personId, pageId);
   }
 
   /** Who the request is made as, for the web app's shell. */
@@ -655,6 +683,12 @@ export class PagesController {
   @HttpCode(200)
   removeManager(@CurrentUser('userId') personId: string, @Param('id') id: string, @Param('personId') target: string) {
     return this.pages.removeManager(personId, id, target);
+  }
+
+  /** Spec 045: the owner makes another manager the owner. */
+  @Put(':id/owner')
+  owner(@CurrentUser('userId') personId: string, @Param('id') id: string, @Body() dto: TransferOwnerDto) {
+    return this.pages.transferOwnership(personId, id, dto.personId);
   }
 
   @Delete(':id/invites/:inviteId')

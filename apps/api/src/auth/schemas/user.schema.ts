@@ -82,13 +82,17 @@ export class User {
   @Prop({ type: String, enum: ['page'] })
   kind?: 'page';
 
-  /** A page's managers: the people who may act as it. One for now. */
+  /** A page's managers: the people who may act as it (spec 045: up to 10). */
   @Prop({ type: [String], default: undefined })
   managers?: string[];
 
-  /** The person who created the page. What their page limit counts. */
+  /** The person who created the page. What their page limit counts, even after a handover. */
   @Prop()
   createdBy?: string;
+
+  /** Spec 045: the page's owner once ownership was handed over; absent: its creator. */
+  @Prop()
+  ownerId?: string;
 
   /** The app's own page, set by the owner. */
   @Prop()
