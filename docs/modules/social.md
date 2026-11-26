@@ -118,8 +118,9 @@ Profiles now have Posts and About tabs when social + nutrition + foodPosts are e
 
 ## The portal (spec 046)
 
-A person's profile is their **portal**: it opens on the Portal tab (their shared modules), then
-Posts and Badges; a page's opens on its posts. The tab bar says "Portal". A portal's address is
+A person's profile is their **portal**: its Portal tab is their shared modules with their posts
+right under them (no separate Posts tab since 2026-11-26), then Badges on your own; a page's
+opens on its posts. The tab bar says "Portal". A portal's address is
 `/@username` (rewritten to `/u/[username]` in `next.config.js`); sharing a portal sends it.
 
 - **Members:** `GET /social/usernames/:username` turns an address into an account (404 when it

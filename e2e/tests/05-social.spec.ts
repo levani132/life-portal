@@ -120,11 +120,16 @@ test('Training shows on your portal and opens into the week, records and workout
   await call(ana, 'PUT', '/nutrition/profile', { sex: 'female', heightCm: 165, birthDate: '1992-01-01', goal: 'maintain', shareMeals: true });
   await call(ana, 'PUT', '/portal', { moduleVisibility: { training: 'friends', nutrition: 'friends' } });
   await call(ana, 'PUT', '/portal/arrangement', { order: ['training', 'nutrition'], sizes: { training: '4x3', nutrition: '2x2' } });
+  await call(ana, 'POST', '/posts', { requestId: randomUUID(), title: 'Squat day', caption: 'New best on squats.', audience: 'public' });
   await signIn(page, ana);
   await page.goto('/profile');
   const training = page.getByRole('button', { name: 'Open Training' }).filter({ visible: true }).first();
   await expect(training).toBeVisible();
   await snap(page, '05-portal-training');
+  // Posts follow the widgets on the same tab.
+  await expect(page.getByText('New best on squats.').filter({ visible: true }).first()).toBeVisible();
+  await page.getByText('New best on squats.').filter({ visible: true }).first().scrollIntoViewIfNeeded();
+  await snap(page, '05-portal-posts');
   await training.click();
   const folder = page.getByRole('dialog', { name: 'Training' });
   await expect(folder.getByText('Recent workouts')).toBeVisible();

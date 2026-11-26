@@ -88,11 +88,6 @@ export function PublicPortalView({ username }: { username: string }) {
               <button type="button" role="tab" aria-selected className="glass-tab-on rounded-full border border-transparent px-4 py-1.5 text-sm font-medium">
                 {portal.data.isPage ? 'Posts' : 'Portal'}
               </button>
-              {!portal.data.isPage && (
-                <button type="button" role="tab" aria-selected={false} className="rounded-full border border-transparent px-4 py-1.5 text-sm text-ink-muted" onClick={() => setGate(true)}>
-                  Posts
-                </button>
-              )}
               <button type="button" role="tab" aria-selected={false} className="rounded-full border border-transparent px-4 py-1.5 text-sm text-ink-muted" onClick={() => setGate(true)}>
                 {portal.data.isPage ? 'Library' : 'Badges'}
               </button>

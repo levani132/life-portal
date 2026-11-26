@@ -433,9 +433,11 @@ export function ProfileView({ userId }: { userId?: string }) {
     portal.data.access.nutrition &&
     portal.data.access.social;
   // The badge collection holds private progress, so it is only on your own, un-previewed profile.
+  // Spec 046: a person's posts follow their widgets on the Portal tab; a page (no widgets) keeps
+  // its posts as its first tab.
   const tabs = [
     ...(person.isPage ? [] : (['about'] as const)),
-    ...(posts ? (['posts'] as const) : []),
+    ...(posts && person.isPage ? (['posts'] as const) : []),
     ...(own && preview === 'normal' && !person.isPage ? (['badges'] as const) : []),
   ];
   const shown = tabs.find((value) => value === tab) ?? tabs[0];
@@ -565,13 +567,15 @@ export function ProfileView({ userId }: { userId?: string }) {
               {/* Spec 046: the portal's widgets, read only; arranged only by its owner, as themselves. */}
               <PortalGrid widgets={person.widgets} arrangeable={own && viewAs === 'normal' && !actingPageId()} ownerId={person.userId} viewAs={viewAs} />
             </>
-          ) : (
-            <div className="card p-6 text-sm text-ink-muted">
-              {own
-                ? 'Your portal shows nothing to this audience yet. Choose who sees each module in Privacy and sharing.'
-                : 'Nothing on this portal is shared with you.'}
+          ) : own ? (
+            <div className="card p-6 text-sm text-ink-muted">Your portal shows no widgets to this audience yet. Choose who sees each module in Privacy and sharing.</div>
+          ) : null}
+          {posts && (
+            <div className={person.widgets.length || own ? 'mt-5' : ''}>
+              <PostsList authorId={person.userId} preview={viewAs} />
             </div>
           )}
+          {!posts && !person.widgets.length && !own && <div className="card p-6 text-sm text-ink-muted">Nothing on this portal is shared with you.</div>}
         </div>
       )}
     </div>
