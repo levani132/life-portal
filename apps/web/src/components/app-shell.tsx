@@ -57,7 +57,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 export function PortalShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const { user, loading } = useAuth();
   if (PUBLIC_PATHS.includes(pathname)) return <>{children}</>;
+  // Spec 046: a portal's address opens for someone without an account, outside the app.
+  // The address is rewritten, so the path the browser reports is still `/@username`.
+  if ((pathname.startsWith('/u/') || pathname.startsWith('/@')) && !loading && !user) return <>{children}</>;
   return <Portal>{children}</Portal>;
 }
 
@@ -640,7 +644,7 @@ function tabsFor(
     // Spec 041: a page's library, where a person has Food and Training on Home.
     ...(isPage ? [tab('/library', 'Library', LibraryBig, PageLibrary, pathname.startsWith('/library'))] : []),
     access.social
-      ? tab(LAST_TAB_HREF.profile, 'Profile', UserRound, OwnProfile, inMenu)
+      ? tab(LAST_TAB_HREF.profile, 'Portal', UserRound, OwnProfile, inMenu)
       : tab(LAST_TAB_HREF.menu, 'Menu', Menu, MenuContent, inMenu),
   ];
 }

@@ -51,6 +51,7 @@ import {
   type ConnectionAction,
   type ConnectionList,
   type PeoplePage,
+  type PublicPortal,
   type SocialPerson,
   type SocialAvatarUpdate,
   type SocialProfile as ProfileDto,
@@ -352,6 +353,41 @@ export class SocialService implements OnModuleInit {
     const profile = await this.profiles.findOne({ userId }).lean();
     return profile ? this.identity(profile) : null;
   }
+  /**
+   * Spec 046: the visitor's view of a portal, by username: identity and the modules shared with
+   * everyone. A person shows only if findable by strangers (`discoverable`); a page always. A
+   * suspended, deleted or social-off account is not found. Posts are added by the caller.
+   */
+  async publicPortal(username: string, today: string): Promise<Omit<PublicPortal, 'posts'> & { userId: string }> {
+    const missing = () => new NotFoundException({ code: 'PORTAL_PRIVATE', message: 'This portal is private.' });
+    const profile = await this.profiles.findOne({ username: username.trim().toLowerCase().replace(/^@/, '') }).lean();
+    if (!profile || (profile.kind !== 'page' && !profile.discoverable) || !(await this.enabled(profile.userId))) throw missing();
+    // A visitor is treated as a member with every feature the owner has, who is not a friend:
+    // exactly what is set to "public" passes.
+    const owner = await this.access.forUser(profile.userId);
+    const identity = await this.identity(profile);
+    return {
+      userId: profile.userId,
+      username: identity.username,
+      displayName: identity.displayName,
+      bio: profile.bio,
+      ...(identity.avatarUrl ? { avatarUrl: identity.avatarUrl } : {}),
+      ...(identity.isPage ? { isPage: true as const } : {}),
+      ...(identity.official ? { official: true as const } : {}),
+      ...(identity.aiManaged ? { aiManaged: true as const } : {}),
+      widgets: profile.kind === 'page' ? [] : await this.shared.forViewer(profile.userId, owner.access, false, today),
+    };
+  }
+
+  /** Spec 046: the account behind a portal address, for a signed-in viewer. Blocked reads as missing. */
+  async idByUsername(viewerId: string, username: string): Promise<{ userId: string }> {
+    const profile = await this.profiles.findOne({ username: username.trim().toLowerCase().replace(/^@/, '') }).select('userId').lean();
+    const missing = () => new NotFoundException('Profile not found.');
+    if (!profile || !(await this.enabled(profile.userId))) throw missing();
+    if (profile.userId !== viewerId && (await this.graph.between(viewerId, profile.userId))?.blockedBy.length) throw missing();
+    return { userId: profile.userId };
+  }
+
   private async person(
     profile: SocialProfile,
     relationship: SocialPerson['relationship'],
@@ -691,6 +727,10 @@ export class SocialController {
     @Today() today: string,
   ) {
     return this.social.connections(userId, query, today);
+  }
+  /** Spec 046: a portal address (`/@username`) to the account, for a signed-in viewer. */
+  @Get('usernames/:username') byUsername(@CurrentUser('userId') userId: string, @Param('username') username: string) {
+    return this.social.idByUsername(userId, username);
   }
   @Get('profiles/:id') profile(
     @CurrentUser('userId') userId: string,

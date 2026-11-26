@@ -14,20 +14,22 @@ const path = require('path');
  * @type {import('next').NextConfig}
  */
 const nextConfig = {
-  // Serve the local browser and API from one development origin.
-  ...(process.env.NODE_ENV === 'development'
-    ? {
-        async rewrites() {
-          return [
+  async rewrites() {
+    return [
+      // Spec 046: a portal's address, `/@username`, is served by `/u/[username]`.
+      { source: '/@:username', destination: '/u/:username' },
+      // Serve the local browser and API from one development origin.
+      ...(process.env.NODE_ENV === 'development'
+        ? [
             {
               source: '/api/:path*',
               // API_DEV_TARGET: another API port, when 3333 is taken by a second checkout.
               destination: `${process.env.API_DEV_TARGET ?? 'http://127.0.0.1:3333/api'}/:path*`,
             },
-          ];
-        },
-      }
-    : {}),
+          ]
+        : []),
+    ];
+  },
   // The monorepo root, so file tracing follows imports out of `apps/web` into `libs/`.
   outputFileTracingRoot: path.join(__dirname, '../../'),
 };

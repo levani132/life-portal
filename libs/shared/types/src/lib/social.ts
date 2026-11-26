@@ -1,5 +1,6 @@
 import type { MealSlot, FoodUnit, ServingTotals } from './nutrition';
 import type { ModuleId, Audience } from './portal';
+import type { PublicPostPreview } from './posts';
 export type Relationship =
   | 'self'
   | 'none'
@@ -90,4 +91,22 @@ export interface SharedFoodDiary {
       totals: ServingTotals;
     }[];
   }[];
+}
+
+/**
+ * Spec 046: a portal as someone without an account sees it. Only what the person made public,
+ * and only if they can be found by strangers; a page always. Nothing else reaches a visitor.
+ */
+export interface PublicPortal {
+  username: string;
+  displayName: string;
+  bio: string;
+  avatarUrl?: string;
+  isPage?: true;
+  official?: true;
+  aiManaged?: true;
+  /** Modules shared with everyone, as read-only cards. */
+  widgets: SharedWidget[];
+  /** The two newest public posts, in the link preview's narrow form. */
+  posts: PublicPostPreview[];
 }

@@ -481,6 +481,22 @@ export class PostsService {
       ...(photoUrl ? { photoUrl } : {}),
     };
   }
+  /**
+   * Spec 046: an account's newest public, live, original posts in the link preview's narrow form,
+   * for a visitor's view of a portal. Nothing a member-only read would add.
+   */
+  async latestPublicPreviews(userId: string, limit = 2): Promise<PublicPostPreview[]> {
+    if (!(await this.enabled(userId))) return [];
+    const rows = await this.posts
+      .find({ userId, audience: 'public', deleted: { $ne: true }, heldAt: { $exists: false }, ...ORIGINAL })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .select('_id')
+      .lean();
+    const out: PublicPostPreview[] = [];
+    for (const row of rows) out.push(await this.publicPreview(String(row._id)));
+    return out;
+  }
   /** The owner's live posts, newest first, as id → title. Used for their Activity. */
   async ownTitles(userId: string, limit = 500): Promise<Map<string, string>> {
     const rows = await this.posts

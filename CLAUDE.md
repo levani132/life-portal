@@ -191,6 +191,10 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   once, requires a real JPEG and strips its metadata with `cleanJpeg()` before `checkedAt` is set;
   never attach one without `checkedAt`. See
   `docs/modules/posts.md`.
+- **`GET /api/public/portals/:username` (spec 046) is the one other open read**: a visitor's view
+  of a portal, only for a person who is `discoverable` (or a page), with the modules set to
+  public and the two newest public posts in the preview's narrow form. Don't add fields to it or
+  a sibling; the join popup on the web is a nudge, never the protection.
 - **`GET /api/public/posts/:id/preview` is the only `@Public()` posts route**, for link-preview
   crawlers. It answers for public, live, original posts only and returns a narrow projection;
   don't widen it or add a sibling. Share images are only for own or public posts

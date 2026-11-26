@@ -404,7 +404,8 @@ export function ProfileView({ userId }: { userId?: string }) {
   const { user } = useAuth();
   const own = !userId || userId === user?.id;
   const [preview, setPreview] = useState<Preview>('normal');
-  const [tab, setTab] = useState<'posts' | 'badges' | 'about'>('posts');
+  // Spec 046: a person's portal opens on the Portal; a page (which shares no modules) on its posts.
+  const [tab, setTab] = useState<'posts' | 'badges' | 'about'>('about');
   const [openBadge, setOpenBadge] = useState<BadgeId | null>(null);
   // Spec 033: offline, the shell's kept portal state still says the Posts tab exists.
   const portalLive = useApi<PortalState>('/portal');
@@ -432,9 +433,9 @@ export function ProfileView({ userId }: { userId?: string }) {
     portal.data.access.social;
   // The badge collection holds private progress, so it is only on your own, un-previewed profile.
   const tabs = [
+    ...(person.isPage ? [] : (['about'] as const)),
     ...(posts ? (['posts'] as const) : []),
     ...(own && preview === 'normal' && !person.isPage ? (['badges'] as const) : []),
-    'about' as const,
   ];
   const shown = tabs.find((value) => value === tab) ?? tabs[0];
   return (
@@ -534,7 +535,7 @@ export function ProfileView({ userId }: { userId?: string }) {
               }
               onClick={() => setTab(value)}
             >
-              {value === 'posts' ? 'Posts' : value === 'badges' ? 'Badges' : 'About'}
+              {value === 'posts' ? 'Posts' : value === 'badges' ? 'Badges' : 'Portal'}
             </button>
           ))}
         </div>
@@ -557,11 +558,7 @@ export function ProfileView({ userId }: { userId?: string }) {
       ) : shown === 'badges' ? (
         <BadgeCollection open={openBadge} onOpened={() => setOpenBadge(null)} />
       ) : (
-        <>
-          <div className="mb-4 mt-6 flex items-center justify-between gap-4">
-            <h2 className="text-lg font-semibold">About</h2>
-            <span className="text-xs text-ink-faint">Shared widgets</span>
-          </div>
+        <div className="mt-4">
           {person.widgets.length ? (
             <SharedWidgets
               widgets={person.widgets}
@@ -571,14 +568,11 @@ export function ProfileView({ userId }: { userId?: string }) {
           ) : (
             <div className="card p-6 text-sm text-ink-muted">
               {own
-                ? 'Nothing is shared in this view. Choose audiences in Privacy and sharing. Food also has separate meal, weight and target controls.'
-                : 'No widgets are shared with you.'}
+                ? 'Your portal shows nothing to this audience yet. Choose who sees each module in Privacy and sharing.'
+                : 'Nothing on this portal is shared with you.'}
             </div>
           )}
-          <p className="mt-4 text-xs text-ink-faint">
-            Only widgets shared with this audience appear here.
-          </p>
-        </>
+        </div>
       )}
     </div>
   );
@@ -627,7 +621,8 @@ function OwnHeaderActions({
     return () => window.clearTimeout(timer);
   }, [copied]);
   async function share() {
-    const url = `${window.location.origin}/people/${person.userId}`;
+    // Spec 046: a portal's address is its username.
+    const url = person.username ? `${window.location.origin}/@${person.username}` : `${window.location.origin}/people/${person.userId}`;
     if (navigator.share) {
       try {
         await navigator.share({ title: person.displayName, url });

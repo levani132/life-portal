@@ -1,4 +1,4 @@
-# Spec 046: My Portal (draft, planning)
+# Spec 046: My Portal
 
 Asked by the owner on 2026-11-26, after pausing Pages. Roadmap item 5, decided 2026-11-22.
 
@@ -12,8 +12,8 @@ sees how that person eats and trains, not only their posts.
 
 Principles already decided (ROADMAP item 5):
 - The person decides per module: private, friends or public. **Private stays the default.**
-- Money is the person's choice too, later, with a plain warning (scams are built on it, and once
-  public it cannot be taken back).
+- Money stays out of portals for now (its modules are not open to members yet). No in-app warning:
+  the terms cover what sharing money means (owner, 2026-11-26).
 - Self-declared, and shown as such: nothing is presented as checked unless it was (imported
   workouts and Apple Health data are the one "verified" kind).
 - The words follow: "Profile" becomes "Portal" in the tab bar, menu, sharing and links, and a
@@ -48,15 +48,32 @@ Principles already decided (ROADMAP item 5):
    from portals.
 8. **Pages' portals** (later): a page's portal is its library (foods, recipes, plans, programmes).
 
-## Open decisions (for the owner)
+## Decisions (owner, 2026-11-26)
 
-1. **Public = who?** Signed-in members only (today's rule: no open-internet routes), or a portal
-   link that also opens for people without an account? Recommendation: members only now; an
-   open, narrow preview card for links later, like posts have.
-2. **Portal order:** its own arrangement, or the same order as Home? Recommendation: its own,
-   starting from Home's order.
-3. **Training parts:** which may be shown (workouts per week, streak, records, level, rank)?
-   Body weight never, as for posts. Recommendation: each opt-in, level and rank included.
-4. **Money now:** hide money modules from portals until the warning flow exists (they are
-   shareable today without one). Recommendation: yes, hide now.
-5. **Food detail:** keep today's split (meals, targets, weight separately) and add "this week".
+1. **A portal opens without an account.** Someone with no account sees what is public on the
+   portal's first view and one or two of the latest public posts; scrolling further or opening
+   another tab covers everything with a popup to join or sign in.
+2. **Its own arrangement, unlike Home.** No carousel: the widgets look the same as on Home, read
+   only, laid out like iOS home-screen widgets (sizes on a grid), arranged for the portal alone.
+3. **Training: rank too.** People want to share and compare ranks; workouts, streak, records,
+   level and rank can each be shared. Body weight is still never shown.
+4. **Everything has its own privacy setting.**
+5. **Money:** no warning; already hidden from members. Addressed in the terms when it opens.
+6. **Food adds "this week".**
+7. **Pages' portals later.**
+
+## Privacy rules for the open portal (slice 1)
+
+- Only what the person made **public** is shown to someone without an account, and only if the
+  person is findable by strangers (`discoverable`); otherwise the open link says the portal is
+  private and offers to join. Pages are public by nature.
+- The open view is one narrow, `@Public()` read of a portal by username: identity (name,
+  username, photo, bio, page marks), public widgets, and the two newest public posts in the same
+  narrow projection as the link preview. Nothing else is reachable without an account, and the
+  popup is a nudge, not the protection: the server sends nothing more.
+
+## Progress
+
+- **Slice 1, done 2026-11-26:** Portal tab first, "Portal" in the tab bar, `/@username`
+  addresses, the open portal for visitors with the join popup, sign-in back to the portal.
+

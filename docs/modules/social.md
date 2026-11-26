@@ -115,3 +115,22 @@ and Blocked. Privacy settings link to the preview and to Food's meal/target/weig
 ## Wall and profile posts (007)
 
 Profiles now have Posts and About tabs when social + nutrition + foodPosts are enabled. [PostsModule](posts.md) owns explicit food publications and imports. `SocialGraphService.wallAuthorIds` returns accepted, unblocked, unmuted friends; direct post reads still evaluate current audience and graph permissions. Muting affects Wall rather than profile access. Public post authors use the same allowlisted profile projection, never Auth user records.
+
+## The portal (spec 046)
+
+A person's profile is their **portal**: it opens on the Portal tab (their shared modules), then
+Posts and Badges; a page's opens on its posts. The tab bar says "Portal". A portal's address is
+`/@username` (rewritten to `/u/[username]` in `next.config.js`); sharing a portal sends it.
+
+- **Members:** `GET /social/usernames/:username` turns an address into an account (404 when it
+  is missing, social is off, or a block stands either way). The portal then reads as any profile.
+- **Visitors without an account:** `@Public() GET /public/portals/:username?today=` (posts module,
+  because it adds posts). It answers only for a person with `discoverable` on, or a page, whose
+  account is live (404 `PORTAL_PRIVATE` otherwise): name, username, photo, bio, page marks, the
+  modules set to **public** (`SharedWidgetsService.forViewer` with the owner's own features and
+  `friends: false`), and the two newest public, live, original posts as `PublicPostPreview`.
+  Nothing else is reachable. The web (`components/public-portal.tsx`) shows it and covers the
+  page with a join popup once the visitor scrolls past it or taps another tab; sign-in and
+  sign-up come back to the portal (`lib/next-path.ts`, same-app paths only).
+- Tested in `integration/public-portal.integration.ts` and the screen test.
+

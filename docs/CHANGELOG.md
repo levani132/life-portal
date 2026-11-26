@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-26: My Portal, part one
+
+- Your profile is now your **portal**: it opens on what you share, then your posts and badges.
+  The tab bar says Portal.
+- Your portal has an address you can send: lifeportal.one/@your-username (Share sends it).
+- With "Let people find me" on, someone without an account who opens that address sees your
+  public side and your two newest public posts, then is asked to join to see more.
+
 ## 2026-11-26: Pages: "By a person"
 
 - On a page run with AI, a post, comment or message written by a person through the app now says

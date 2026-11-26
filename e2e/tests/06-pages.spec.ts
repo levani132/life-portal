@@ -17,7 +17,7 @@ test('holding the profile tab opens "Using the app as"', async ({ page }) => {
   await call<{ id: string }>(ana, 'POST', '/pages', { name: 'E2E Bakery', username: `e2e-bakery-${randomUUID().slice(0, 6)}`, bio: '' });
   await signIn(page, ana);
   await page.goto('/');
-  const tab = page.getByRole('navigation').getByRole('link', { name: /profile/i });
+  const tab = page.getByRole('navigation').getByRole('link', { name: /portal/i });
   const box = await tab.boundingBox();
   if (!box) throw new Error('No profile tab');
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { nextPath } from '../../lib/next-path';
 import { useEffect, useState } from 'react';
 import { ApiError } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
@@ -29,7 +30,8 @@ export default function RegisterPage() {
   }, []);
 
   useEffect(() => {
-    if (!loading && user) router.replace('/');
+    // Spec 046: back to where a visitor came from (a portal), never outside the app.
+    if (!loading && user) router.replace(nextPath(window.location.search));
   }, [loading, user, router]);
 
   const set = (key: keyof typeof form) => (event: React.ChangeEvent<HTMLInputElement>) =>

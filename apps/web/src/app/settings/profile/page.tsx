@@ -116,8 +116,9 @@ function ProfileEditor({ profile }: { profile: SocialProfile }) {
             <span>
               <span className="block font-medium">Let people find me</span>
               <span className="mt-1 block text-xs text-ink-muted">
-                Appear in name and username search, and let your public posts show in For You. Your email is never shown.
-                Profile links work even when this is off.
+                Appear in name and username search, let your public posts show in For You, and let your portal’s address
+                show its public side to people without an account. Your email is never shown. Members can open your portal
+                link even when this is off.
               </span>
             </span>
           </label>

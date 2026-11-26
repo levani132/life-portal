@@ -52,3 +52,17 @@ test('search starts with the box, no title', async ({ page }) => {
   await expect(page.getByText('Find your people')).toHaveCount(0);
   await snap(page, '05-search');
 });
+
+test('a portal address opens for a visitor, then asks them to join', async ({ page }) => {
+  const ana = await account('Ana');
+  const username = `e2e-${randomUUID().slice(0, 8)}`;
+  await call(ana, 'PUT', '/social/me', { username, displayName: 'Ana Portal', bio: 'Lentils and lifts', discoverable: true });
+  await call(ana, 'POST', '/posts', { requestId: randomUUID(), title: 'Lentil soup', caption: 'Warm and cheap.', audience: 'public' });
+  await page.goto(`/@${username}`);
+  await expect(page.getByRole('heading', { name: 'Ana Portal' })).toBeVisible();
+  await expect(page.getByText('Lentil soup')).toBeVisible();
+  await snap(page, '05-public-portal');
+  await page.getByRole('tab', { name: 'Badges' }).click();
+  await expect(page.getByRole('dialog', { name: /See more of Ana Portal/ })).toBeVisible();
+  await snap(page, '05-public-portal-gate');
+});

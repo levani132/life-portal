@@ -36,6 +36,9 @@ export default function PrivacyPage() {
         </p>
         <p>
           Our error log and usage counters hold no person: a scrubbed error message, the kind of page, and a count.
+          If you turn on “Let people find me”, your portal’s address (lifeportal.one/@your-username) also shows people
+          without an account your name, photo, bio, what you made public and your two newest public posts; nothing
+          else. A page’s portal is always open this way.
           When you see a page’s post, the page’s managers see one more view on it. We keep only a count per post and
           day; to count you once a day we keep a coded key made from your account, the post and the day, which
           cannot be read without our server’s secret and is deleted after two days.

@@ -3,6 +3,7 @@ import { Wordmark } from '../../components/wordmark';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { nextPath } from '../../lib/next-path';
 import { useEffect, useState } from 'react';
 import { ApiError, SIGNED_OUT_REASON_KEY } from '../../lib/api';
 import { authCapabilities } from '../../lib/auth-capabilities';
@@ -42,7 +43,8 @@ export default function LoginPage() {
 
   // Already signed in: no reason to show the form.
   useEffect(() => {
-    if (!loading && user) router.replace('/');
+    // Spec 046: back to where a visitor came from (a portal), never outside the app.
+    if (!loading && user) router.replace(nextPath(window.location.search));
   }, [loading, user, router]);
 
   async function submit(event: React.FormEvent) {

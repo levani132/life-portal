@@ -1,4 +1,4 @@
-import type { TrainingPostSelection } from '@life-portal/shared-types';
+import type { PublicPortal, TrainingPostSelection } from '@life-portal/shared-types';
 import { TrainingModule } from '../training/training.module';
 import {
   PostEngagementService,
@@ -27,7 +27,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { RequireModule } from '../access/access.module';
 import { CurrentUser, Public } from '../auth/current-user.decorator';
 import { NutritionModule } from '../nutrition/nutrition.module';
-import { SocialModule, SocialNoStore } from '../social/social.module';
+import { SocialModule, SocialNoStore, SocialService } from '../social/social.module';
 import {
   CreatePostDto,
   AddPostCommentDto,
@@ -381,6 +381,26 @@ class PageInsightsController {
   }
 }
 
+/**
+ * Spec 046: a portal for someone without an account: the person's public modules and two newest
+ * public posts, nothing else. The page shown around it covers the rest with a popup to join.
+ */
+@UseInterceptors(SocialNoStore)
+@Controller('public/portals')
+class PublicPortalController {
+  constructor(
+    private readonly social: SocialService,
+    private readonly posts: PostsService,
+  ) {}
+  @Public()
+  @Get(':username')
+  async portal(@Param('username') username: string, @Query('today') today?: string): Promise<PublicPortal> {
+    const day = typeof today === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(today) ? today : new Date().toISOString().slice(0, 10);
+    const { userId, ...portal } = await this.social.publicPortal(username, day);
+    return { ...portal, posts: await this.posts.latestPublicPreviews(userId, 2) };
+  }
+}
+
 @UseInterceptors(SocialNoStore)
 @Controller('public/posts')
 class PublicPostsController {
@@ -413,7 +433,7 @@ class PublicPostsController {
       { name: User.name, schema: UserSchema },
     ]),
   ],
-  controllers: [PostsController, PublicPostsController, PageInsightsController],
+  controllers: [PostsController, PublicPostsController, PageInsightsController, PublicPortalController],
   providers: [PostsService, PostEngagementService, ForYouService, FeedMetricsService, PostModerationService, PageInsightsService],
   // Messages renders shared posts through the same read authorization as opening one.
   exports: [PostsService, PostEngagementService, ForYouService, PageInsightsService],

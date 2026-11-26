@@ -2934,3 +2934,12 @@ answerable for it; if the owner's account is deleted, the longest-serving other 
 the owner. Ownership is a separate field (`ownerId`) from `createdBy`, because the page limit
 counts pages a person created and a handover must not push the receiver over theirs.
 
+## 2026-11-26: A portal opens without an account, only for people who chose to be found
+
+The owner wants portals visible to people without an account, with a popup to join after a
+little scrolling. The popup cannot be the protection (anything sent to a browser can be read), so
+the server sends a visitor only the public side: identity, public modules and two newest public
+posts in the link preview's narrow form. And only for people who turned on "Let people find me"
+(pages always): someone who never chose to be found by strangers should not become visible to
+the whole internet because this feature shipped. The setting's text and the privacy policy say so.
+
