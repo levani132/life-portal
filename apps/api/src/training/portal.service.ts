@@ -32,6 +32,12 @@ export class TrainingPortalService {
     private readonly catalogue: CatalogueService,
   ) {}
 
+  /** Which parts the owner shares, for Home's card on the portal. */
+  async shares(userId: string): Promise<{ workouts: boolean; records: boolean }> {
+    const profile = await this.profiles.read(userId);
+    return { workouts: profile.shareWorkouts, records: profile.shareRecords };
+  }
+
   async portal(userId: string, today: string): Promise<PortalTraining | undefined> {
     const profile = await this.profiles.read(userId);
     if (!profile.shareWorkouts && !profile.shareRecords && !profile.shareLevel && !profile.shareRanks) return undefined;

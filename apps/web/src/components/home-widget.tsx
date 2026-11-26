@@ -190,12 +190,21 @@ export function HomeWidget({
   state,
   onMenu,
   onQuickAction,
+  readOnly = false,
+  audience,
 }: {
   card: WidgetCard;
   nutrition?: NutritionSummary;
   state: SortableState;
-  onMenu: () => void;
+  onMenu?: () => void;
   onQuickAction?: () => void;
+  /**
+   * Spec 046: on a portal. The same card, showing only: no links, no buttons. Whoever holds it
+   * (the portal grid) opens it or arranges it.
+   */
+  readOnly?: boolean;
+  /** Spec 046: who the card is shared with, shown in place of the buttons on a portal. */
+  audience?: string;
 }) {
   const Icon = WIDGET_ICONS[card.key];
   const hue = WIDGET_HUES[card.key];
@@ -236,7 +245,7 @@ export function HomeWidget({
   // In edit mode the links stay links with their click cancelled: replacing the node under the
   // finger would cancel the touch that is dragging it (see sortable-grid.tsx).
   const open = (event: MouseEvent) => {
-    if (state.editing) event.preventDefault();
+    if (state.editing || readOnly) event.preventDefault();
   };
   return (
     <article
@@ -255,7 +264,7 @@ export function HomeWidget({
         <Link
           href={card.href}
           draggable={false}
-          tabIndex={state.editing ? -1 : undefined}
+          tabIndex={state.editing || readOnly ? -1 : undefined}
           aria-label={`Open ${card.title}`}
           onClick={open}
           className="flex items-center gap-2 text-sm font-semibold hover:text-accent"
@@ -279,7 +288,8 @@ export function HomeWidget({
           )}
         </Link>
         <div className="flex shrink-0 items-center gap-1">
-          {onQuickAction && (
+          {readOnly && audience && <span className="shrink-0 text-[10px] text-ink-faint">{audience}</span>}
+          {!readOnly && onQuickAction && (
             <button
               type="button"
               data-widget-action
@@ -299,6 +309,7 @@ export function HomeWidget({
               )}
             </button>
           )}
+          {!readOnly && (
           <button
             type="button"
             data-widget-action
@@ -312,12 +323,13 @@ export function HomeWidget({
               <MoreHorizontal size={19} aria-hidden />
             )}
           </button>
+          )}
         </div>
       </div>
       <Link
         href={card.href}
         draggable={false}
-        tabIndex={state.editing ? -1 : undefined}
+        tabIndex={state.editing || readOnly ? -1 : undefined}
         title={`View ${card.title} details`}
         onClick={open}
         className="flex min-h-0 flex-1 flex-col overflow-hidden [justify-content:safe_center]"
@@ -383,7 +395,7 @@ export function HomeWidget({
           {card.alert}
         </div>
       )}
-      {nutrition && !nutrition.targetsAvailable && (
+      {nutrition && !nutrition.targetsAvailable && !readOnly && (
         <Link
           className="mt-1 text-center text-[11px] text-accent"
           href="/nutrition?tab=you"

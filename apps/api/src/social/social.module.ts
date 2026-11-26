@@ -68,6 +68,7 @@ import { SocialGraphService } from '../social-graph/social-graph.module';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NutritionModule } from '../nutrition/nutrition.module';
 import { TrainingModule } from '../training/training.module';
+import { DashboardModule } from '../dashboard/dashboard.module';
 import { SettingsModule } from '../settings/settings.module';
 import { CashflowModule } from '../cashflow/cashflow.module';
 import { StocksModule } from '../stocks/stocks.module';
@@ -772,6 +773,7 @@ export class SocialController {
     BoardsModule,
     FxModule,
     TrainingModule,
+    DashboardModule,
   ],
   controllers: [SocialController],
   providers: [SocialService, SharedWidgetsService, SocialNoStore],

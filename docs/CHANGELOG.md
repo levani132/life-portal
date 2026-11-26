@@ -6,6 +6,8 @@ User-visible changes. Newest first.
 
 - Your posts now come right under your widgets on the Portal tab; the separate Posts tab is gone.
 - "Who sees your portal", under your widgets, opens Privacy and sharing.
+- A widget on your portal now shows exactly what it shows you on Home (Training's record
+  included), minus whatever you do not share, and without Home's buttons.
 - Training can be on your portal. In Privacy and sharing, choose its audience and switch on what
   shows: workouts (this week, your week streak, recent workouts), personal records, level and
   ranks. Your body weight is never shown. Open the widget for the week, records and workouts.

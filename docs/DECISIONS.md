@@ -2943,3 +2943,13 @@ posts in the link preview's narrow form. And only for people who turned on "Let 
 (pages always): someone who never chose to be found by strangers should not become visible to
 the whole internet because this feature shipped. The setting's text and the privacy policy say so.
 
+## 2026-11-26: A portal widget is Home's widget, minus what is not shared
+
+The owner saw his portal's Training widget without the record his Home card shows, although he
+shared everything: the portal had its own drawings of each module, and they drifted. Now one
+component and one server builder serve both: the portal renders `HomeWidget` read only, from the
+card `DashboardService` builds for Home, with each unshared part taken out before it leaves the
+server (Training's record without `shareRecords`, every quick action and alert always). Opening
+a widget should follow: the module's own screens, read only, built from shared components rather
+than a second set; that is the next piece of work, one module at a time.
+

@@ -137,5 +137,6 @@ export class DashboardController {
   ],
   controllers: [DashboardController],
   providers: [DashboardService],
+  exports: [DashboardService],
 })
 export class DashboardModule {}

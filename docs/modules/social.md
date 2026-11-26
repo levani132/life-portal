@@ -150,3 +150,13 @@ size. `PUT /portal/arrangement {order, sizes}` saves both (sizes `"<w>x<h>"`; th
 carries `size` and arrives in the portal's own order (`portalOrder`, else Home's). Food adds
 `food` (`NutritionService.portalFood`): today and the week (`portalFoodWeek()`) only with meals
 shared, targets only with targets shared. Tested in `integration/portal-widgets.integration.ts`.
+
+**Same card as Home (2026-11-26).** A portal widget two squares tall or more is Home's own widget
+component (`HomeWidget` with `readOnly`: no links, no quick action, no menu), fed by Home's own
+card: `DashboardService.portalCards()` builds the owner's dashboard and returns the cards of the
+modules the viewer may see, without `quickAction` or `alert`. Training's card needs workouts
+shared and carries its record only with records shared; Food's card is made in the browser from
+its shared parts. One square tall shows the card's first figure as a line; one square wide is the
+icon. The folder still shows the module's shared detail; making it the module's own screens in
+read-only form is the next step.
+

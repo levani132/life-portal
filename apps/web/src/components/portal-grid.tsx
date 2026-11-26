@@ -4,12 +4,12 @@ import clsx from 'clsx';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
-import type { PortalWidgetSize, SharedWidget, WidgetCard } from '@life-portal/shared-types';
+import type { NutritionSummary, PortalWidgetSize, SharedWidget, WidgetCard } from '@life-portal/shared-types';
 import { portalSize } from '@life-portal/shared-domain';
 import { api } from '../lib/api';
 import { revalidate } from '../lib/hooks';
 import { MACRO_COLORS } from '../lib/macro-colors';
-import { MacroBar, NutritionRing, WIDGET_HUES, WIDGET_ICONS, type NutritionMetric } from './home-widget';
+import { HomeWidget, MacroBar, NutritionRing, WIDGET_HUES, WIDGET_ICONS, type NutritionMetric } from './home-widget';
 import { DailyFoodDiary } from './shared-food-diary';
 import { SortableGrid, type SortableState } from './sortable-grid';
 import { EstimateMark, ErrorNote } from './ui';
@@ -138,6 +138,35 @@ export function PortalGrid({
   );
 }
 
+/**
+ * Home's own card for a portal widget: the one the server built (minus what is not shared), or
+ * for Food one made from its shared parts, with today's figures as Home's rings take them.
+ */
+function homeCard(widget: SharedWidget): { card: WidgetCard; nutrition?: NutritionSummary } | null {
+  if (widget.card) return { card: widget.card };
+  const food = widget.food;
+  if (!food?.today) return null;
+  const targets = food.targets;
+  return {
+    card: { key: 'nutrition', id: 'nutrition', title: 'Food', href: '/nutrition', icon: 'utensils', accent: 'green', tone: 'neutral', stats: [], order: 25 },
+    nutrition: {
+      day: '',
+      eatenKcal: food.today.eatenKcal,
+      proteinEatenG: food.today.proteinG,
+      carbEatenG: food.today.carbG,
+      fatEatenG: food.today.fatG,
+      entryCount: 0,
+      targetsAvailable: !!targets,
+      goal: 'maintain',
+      ...(targets?.kcal !== undefined ? { targetKcal: targets.kcal } : {}),
+      ...(targets?.proteinG !== undefined ? { proteinTargetG: targets.proteinG } : {}),
+      ...(targets?.carbG !== undefined ? { carbTargetG: targets.carbG } : {}),
+      ...(targets?.fatG !== undefined ? { fatTargetG: targets.fatG } : {}),
+      ...(targets?.estimated ? { targetBasis: { calories: 'estimated' } } : {}),
+    } as NutritionSummary,
+  };
+}
+
 /** One read-only widget, in the look of Home's glass card, laid out for its size. */
 function PortalWidget({
   widget,
@@ -159,6 +188,62 @@ function PortalWidget({
   const hue = WIDGET_HUES[key] ?? WIDGET_HUES.projects;
   const editing = !!state?.editing;
   const icon = size.w === 1;
+  // Two squares tall and up: Home's own widget, read only, so the portal shows what Home shows.
+  const home = !icon && size.h >= 2 ? homeCard(widget) : null;
+  const sizeBadge = editing && onResize && (
+    <button
+      type="button"
+      aria-label={`Size of ${widget.title}: ${size.w} by ${size.h}. Change it`}
+      className="absolute right-1.5 top-1.5 z-10 rounded-full bg-ink/80 px-1.5 py-0.5 text-[10px] font-semibold tabular text-surface shadow"
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        setPicking(event.currentTarget.getBoundingClientRect());
+      }}
+    >
+      {size.w}×{size.h}
+    </button>
+  );
+  const picker = picking && onResize && (
+    <SizePicker
+      anchor={picking}
+      current={size}
+      onPick={(next) => {
+        setPicking(null);
+        if (next !== size.size) onResize(next);
+      }}
+      onClose={() => setPicking(null)}
+    />
+  );
+  if (home)
+    return (
+      <div
+        ref={ref as never}
+        className={clsx('relative h-full', !editing && 'cursor-pointer transition-transform active:scale-[0.98]')}
+        role={editing ? undefined : 'button'}
+        tabIndex={editing ? -1 : 0}
+        aria-label={editing ? undefined : `Open ${widget.title}`}
+        onClick={() => {
+          if (!editing && ref.current) onOpen(ref.current.getBoundingClientRect());
+        }}
+        onKeyDown={(event) => {
+          if (!editing && (event.key === 'Enter' || event.key === ' ') && ref.current) {
+            event.preventDefault();
+            onOpen(ref.current.getBoundingClientRect());
+          }
+        }}
+      >
+        <HomeWidget
+          card={home.card}
+          nutrition={home.nutrition}
+          state={{ index: state?.index ?? 0, editing, dragging: !!state?.dragging }}
+          readOnly
+          audience={size.w >= 3 && !editing ? (widget.audience === 'friends' ? 'Friends' : 'Everyone') : undefined}
+        />
+        {sizeBadge}
+        {picker}
+      </div>
+    );
   return (
     <article
       ref={ref}
@@ -202,37 +287,23 @@ function PortalWidget({
           <WidgetBody widget={widget} w={size.w} h={size.h} />
         </>
       )}
-      {editing && onResize && (
-        <button
-          type="button"
-          aria-label={`Size of ${widget.title}: ${size.w} by ${size.h}. Change it`}
-          className="absolute right-1.5 top-1.5 z-10 rounded-full bg-ink/80 px-1.5 py-0.5 text-[10px] font-semibold tabular text-surface shadow"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation();
-            setPicking(event.currentTarget.getBoundingClientRect());
-          }}
-        >
-          {size.w}×{size.h}
-        </button>
-      )}
-      {picking && onResize && (
-        <SizePicker
-          anchor={picking}
-          current={size}
-          onPick={(next) => {
-            setPicking(null);
-            if (next !== size.size) onResize(next);
-          }}
-          onClose={() => setPicking(null)}
-        />
-      )}
+      {sizeBadge}
+      {picker}
     </article>
   );
 }
 
 /** What fills a widget, by its size: a figure when it is one square tall, more as it grows. */
 function WidgetBody({ widget, w, h }: { widget: SharedWidget; w: number; h: number }) {
+  // One square tall with Home's card: its first figure, as one line.
+  const first = widget.card?.stats[0];
+  if (h === 1 && first)
+    return (
+      <p className="mt-auto truncate text-sm">
+        <strong className="text-lg tabular">{first.value}</strong>
+        <span className="text-ink-muted"> {first.label.toLowerCase()}{widget.card?.subtitle ? ` ${widget.card.subtitle}` : ''}</span>
+      </p>
+    );
   if (widget.food?.today) return <FoodBody widget={widget} w={w} h={h} />;
   if (widget.training?.workouts) return <TrainingBody widget={widget} w={w} h={h} />;
   const stats = h === 1 ? widget.stats.slice(0, w >= 3 ? 2 : 1) : w === 2 ? widget.stats.slice(0, h >= 3 ? 3 : 2) : widget.stats;

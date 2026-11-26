@@ -61,6 +61,32 @@ export class DashboardService {
    * applies `settings.widgetOrder` — what they dragged the cards into — and falls back to each
    * widget's own `order` for anything they have not arranged.
    */
+  /**
+   * Spec 046: Home's own cards for a portal, so a widget there shows what it shows its owner on
+   * Home, minus what the owner does not share. Only the modules asked for (already cleared for
+   * this viewer by the caller); never a quick action or an alert line. Training's card needs
+   * workouts shared, and carries its record only with records shared too. Food is drawn from its
+   * own shared parts by the caller, so it has no card here.
+   */
+  async portalCards(ownerId: string, today: string, modules: readonly ModuleId[], training: { workouts: boolean; records: boolean }): Promise<Map<ModuleId, WidgetCard>> {
+    const out = new Map<ModuleId, WidgetCard>();
+    if (!modules.some((id) => id !== 'nutrition')) return out;
+    const dashboard = await this.build(ownerId, today);
+    const cardId: Partial<Record<ModuleId, string>> = { money: 'cashflow' };
+    for (const module of modules) {
+      if (module === 'nutrition' || module === 'epam') continue;
+      let card: WidgetCard | undefined;
+      if (module === 'training') {
+        const summary = dashboard.summaries.training;
+        if (summary && training.workouts) card = this.trainingCard({ ...summary, latestRecord: training.records ? summary.latestRecord : undefined, openSessionId: undefined });
+      } else card = dashboard.cards.find((row) => row.id === (cardId[module] ?? module));
+      if (!card) continue;
+      const { quickAction: _action, alert: _alert, size: _size, ...shown } = card;
+      out.set(module, shown);
+    }
+    return out;
+  }
+
   async build(userId: string, today: string): Promise<DashboardResponse> {
     const settings = await this.settings.get(userId);
     const identity = await this.access.forUser(userId);

@@ -78,7 +78,7 @@ test('a page’s insights show its posts with views and likes', async ({ page })
   await signIn(page, ana);
   await page.goto(`/settings/pages/${made.id}`);
   await expect(page.getByRole('heading', { name: 'Insights', exact: true }).filter({ visible: true }).first()).toBeVisible();
-  await expect(page.getByText('Chicken and lentil bowl')).toBeVisible();
+  await expect(page.getByText('Chicken and lentil bowl').filter({ visible: true }).first()).toBeVisible();
   await expect(page.getByText('+1 new')).toBeVisible();
   await snap(page, '06-page-insights');
 });

@@ -35,6 +35,12 @@ export interface SharedWidget {
   size?: import('./dashboard').PortalWidgetSize;
   /** Spec 046: Food on a portal, each part only behind its own sharing switch. */
   food?: PortalFood;
+  /**
+   * Spec 046: Home's own card for this module, built for its owner and stripped of what is not
+   * shared (no quick action, no alert), so a portal widget shows what Home shows. Absent for Food,
+   * which is drawn from `food`.
+   */
+  card?: import('./dashboard').WidgetCard;
   /** Spec 046: Training on a portal, each part only behind its own sharing switch. */
   training?: import('./training').PortalTraining;
 }

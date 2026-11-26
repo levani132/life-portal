@@ -1,5 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { TrainingPortalService } from '../training/portal.service';
+import { DashboardService } from '../dashboard/dashboard.service';
 import type {
   FeatureAccess,
   SharedStat,
@@ -39,6 +40,7 @@ export class SharedWidgetsService {
     private readonly boards: BoardsService,
     private readonly fx: FxService,
     @Optional() private readonly training?: TrainingPortalService,
+    @Optional() private readonly dashboard?: DashboardService,
   ) {}
   async forViewer(
     ownerId: string,
@@ -204,6 +206,15 @@ export class SharedWidgetsService {
           ...(training ? { training } : {}),
         });
       if (widgets.length >= limit) break;
+    }
+    // Spec 046: each widget also carries Home's own card, minus what is not shared.
+    if (this.dashboard && widgets.length) {
+      const share = this.training ? await this.training.shares(ownerId) : { workouts: false, records: false };
+      const cards = await this.dashboard.portalCards(ownerId, today, widgets.map((widget) => widget.module), share).catch(() => new Map());
+      for (const widget of widgets) {
+        const card = cards.get(widget.module);
+        if (card) widget.card = card;
+      }
     }
     return widgets;
   }
