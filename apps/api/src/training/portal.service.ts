@@ -8,11 +8,12 @@ import { TrainingLevelService } from './level.service';
 import { TrainingProfileService } from './profile.service';
 import { TrainingRankService } from './rank.service';
 import { TrainingSummaryService } from './summary.service';
+import { SessionsService } from './sessions.service';
 import { WorkoutExercise, WorkoutSession } from './training.schemas';
 
 type SessionRow = WorkoutSession & { _id: unknown };
 const RECORD_DAYS = 60;
-const RECENT_WORKOUTS = 10;
+const RECENT_WORKOUTS = 20;
 const STREAK_DAYS = 7 * 104;
 
 /**
@@ -30,6 +31,7 @@ export class TrainingPortalService {
     private readonly levels: TrainingLevelService,
     private readonly ranks: TrainingRankService,
     private readonly catalogue: CatalogueService,
+    private readonly history: SessionsService,
   ) {}
 
   /** Which parts the owner shares, for Home's card on the portal. */
@@ -53,13 +55,24 @@ export class TrainingPortalService {
         name: row.plan?.workoutName ?? 'Workout',
         durationSeconds: sessionDurationSeconds({ startedAt: row.startedAt.toISOString(), endedAt: row.endedAt?.toISOString() }),
       }));
-      const week = await this.summary.summary(userId, today);
+      const [week, history] = await Promise.all([this.summary.summary(userId, today), this.history.list(userId)]);
       out.workouts = {
         thisWeek: week.workoutsThisWeek,
         minutesThisWeek: Math.round(week.secondsThisWeek / 60),
         streakWeeks: trainingWeekStreak(timed.map((row) => row.day), today),
         days: portalTrainingWeek(today, timed),
-        recent: timed.slice(0, RECENT_WORKOUTS).map((row) => ({ day: row.day, name: row.name, minutes: Math.round(row.durationSeconds / 60) })),
+        // As History lists them: finished only, and no ids (nothing on a portal opens a workout yet).
+        recent: history.sessions
+          .filter((row) => row.status === 'finished')
+          .slice(0, RECENT_WORKOUTS)
+          .map(({ id: _id, startedAt: _start, endedAt: _end, ...row }) => row),
+        summary: {
+          workoutsThisWeek: week.workoutsThisWeek,
+          secondsThisWeek: week.secondsThisWeek,
+          weightUnit: week.weightUnit,
+          ...(week.daysSinceLast !== undefined ? { daysSinceLast: week.daysSinceLast } : {}),
+          ...(profile.shareRecords && week.latestRecord && !week.latestRecord.bodyWeightDay ? { latestRecord: week.latestRecord } : {}),
+        },
       };
     }
     if (profile.shareRecords) {

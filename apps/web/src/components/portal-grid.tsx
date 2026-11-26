@@ -5,12 +5,15 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import type { NutritionSummary, PortalWidgetSize, SharedWidget, WidgetCard } from '@life-portal/shared-types';
-import { portalSize } from '@life-portal/shared-domain';
+import { portalSize, rankLabel } from '@life-portal/shared-domain';
 import { api } from '../lib/api';
 import { revalidate } from '../lib/hooks';
 import { MACRO_COLORS } from '../lib/macro-colors';
 import { HomeWidget, MacroBar, NutritionRing, WIDGET_HUES, WIDGET_ICONS, type NutritionMetric } from './home-widget';
 import { DailyFoodDiary } from './shared-food-diary';
+import { HistoryRow } from './training/history-row';
+import { RankEmblem } from './training/rank-emblem';
+import { TrainingHeroView } from './training/training-hero';
 import { SortableGrid, type SortableState } from './sortable-grid';
 import { EstimateMark, ErrorNote } from './ui';
 
@@ -428,43 +431,26 @@ function MinutesBars({ widget, tall = false }: { widget: SharedWidget; tall?: bo
   );
 }
 
-/** Everything Training shares, opened. */
+/**
+ * Everything Training shares, opened: Training's own hero, history rows and rank emblems, read
+ * only (spec 046 step 2), so a friend sees what the owner sees on their own Training page.
+ */
 function TrainingFolder({ widget }: { widget: SharedWidget }) {
   const training = widget.training!;
-  const date = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
   return (
     <>
+      {(training.workouts || training.level) && (
+        <TrainingHeroView visitor summary={training.workouts?.summary} level={training.level} />
+      )}
       {training.workouts && (
         <section>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">This week</p>
-          <dl className="grid grid-cols-3 gap-2">
-            {[
-              { label: 'Workouts', value: String(training.workouts.thisWeek) },
-              { label: 'Time', value: minutesText(training.workouts.minutesThisWeek) },
-              { label: 'Week streak', value: String(training.workouts.streakWeeks) },
-            ].map((figure) => (
-              <div key={figure.label} className="rounded-xl bg-ink/5 px-3 py-2">
-                <dd className="text-lg font-bold tabular">{figure.value}</dd>
-                <dt className="text-xs text-ink-muted">{figure.label}</dt>
-              </div>
-            ))}
-          </dl>
-          <div className="mt-2 flex h-32 flex-col">
+          <div className="flex h-20 flex-col">
             <MinutesBars widget={widget} />
           </div>
-        </section>
-      )}
-      {training.level && (
-        <section>
-          <p className="mb-1 flex justify-between text-sm">
-            <span className="font-semibold">Level {training.level.level}</span>
-            <span className="text-xs text-ink-muted tabular">
-              {training.level.xpIntoLevel} / {training.level.xpForLevel} XP
-            </span>
+          <p className="mt-1 text-xs text-ink-muted">
+            {training.workouts.streakWeeks} {training.workouts.streakWeeks === 1 ? 'week' : 'weeks'} in a row
           </p>
-          <div className="h-2 overflow-hidden rounded-full bg-border">
-            <div className="h-full rounded-full bg-train-arms-solid" style={{ width: `${Math.min(100, (training.level.xpIntoLevel / Math.max(1, training.level.xpForLevel)) * 100)}%` }} />
-          </div>
         </section>
       )}
       {training.records && training.records.length > 0 && (
@@ -485,11 +471,15 @@ function TrainingFolder({ widget }: { widget: SharedWidget }) {
       )}
       {training.ranks && training.ranks.length > 0 && (
         <section>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">Ranks</p>
-          <ul className="flex flex-wrap gap-1.5">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">Strength ranks</p>
+          <ul className="grid grid-cols-2 gap-2">
             {training.ranks.map((rank) => (
-              <li key={rank.exerciseName} className={clsx('rounded-full border px-2.5 py-1 text-xs', rank.current ? 'border-train-arms-solid/40 bg-train-arms-solid/10' : 'border-border text-ink-muted')}>
-                {rank.exerciseName} · <span className="font-semibold">{rank.tier} {rank.division}</span>
+              <li key={rank.exerciseName} className="card flex items-center gap-2 p-2">
+                <RankEmblem tier={rank.tier} division={rank.division} size={28} muted={!rank.current} />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold">{rank.exerciseName}</span>
+                  <span className="block text-xs text-ink-muted">{rankLabel(rank)}{rank.current ? '' : ' · highest'}</span>
+                </span>
               </li>
             ))}
           </ul>
@@ -497,14 +487,11 @@ function TrainingFolder({ widget }: { widget: SharedWidget }) {
       )}
       {training.workouts && training.workouts.recent.length > 0 && (
         <section>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">Recent workouts</p>
-          <ul className="divide-y divide-border">
-            {training.workouts.recent.map((workout, index) => (
-              <li key={`${workout.day}:${index}`} className="flex justify-between gap-3 py-2 text-sm">
-                <span className="min-w-0 truncate">{workout.name}</span>
-                <span className="shrink-0 text-ink-muted tabular">
-                  {date(workout.day)} · {minutesText(workout.minutes)}
-                </span>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">History</p>
+          <ul className="space-y-2">
+            {training.workouts.recent.map((session, index) => (
+              <li key={`${session.day}:${index}`}>
+                <HistoryRow session={session} />
               </li>
             ))}
           </ul>

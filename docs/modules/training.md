@@ -1042,12 +1042,16 @@ shapes these services use. Manual checks: `specs/020-training-logging/quickstart
 Training is shareable since 046 (no longer in `UNSHAREABLE_MODULES`): its audience is chosen like
 any module's, and four switches on the training profile decide what shows, all off until turned
 on: `shareWorkouts` (this week's workouts and time, the week streak, the last seven days in
-minutes, the ten newest workouts), `shareRecords` (the five newest records of the last 60 days),
+minutes, the twenty newest finished workouts as History's rows — `SessionListItem` without `id`,
+`startedAt` or `endedAt` — and Training's own week summary for the hero, its `latestRecord` only
+with `shareRecords` and never one from a weigh-in), `shareRecords` (the five newest records of the last 60 days),
 `shareLevel` and `shareRanks` (each ranked lift's tier and division, current or past).
 `TrainingPortalService.portal()` builds it (`PortalTraining`); the streak is
 `trainingWeekStreak()` (weeks in a row with a workout, not broken by a Monday with nothing yet)
 and the week `portalTrainingWeek()`. **Body weight never appears**: a record resting on a weigh-in
 is left out and a rank is only its tier. Web: Privacy and sharing → "Training on your portal";
-the portal's Training widget and its folder (`portal-grid.tsx`). Tested in
+the portal's Training widget and its folder (`portal-grid.tsx`), which renders Training's own
+`TrainingHeroView` and `HistoryRow` (`components/training/history-row.tsx`) read only, and the
+rank emblems. Tested in
 `integration/portal-training.integration.ts`.
 

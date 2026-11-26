@@ -83,4 +83,7 @@ Principles already decided (ROADMAP item 5):
   icon), a size picker of squares, Home's glass look, and opening a widget like an iOS folder.
 - **Slice 3, done 2026-11-26:** Training on the portal with four switches (workouts, records,
   level, ranks), never body weight; its widget and folder.
+- **Folders step 2, Training, done 2026-11-26:** opening the Training widget shows Training's own
+  screens read only: its hero (`TrainingHeroView`), History's rows and the rank emblems, from the
+  same components the Training tab uses. Food and money next.
 

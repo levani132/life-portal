@@ -41,6 +41,13 @@ describe('Training on a portal', () => {
     const workouts = await widget();
     expect(workouts?.training?.workouts).toMatchObject({ thisWeek: 2, streakWeeks: 1 });
     expect(workouts?.training?.workouts?.recent).toHaveLength(2);
+    // History's own rows, but nothing that opens a workout or says when it started.
+    expect(workouts?.training?.workouts?.recent[0]).toMatchObject({ exerciseNames: ['Portal press'], setCount: 1 });
+    expect(workouts?.training?.workouts?.recent[0]).not.toHaveProperty('id');
+    expect(workouts?.training?.workouts?.recent[0]).not.toHaveProperty('startedAt');
+    // The hero's summary carries no record while records are not shared.
+    expect(workouts?.training?.workouts?.summary).toMatchObject({ workoutsThisWeek: 2 });
+    expect(workouts?.training?.workouts?.summary.latestRecord).toBeUndefined();
     expect(workouts?.training?.records).toBeUndefined();
     // Home's own card, without the record (records are not shared) and without its Play button.
     expect(workouts?.card?.stats.map((stat) => stat.label)).toEqual(['Workouts', 'Time', 'Last workout']);
@@ -56,6 +63,7 @@ describe('Training on a portal', () => {
     await api.call(ana, 'PUT', '/training/profile', { shareWorkouts: true, shareRecords: true, shareLevel: true, shareRanks: true });
     // With both, the card is Home's: the record as its third figure.
     expect((await widget())?.card?.stats[2]).toMatchObject({ label: 'PR · Portal press', value: '70 kg' });
+    expect((await widget())?.training?.workouts?.summary.latestRecord).toMatchObject({ exerciseName: 'Portal press' });
     const all = JSON.stringify(await widget());
     expect(all).not.toContain('71300');
     expect(all).not.toContain('71.3');

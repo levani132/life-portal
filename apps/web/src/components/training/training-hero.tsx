@@ -33,24 +33,60 @@ export function TrainingHero({ hidden = false, action }: { hidden?: boolean; act
   const today = useWorkoutDay()();
   const { data } = useApi<TrainingSummary>(`/training/summary?today=${today}`);
   const portal = useApi<PortalState>('/portal');
+  const enabled = !!portal.data?.access.trainingLevels;
+  const level = useApi<TrainingLevel>(enabled ? `/training/level?today=${today}` : null);
   const [ranks, setRanks] = useState(false);
   // On the Workout tab the open workout's own header says all of this; keep it near the top.
   if (hidden) return null;
+  return (
+    <>
+      <TrainingHeroView summary={data} level={enabled ? level.data : undefined} action={action} onRanks={portal.data?.access.trainingRanks ? () => setRanks(true) : undefined} />
+      {/* Outside the hero: its backdrop blur would trap a fixed modal, and its white text would leak in. */}
+      <Modal open={ranks} onClose={() => setRanks(false)} title="Strength ranks" wide>
+        <RankJourney tournaments={!!portal.data?.access.tournaments} />
+      </Modal>
+    </>
+  );
+}
+
+/**
+ * The hero itself, from data (spec 046): the Training page passes your own summary and level; a
+ * portal passes what its owner shares (`PortalTraining.workouts.summary`). `visitor` words it
+ * as a plain account of someone else's week, without the encouragement meant for you.
+ */
+export function TrainingHeroView({
+  summary: data,
+  level,
+  action,
+  onRanks,
+  visitor,
+}: {
+  summary?: Pick<TrainingSummary, 'workoutsThisWeek' | 'secondsThisWeek' | 'latestRecord' | 'daysSinceLast' | 'weightUnit' | 'openSessionId'>;
+  level?: Pick<TrainingLevel, 'level' | 'xpIntoLevel' | 'xpForLevel'>;
+  action?: React.ReactNode;
+  onRanks?: () => void;
+  visitor?: boolean;
+}) {
   const workouts = data?.workoutsThisWeek ?? 0;
   const line = !data
-    ? 'Loading your week…'
+    ? visitor
+      ? 'Training level'
+      : 'Loading your week…'
     : data.openSessionId
       ? 'Workout in progress. Keep going.'
       : data.latestRecord
         ? `New record: ${data.latestRecord.exerciseName}, ${formatRecordValue(data.latestRecord, data.weightUnit)}`
-        : workouts === 0
-          ? 'A fresh week. Time to get moving.'
-          : workouts === 1
-            ? 'One workout down this week. Nice start.'
-            : `${workouts} workouts down this week. Nice work.`;
+        : visitor
+          ? workouts === 0
+            ? 'No workouts yet this week.'
+            : `${workouts} ${workouts === 1 ? 'workout' : 'workouts'} this week.`
+          : workouts === 0
+            ? 'A fresh week. Time to get moving.'
+            : workouts === 1
+              ? 'One workout down this week. Nice start.'
+              : `${workouts} workouts down this week. Nice work.`;
 
   return (
-    <>
     <section className="relative mb-4 overflow-hidden rounded-2xl bg-gradient-to-br from-train-pull-solid via-train-arms-solid to-train-cardio-solid p-4 text-white shadow-lg shadow-train-arms-solid/20 sm:p-5">
       <div aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-white/10" />
       <div aria-hidden className="pointer-events-none absolute -bottom-16 right-16 h-32 w-32 rounded-full bg-white/10" />
@@ -65,7 +101,8 @@ export function TrainingHero({ hidden = false, action }: { hidden?: boolean; act
           </div>
           {action}
         </div>
-        <dl className="mt-4 grid grid-cols-3 gap-2">
+        {/* A visitor shown only the level has no week to count. */}
+        {!(visitor && !data) && <dl className="mt-4 grid grid-cols-3 gap-2">
           <Stat icon={<Flame className="h-4 w-4" />} value={String(workouts)} label={workouts === 1 ? 'workout' : 'workouts'} />
           <Stat icon={<Clock className="h-4 w-4" />} value={shortTime(data?.secondsThisWeek ?? 0)} label="time" />
           {data?.latestRecord ? (
@@ -73,15 +110,10 @@ export function TrainingHero({ hidden = false, action }: { hidden?: boolean; act
           ) : (
             <Stat icon={<Zap className="h-4 w-4" />} value={data?.openSessionId ? 'Now' : lastLabel(data?.daysSinceLast)} label="last workout" />
           )}
-        </dl>
-        <LevelBar today={today} onRanks={portal.data?.access.trainingRanks ? () => setRanks(true) : undefined} />
+        </dl>}
+        {level && <LevelBar data={level} onRanks={onRanks} />}
       </div>
     </section>
-    {/* Outside the hero: its backdrop blur would trap a fixed modal, and its white text would leak in. */}
-    <Modal open={ranks} onClose={() => setRanks(false)} title="Strength ranks" wide>
-      <RankJourney tournaments={!!portal.data?.access.tournaments} />
-    </Modal>
-    </>
   );
 }
 
@@ -90,11 +122,7 @@ export function TrainingHero({ hidden = false, action }: { hidden?: boolean; act
  * you have trained, not how strong you are, so it never sits next to a strength figure. Hidden
  * until it loads, and when the flag is off.
  */
-function LevelBar({ today, onRanks }: { today: string; onRanks?: () => void }) {
-  const portal = useApi<PortalState>('/portal');
-  const enabled = !!portal.data?.access.trainingLevels;
-  const { data } = useApi<TrainingLevel>(enabled ? `/training/level?today=${today}` : null);
-  if (!enabled || !data) return null;
+function LevelBar({ data, onRanks }: { data: Pick<TrainingLevel, 'level' | 'xpIntoLevel' | 'xpForLevel'>; onRanks?: () => void }) {
   const toNext = data.xpForLevel - data.xpIntoLevel;
   return (
     <div className="mt-3 rounded-xl bg-white/15 px-3 py-2 backdrop-blur-sm">

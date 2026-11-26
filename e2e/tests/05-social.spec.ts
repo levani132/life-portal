@@ -133,7 +133,8 @@ test('Training shows on your portal and opens into the week, records and workout
   await snap(page, '05-portal-posts');
   await training.click();
   const folder = page.getByRole('dialog', { name: 'Training' });
-  await expect(folder.getByText('Recent workouts')).toBeVisible();
+  await expect(folder.getByText('History')).toBeVisible();
+  await expect(folder.getByText('sets').first()).toBeVisible();
   await page.waitForTimeout(400);
   await snap(page, '05-portal-training-folder');
 });

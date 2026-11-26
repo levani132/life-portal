@@ -159,7 +159,10 @@ export interface PortalTraining {
     minutesThisWeek: number;
     streakWeeks: number;
     days: { day: string; minutes: number }[];
-    recent: { day: string; name: string; minutes: number }[];
+    /** Finished workouts, newest first, as Training's History lists them, without their ids. */
+    recent: Omit<SessionListItem, 'id' | 'startedAt' | 'endedAt'>[];
+    /** Training's own week summary, for its hero; the record only with records shared. */
+    summary: Pick<TrainingSummary, 'workoutsThisWeek' | 'secondsThisWeek' | 'latestRecord' | 'daysSinceLast' | 'weightUnit'>;
   };
   /** Newest first, at most five, never one that depends on a weigh-in. */
   records?: { exerciseName: string; label: string; value: string; day: string }[];

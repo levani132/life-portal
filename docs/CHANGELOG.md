@@ -2,6 +2,11 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-26: My Portal, part four
+
+- Opening Training on someone's portal now looks like Training itself: its week card with level,
+  your records, rank emblems and History's workout rows, read only.
+
 ## 2026-11-26: My Portal, part three
 
 - Your posts now come right under your widgets on the Portal tab; the separate Posts tab is gone.
