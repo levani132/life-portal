@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { account, call, expect, signIn, snap, test } from '../support';
+import { account, call, expect, signIn, snap, test, today } from '../support';
 
 test('a post, a comment and a reply written under it', async ({ page }) => {
   const ana = await account('Ana');
@@ -65,4 +65,19 @@ test('a portal address opens for a visitor, then asks them to join', async ({ pa
   await page.getByRole('tab', { name: 'Badges' }).click();
   await expect(page.getByRole('dialog', { name: /See more of Ana Portal/ })).toBeVisible();
   await snap(page, '05-public-portal-gate');
+});
+
+test('your portal shows Food as a large widget, and you can arrange it', async ({ page }) => {
+  const ana = await account('Ana');
+  const day = today();
+  await call(ana, 'PUT', '/nutrition/profile', { sex: 'female', heightCm: 165, birthDate: '1992-01-01', goal: 'maintain', shareMeals: true, shareTargets: true });
+  await call(ana, 'PUT', `/nutrition/weigh-ins?today=${day}`, { day, weightGrams: 62_000 });
+  const food = await call<{ id: string }>(ana, 'POST', '/nutrition/foods', { name: 'E2E oats', unit: 'g', servingSize: 100, entryMode: 'per_100', energyKcal: 380, proteinMg: 13000, fatMg: 7000, carbMg: 60000 });
+  await call(ana, 'POST', '/nutrition/entries', { foodId: food.id, amount: 150, slot: 'breakfast', day });
+  await call(ana, 'PUT', '/portal', { moduleVisibility: { nutrition: 'friends' } });
+  await signIn(page, ana);
+  await page.goto('/profile');
+  await expect(page.getByRole('tab', { name: 'Portal' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByText('This week', { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  await snap(page, '05-own-portal');
 });

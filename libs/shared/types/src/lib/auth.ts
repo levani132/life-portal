@@ -151,6 +151,10 @@ export interface UserSettings extends Timestamped {
   widgetOrder: string[];
   /** Card id → the width chosen for it on Home. A card without an entry is `wide`. */
   widgetSizes?: Record<string, import('./dashboard').WidgetSize>;
+  /** Spec 046: the portal's own arrangement (module ids). Absent: Home's order. */
+  portalOrder?: string[];
+  /** Spec 046: module id → its size on the portal. Absent: the module's default. */
+  portalSizes?: Record<string, import('./dashboard').PortalWidgetSize>;
   selectedModules?: ModuleId[];
   moduleVisibility?: Partial<Record<ModuleId, Audience>>;
   completedSetupSteps?: import('./portal').SetupStep[];

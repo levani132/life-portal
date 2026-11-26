@@ -2,6 +2,15 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-26: My Portal, part two
+
+- Your portal shows what you share as widgets, in the look of Home's but read only, on a grid like
+  an iPhone's home screen: small, medium and large. Hold a widget on your own portal to move it,
+  and tap it while arranging to change its size. The portal's arrangement is its own; Home's
+  stays as it is.
+- Food on a portal shows today's rings and the week (calories a day, days logged) with meals
+  shared, and against your targets when those are shared.
+
 ## 2026-11-26: My Portal, part one
 
 - Your profile is now your **portal**: it opens on what you share, then your posts and badges.

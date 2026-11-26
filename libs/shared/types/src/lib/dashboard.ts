@@ -35,6 +35,13 @@ export const WIDGET_SIZES = ['half', 'wide', 'full'] as const;
 export type WidgetSize = (typeof WIDGET_SIZES)[number];
 export const DEFAULT_WIDGET_SIZE: WidgetSize = 'wide';
 
+/**
+ * Spec 046: a widget's size on a portal, as on an iOS home screen: `small` is one cell of a
+ * two-wide grid, `medium` a row, `large` two rows. The portal's own choice, never Home's.
+ */
+export const PORTAL_WIDGET_SIZES = ['small', 'medium', 'large'] as const;
+export type PortalWidgetSize = (typeof PORTAL_WIDGET_SIZES)[number];
+
 /** Severity of the card's headline, used for the accent and the sort. */
 export type WidgetTone = 'neutral' | 'good' | 'warn' | 'bad';
 

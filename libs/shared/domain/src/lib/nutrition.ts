@@ -1222,3 +1222,21 @@ export function remainingOf(
 ): number | undefined {
   return target == null ? undefined : target - eaten;
 }
+
+/**
+ * Spec 046: the week on a portal's Food card. The seven days ending `today` (oldest first), the
+ * calories eaten on each, how many days had anything logged, and the average over those days (a
+ * day with nothing logged is not a day of eating nothing, so it does not pull the average down).
+ */
+export function portalFoodWeek(today: string, kcalByDay: ReadonlyMap<string, number>): { days: { day: string; kcal: number }[]; daysLogged: number; avgKcal?: number } {
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const day = addDays(today, i - 6);
+    return { day, kcal: Math.max(0, Math.round(kcalByDay.get(day) ?? 0)) };
+  });
+  const logged = days.filter((row) => kcalByDay.has(row.day));
+  return {
+    days,
+    daysLogged: logged.length,
+    ...(logged.length ? { avgKcal: Math.round(logged.reduce((sum, row) => sum + row.kcal, 0) / logged.length) } : {}),
+  };
+}

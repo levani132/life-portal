@@ -134,3 +134,15 @@ Posts and Badges; a page's opens on its posts. The tab bar says "Portal". A port
   sign-up come back to the portal (`lib/next-path.ts`, same-app paths only).
 - Tested in `integration/public-portal.integration.ts` and the screen test.
 
+**Widgets (slice 2).** The Portal tab and the visitor's view draw each shared module as a
+read-only widget in Home's look (`components/portal-grid.tsx`), on an iOS-like grid: two cells
+wide on a phone (four on a wide screen), each widget `small` (one cell), `medium` (a row) or
+`large` (two rows), packed densely. Nothing on a widget acts. Each `SharedWidget` carries its
+`size` (`settings.portalSizes`, default Food `large`, others `medium`) and arrives in the portal's
+own order (`settings.portalOrder`, else Home's `widgetOrder`). Food adds `food`
+(`NutritionService.portalFood`): today's totals and the last seven days (`portalFoodWeek()`) only
+with meals shared, targets only with targets shared, weight still its own stat. On your own
+portal, seen as yourself, holding a widget starts arranging (drag; tap to cycle its size); `PUT
+/portal/arrangement {order, sizes}` saves both, never touching Home. Tested in
+`integration/portal-widgets.integration.ts`.
+

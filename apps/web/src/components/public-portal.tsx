@@ -7,7 +7,7 @@ import { useApi } from '../lib/hooks';
 import { Avatar } from './avatar';
 import { OfficialMark } from './follow';
 import { PageMark } from './identity-switcher';
-import { SharedWidgets } from './social';
+import { PortalGrid } from './portal-grid';
 import { Spinner } from './ui';
 import { Wordmark } from './wordmark';
 
@@ -99,7 +99,7 @@ export function PublicPortalView({ username }: { username: string }) {
             </div>
             {portal.data.widgets.length > 0 && (
               <div className="mt-4">
-                <SharedWidgets widgets={portal.data.widgets} />
+                <PortalGrid widgets={portal.data.widgets} />
               </div>
             )}
             {portal.data.posts.length > 0 && (
@@ -108,7 +108,6 @@ export function PublicPortalView({ username }: { username: string }) {
                   <li key={post.id} className="card overflow-hidden">
                     {post.photoUrl && (
                       // A signed, short-lived link; nothing to optimise.
-                      // eslint-disable-next-line @next/next/no-img-element
                       <img src={post.photoUrl} alt="" className="max-h-80 w-full object-cover" />
                     )}
                     <div className="p-4">

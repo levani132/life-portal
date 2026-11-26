@@ -3,6 +3,7 @@ import type {
   FeatureAccess,
   SharedStat,
   SharedWidget,
+  PortalFood,
 } from '@life-portal/shared-types';
 import {
   formatCentsCompact,
@@ -55,11 +56,13 @@ export class SharedWidgetsService {
       let title = '';
       let stats: SharedStat[] = [];
       let hasDiary = false;
+      let food: PortalFood | undefined;
       if (id === 'nutrition') {
         title = 'Food';
         const profile = await this.nutrition.profile(ownerId);
         hasDiary = profile.shareDiary === true;
         stats = await this.nutrition.sharedStats(ownerId, today, profile);
+        food = await this.nutrition.portalFood(ownerId, today, profile);
       }
       if (id === 'money') {
         title = 'Money';
@@ -178,6 +181,8 @@ export class SharedWidgetsService {
           audience: settings.moduleVisibility![id]!,
           stats,
           ...(hasDiary ? { hasDiary: true } : {}),
+          size: settings.portalSizes?.[id] ?? (id === 'nutrition' ? 'large' : 'medium'),
+          ...(food ? { food } : {}),
         });
       if (widgets.length >= limit) break;
     }
@@ -203,7 +208,8 @@ export class SharedWidgetsService {
             ownerAccess: identity.access,
             viewerAccess,
             visibility: settings.moduleVisibility ?? {},
-            order: settings.widgetOrder,
+            // Spec 046: the portal's own arrangement, else Home's.
+            order: settings.portalOrder?.length ? settings.portalOrder : settings.widgetOrder,
             friends,
           });
     return { ids, settings };

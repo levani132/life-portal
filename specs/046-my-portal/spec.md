@@ -76,4 +76,7 @@ Principles already decided (ROADMAP item 5):
 
 - **Slice 1, done 2026-11-26:** Portal tab first, "Portal" in the tab bar, `/@username`
   addresses, the open portal for visitors with the join popup, sign-in back to the portal.
+- **Slice 2, done 2026-11-26:** read-only widgets on an iOS-like grid (small, medium, large), the
+  portal's own order and sizes (`PUT /portal/arrangement`), Food with today, targets and the week,
+  each behind its own switch.
 

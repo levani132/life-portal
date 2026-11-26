@@ -13,7 +13,7 @@ import {
 } from '@nestjs/mongoose';
 import { IsIn, IsInt, IsNumber, IsOptional, Max, Min } from 'class-validator';
 import { Model } from 'mongoose';
-import type { UserSettings as UserSettingsDto, WidgetSize } from '@life-portal/shared-types';
+import type { PortalWidgetSize, UserSettings as UserSettingsDto, WidgetSize } from '@life-portal/shared-types';
 import { withWidgetSize } from '@life-portal/shared-domain';
 import { SUPPORTED_CURRENCIES } from '@life-portal/shared-types';
 import { baseSchemaOptions } from '../common/mongoose';
@@ -87,6 +87,14 @@ export class UserSettings {
    */
   @Prop({ type: Object })
   widgetSizes?: Record<string, WidgetSize>;
+
+  /** Spec 046: the portal's own order of module ids. No default: absent means Home's order. */
+  @Prop({ type: [String], default: undefined })
+  portalOrder?: string[];
+
+  /** Spec 046: module id → its size on the portal. No default. */
+  @Prop({ type: Object })
+  portalSizes?: Record<string, PortalWidgetSize>;
 
   @Prop({ type: [String], default: undefined }) selectedModules?: ModuleId[];
   @Prop({ type: Object }) moduleVisibility?: Partial<
@@ -184,6 +192,11 @@ export class SettingsService {
     widgetOrder: string[],
   ): Promise<UserSettingsDto> {
     return this.write(userId, { widgetOrder });
+  }
+
+  /** Spec 046: the portal's arrangement, written by `PUT /portal/arrangement`. One writer. */
+  setPortalArrangement(userId: string, order: string[], sizes: Record<string, PortalWidgetSize>): Promise<UserSettingsDto> {
+    return this.write(userId, { portalOrder: order, portalSizes: sizes });
   }
 
   /** One card's width on Home, written by `PUT /dashboard/size`. The whole map is replaced. */

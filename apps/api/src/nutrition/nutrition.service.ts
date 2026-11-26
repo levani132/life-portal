@@ -43,8 +43,10 @@ import type {
   SavedMeal as SavedMealDto,
   SavedMealComponentView,
   WeighIn as WeighInDto,
+  PortalFood,
 } from '@life-portal/shared-types';
 import {
+  portalFoodWeek,
   addDays,
   ageOn,
   cheatDayInfo,
@@ -1600,6 +1602,33 @@ export class NutritionService {
     if (profile.shareMeals && summary && stats.length < 3)
       stats.push({ label: 'Logged foods', value: String(summary.entryCount) });
     return stats;
+  }
+
+  /**
+   * Spec 046: Food on a portal, part by part behind the owner's switches: today's totals and the
+   * last seven days with meals shared, targets with targets shared. Caller checks the audience.
+   */
+  async portalFood(userId: string, today: string, sharedProfile?: NutritionProfileDto): Promise<PortalFood | undefined> {
+    const profile = sharedProfile ?? (await this.profile(userId));
+    if (!profile.shareMeals && !profile.shareTargets) return undefined;
+    const summary = await this.summary(userId, today);
+    const out: PortalFood = {};
+    if (profile.shareMeals) {
+      out.today = { eatenKcal: summary.eatenKcal, proteinG: summary.proteinEatenG, carbG: summary.carbEatenG, fatG: summary.fatEatenG };
+      const entries = await this.listEntries(userId, { from: addDays(today, -6), to: today });
+      const byDay = new Map<string, number>();
+      for (const entry of entries) byDay.set(entry.day, (byDay.get(entry.day) ?? 0) + entry.totals.energyKcal);
+      out.week = portalFoodWeek(today, byDay);
+    }
+    if (profile.shareTargets && summary.targetsAvailable)
+      out.targets = {
+        ...(summary.targetKcal !== undefined ? { kcal: summary.targetKcal } : {}),
+        ...(summary.proteinTargetG !== undefined ? { proteinG: summary.proteinTargetG } : {}),
+        ...(summary.carbTargetG !== undefined ? { carbG: summary.carbTargetG } : {}),
+        ...(summary.fatTargetG !== undefined ? { fatG: summary.fatTargetG } : {}),
+        estimated: profile.energyOverrideKcal == null,
+      };
+    return out;
   }
 
   /** Caller must check module audience and graph access before requesting this projection. */

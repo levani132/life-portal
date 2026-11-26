@@ -8,6 +8,7 @@ import {
   ACTIVITY_FACTORS,
   GOAL_PLAN,
   targetWeightOutlook,
+  portalFoodWeek,
   addTotals,
   ageOn,
   amountToServings,
@@ -1089,5 +1090,20 @@ describe('targetWeightOutlook (spec 043)', () => {
     expect(targetWeightOutlook(80_000, 80_800, 0.3).status).toBe('there');
     expect(targetWeightOutlook(80_000, 75_000, 0.3).status).toBe('mismatch');
     expect(targetWeightOutlook(80_000, 75_000, 0).status).toBe('mismatch');
+  });
+});
+
+describe('portalFoodWeek (spec 046)', () => {
+  it('covers the seven days to today and averages only the days with something logged', () => {
+    const week = portalFoodWeek('2026-11-26', new Map([['2026-11-20', 2000], ['2026-11-24', 1500], ['2026-11-26', 1000.4], ['2026-11-19', 9999]]));
+    expect(week.days.map((row) => row.day)).toEqual(['2026-11-20', '2026-11-21', '2026-11-22', '2026-11-23', '2026-11-24', '2026-11-25', '2026-11-26']);
+    expect(week.days.map((row) => row.kcal)).toEqual([2000, 0, 0, 0, 1500, 0, 1000]);
+    expect(week.daysLogged).toBe(3);
+    expect(week.avgKcal).toBe(1500);
+  });
+  it('has no average with nothing logged', () => {
+    const week = portalFoodWeek('2026-11-26', new Map());
+    expect(week.daysLogged).toBe(0);
+    expect(week.avgKcal).toBeUndefined();
   });
 });

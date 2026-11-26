@@ -58,6 +58,7 @@ import { prepareAvatar, uploadMedia } from '../lib/media';
 import { useOfflineCopy } from '../lib/offline/use-offline-copy';
 import { requestNotificationOffer } from './notifications';
 import { messagingAvailable, openConversation } from './messages';
+import { PortalGrid } from './portal-grid';
 
 export function SharedWidgets({
   widgets,
@@ -560,11 +561,15 @@ export function ProfileView({ userId }: { userId?: string }) {
       ) : (
         <div className="mt-4">
           {person.widgets.length ? (
-            <SharedWidgets
-              widgets={person.widgets}
-              ownerId={person.userId}
-              preview={viewAs}
-            />
+            <>
+              {/* Spec 046: the portal's widgets, read only; arranged only by its owner, as themselves. */}
+              <PortalGrid widgets={person.widgets} arrangeable={own && viewAs === 'normal' && !actingPageId()} />
+              {person.widgets.some((widget) => widget.hasDiary) && (
+                <section className="card mt-3 p-4">
+                  <DailyFoodDiary key={`${person.userId}:${viewAs}`} userId={person.userId} preview={viewAs} />
+                </section>
+              )}
+            </>
           ) : (
             <div className="card p-6 text-sm text-ink-muted">
               {own

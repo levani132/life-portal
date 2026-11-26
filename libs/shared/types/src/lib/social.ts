@@ -31,6 +31,20 @@ export interface SharedWidget {
   audience: Audience;
   stats: SharedStat[];
   hasDiary?: boolean;
+  /** Spec 046: its size on the portal, as its owner arranged it. */
+  size?: import('./dashboard').PortalWidgetSize;
+  /** Spec 046: Food on a portal, each part only behind its own sharing switch. */
+  food?: PortalFood;
+}
+
+/**
+ * Spec 046: Food on a portal. `today` and `week` only with meals shared; `targets` only with
+ * targets shared. Weight stays a stat, behind its own switch.
+ */
+export interface PortalFood {
+  today?: { eatenKcal: number; proteinG: number; carbG: number; fatG: number };
+  targets?: { kcal?: number; proteinG?: number; carbG?: number; fatG?: number; estimated: boolean };
+  week?: { days: { day: string; kcal: number }[]; daysLogged: number; avgKcal?: number };
 }
 export interface SocialPerson {
   userId: string;

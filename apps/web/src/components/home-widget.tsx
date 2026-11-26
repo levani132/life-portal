@@ -102,7 +102,7 @@ export function NutritionRing({ metric }: { metric: NutritionMetric }) {
 }
 
 /** One macro as a line: its name, what was eaten, and a slim bar in its colour showing it against the goal. */
-function MacroBar({ metric }: { metric: NutritionMetric }) {
+export function MacroBar({ metric }: { metric: NutritionMetric }) {
   const { label, value, target, unit, color } = metric;
   const ratio = target !== undefined && target > 0 ? Math.min(1, Math.max(0, value / target)) : 0;
   const over = target !== undefined && value > target;
@@ -121,7 +121,7 @@ function MacroBar({ metric }: { metric: NutritionMetric }) {
   );
 }
 
-const ICONS = {
+export const WIDGET_ICONS = {
   nutrition: Utensils,
   stocks: TrendingUp,
   cashflow: Wallet,
@@ -140,7 +140,7 @@ const ICONS = {
  * colours). These are the six theme-aware hues Training introduced (spec 024); the class names
  * are written out in full so Tailwind sees them.
  */
-const HUES: Record<WidgetCard['key'], { tile: string; hover: string }> = {
+export const WIDGET_HUES: Record<WidgetCard['key'], { tile: string; hover: string }> = {
   nutrition: {
     tile: 'bg-train-legs/10 text-train-legs',
     hover: 'hover:bg-train-legs/20',
@@ -197,8 +197,8 @@ export function HomeWidget({
   onMenu: () => void;
   onQuickAction?: () => void;
 }) {
-  const Icon = ICONS[card.key];
-  const hue = HUES[card.key];
+  const Icon = WIDGET_ICONS[card.key];
+  const hue = WIDGET_HUES[card.key];
   const metrics: NutritionMetric[] | undefined = nutrition && [
     {
       label: 'Calories',

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Module, Put, Req } from '@nestjs/common';
 import type { ProxiedRequest } from '../app/web-proxy';
-import { ArrayMaxSize, IsArray, IsIn, Matches } from 'class-validator';
-import { WIDGET_SIZES, type DashboardResponse, type UserSettings, type WidgetSize } from '@life-portal/shared-types';
+import { ArrayMaxSize, IsArray, IsIn, IsObject, Matches, Validate, ValidatorConstraint, type ValidatorConstraintInterface } from 'class-validator';
+import { PORTAL_WIDGET_SIZES, WIDGET_SIZES, type DashboardResponse, type PortalWidgetSize, type UserSettings, type WidgetSize } from '@life-portal/shared-types';
 import { CurrentUser, Public } from '../auth/current-user.decorator';
 import { Today } from '../common/today';
 import { BoardsModule } from '../boards/boards.module';
@@ -38,6 +38,30 @@ export class WidgetOrderDto {
 
 const CARD_ID = /^[a-z0-9]{1,32}(:[a-z0-9_-]{1,64})?$/i;
 
+/** At most 32 entries, each a module id with a portal size. */
+@ValidatorConstraint({ name: 'portalSizes' })
+class PortalSizes implements ValidatorConstraintInterface {
+  validate(value: unknown) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const entries = Object.entries(value as Record<string, unknown>);
+    return entries.length <= 32 && entries.every(([id, size]) => /^[a-z]{2,32}$/.test(id) && (PORTAL_WIDGET_SIZES as readonly unknown[]).includes(size));
+  }
+  defaultMessage() {
+    return 'sizes must map module ids to small, medium or large';
+  }
+}
+
+/** Spec 046: the portal's arrangement: module ids in order, and each one's size. */
+export class PortalArrangementDto {
+  @IsArray()
+  @ArrayMaxSize(32)
+  @Matches(/^[a-z]{2,32}$/, { each: true, message: 'order must contain module ids' })
+  order!: string[];
+  @IsObject()
+  @Validate(PortalSizes)
+  sizes!: Record<string, PortalWidgetSize>;
+}
+
 /** One card's width on Home. The id is pattern-checked like the order's, for the same reason. */
 export class WidgetSizeDto {
   @Matches(CARD_ID, { message: 'id must be a dashboard card id' }) id!: string;
@@ -65,6 +89,13 @@ export class DashboardController {
   ): Promise<{ order: UserSettings['widgetOrder'] }> {
     const settings = await this.settings.setWidgetOrder(userId, dto.order);
     return { order: settings.widgetOrder };
+  }
+
+  /** Spec 046: the portal's own order and sizes, written as one arrangement. */
+  @Put('portal/arrangement')
+  async arrangePortal(@CurrentUser('userId') userId: string, @Body() dto: PortalArrangementDto) {
+    const settings = await this.settings.setPortalArrangement(userId, [...new Set(dto.order)], dto.sizes);
+    return { order: settings.portalOrder ?? [], sizes: settings.portalSizes ?? {} };
   }
 
   /** Persists the width the person chose for one card. */

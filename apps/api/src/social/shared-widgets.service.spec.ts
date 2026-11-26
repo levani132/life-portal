@@ -14,6 +14,7 @@ function fixture(audience: Audience = 'friends') {
   const nutrition = {
     profile: jest.fn().mockResolvedValue({ shareDiary: true }),
     sharedStats: jest.fn().mockResolvedValue([]),
+    portalFood: jest.fn().mockResolvedValue(undefined),
     sharedDiary: jest.fn().mockResolvedValue({ day: '2026-10-22', slots: [] }),
   };
   const service = new SharedWidgetsService(
@@ -81,6 +82,8 @@ describe('daily diary audience and module checks', () => {
         audience: 'friends',
         stats: [],
         hasDiary: true,
+        // Spec 046: Food is a large widget on a portal until its owner resizes it.
+        size: 'large',
       },
     ]);
   });
