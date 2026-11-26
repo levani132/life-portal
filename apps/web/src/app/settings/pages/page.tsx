@@ -95,6 +95,9 @@ function PagesOverview() {
                   @{page.username} · {page.postsToday} posted today · {page.queued} waiting
                   {page.lastActionAt ? ` · last active ${new Date(page.lastActionAt).toLocaleString()}` : ' · never used by the assistant'}
                 </p>
+                <Link href={`/settings/pages/${page.id}`} className="mt-1 inline-block text-xs text-accent hover:underline">
+                  Insights and settings
+                </Link>
                 {page.failed > 0 && (
                   <p className="mt-1 text-xs text-danger">
                     {page.failed} failed in the last day{page.lastError ? `. Latest: ${page.lastError}` : ''}

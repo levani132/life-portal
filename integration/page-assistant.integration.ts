@@ -146,6 +146,11 @@ describe('the assistant for pages', () => {
     const liked = await callBeka('get_post_comments', { pageId: other, postId: theirPost });
     expect((liked.body.result?.['comments'] as { likeCount: number; likedByPage: boolean }[])[0]).toMatchObject({ likeCount: 1, likedByPage: true });
     expect((await callBeka('unlike_comment', { pageId: other, postId: theirPost, commentId })).body.result).toEqual({ likeCount: 0, liked: false });
+    // Spec 045: the other page's insights count the like and the comment on its post.
+    const insights = await callBeka('get_page_insights', { pageId: other });
+    const counted = (insights.body.result?.['posts'] as { id: string; likes: number; comments: number }[]).find((row) => row.id === theirPost);
+    expect(counted).toMatchObject({ likes: 1, comments: 1 });
+    expect((await call('get_page_insights', { pageId: other })).body.code).toBe('NOT_A_MANAGER');
 
     // The owner lowers this person's comment cap to what is already used: the next is refused.
     const { CONFIG } = await import('../apps/api/src/config/configuration');

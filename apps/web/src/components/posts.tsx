@@ -45,6 +45,7 @@ import { UsePlanFromPost } from './meal-plans';
 import { CopyTrainingButton, TrainingAttachmentView } from './training/training-post';
 import { revalidate, useAction, useApi } from '../lib/hooks';
 import { ByPersonMark, PageMark } from './identity-switcher';
+import { recordPostView } from '../lib/post-views';
 import { OfficialMark } from './follow';
 import { SOCIAL_REFRESH } from '../lib/social-hooks';
 import {
@@ -385,6 +386,8 @@ export function PostCard({
   );
   const card = useRef<HTMLElement>(null);
   useImpression(card, recordMetric ? () => recordMetric('impression') : null);
+  // Spec 045: a page's post seen by someone else counts toward the page's insights.
+  useImpression(card, post.author.isPage && !post.isOwner ? () => recordPostView(post.id) : null);
   // Spec 039: the photo check takes a few seconds; look again so the note goes away by itself.
   const checking = post.held === 'checking';
   useEffect(() => {

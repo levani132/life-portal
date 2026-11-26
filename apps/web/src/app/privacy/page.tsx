@@ -27,7 +27,7 @@ export default function PrivacyPage() {
           <li><strong>Pages you follow and pages you manage:</strong> which pages you follow, and for a page you created, its profile, posts, messages and who manages it. A page’s follower count is shown; the list of who follows it is not shown to anyone, including the page. A page may follow you: it then sees your public posts in its feed, which it could already open, and nothing else.</li>
           <li><strong>Anything else you enter</strong> in a part of the app you switched on.</li>
           <li><strong>Sign-in and safety records:</strong> the devices signed in to your account, and a log of sign-in events (for example a failed password) kept for 90 days. It holds a scrambled form of the internet address, never the address itself.</li>
-          <li><strong>Notification details,</strong> if you allow notifications: the address your phone or browser gives us to deliver them.</li>
+          <li><strong>Notification details,</strong> if you allow notifications: the address your phone or browser gives us to deliver them, and, if you manage pages, which of them that device is using the app as.</li>
         </ul>
         <p>
           We do not use advertising or tracking cookies and we run no third-party analytics. The app keeps one cookie
@@ -36,6 +36,9 @@ export default function PrivacyPage() {
         </p>
         <p>
           Our error log and usage counters hold no person: a scrubbed error message, the kind of page, and a count.
+          When you see a page’s post, the page’s managers see one more view on it. We keep only a count per post and
+          day; to count you once a day we keep a coded key made from your account, the post and the day, which
+          cannot be read without our server’s secret and is deleted after two days.
         </p>
       </LegalSection>
 

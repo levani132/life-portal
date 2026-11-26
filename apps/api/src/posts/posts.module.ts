@@ -43,6 +43,7 @@ import {
   PreviewPostDto,
   ReportPostDto,
   UpdatePostDto,
+  PostViewsDto,
 } from './posts.dto';
 import {
   FeedFeedbackRecord,
@@ -68,6 +69,8 @@ import {
   FeedMetricsService,
 } from './feed-metrics.service';
 import { ForPages } from '../auth/acting';
+import { User, UserSchema } from '../auth/schemas/user.schema';
+import { PageInsightsService, PostViewKeyRecord, PostViewKeySchema, PostViewsDailyRecord, PostViewsDailySchema } from './page-insights.service';
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
 @RequireModule('foodPosts')
 @UseInterceptors(SocialNoStore)
@@ -79,6 +82,7 @@ class PostsController {
     private readonly engagement: PostEngagementService,
     private readonly forYouFeed: ForYouService,
     private readonly metrics: FeedMetricsService,
+    private readonly insights: PageInsightsService,
     private readonly moderation: PostModerationService,
   ) {}
   @Post('preview') preview(
@@ -177,6 +181,10 @@ class PostsController {
     @Param('id') id: string,
   ) {
     return this.posts.moderate(userId, id);
+  }
+  /** Spec 045: posts of pages this person saw (feed cards on screen, or opened). Counts only. */
+  @Post('views') views(@CurrentUser('userId') userId: string, @Body() dto: PostViewsDto) {
+    return this.insights.recordViews(userId, dto.ids);
   }
   @Get(':id/engagement') engagementStats(
     @CurrentUser('userId') userId: string,
@@ -353,6 +361,19 @@ class PostsController {
  * The one unauthenticated posts route: link previews for public posts (spec 017). No module
  * guard (there is no user), and a fixed small shape from `PostsService.publicPreview()`.
  */
+/** Spec 045: a page's insights, for its managers (as themselves, or as the page). */
+@ForPages()
+@UseInterceptors(SocialNoStore)
+@Controller('page-insights')
+class PageInsightsController {
+  constructor(private readonly insights: PageInsightsService) {}
+  @Get(':pageId')
+  get(@CurrentUser() user: AuthenticatedUser, @Param('pageId') pageId: string) {
+    // As the page, `userId` is the page; as a person, their own id. Either must manage it.
+    return this.insights.insights(user.userId === pageId ? (user.actorId ?? user.userId) : user.userId, pageId);
+  }
+}
+
 @UseInterceptors(SocialNoStore)
 @Controller('public/posts')
 class PublicPostsController {
@@ -380,11 +401,14 @@ class PublicPostsController {
       { name: FeedPreferencesRecord.name, schema: FeedPreferencesSchema },
       { name: FeedMetricKeyRecord.name, schema: FeedMetricKeySchema },
       { name: FeedMetricsDailyRecord.name, schema: FeedMetricsDailySchema },
+      { name: PostViewKeyRecord.name, schema: PostViewKeySchema },
+      { name: PostViewsDailyRecord.name, schema: PostViewsDailySchema },
+      { name: User.name, schema: UserSchema },
     ]),
   ],
-  controllers: [PostsController, PublicPostsController],
-  providers: [PostsService, PostEngagementService, ForYouService, FeedMetricsService, PostModerationService],
+  controllers: [PostsController, PublicPostsController, PageInsightsController],
+  providers: [PostsService, PostEngagementService, ForYouService, FeedMetricsService, PostModerationService, PageInsightsService],
   // Messages renders shared posts through the same read authorization as opening one.
-  exports: [PostsService, PostEngagementService, ForYouService],
+  exports: [PostsService, PostEngagementService, ForYouService, PageInsightsService],
 })
 export class PostsModule {}

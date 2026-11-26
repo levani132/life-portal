@@ -105,3 +105,31 @@ export type Identity =
 /** Error codes of the pages routes and the acting check. */
 export const PAGE_ERROR_CODES = ['PAGE_LIMIT', 'USERNAME_TAKEN', 'NOT_A_MANAGER', 'NOT_FOR_PAGES', 'PAGES_OFF', 'PAGE_DISABLED'] as const;
 export type PageErrorCode = (typeof PAGE_ERROR_CODES)[number];
+
+/** Spec 045: one post on a page's insights. Counts only. */
+export interface PageInsightsPost {
+  id: string;
+  /** The title, or the start of the caption. */
+  label: string;
+  createdAt: string;
+  views: number;
+  likes: number;
+  comments: number;
+  reposts: number;
+  /** People who saved something from it into their own library. */
+  saves: number;
+}
+
+/**
+ * Spec 045: a page's insights, for its managers. `days` is the window of the totals and of
+ * `newFollowersByDay` (oldest first). A view is a person seeing a post, once per person, post
+ * and day; nothing records who.
+ */
+export interface PageInsights {
+  days: number;
+  followers: number;
+  newFollowersByDay: { day: string; count: number }[];
+  totals: { views: number; likes: number; comments: number; reposts: number; newFollowers: number };
+  /** The page's 30 newest posts, newest first, with counts since they were posted. */
+  posts: PageInsightsPost[];
+}

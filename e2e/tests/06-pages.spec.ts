@@ -66,3 +66,19 @@ test('Menu starts with who you are, folded, and the menu right under it', async 
   await fold.click();
   await expect(page.getByText('E2E Folded Page').filter({ visible: true }).first()).toBeVisible();
 });
+
+test('a page’s insights show its posts with views and likes', async ({ page }) => {
+  const ana = await account('Ana');
+  const beka = await account('Beka');
+  const made = await call<{ id: string }>(ana, 'POST', '/pages', { name: 'E2E Insights Kitchen', username: `e2e-ins-${randomUUID().slice(0, 6)}`, bio: '' });
+  const post = await call<{ id: string }>(ana, 'POST', '/posts', { requestId: randomUUID(), title: 'Chicken and lentil bowl', caption: '', audience: 'public' }, { 'x-lp-act-as': made.id });
+  await call(beka, 'POST', '/posts/views', { ids: [post.id] });
+  await call(beka, 'PUT', `/posts/${post.id}/like`, {});
+  await call(beka, 'PUT', `/follows/${made.id}`, {});
+  await signIn(page, ana);
+  await page.goto(`/settings/pages/${made.id}`);
+  await expect(page.getByRole('heading', { name: 'Insights' })).toBeVisible();
+  await expect(page.getByText('Chicken and lentil bowl')).toBeVisible();
+  await expect(page.getByText('+1 new')).toBeVisible();
+  await snap(page, '06-page-insights');
+});

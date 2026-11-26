@@ -508,4 +508,18 @@ export class NutritionPublicationService {
       ...(mealPlanId ? { mealPlanId } : {}),
     };
   }
+
+  /**
+   * Spec 045: how many people saved something from each post (a food, recipe or plan copied into
+   * their own library), for a page's insights. Counts only; no account leaves.
+   */
+  async saveCounts(postIds: string[]): Promise<Map<string, number>> {
+    if (!postIds.length) return new Map();
+    const rows = await this.foods.aggregate<{ _id: string; n: number }>([
+      { $match: { sourceRef: { $in: postIds.map((id) => `post:${id}`) } } },
+      { $group: { _id: { ref: '$sourceRef', user: '$userId' } } },
+      { $group: { _id: '$_id.ref', n: { $sum: 1 } } },
+    ]);
+    return new Map(rows.map((row) => [row._id.slice('post:'.length), row.n]));
+  }
 }

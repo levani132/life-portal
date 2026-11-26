@@ -43,6 +43,7 @@ import { NutritionService } from '../nutrition/nutrition.service';
 import { PagesService } from '../pages/pages.module';
 import { ForYouService } from '../posts/for-you.service';
 import { PostEngagementService } from '../posts/post-engagement.service';
+import { PageInsightsService } from '../posts/page-insights.service';
 import { PostsService } from '../posts/posts.service';
 import { SocialService } from '../social/social.module';
 import { CatalogueService } from '../training/catalogue.service';
@@ -177,6 +178,7 @@ export class PageAssistantService {
     private readonly notifications: NotificationsService,
     @InjectModel(PageScheduledAction.name) private readonly scheduledActions: Model<PageScheduledAction>,
     @Inject(CONFIG) private readonly config: AppConfig,
+    private readonly insights: PageInsightsService,
   ) {}
 
   // ------------------------------------------------------------------ caps and the log
@@ -1121,6 +1123,16 @@ export class PageAssistantService {
           const result = await this.posts.remove(page, String(args['postId']));
           await this.record(personId, page, 'post', 'delete_page_post', String(args['postId']));
           return result;
+        },
+      },
+      {
+        name: 'get_page_insights',
+        description:
+          'How the page is doing (spec 045): followers and new follows per day over 28 days, and for its 30 newest posts the views, likes, comments, reposts and saves. Use it to see which posts and subjects work before planning the next ones.',
+        shape: { pageId },
+        run: async (personId, args) => {
+          const page = await this.acting(personId, args);
+          return this.insights.insights(page, page);
         },
       },
       {

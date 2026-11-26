@@ -411,3 +411,22 @@ Pages may like comments (`@ForPages`), and the assistant has `like_comment` / `u
 Deleting an account removes its likes, the likes on its comments and the likes under its posts.
 Tested in `integration/comment-likes.integration.ts`.
 
+## Views and page insights (spec 045)
+
+`apps/api/src/posts/page-insights.service.ts`. **Views are counted for pages' public, live,
+original posts only**, from people (never a page acting, never one of the page's own managers):
+`POST /posts/views {ids}` (up to 50; the web sends feed cards that were on screen, and opened
+posts, in batches; `lib/post-views.ts`). Once per person, post and UTC day: `post_view_keys
+{key, expiresAt}` holds an HMAC of account, post and day (secret derived from `JWT_SECRET`,
+`post-views-v1`), deleted after two days; `post_views_daily {postId, pageId, day, count}` holds
+the count, kept 400 days. Nothing names a viewer. Views on people's posts are roadmap item 17.
+
+`GET /page-insights/:pageId` (a manager, as themselves or acting as the page; 403
+`NOT_A_MANAGER` otherwise): `followers`, `newFollowersByDay` (28 days, from current follows'
+`createdAt`; an unfollow removes its row, so this is follows that are still there), 28-day
+`totals` (views, likes, comments, reposts, new followers) and the 30 newest posts with views,
+likes, comments, reposts and saves (distinct people with a food copied from the post,
+`NutritionPublicationService.saveCounts`). The assistant's `get_page_insights` answers the same.
+Web: Menu → Manage pages → the page, or "Insights and settings" in All pages at a glance.
+Tested in `integration/page-insights.integration.ts`.
+

@@ -102,6 +102,8 @@ export const ACCOUNT_PLAN: Record<string, CollectionRule> = {
   post_likes: owned,
   post_comments: owned,
   post_comment_likes: owned,
+  post_views_daily: { kind: 'owned', field: 'pageId', export: false },
+  post_view_keys: noPerson('A keyed hash of account, post and day, unreadable without the server secret; gone within 2 days.'),
   post_reports: owned,
   post_media: owned,
   feed_feedback: owned,

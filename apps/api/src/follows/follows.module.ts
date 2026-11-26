@@ -84,6 +84,12 @@ export class FollowsService {
     return this.follows.countDocuments({ pageId });
   }
 
+  /** Spec 045: when each current follow began, since a time: insights' new followers per day. No follower ids leave. */
+  async followedSince(pageId: string, since: Date): Promise<Date[]> {
+    const rows = await this.follows.find({ pageId, createdAt: { $gte: since } }).select('createdAt').lean<{ createdAt: Date }[]>();
+    return rows.map((row) => row.createdAt);
+  }
+
   /** A block between two accounts ends any follow between them, in either direction. */
   async endBetween(a: string, b: string): Promise<void> {
     await this.follows.deleteMany({ $or: [{ followerId: a, pageId: b }, { followerId: b, pageId: a }] });

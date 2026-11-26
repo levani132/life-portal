@@ -227,3 +227,7 @@ export class AddPostCommentDto {
   @IsOptional() @IsMongoId() id?: string;
 }
 
+/** Spec 045: posts seen on screen or opened, for page insights. */
+export class PostViewsDto {
+  @IsArray() @ArrayMaxSize(50) @IsMongoId({ each: true }) ids!: string[];
+}
