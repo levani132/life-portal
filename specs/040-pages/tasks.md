@@ -66,7 +66,7 @@ Logged 2026-11-22, after slice 2. Each is closed by the task named, or by a deci
 | Per-identity offline stores (T041): switching identity clears what the device kept for offline use. | Deferred |
 | A page's library screens in Food and Training are not built (T040), so a page cannot yet attach a food or a plan to a post. | Closed 2026-11-23 (spec 041 slice 1) |
 | The "by a person" mark on a post or comment of an AI-run page is not built (T032b). The page-level "run with AI" mark is. | Closed 2026-11-26 (spec 045 slice 1): posts, comments and messages |
-| A personal notification tapped while acting as a page opens in the page's context (only a page's notification switches identity, with `?as=`). | Open: decide whether personal links should switch back |
+| A personal notification tapped while acting as a page opens in the page's context (only a page's notification switches identity, with `?as=`). | Closed 2026-11-26 (spec 045 slice 3): personal links carry `as=me` |
 | A notification link for a page does not switch identity while unsent changes wait on the device; it opens as the current identity. | Accepted: same rule as the menu switch |
-| A page's notifications use the default preferences (no message or comment previews, every type on); a manager cannot mute one page's notifications. | Open |
+| A page's notifications use the default preferences (no message or comment previews, every type on); a manager cannot mute one page's notifications. | Closed 2026-11-26 (spec 045 slice 3): each manager's own switches apply, and per page "only while using the app as it" |
 | A page can open a conversation with a follower through the API, but there is no screen listing followers to pick from (by design: follower lists are not shown). A page answers people who wrote first. | Accepted for now |

@@ -66,8 +66,15 @@ export class RegisterDeviceDto {
   @Type(() => SubscriptionDto)
   subscription!: SubscriptionDto;
   @IsString() @MinLength(1) @MaxLength(60) label!: string;
+  /** Spec 045: the page this device is using the app as; absent or null for the person. */
+  @IsOptional() @Matches(/^[0-9a-f]{24}$/) actingAs?: string | null;
   /** true when the member just tapped "Turn on notifications"; false for a background re-sync. */
   @IsOptional() @IsBoolean() enable?: boolean;
+}
+
+export class PageNotificationsDto {
+  /** Only while a device is using the app as this page; false: always (the default). */
+  @IsBoolean() onlyWhileActing!: boolean;
 }
 
 export class UnregisterDeviceDto {

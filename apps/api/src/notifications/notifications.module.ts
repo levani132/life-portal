@@ -33,6 +33,7 @@ import { PushSender } from './push-sender';
 import {
   ActivityQueryDto,
   RegisterDeviceDto,
+  PageNotificationsDto,
   UnregisterDeviceDto,
   UpdateNotificationPreferencesDto,
 } from './notifications.dto';
@@ -94,7 +95,17 @@ export class NotificationsController {
       dto.subscription,
       dto.label.trim(),
       dto.enable === true,
+      dto.actingAs,
     );
+  }
+  /** Spec 045: one page's notifications, always or only while using the app as it. */
+  @Put('pages/:pageId')
+  pageMode(
+    @CurrentUser('userId') userId: string,
+    @Param('pageId') pageId: string,
+    @Body() dto: PageNotificationsDto,
+  ) {
+    return this.notifications.setPageMode(userId, pageId, dto.onlyWhileActing);
   }
   @RequireModule('push')
   @Get('devices')

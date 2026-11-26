@@ -182,3 +182,21 @@ A page marked "run with AI" gets no push for what **another page** does to it (t
 decision: with many such pages reacting to each other it would be hundreds a day); what a
 person does still arrives, and the page's Activity lists everything.
 See [pages](pages.md).
+
+## A page's managers (spec 045)
+
+- **A page has no switches of its own.** Its notification passes the page's checks with
+  everything on (no previews), then reaches each manager whose own notifications are on with
+  that type on. Before 2026-11-26 the page's missing preferences row read as "off", so no page
+  notification was ever pushed.
+- **Always, or only while using the app as the page.** `PUT /notifications/pages/:pageId
+  {onlyWhileActing}` (person; 404 `NOT_A_MANAGER`) adds or removes the page in
+  `notification_preferences.pagesWhileActing`; the preferences answer lists it. A device says
+  which identity it is using in its registration (`actingAs`, sent on every start, and switching
+  reloads the app), stored on `push_devices.actingAs` only if its person manages that page. For a
+  manager who chose "only while", only devices with `actingAs` equal to the page get it.
+- **Your own notification opens as you.** Its link carries `as=me`, so a tap while acting as a
+  page switches back (`useActAsLink`). A page's link carries `as=<pageId>` as before.
+- Web: Menu → Manage pages → the page (`/settings/pages/:id`), "Notifications".
+- Tested in `integration/page-notifications.integration.ts`.
+

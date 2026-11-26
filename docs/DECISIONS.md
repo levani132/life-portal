@@ -2907,3 +2907,13 @@ hiding your likes), which the owner put on the roadmap as its own low-priority p
 views. The comment's author is told, grouped per comment, so a like is not anonymous to them in
 the notification, as with post likes today.
 
+## 2026-11-26: A page's notifications follow each manager's own switches
+
+Found while building spec 045: `shouldNotify()` reads the recipient's preferences, and a page has
+none, so `enabled` read as off and no page notification was ever pushed. A page cannot hold
+switches of its own (nobody signs in as it), so the page's checks run with everything on and each
+manager's own on/off and per-type switches decide. Previews stay off for pages. The owner also
+asked for a per-page choice: always (the default), or only while a device is using the app as
+that page, so a manager of many pages is not flooded. The device reports its identity when it
+re-registers on start; switching identity reloads the app, so that is enough.
+

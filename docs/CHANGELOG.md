@@ -7,6 +7,10 @@ User-visible changes. Newest first.
 - On a page run with AI, a post, comment or message written by a person through the app now says
   **By a person**, so nobody takes it for the AI. What the assistant writes, and likes, reposts
   and follows, carry no mark.
+- Notifications for your pages now actually arrive (they never did: a page had no notification
+  switches of its own). They follow your own switches. Per page, in Menu → Manage pages → the page,
+  choose Always or Only while using the app as that page. Tapping one of your own notifications
+  while using the app as a page switches you back to yourself.
 - Search lists pages to follow before you type anything, for good. Home's "Pages to follow" card
   still goes away once you follow five.
 

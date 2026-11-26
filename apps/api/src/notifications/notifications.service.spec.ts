@@ -110,7 +110,7 @@ describe('NotificationsService.notify', () => {
       expect.objectContaining({
         title: 'Ana',
         body: 'liked “Lunch”',
-        url: '/posts/post1',
+        url: '/posts/post1?as=me',
         tag: 'postLike:post1',
       }),
     );
@@ -222,7 +222,7 @@ describe('NotificationsService.remind (spec 025)', () => {
     await f.service.remind({ type: 'restOver', recipientId: 'owner', targetId: 'session1' });
     expect(f.sender.send).toHaveBeenCalledWith(
       f.device,
-      expect.objectContaining({ title: 'Rest over', body: 'Time for your next set.', url: '/training', tag: 'restOver:session1' }),
+      expect.objectContaining({ title: 'Rest over', body: 'Time for your next set.', url: '/training?as=me', tag: 'restOver:session1' }),
     );
     // No actor: no block or mute lookup, and no collapse row.
     expect(f.graph.between).not.toHaveBeenCalled();

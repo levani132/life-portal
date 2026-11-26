@@ -165,6 +165,23 @@ export class NotificationsService {
     return this.preferencesDto(row);
   }
 
+  /**
+   * Spec 045: whether one page's notifications reach this manager always (the default) or only on
+   * a device that is using the app as that page. 404 for a page they do not manage.
+   */
+  async setPageMode(userId: string, pageId: string, onlyWhileActing: boolean): Promise<NotificationPreferences> {
+    const page = /^[0-9a-f]{24}$/.test(pageId) ? await this.pageOf?.(pageId) : null;
+    if (!page?.managers.includes(userId)) throw new NotFoundException({ code: 'NOT_A_MANAGER', message: 'You do not manage that page.' });
+    const row = await this.preferences
+      .findOneAndUpdate(
+        { userId },
+        { [onlyWhileActing ? '$addToSet' : '$pull']: { pagesWhileActing: pageId }, $setOnInsert: { userId } },
+        { upsert: true, new: true },
+      )
+      .lean();
+    return this.preferencesDto(row);
+  }
+
   async dismissOffer(userId: string): Promise<NotificationPreferences> {
     const row = await this.preferences
       .findOneAndUpdate(
@@ -189,6 +206,7 @@ export class NotificationsService {
       ) as Record<NotificationType, boolean>,
       showCommentPreviews: row?.showCommentPreviews === true,
       showMessagePreviews: row?.showMessagePreviews === true,
+      pagesWhileActing: row?.pagesWhileActing ?? [],
       ...(hiddenUntil && hiddenUntil > this.now()
         ? { offerHiddenUntil: hiddenUntil.toISOString() }
         : {}),
@@ -202,15 +220,20 @@ export class NotificationsService {
     subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
     label: string,
     enable: boolean,
+    actingAs?: string | null,
   ): Promise<{ id: string }> {
     const now = this.now();
+    // Spec 045: a page is recorded only if this person manages it.
+    const page = actingAs ? await this.pageOf?.(actingAs) : null;
+    const acting = page?.managers.includes(userId) ? actingAs : undefined;
     // Upsert by endpoint: a device signed in by someone new moves to them (FR-008).
     const device = await this.devices
       .findOneAndUpdate(
         { endpoint: subscription.endpoint },
         {
-          $set: { userId, keys: subscription.keys, label, lastUsedAt: now },
+          $set: { userId, keys: subscription.keys, label, lastUsedAt: now, ...(acting ? { actingAs: acting } : {}) },
           $setOnInsert: { endpoint: subscription.endpoint },
+          ...(acting ? {} : { $unset: { actingAs: '' } }),
         },
         { upsert: true, new: true },
       )
@@ -307,8 +330,11 @@ export class NotificationsService {
   private async deliver(event: NotificationEvent) {
     const def = this.types.get(event.type);
     if (!def || !this.sender.configured) return;
+    // Spec 040/045: a page keeps no switches of its own; its notifications pass the page's checks
+    // with everything on, then each manager's own switches decide below.
+    const page = (await this.pageOf?.(event.recipientId)) ?? null;
     const [prefs, recipientAccess, actorAccess, connection] = await Promise.all([
-      this.preferences.findOne({ userId: event.recipientId }).lean(),
+      page ? Promise.resolve({ userId: event.recipientId, enabled: true } as NotificationPreferencesRecord) : this.preferences.findOne({ userId: event.recipientId }).lean(),
       this.accessFor(event.recipientId),
       this.accessFor(event.actorId),
       event.actorId === event.recipientId
@@ -329,13 +355,27 @@ export class NotificationsService {
     if (def.canStillSee && !(await def.canStillSee(event))) return;
     if (def.suppress && (await def.suppress(event))) return;
     // Spec 040: a page's notifications go to its managers' devices, labelled as the page's.
-    const page = (await this.pageOf?.(event.recipientId)) ?? null;
     // A page run with AI hears nothing on its manager's phone about what other pages do to it:
     // with many such pages reacting to each other that would be hundreds a day. What a person
     // does still arrives, and the page's Activity lists everything.
     if (page?.aiManaged && (await this.pageOf?.(event.actorId))) return;
-    const holders = page ? page.managers.filter((id) => id !== event.actorId) : [event.recipientId];
-    const devices = holders.length ? await this.devices.find({ userId: { $in: holders } }).lean() : [];
+    let holders = page ? page.managers.filter((id) => id !== event.actorId) : [event.recipientId];
+    // A page's notification reaches a manager who has notifications on, and that type on.
+    const managerPrefs = page && holders.length ? await this.preferences.find({ userId: { $in: holders } }).lean() : [];
+    if (page) {
+      const byManager = new Map(managerPrefs.map((row) => [row.userId, row]));
+      holders = holders.filter((id) => {
+        const own = byManager.get(id);
+        return own?.enabled === true && typeEnabled(own, event.type);
+      });
+    }
+    let devices = holders.length ? await this.devices.find({ userId: { $in: holders } }).lean() : [];
+    // Spec 045: a manager who chose "only while using the app as this page" hears it only on a
+    // device that is using it now.
+    if (page && devices.length) {
+      const quiet = new Set(managerPrefs.filter((row) => row.pagesWhileActing?.includes(event.recipientId)).map((row) => row.userId));
+      devices = devices.filter((device) => !quiet.has(device.userId) || device.actingAs === event.recipientId);
+    }
     if (!devices.length) return;
     const others = await this.collapse(event, def.collapseKey(event), def.windowMs);
     if (others === null) return;
@@ -356,7 +396,9 @@ export class NotificationsService {
       showMessagePreviews: prefs?.showMessagePreviews === true,
       others,
     });
-    const shown = page ? pageNotification(text, def.url(event), page) : { ...text, url: def.url(event) };
+    // Spec 045: your own notification opens as you (`as=me`), even if the app was acting as a page.
+    const own = def.url(event);
+    const shown = page ? pageNotification(text, own, page) : { ...text, url: `${own}${own.includes('?') ? '&' : '?'}as=me` };
     const tag = notificationTag(event.type, page ? `${page.id}:${key}` : key);
     // The badge is the device owner's own count; a page's unread items do not add to it.
     const badges = new Map<string, number>();

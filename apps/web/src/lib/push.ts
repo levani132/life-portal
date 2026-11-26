@@ -3,6 +3,7 @@
 import type { NotificationsConfig } from '@life-portal/shared-types';
 import { api } from './api';
 import { isIOSDevice } from './ios-device';
+import { actingPageId } from './identity';
 
 /**
  * Browser side of push notifications (specs/012-web-push-notifications).
@@ -95,6 +96,8 @@ async function register(subscription: PushSubscription, enable: boolean) {
     subscription: { endpoint: json.endpoint, keys: json.keys },
     label: deviceLabel(navigator.userAgent),
     enable,
+    // Spec 045: which identity this device is using, for "only while using the app as this page".
+    actingAs: actingPageId(),
   });
   try {
     window.localStorage.setItem(DEVICE_KEY, id);

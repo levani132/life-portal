@@ -21,6 +21,11 @@ export class PushDevice {
   @Prop({ required: true, maxlength: 60 }) label!: string;
   @Prop({ required: true }) lastUsedAt!: Date;
   @Prop() lastSuccessAt?: Date;
+  /**
+   * Spec 045: the page this device is using the app as, as it last said (on start and on every
+   * switch). Absent: the person. Only ever a page the device's person manages.
+   */
+  @Prop() actingAs?: string;
   createdAt!: Date;
 }
 export const PushDeviceSchema = SchemaFactory.createForClass(PushDevice);
@@ -36,6 +41,8 @@ export class NotificationPreferencesRecord {
   @Prop() showMessagePreviews?: boolean;
   @Prop() activitySeenAt?: Date;
   @Prop() offerDismissedAt?: Date;
+  /** Spec 045: pages whose notifications reach this manager only while a device is using the app as them. */
+  @Prop({ type: [String], default: undefined }) pagesWhileActing?: string[];
 }
 export const NotificationPreferencesSchema = SchemaFactory.createForClass(
   NotificationPreferencesRecord,

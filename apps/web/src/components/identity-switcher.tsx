@@ -249,10 +249,10 @@ function ManagePages({ pages, userId }: { pages: PageSummary[]; userId: string }
       <ul className="mt-2 space-y-2">
         {pages.map((page) => (
           <li key={page.id} className="flex flex-wrap items-center justify-between gap-2">
-            <span className="min-w-0 truncate">
+            <Link href={`/settings/pages/${page.id}`} className="min-w-0 truncate text-accent hover:underline">
               {page.name}
               {page.disabled && <span className="ml-2 text-xs text-ink-faint">switched off</span>}
-            </span>
+            </Link>
             <span className="flex gap-2">
               <button
                 type="button"

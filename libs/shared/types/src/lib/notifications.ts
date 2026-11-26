@@ -91,6 +91,8 @@ export interface NotificationPreferences {
   types: Record<NotificationType, boolean>;
   showCommentPreviews: boolean;
   showMessagePreviews: boolean;
+  /** Spec 045: pages whose notifications reach you only while a device is using the app as them. */
+  pagesWhileActing: string[];
   /** Set when the in-app offer is hidden; the offer may show again after this time. */
   offerHiddenUntil?: string;
 }

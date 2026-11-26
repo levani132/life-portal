@@ -113,7 +113,8 @@ followed. The owner sees an "Official" switch on any page's profile.
   manager who caused it), titled "<page> (page)" with the actor in the body
   (`pageNotification()`), and its link carries `?as=<pageId>`. The web app (`useActAsLink` in
   `identity-switcher.tsx`) switches identity on such a link under the menu's rules. The badge
-  count on the device stays the device owner's own.
+  count on the device stays the device owner's own. Each manager chooses per page: always, or
+  only while using the app as it (spec 045, see notifications.md).
 - **Blocking.** `PUT /social/connections/:id` is open to a page for `block` and `unblock` only
   (409 `NOT_A_PERSON` otherwise); `GET /social/connections` answers a page only for
   `kind=blocked`. Menu → Blocked accounts.
