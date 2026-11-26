@@ -1,9 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { TrainingPortalService } from '../training/portal.service';
 import type {
   FeatureAccess,
   SharedStat,
   SharedWidget,
   PortalFood,
+  PortalTraining,
 } from '@life-portal/shared-types';
 import {
   formatCentsCompact,
@@ -36,6 +38,7 @@ export class SharedWidgetsService {
     private readonly personal: PersonalService,
     private readonly boards: BoardsService,
     private readonly fx: FxService,
+    @Optional() private readonly training?: TrainingPortalService,
   ) {}
   async forViewer(
     ownerId: string,
@@ -64,6 +67,19 @@ export class SharedWidgetsService {
         hasDiary = profile.shareDiary === true;
         stats = await this.nutrition.sharedStats(ownerId, today, profile);
         food = await this.nutrition.portalFood(ownerId, today, profile);
+      }
+      let training: PortalTraining | undefined;
+      if (id === 'training' && this.training) {
+        title = 'Training';
+        training = await this.training.portal(ownerId, today);
+        if (training?.workouts)
+          stats.push(
+            { label: 'Workouts this week', value: String(training.workouts.thisWeek) },
+            { label: 'Week streak', value: String(training.workouts.streakWeeks) },
+          );
+        if (training?.level) stats.push({ label: 'Level', value: String(training.level.level) });
+        if (training?.records?.[0]) stats.push({ label: `PR · ${training.records[0].exerciseName}`, value: training.records[0].value });
+        if (training?.ranks?.length) stats.push({ label: 'Ranked lifts', value: String(training.ranks.length) });
       }
       if (id === 'money') {
         title = 'Money';
@@ -175,7 +191,8 @@ export class SharedWidgetsService {
           },
         ];
       }
-      if (stats.length || hasDiary)
+      // Food and Training show their own parts even before there is a figure to put in a stat.
+      if (stats.length || hasDiary || food || training)
         widgets.push({
           module: id,
           title,
@@ -184,6 +201,7 @@ export class SharedWidgetsService {
           ...(hasDiary ? { hasDiary: true } : {}),
           size: portalSize(settings.portalSizes?.[id], id).size,
           ...(food ? { food } : {}),
+          ...(training ? { training } : {}),
         });
       if (widgets.length >= limit) break;
     }

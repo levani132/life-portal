@@ -125,6 +125,11 @@ export class TrainingProfile {
   defaultRestSeconds!: number;
   /** Strength-rank standards (issue #5b), the member's own choice; absent until chosen. */
   @Prop({ enum: RANK_STANDARDS }) rankStandards?: string;
+  /** Spec 046: what Training shows on the portal. Off until turned on. */
+  @Prop() shareWorkouts?: boolean;
+  @Prop() shareRecords?: boolean;
+  @Prop() shareLevel?: boolean;
+  @Prop() shareRanks?: boolean;
 }
 
 export const TrainingProfileSchema = SchemaFactory.createForClass(TrainingProfile);

@@ -1,5 +1,7 @@
 import {
   CATALOGUE_EQUIPMENT_SUFFIX,
+  portalTrainingWeek,
+  trainingWeekStreak,
   catalogueName,
   matchesExerciseSearch,
   legacyMachineCase,
@@ -504,5 +506,27 @@ describe('body weight with a signed external load (#5)', () => {
     expect(catalogueMeasure({ ...other, id: 'Sled_Row' })).toBe('weight_reps');
     expect(catalogueMeasure({ ...other, id: 'Some_Other_Thing' })).toBe('weight_reps');
     expect(catalogueMeasure(other)).toBe('weight_reps');
+  });
+});
+
+describe('portal training (spec 046)', () => {
+  it('counts weeks in a row with a workout, not breaking on a fresh Monday', () => {
+    // 2026-11-26 is a Thursday; its week starts Monday 2026-11-23.
+    expect(trainingWeekStreak(['2026-11-24', '2026-11-17', '2026-11-10', '2026-10-27'], '2026-11-26')).toBe(3);
+    // Nothing yet this week: counted from last week.
+    expect(trainingWeekStreak(['2026-11-17', '2026-11-10'], '2026-11-26')).toBe(2);
+    // A gap of a full week ends it; days after today do not count.
+    expect(trainingWeekStreak(['2026-11-03', '2026-12-01'], '2026-11-26')).toBe(0);
+    expect(trainingWeekStreak([], '2026-11-26')).toBe(0);
+  });
+  it('adds up minutes per day over the last seven days', () => {
+    const week = portalTrainingWeek('2026-11-26', [
+      { day: '2026-11-26', durationSeconds: 1800 },
+      { day: '2026-11-26', durationSeconds: 1200 },
+      { day: '2026-11-20', durationSeconds: 3600 },
+      { day: '2026-11-19', durationSeconds: 3600 },
+    ]);
+    expect(week.map((row) => row.minutes)).toEqual([60, 0, 0, 0, 0, 0, 50]);
+    expect(week[0].day).toBe('2026-11-20');
   });
 });

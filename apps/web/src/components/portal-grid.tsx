@@ -234,6 +234,7 @@ function PortalWidget({
 /** What fills a widget, by its size: a figure when it is one square tall, more as it grows. */
 function WidgetBody({ widget, w, h }: { widget: SharedWidget; w: number; h: number }) {
   if (widget.food?.today) return <FoodBody widget={widget} w={w} h={h} />;
+  if (widget.training?.workouts) return <TrainingBody widget={widget} w={w} h={h} />;
   const stats = h === 1 ? widget.stats.slice(0, w >= 3 ? 2 : 1) : w === 2 ? widget.stats.slice(0, h >= 3 ? 3 : 2) : widget.stats;
   return (
     <dl className={clsx('mt-auto grid gap-x-3 gap-y-2', w === 2 || h === 1 ? (h === 1 && w >= 3 ? 'grid-cols-2' : 'grid-cols-1') : 'grid-cols-3')}>
@@ -287,6 +288,152 @@ function FoodBody({ widget, w, h }: { widget: SharedWidget; w: number; h: number
       </div>
       {h >= 3 && widget.food?.week && <WeekBars widget={widget} />}
     </div>
+  );
+}
+
+const minutesText = (minutes: number) => (minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`);
+
+/** Training, as on Home: this week's workouts and time, the streak; the week from three squares tall. */
+function TrainingBody({ widget, w, h }: { widget: SharedWidget; w: number; h: number }) {
+  const training = widget.training!;
+  const workouts = training.workouts!;
+  if (h === 1)
+    return (
+      <p className="mt-auto truncate text-sm">
+        <strong className="text-lg tabular">{workouts.thisWeek}</strong>
+        <span className="text-ink-muted"> {workouts.thisWeek === 1 ? 'workout' : 'workouts'} this week</span>
+      </p>
+    );
+  const figures = [
+    { label: 'Workouts', value: String(workouts.thisWeek) },
+    { label: 'Time', value: minutesText(workouts.minutesThisWeek) },
+    { label: 'Week streak', value: String(workouts.streakWeeks) },
+  ].slice(0, w >= 3 ? 3 : 2);
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <p className="text-[11px] text-ink-muted">this week</p>
+      <dl className={clsx('grid gap-x-3 gap-y-2', w >= 3 ? 'grid-cols-3' : 'grid-cols-1')}>
+        {figures.map((figure) => (
+          <div key={figure.label} className="min-w-0">
+            <dd className="widget-stat-value truncate font-bold leading-tight tabular">{figure.value}</dd>
+            <dt className="widget-stat-label mt-0.5 text-ink-faint">{figure.label}</dt>
+          </div>
+        ))}
+      </dl>
+      {h >= 3 && <MinutesBars widget={widget} />}
+      {h >= 4 && training.records?.[0] && (
+        <p className="mt-2 truncate text-xs">
+          <span className="font-semibold text-success">{training.records[0].value}</span>
+          <span className="text-ink-muted"> PR · {training.records[0].exerciseName}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Minutes trained on each of the last seven days. */
+function MinutesBars({ widget, tall = false }: { widget: SharedWidget; tall?: boolean }) {
+  const days = widget.training!.workouts!.days;
+  const most = Math.max(30, ...days.map((day) => day.minutes));
+  return (
+    <div className={clsx('mt-3 flex min-h-0 flex-1 items-end gap-1.5', tall && 'min-h-32')} aria-label="Minutes trained each day this week">
+      {days.map((day) => (
+        <div key={day.day} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+          <span
+            title={`${day.day}: ${day.minutes} min`}
+            className={clsx('w-full rounded-md', day.minutes ? 'bg-train-arms-solid/70' : 'bg-border')}
+            style={{ height: day.minutes ? `${Math.max(12, (day.minutes / most) * 100)}%` : '4px' }}
+          />
+          <span className="text-[10px] leading-none text-ink-faint">{'SMTWTFS'[new Date(`${day.day}T12:00:00Z`).getUTCDay()]}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Everything Training shares, opened. */
+function TrainingFolder({ widget }: { widget: SharedWidget }) {
+  const training = widget.training!;
+  const date = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return (
+    <>
+      {training.workouts && (
+        <section>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">This week</p>
+          <dl className="grid grid-cols-3 gap-2">
+            {[
+              { label: 'Workouts', value: String(training.workouts.thisWeek) },
+              { label: 'Time', value: minutesText(training.workouts.minutesThisWeek) },
+              { label: 'Week streak', value: String(training.workouts.streakWeeks) },
+            ].map((figure) => (
+              <div key={figure.label} className="rounded-xl bg-ink/5 px-3 py-2">
+                <dd className="text-lg font-bold tabular">{figure.value}</dd>
+                <dt className="text-xs text-ink-muted">{figure.label}</dt>
+              </div>
+            ))}
+          </dl>
+          <div className="mt-2 flex h-32 flex-col">
+            <MinutesBars widget={widget} />
+          </div>
+        </section>
+      )}
+      {training.level && (
+        <section>
+          <p className="mb-1 flex justify-between text-sm">
+            <span className="font-semibold">Level {training.level.level}</span>
+            <span className="text-xs text-ink-muted tabular">
+              {training.level.xpIntoLevel} / {training.level.xpForLevel} XP
+            </span>
+          </p>
+          <div className="h-2 overflow-hidden rounded-full bg-border">
+            <div className="h-full rounded-full bg-train-arms-solid" style={{ width: `${Math.min(100, (training.level.xpIntoLevel / Math.max(1, training.level.xpForLevel)) * 100)}%` }} />
+          </div>
+        </section>
+      )}
+      {training.records && training.records.length > 0 && (
+        <section>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">Recent records</p>
+          <ul className="divide-y divide-border">
+            {training.records.map((record) => (
+              <li key={`${record.exerciseName}:${record.day}:${record.label}`} className="flex items-baseline justify-between gap-3 py-2 text-sm">
+                <span className="min-w-0 truncate">
+                  {record.exerciseName}
+                  <span className="text-ink-faint"> · {record.label}</span>
+                </span>
+                <span className="shrink-0 font-semibold text-success tabular">{record.value}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {training.ranks && training.ranks.length > 0 && (
+        <section>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">Ranks</p>
+          <ul className="flex flex-wrap gap-1.5">
+            {training.ranks.map((rank) => (
+              <li key={rank.exerciseName} className={clsx('rounded-full border px-2.5 py-1 text-xs', rank.current ? 'border-train-arms-solid/40 bg-train-arms-solid/10' : 'border-border text-ink-muted')}>
+                {rank.exerciseName} · <span className="font-semibold">{rank.tier} {rank.division}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {training.workouts && training.workouts.recent.length > 0 && (
+        <section>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">Recent workouts</p>
+          <ul className="divide-y divide-border">
+            {training.workouts.recent.map((workout, index) => (
+              <li key={`${workout.day}:${index}`} className="flex justify-between gap-3 py-2 text-sm">
+                <span className="min-w-0 truncate">{workout.name}</span>
+                <span className="shrink-0 text-ink-muted tabular">
+                  {date(workout.day)} · {minutesText(workout.minutes)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
   );
 }
 
@@ -455,7 +602,7 @@ function PortalFolder({ widget, from, ownerId, viewAs, onClose }: { widget: Shar
 function FolderBody({ widget, ownerId, viewAs }: { widget: SharedWidget; ownerId?: string; viewAs: Viewer }) {
   const food = widget.food;
   // With today's rings shown, the figures that repeat them are left out.
-  const stats = food?.today ? widget.stats.filter((stat) => !['Eaten today', 'Protein', 'Logged foods'].includes(stat.label)) : widget.stats;
+  const stats = widget.training ? [] : food?.today ? widget.stats.filter((stat) => !['Eaten today', 'Protein', 'Logged foods'].includes(stat.label)) : widget.stats;
   return (
     <div className="space-y-4">
       {food?.today && (
@@ -486,6 +633,7 @@ function FolderBody({ widget, ownerId, viewAs }: { widget: SharedWidget; ownerId
           ))}
         </dl>
       )}
+      {widget.training && <TrainingFolder widget={widget} />}
       {widget.hasDiary && ownerId && <DailyFoodDiary key={`${ownerId}:${viewAs}`} userId={ownerId} preview={viewAs} />}
     </div>
   );

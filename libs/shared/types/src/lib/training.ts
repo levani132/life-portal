@@ -140,6 +140,31 @@ export interface TrainingProfile {
   defaultRestSeconds: number;
   /** Strength-rank standards (issue #5b); absent until the member chooses. */
   rankStandards?: RankStandards;
+  /**
+   * Spec 046: what Training shows on the portal, each its own switch, all off until turned on
+   * (the module's audience decides who). Workouts: this week, the week streak and recent workouts.
+   * Body weight is never shown, whatever is on.
+   */
+  shareWorkouts: boolean;
+  shareRecords: boolean;
+  shareLevel: boolean;
+  shareRanks: boolean;
+}
+
+/** Spec 046: Training on a portal, each part only behind its own switch. */
+export interface PortalTraining {
+  weightUnit: WeightUnit;
+  workouts?: {
+    thisWeek: number;
+    minutesThisWeek: number;
+    streakWeeks: number;
+    days: { day: string; minutes: number }[];
+    recent: { day: string; name: string; minutes: number }[];
+  };
+  /** Newest first, at most five, never one that depends on a weigh-in. */
+  records?: { exerciseName: string; label: string; value: string; day: string }[];
+  level?: { level: number; xpIntoLevel: number; xpForLevel: number };
+  ranks?: { exerciseName: string; tier: RankTier; division: RankDivision; current: boolean }[];
 }
 
 // ------------------------------------------------------------------ sessions

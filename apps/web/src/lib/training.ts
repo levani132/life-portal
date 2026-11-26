@@ -45,7 +45,7 @@ export const planKey = (id: string) => `/training/plans/${id}`;
 export function useTrainingProfile(): TrainingProfile & { loaded: boolean } {
   // Spec 040: a page has no training profile; it sees the defaults.
   const { data } = useApi<TrainingProfile>(actingPageId() ? null : PROFILE_KEY);
-  return { ...(data ?? { weightUnit: 'kg', defaultRestSeconds: 90 }), loaded: !!data };
+  return { ...(data ?? { weightUnit: 'kg', defaultRestSeconds: 90, shareWorkouts: false, shareRecords: false, shareLevel: false, shareRanks: false }), loaded: !!data };
 }
 
 /** The person's display unit (spec 020 US5). Display and input only; stored weights are grams. */

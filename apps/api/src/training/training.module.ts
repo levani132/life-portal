@@ -37,6 +37,7 @@ import { TrainingLevelService } from './level.service';
 import { TrainingRankService } from './rank.service';
 import { TrainingPublicationService } from './training-publication.service';
 import { TrainingRecapService } from './recap.service';
+import { TrainingPortalService } from './portal.service';
 import { TrainingSummaryService } from './summary.service';
 import { RestAlarmService } from './rest-alarm.service';
 import { Today } from '../common/today';
@@ -476,7 +477,7 @@ export class TrainingController {
     ]),
   ],
   controllers: [TrainingController],
-  providers: [CatalogueSeeder, PlanSeeder, PlansService, PlanDayUpdateService, CatalogueService, ProgressService, TrainingProfileService, SessionsService, TrainingSummaryService, RestAlarmService, TrainingLevelService, TrainingRankService, TrainingRecapService, TrainingPublicationService],
-  exports: [PlansService, CatalogueService, SessionsService, TrainingSummaryService, TrainingRankService, TrainingProfileService, TrainingPublicationService],
+  providers: [CatalogueSeeder, PlanSeeder, PlansService, PlanDayUpdateService, CatalogueService, ProgressService, TrainingProfileService, SessionsService, TrainingSummaryService, RestAlarmService, TrainingLevelService, TrainingRankService, TrainingRecapService, TrainingPublicationService, TrainingPortalService],
+  exports: [TrainingPortalService, PlansService, CatalogueService, SessionsService, TrainingSummaryService, TrainingRankService, TrainingProfileService, TrainingPublicationService],
 })
 export class TrainingModule {}

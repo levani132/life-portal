@@ -1036,3 +1036,18 @@ weigh-in on or before, records per kind, warm-ups, fallback after removal, pace)
 `ProgressService` block in `sessions.service.spec.ts` (marks in set responses and detail,
 history paging, deletion and lowering moving records, weigh-in loads, other users). The specs run on `fake-model.testing.ts`, an in-memory stand-in for the query
 shapes these services use. Manual checks: `specs/020-training-logging/quickstart.md`.
+
+## On the portal (spec 046, slice 3)
+
+Training is shareable since 046 (no longer in `UNSHAREABLE_MODULES`): its audience is chosen like
+any module's, and four switches on the training profile decide what shows, all off until turned
+on: `shareWorkouts` (this week's workouts and time, the week streak, the last seven days in
+minutes, the ten newest workouts), `shareRecords` (the five newest records of the last 60 days),
+`shareLevel` and `shareRanks` (each ranked lift's tier and division, current or past).
+`TrainingPortalService.portal()` builds it (`PortalTraining`); the streak is
+`trainingWeekStreak()` (weeks in a row with a workout, not broken by a Monday with nothing yet)
+and the week `portalTrainingWeek()`. **Body weight never appears**: a record resting on a weigh-in
+is left out and a rank is only its tier. Web: Privacy and sharing → "Training on your portal";
+the portal's Training widget and its folder (`portal-grid.tsx`). Tested in
+`integration/portal-training.integration.ts`.
+

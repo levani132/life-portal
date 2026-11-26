@@ -105,3 +105,29 @@ test('your portal shows Food as a large widget, and you can arrange it', async (
   await expect(page.getByRole('button', { name: /Size of Food: 4 by 4/ })).toBeVisible();
   await expect.poll(async () => (await call<{ portalSizes?: Record<string, string> }>(ana, 'GET', '/settings')).portalSizes?.['nutrition']).toBe('4x4');
 });
+
+test('Training shows on your portal and opens into the week, records and workouts', async ({ page }) => {
+  const ana = await account('Ana');
+  const day = today();
+  const exercise = await call<{ id: string }>(ana, 'POST', '/training/exercises', { name: 'E2E portal squat', primaryMuscles: ['quadriceps'], equipmentType: 'barbell', measure: 'weight_reps' });
+  for (const weightGrams of [60_000, 80_000]) {
+    const session = await call<{ id: string }>(ana, 'POST', '/training/sessions', { requestId: randomUUID(), day });
+    const added = await call<{ id: string }>(ana, 'POST', `/training/sessions/${session.id}/exercises`, { requestId: randomUUID(), exerciseId: exercise.id });
+    await call(ana, 'POST', `/training/sessions/${session.id}/exercises/${added.id}/sets`, { requestId: randomUUID(), reps: 5, weightGrams });
+    await call(ana, 'POST', `/training/sessions/${session.id}/finish`, { endedAt: new Date().toISOString() });
+  }
+  await call(ana, 'PUT', '/training/profile', { shareWorkouts: true, shareRecords: true, shareLevel: true });
+  await call(ana, 'PUT', '/nutrition/profile', { sex: 'female', heightCm: 165, birthDate: '1992-01-01', goal: 'maintain', shareMeals: true });
+  await call(ana, 'PUT', '/portal', { moduleVisibility: { training: 'friends', nutrition: 'friends' } });
+  await call(ana, 'PUT', '/portal/arrangement', { order: ['training', 'nutrition'], sizes: { training: '4x3', nutrition: '2x2' } });
+  await signIn(page, ana);
+  await page.goto('/profile');
+  const training = page.getByRole('button', { name: 'Open Training' }).filter({ visible: true }).first();
+  await expect(training).toBeVisible();
+  await snap(page, '05-portal-training');
+  await training.click();
+  const folder = page.getByRole('dialog', { name: 'Training' });
+  await expect(folder.getByText('Recent workouts')).toBeVisible();
+  await page.waitForTimeout(400);
+  await snap(page, '05-portal-training-folder');
+});

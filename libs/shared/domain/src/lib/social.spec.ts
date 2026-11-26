@@ -106,18 +106,18 @@ describe('social authorization policy', () => {
       }),
     ).toEqual([]);
   });
-  it('never shares training, even when its audience says public (spec 020)', () => {
+  it('shares training like any module since spec 046, and never EPAM', () => {
     const access = resolveFeatureAccess('developer');
     expect(
       sharedModuleOrder({
-        selected: ['training', 'money'],
+        selected: ['training', 'money', 'epam'],
         ownerAccess: access,
         viewerAccess: access,
-        visibility: { training: 'public', money: 'public' },
+        visibility: { training: 'public', money: 'public', epam: 'public' },
         order: [],
         friends: true,
       }),
-    ).toEqual(['money']);
+    ).toEqual(['money', 'training']);
   });
   it('keeps social disabled for production and configurable independently of modules', () => {
     expect(resolveFeatureAccess('production').social).toBe(false);

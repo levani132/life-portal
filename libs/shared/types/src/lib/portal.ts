@@ -103,7 +103,7 @@ export const MODULES: {
  * Modules whose cards never appear on a profile. EPAM is a private work dashboard; training is
  * private until its sharing phase (spec 020).
  */
-export const UNSHAREABLE_MODULES: readonly ModuleId[] = ['epam', 'training'];
+export const UNSHAREABLE_MODULES: readonly ModuleId[] = ['epam'];
 export function isShareableModule(id: ModuleId): boolean {
   return !UNSHAREABLE_MODULES.includes(id);
 }

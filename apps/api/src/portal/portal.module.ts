@@ -68,10 +68,9 @@ export class VisibilityDto {
   @ValidateIf((_, value: unknown) => value !== undefined)
   @IsIn(['private'])
   epam?: Audience;
-  // Training is unshareable (UNSHAREABLE_MODULES), like EPAM: the web still sends it in the full
-  // map, so it must be accepted, but only as private.
+  // Spec 046: Training is shareable on the portal, part by part behind its own switches.
   @ValidateIf((_, value: unknown) => value !== undefined)
-  @IsIn(['private'])
+  @IsIn(AUDIENCES)
   training?: Audience;
 }
 export class PortalPreferencesDto implements PortalPreferences {

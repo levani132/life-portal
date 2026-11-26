@@ -79,4 +79,8 @@ Principles already decided (ROADMAP item 5):
 - **Slice 2, done 2026-11-26:** read-only widgets on an iOS-like grid (small, medium, large), the
   portal's own order and sizes (`PUT /portal/arrangement`), Food with today, targets and the week,
   each behind its own switch.
+- **Slice 2 reworked, 2026-11-26:** widgets measured in squares (1-4 wide and tall; one wide is an
+  icon), a size picker of squares, Home's glass look, and opening a widget like an iOS folder.
+- **Slice 3, done 2026-11-26:** Training on the portal with four switches (workouts, records,
+  level, ranks), never body weight; its widget and folder.
 

@@ -90,7 +90,7 @@ export class TrainingSummaryService {
    * Records **set** (marked) in the window, for exercises done in it. Only those exercises' full
    * histories are loaded, because a mark depends on every earlier set.
    */
-  private async recentRecords(
+  async recentRecords(
     userId: string,
     exerciseRows: ExerciseRow[],
     since: string,

@@ -619,3 +619,37 @@ export function weekSummary(input: {
     ...(open ? { openSessionId: open.id } : {}),
   };
 }
+
+/** The Monday of the week a day falls in (weeks start on Monday, as Training's do). */
+function mondayOf(day: string): string {
+  return addDays(day, -((weekdayOf(day) + 6) % 7));
+}
+
+/**
+ * Spec 046: the week streak on a portal's Training widget: how many weeks in a row, ending this
+ * week, had at least one workout. A week with nothing logged yet *this* week does not break it:
+ * the streak then counts from last week, so it does not drop to zero every Monday morning.
+ */
+export function trainingWeekStreak(workoutDays: readonly string[], today: string): number {
+  const weeks = new Set(workoutDays.filter((day) => day <= today).map(mondayOf));
+  let week = mondayOf(today);
+  if (!weeks.has(week)) week = addDays(week, -7);
+  let streak = 0;
+  while (weeks.has(week)) {
+    streak++;
+    week = addDays(week, -7);
+  }
+  return streak;
+}
+
+/**
+ * Spec 046: the last seven days of training on a portal, oldest first: the minutes trained each
+ * day (all of that day's workouts), for the week chart.
+ */
+export function portalTrainingWeek(today: string, sessions: readonly { day: string; durationSeconds: number }[]): { day: string; minutes: number }[] {
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = addDays(today, i - 6);
+    const seconds = sessions.filter((row) => row.day === day).reduce((sum, row) => sum + row.durationSeconds, 0);
+    return { day, minutes: Math.round(seconds / 60) };
+  });
+}

@@ -17,9 +17,9 @@ describe('portal preferences validation', () => {
     await expect(validate({ selectedModules: [...MODULE_IDS] })).resolves.toBeDefined();
   });
 
-  it('keeps unshareable modules private', async () => {
-    await expect(validate({ moduleVisibility: { training: 'friends' } })).rejects.toBeDefined();
+  it('keeps unshareable modules private, and lets Training be shared (spec 046)', async () => {
     await expect(validate({ moduleVisibility: { epam: 'friends' } })).rejects.toBeDefined();
+    await expect(validate({ moduleVisibility: { training: 'friends' } })).resolves.toBeDefined();
   });
 });
 

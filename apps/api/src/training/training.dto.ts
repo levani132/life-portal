@@ -176,6 +176,11 @@ export class UpdateTrainingProfileDto {
   @IsOptional() @IsIn(WEIGHT_UNITS) weightUnit?: (typeof WEIGHT_UNITS)[number];
   @IsOptional() @IsInt() @Min(0) @Max(900) defaultRestSeconds?: number;
   @IsOptional() @IsIn(RANK_STANDARDS) rankStandards?: (typeof RANK_STANDARDS)[number];
+  /** Spec 046: what Training shows on the portal. */
+  @IsOptional() @IsBoolean() shareWorkouts?: boolean;
+  @IsOptional() @IsBoolean() shareRecords?: boolean;
+  @IsOptional() @IsBoolean() shareLevel?: boolean;
+  @IsOptional() @IsBoolean() shareRanks?: boolean;
 }
 
 // ------------------------------------------------------------------ plans (spec 023)

@@ -4,7 +4,7 @@ import type { Model } from 'mongoose';
 import type { RankStandards, TrainingProfile as TrainingProfileDto, WeightUnit } from '@life-portal/shared-types';
 import { TrainingProfile } from './training.schemas';
 
-const DEFAULTS: TrainingProfileDto = { weightUnit: 'kg', defaultRestSeconds: 90 };
+const DEFAULTS: Pick<TrainingProfileDto, 'weightUnit' | 'defaultRestSeconds'> = { weightUnit: 'kg', defaultRestSeconds: 90 };
 
 /**
  * Training preferences, one row per user, created on first read.
@@ -39,6 +39,7 @@ export class TrainingProfileService {
     if (patch.weightUnit !== undefined) set.weightUnit = patch.weightUnit;
     if (patch.defaultRestSeconds !== undefined) set.defaultRestSeconds = patch.defaultRestSeconds;
     if (patch.rankStandards !== undefined) set.rankStandards = patch.rankStandards;
+    for (const key of ['shareWorkouts', 'shareRecords', 'shareLevel', 'shareRanks'] as const) if (patch[key] !== undefined) set[key] = patch[key];
     const onInsert: Record<string, unknown> = { userId };
     for (const [key, value] of Object.entries(DEFAULTS) as [string, unknown][]) {
       if (!(key in set)) onInsert[key] = value;
@@ -54,10 +55,16 @@ export class TrainingProfileService {
   }
 }
 
-function toDto(row: { weightUnit?: string; defaultRestSeconds?: number; rankStandards?: string } | null): TrainingProfileDto {
+function toDto(
+  row: { weightUnit?: string; defaultRestSeconds?: number; rankStandards?: string; shareWorkouts?: boolean; shareRecords?: boolean; shareLevel?: boolean; shareRanks?: boolean } | null,
+): TrainingProfileDto {
   return {
     weightUnit: (row?.weightUnit ?? DEFAULTS.weightUnit) as WeightUnit,
     defaultRestSeconds: row?.defaultRestSeconds ?? DEFAULTS.defaultRestSeconds,
     ...(row?.rankStandards ? { rankStandards: row.rankStandards as RankStandards } : {}),
+    shareWorkouts: row?.shareWorkouts === true,
+    shareRecords: row?.shareRecords === true,
+    shareLevel: row?.shareLevel === true,
+    shareRanks: row?.shareRanks === true,
   };
 }

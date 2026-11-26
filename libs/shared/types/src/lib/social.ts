@@ -35,6 +35,8 @@ export interface SharedWidget {
   size?: import('./dashboard').PortalWidgetSize;
   /** Spec 046: Food on a portal, each part only behind its own sharing switch. */
   food?: PortalFood;
+  /** Spec 046: Training on a portal, each part only behind its own sharing switch. */
+  training?: import('./training').PortalTraining;
 }
 
 /**

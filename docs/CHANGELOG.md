@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-26: My Portal, part three
+
+- Training can be on your portal. In Privacy and sharing, choose its audience and switch on what
+  shows: workouts (this week, your week streak, recent workouts), personal records, level and
+  ranks. Your body weight is never shown. Open the widget for the week, records and workouts.
+
 ## 2026-11-26: My Portal, part two
 
 - Your portal shows what you share as widgets in Home's look, on a grid of squares like an
