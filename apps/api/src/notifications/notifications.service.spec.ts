@@ -314,6 +314,7 @@ describe('NotificationsService preferences and activity', () => {
       friendAccepted: true,
       postComment: true,
       commentReply: true,
+      commentLike: true,
       postLike: false,
       postRepost: true,
       message: true,

@@ -266,6 +266,13 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   brand. Public brands have no `userId`, so every `food_brands` query says public, own or both;
   a logo's storage key never leaves the API; logos are uploaded by the admin, not shipped. See
   `docs/modules/nutrition.md` ("Brands").
+- **No title bar on a screen people use** (owner, 2026-11-26). Tabs, posts, profiles, search,
+  Activity and friends carry no `PageHeader`, no subtitle explaining the screen and no button
+  that the tab bar already offers; a post opens edge to edge on a phone, without a card around
+  it, like in the feed. The way back is the shell's back arrow, shown on every screen that is
+  not a tab. `PageHeader` stays for tool screens reached from Menu (settings, money, admin),
+  where the title is the only thing saying where you are; even there, a subtitle only when it
+  says something the screen does not.
 - **Never write a palette colour or a literal in the web app** (spec 037). Every colour is a
   role from `THEME_ROLES` (`text-ink`, `bg-danger-solid/10`, `rgb(var(--macro-kcal))`), because
   the active theme is data: `text-emerald-400` would ignore it. A plain role is text; its

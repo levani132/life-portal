@@ -392,3 +392,22 @@ Removing a comment removes its replies. A reply notifies the post's owner as any
 and the person answered with `commentReply` (push, a preference of its own, and an Activity row
 when the reply is under someone else's post). The assistant's `comment_on_post` takes `replyTo`.
 Tested in `integration/replies.integration.ts`.
+
+## Comment likes (2026-11-26)
+
+`post_comment_likes {commentId, postId, userId, createdAt}`, unique per comment and person.
+`PUT /:id/comments/:commentId/like` and `DELETE` (same path) answer `{likeCount, liked}`; both
+are idempotent. The post must be readable (`detail()`); 404 `COMMENT_GONE` when the comment is
+removed or either side blocked the other, except that unliking a comment that is gone succeeds
+(a retried unlike from the outbox). Every comment and reply in a list carries `likeCount` and
+`liked`, counted on read. **Who liked a comment is never listed**, only how many.
+
+A new like tells the comment's author (`commentLike`, grouped per comment, 15-minute window; the
+comment's text only with comment previews on); liking your own comment tells nobody. Activity
+shows likes on the person's 1,000 most recent comments, one item per comment, with no post title
+(the post may be someone else's). The web queues the like like a post like (`comment.like` in
+`lib/social-offline.ts`, overlaid by `overlayComments`); an opposite waiting toggle cancels it.
+Pages may like comments (`@ForPages`), and the assistant has `like_comment` / `unlike_comment`.
+Deleting an account removes its likes, the likes on its comments and the likes under its posts.
+Tested in `integration/comment-likes.integration.ts`.
+

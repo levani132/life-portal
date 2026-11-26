@@ -53,6 +53,10 @@ function fixture() {
     between: jest.fn(async () => ({ blockedBy: [] as string[] })),
   };
   const notifications = { notify: jest.fn(async () => undefined) };
+  const commentLikes = {
+    aggregate: jest.fn(async () => []),
+    find: jest.fn(() => ({ select: () => ({ lean: async () => [] }) })),
+  };
   return {
     likes,
     comments,
@@ -65,6 +69,7 @@ function fixture() {
     service: new PostEngagementService(
       likes as never,
       comments as never,
+      commentLikes as never,
       posts as never,
       social as never,
       graph as never,

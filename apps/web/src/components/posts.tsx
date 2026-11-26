@@ -497,7 +497,7 @@ export function PostCard({
     <PostMetricsContext.Provider value={recordMetric}>
     <article
       ref={card}
-      className={`card overflow-hidden p-4 sm:p-5 ${detail ? 'rounded-2xl' : 'rounded-none border-0 sm:rounded-2xl sm:border'}`}
+      className={`card overflow-hidden p-4 sm:p-5 ${detail ? 'rounded-none border-0 bg-transparent sm:rounded-2xl sm:border sm:bg-surface-raised' : 'rounded-none border-0 sm:rounded-2xl sm:border'}`}
     >
       {post.repost && (
         <p className="-mt-1 mb-3 flex items-center gap-1.5 text-xs text-ink-muted">

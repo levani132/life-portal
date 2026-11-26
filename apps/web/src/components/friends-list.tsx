@@ -1,9 +1,7 @@
 'use client';
 import { GlassPill } from './glass-pill';
-import Link from 'next/link';
 import { useState } from 'react';
 import type { ConnectionList, PeoplePage } from '@life-portal/shared-types';
-import { PageHeader } from './page-header';
 import { PersonCard, useSocialApi } from './social';
 import { ErrorNote, Spinner } from './ui';
 import { actingPageId } from '../lib/identity';
@@ -23,15 +21,6 @@ export function Friends() {
   );
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader
-        title={page ? 'Blocked' : 'Friends'}
-        subtitle={page ? 'Accounts this page has blocked.' : 'A little window into the things your friends choose to share.'}
-        actions={
-          <Link href="/search" className="btn-primary">
-            Find people
-          </Link>
-        }
-      />
       <div
         className="glass-tabs relative mb-5 flex gap-1 rounded-2xl border p-1"
         role="tablist"

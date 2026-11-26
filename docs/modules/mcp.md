@@ -163,7 +163,7 @@ together. A separate `pages` scope on the grant is the stricter design and is no
 | Photos | `prepare_page_media_upload`, `finish_page_media_upload`, `set_page_photo` (the page's profile photo, from a checked upload) |
 | Posts | `create_page_post` (text; one food, recipe or meal plan and/or one training plan or exercise; `mediaIds`; `draft`), `publish_page_draft`, `update_page_post`, `delete_page_post`, `list_page_posts` |
 | Reading | `get_for_you`, `get_following`, `get_post`, `get_post_comments`, `get_account_profile`, `get_suggested_pages` |
-| Engaging | `follow_page`, `unfollow_page`, `like_post`, `unlike_post`, `repost_post`, `unrepost_post`, `comment_on_post`, `delete_page_comment`, `get_page_notifications`, `block_account`, `unblock_account`, `list_page_conversations`, `get_conversation_messages`, `reply_in_conversation` |
+| Engaging | `follow_page`, `unfollow_page`, `like_post`, `unlike_post`, `like_comment`, `unlike_comment`, `repost_post`, `unrepost_post`, `comment_on_post`, `delete_page_comment`, `get_page_notifications`, `block_account`, `unblock_account`, `list_page_conversations`, `get_conversation_messages`, `reply_in_conversation` |
 
 A draft is a post with audience `private`; publishing sets it to `public`. There is no tool to
 delete a page or to open a conversation.
@@ -211,7 +211,7 @@ the messaging rule (`page-first`) apply unchanged. Tested in
 ### Doing things later (`at`)
 
 An assistant usually runs on its own timetable (an hourly job), so it cannot post at 09:17
-itself. `create_page_post`, `publish_page_draft`, `comment_on_post`, `like_post`, `follow_page`
+itself. `create_page_post`, `publish_page_draft`, `comment_on_post`, `like_post`, `like_comment`, `follow_page`
 and `reply_in_conversation` take an optional `at` (ISO date and time with offset). With it the
 call is stored in `page_scheduled_actions {pageId, personId, tool, args, runAt, status, error?,
 startedAt?, doneAt?}` and answered `{scheduled, actionId, at}`; a clock in `PageAssistantService`

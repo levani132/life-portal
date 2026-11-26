@@ -1,6 +1,6 @@
 # Roadmap
 
-Where Life Portal is, where it is going, and in what order. Updated 2026-11-23. The admin sees this roadmap in the app (Menu → Roadmap); its content lives in
+Where Life Portal is, where it is going, and in what order. Updated 2026-11-26. The admin sees this roadmap in the app (Menu → Roadmap); its content lives in
 `apps/api/src/roadmap/roadmap.data.ts`, which must change with this file. Product
 direction comes from the owner; the order and the architecture tiers are recommendations agreed
 in conversation, not commitments. Costs are rough late-2026 list prices, order of magnitude only.
@@ -270,7 +270,14 @@ three have moved into the numbered steps, because friends already use the app.
     Next: transcoding through Mux or Cloudflare Stream so every clip plays everywhere, library
     videos and 60 seconds. No reels scroller until people make video on their own.
 16. **Native apps.** Wrap the web app with Capacitor and add HealthKit and background location.
-    Background GPS (skiing, rides) is the one thing a PWA cannot do.
+    Background GPS (skiing, rides) is the one thing a PWA cannot do. It would also drop the
+    "from Life Portal" line iOS adds to every web app's notification.
+17. **Post views and who liked a post.** Low priority (asked 2026-11-26). A view count on your own
+    posts, and a list of who liked a post. Comment likes are done (counts only, nobody listed).
+    The work is the privacy rules before any code: who may see the list on someone else's post
+    (friends only? not across a block? never for a private profile?), whether a person can hide
+    their own likes, what a page's managers see, and that a view is counted without storing who
+    viewed. Settle these in a spec first.
 
 Also wanted, unscheduled: more themes, real refraction for the glass (tried 2026-11-18: it works
 in Safari only for small elements and looked poor; shelved), quote reposts (a repost with your

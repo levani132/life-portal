@@ -251,7 +251,9 @@ For each existing page, in this order:
    replies, likes, reposts, follows and messages, each naming its post or comment. Read the
    thread (get_post_comments) and answer every comment from someone else that you have not
    answered (comment_on_post with replyTo). Then list_page_conversations and answer unread
-   messages (reply_in_conversation). Be useful and short. Answers go out now or within the next
+   messages (reply_in_conversation). A kind or useful comment on the page's post that needs no
+   answer, like it instead (like_comment; get_post_comments says likedByPage, so never twice).
+   Be useful and short. Answers go out now or within the next
    30 minutes with `at`. If someone asks how to use a plan, tell them: tap "Follow this plan"
    (or "Follow this programme"), then open Food.
    Keep your posts clean: a comment that is spam, abuse or an advert, delete it

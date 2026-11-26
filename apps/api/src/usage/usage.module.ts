@@ -34,6 +34,7 @@ export const USAGE_SOURCES: UsageSource[] = [
   { collection: 'food_posts', kind: 'post', user: 'userId', at: 'createdAt', match: { deleted: { $ne: true }, repostOf: { $exists: false } } },
   { collection: 'post_comments', kind: 'social', user: 'userId', at: 'createdAt' },
   { collection: 'post_likes', kind: 'social', user: 'userId', at: 'createdAt' },
+  { collection: 'post_comment_likes', kind: 'social', user: 'userId', at: 'createdAt' },
   { collection: 'messages', kind: 'social', user: 'senderId', at: 'createdAt' },
 ];
 

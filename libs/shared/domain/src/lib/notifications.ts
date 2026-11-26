@@ -143,6 +143,11 @@ export function notificationText(
     }
     case 'postRepost':
       return { title, body: `reposted ${postName(event.postTitle)}` };
+    case 'commentLike': {
+      const preview = options.showCommentPreviews && event.commentText ? clip(event.commentText, PREVIEW_LIMIT) : '';
+      const who = others > 0 ? `and ${others} ${others === 1 ? 'other' : 'others'} liked` : 'liked';
+      return { title, body: preview ? `${who} your comment: ${preview}` : `${who} your comment` };
+    }
     case 'badgeEarned':
       return badgeEarnedText(event.targetId ?? '', event.badgeTier, event.count);
     case 'restOver':
@@ -192,7 +197,7 @@ export interface ActivityRow {
 }
 
 /** Types whose rows on one target merge into a single Activity item. */
-const GROUPED: ReadonlySet<NotificationType> = new Set(['postLike']);
+const GROUPED: ReadonlySet<NotificationType> = new Set(['postLike', 'commentLike']);
 const MAX_ACTORS = 3;
 
 /**

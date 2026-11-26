@@ -2888,3 +2888,22 @@ up to 300 MB on a 512 MB instance, so the server ran out of memory and restarted
 was full, every new connection also got 503. Both showed as `-32603` for every worker at once.
 Sessions hold no state a tool needs and an unknown session is answered statelessly, so the table
 is now 10 sessions, idle after 5 minutes, and a new session evicts the longest-idle one.
+
+## 2026-11-26: Screens people use have no title bar; the shell gives the way back
+
+The owner found "Find your people / Search by name or username / My profile" on Search and a
+"Post" title over a framed card on a post: space spent saying what the screen already shows.
+Social screens (search, a post, Activity, friends) lost their `PageHeader`, and a post opens
+edge to edge on a phone like in the feed. Because an installed iPhone app has no browser back
+button, the shell's top bar now shows a back arrow on every screen that is not a tab
+(`router.back()`, or Home with no history). Tool screens from Menu keep their titles. Written into
+CLAUDE.md so new screens follow it.
+
+## 2026-11-26: Comment likes are counts; who liked is never listed
+
+Comment and reply likes show a heart and a number. Nobody can see who liked a comment: a list of
+likers raises the same questions as one for posts (friends only, blocks, private profiles,
+hiding your likes), which the owner put on the roadmap as its own low-priority piece with post
+views. The comment's author is told, grouped per comment, so a like is not anonymous to them in
+the notification, as with post likes today.
+

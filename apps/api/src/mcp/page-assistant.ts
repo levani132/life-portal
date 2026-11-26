@@ -99,7 +99,7 @@ PageScheduledActionSchema.index({ pageId: 1, runAt: 1 });
 PageScheduledActionSchema.index({ doneAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60, sparse: true });
 
 /** The tools that take `at`: done at that time instead of now. */
-const SCHEDULABLE = new Set(['create_page_post', 'publish_page_draft', 'comment_on_post', 'like_post', 'repost_post', 'follow_page', 'reply_in_conversation']);
+const SCHEDULABLE = new Set(['create_page_post', 'publish_page_draft', 'comment_on_post', 'like_post', 'like_comment', 'repost_post', 'follow_page', 'reply_in_conversation']);
 /** How many due actions one run of the clock takes. */
 const DUE_PER_RUN = 100;
 /** A row left "running" this long was cut off by a restart; it is failed, never run twice. */
@@ -1176,9 +1176,11 @@ export class PageAssistantService {
               text: comment.text,
               createdAt: comment.createdAt,
               replyCount: comment.replyCount ?? 0,
+              likeCount: comment.likeCount ?? 0,
+              likedByPage: comment.liked === true,
               // The newest reply, so you can tell whether the page has already answered.
               ...(comment.replies?.length
-                ? { latestReply: { author: { id: comment.replies[comment.replies.length - 1].author.userId, isPage: comment.replies[comment.replies.length - 1].author.isPage === true }, text: comment.replies[comment.replies.length - 1].text } }
+                ? { latestReply: { id: comment.replies[comment.replies.length - 1].id, author: { id: comment.replies[comment.replies.length - 1].author.userId, isPage: comment.replies[comment.replies.length - 1].author.isPage === true }, text: comment.replies[comment.replies.length - 1].text } }
                 : {}),
             })),
             nextCursor: page.nextCursor,
@@ -1251,6 +1253,23 @@ export class PageAssistantService {
         description: 'Take back a like.',
         shape: { pageId, postId: id },
         run: async (personId, args) => this.engagement.setLike(await this.acting(personId, args), String(args['postId']), false),
+      },
+      {
+        name: 'like_comment',
+        description:
+          'Like a comment or reply as the acting page (ids from get_post_comments). Its author is told. Counts as a like against the daily cap. Like a comment you are glad to see, never your own.',
+        shape: { pageId, postId: id, commentId: id },
+        run: (personId, args) =>
+          this.counted(personId, args, 'like', 'like_comment', async (page) => ({
+            result: await this.engagement.setCommentLike(page, String(args['postId']), String(args['commentId']), true),
+            targetId: String(args['commentId']),
+          })),
+      },
+      {
+        name: 'unlike_comment',
+        description: 'Take back a like on a comment.',
+        shape: { pageId, postId: id, commentId: id },
+        run: async (personId, args) => this.engagement.setCommentLike(await this.acting(personId, args), String(args['postId']), String(args['commentId']), false),
       },
       {
         name: 'repost_post',

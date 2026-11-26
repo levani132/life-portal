@@ -171,7 +171,7 @@ export class AccountService {
     // 3. What other people's records hold of this account.
     const postIds = (await this.store.find('food_posts', { userId })).map((row) => String(row['_id']));
     if (postIds.length) {
-      for (const collection of ['post_likes', 'post_comments', 'post_reports']) {
+      for (const collection of ['post_likes', 'post_comments', 'post_comment_likes', 'post_reports']) {
         await this.store.deleteMany(collection, { postId: { $in: postIds } });
       }
       await this.store.deleteMany('food_posts', { repostOf: { $in: postIds } });
@@ -185,6 +185,9 @@ export class AccountService {
         { $set: { 'attribution.label': `Shared by ${FORMER_MEMBER}` } },
       );
     }
+    // Likes other people gave this account's comments go with the comments.
+    const commentIds = (await this.store.find('post_comments', { userId })).map((row) => String(row['_id']));
+    if (commentIds.length) await this.store.deleteMany('post_comment_likes', { commentId: { $in: commentIds } });
     const formerAuthor = { $set: { 'sharedBy.label': FORMER_MEMBER }, $unset: { 'sharedBy.authorId': '' } };
     await this.store.updateMany('exercises', { 'sharedBy.authorId': userId }, formerAuthor);
     await this.store.updateMany('training_plans', { 'sharedBy.authorId': userId }, formerAuthor);

@@ -125,6 +125,7 @@ const DOES: Record<string, string> = {
   comment_on_post: 'Comment',
   reply_in_conversation: 'Message reply',
   like_post: 'Like a post',
+  like_comment: 'Like a comment',
   repost_post: 'Repost',
   follow_page: 'Follow a page',
 };

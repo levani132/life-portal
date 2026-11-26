@@ -395,6 +395,22 @@ function PostComments({
     }
   }
 
+  // A comment's heart after the person taps it, as absolute values: a comment from an earlier page
+  // is never refetched, so this keeps it right after the like is sent.
+  const [commentLikes, setCommentLikes] = useState<Record<string, { liked: boolean; count: number }>>({});
+  const likeOf = (comment: ShownComment) => commentLikes[comment.id] ?? { liked: !!comment.liked, count: comment.likeCount ?? 0 };
+  async function toggleCommentLike(comment: ShownComment) {
+    const now = likeOf(comment);
+    const next = { liked: !now.liked, count: Math.max(0, now.count + (now.liked ? -1 : 1)) };
+    setCommentLikes((all) => ({ ...all, [comment.id]: next }));
+    try {
+      await socialWrites.commentLike(postId, comment.id, next.liked);
+    } catch (e) {
+      setCommentLikes((all) => ({ ...all, [comment.id]: now }));
+      setError(e instanceof Error ? e.message : 'Could not like the comment.');
+    }
+  }
+
   const row = (comment: ShownComment, topId: string) => (
     <div id={`comment-${comment.id}`} className={`flex items-start gap-2 ${focused === comment.id ? 'comment-focus' : ''}`}>
       <Avatar name={comment.author.displayName} url={comment.author.avatarUrl} size={28} className="mt-1" />
@@ -412,6 +428,18 @@ function PostComments({
           {!comment.unsent && (
             <button type="button" className="font-semibold text-ink-muted hover:text-ink" onClick={() => setReplyTo({ id: topId, name: comment.author.displayName })}>
               Reply
+            </button>
+          )}
+          {!comment.unsent && (
+            <button
+              type="button"
+              aria-pressed={likeOf(comment).liked}
+              aria-label={likeOf(comment).liked ? 'Unlike comment' : 'Like comment'}
+              className={`ml-auto flex items-center gap-1 font-semibold ${likeOf(comment).liked ? 'text-danger' : 'text-ink-muted hover:text-ink'}`}
+              onClick={() => void toggleCommentLike(comment)}
+            >
+              <Heart size={12} fill={likeOf(comment).liked ? 'currentColor' : 'none'} aria-hidden="true" />
+              {likeOf(comment).count > 0 && <span className="tabular">{likeOf(comment).count}</span>}
             </button>
           )}
         </span>

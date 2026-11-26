@@ -11,7 +11,8 @@ export type SocialWriteMeta =
   | { op: 'like'; postId: string; on: boolean }
   | { op: 'repost'; postId: string; on: boolean }
   | { op: 'comment'; postId: string; commentId: string; text: string; createdAt: string; parentId?: string }
-  | { op: 'comment.remove'; postId: string; commentId: string };
+  | { op: 'comment.remove'; postId: string; commentId: string }
+  | { op: 'comment.like'; postId: string; commentId: string; on: boolean };
 
 export interface SocialWrite {
   meta: SocialWriteMeta;
@@ -80,6 +81,11 @@ export function overlayComments(
       });
     }
     if (meta.op === 'comment.remove') rows.delete(meta.commentId);
+    // A waiting comment like: the heart and the count as they will be once it is sent.
+    if (meta.op === 'comment.like' && !settled) {
+      const row = rows.get(meta.commentId);
+      if (row && !!row.liked !== meta.on) rows.set(meta.commentId, { ...row, liked: meta.on, likeCount: Math.max(0, (row.likeCount ?? 0) + (meta.on ? 1 : -1)) });
+    }
   }
   return [...rows.values()];
 }
@@ -92,12 +98,14 @@ export function overlayComments(
  */
 export function cancelledBy(
   items: readonly { id: string; meta?: unknown; state: string; maybeSent?: boolean }[],
-  next: Extract<SocialWriteMeta, { op: 'like' | 'repost' }>,
+  next: Extract<SocialWriteMeta, { op: 'like' | 'repost' | 'comment.like' }>,
 ): string[] {
   return items
     .filter((item) => {
       const meta = socialMetaOf(item.meta);
-      return item.state === 'pending' && !item.maybeSent && meta?.op === next.op && meta.postId === next.postId && meta.on !== next.on;
+      if (item.state !== 'pending' || item.maybeSent || meta?.op !== next.op || meta.postId !== next.postId) return false;
+      if (meta.op === 'comment.like' && next.op === 'comment.like' && meta.commentId !== next.commentId) return false;
+      return 'on' in meta && meta.on !== next.on;
     })
     .map((item) => item.id);
 }

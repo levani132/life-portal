@@ -101,6 +101,7 @@ export const ACCOUNT_PLAN: Record<string, CollectionRule> = {
   food_posts: { kind: 'custom', how: 'Own posts and reposts are deleted, with other people’s reposts, likes, comments and reports of them.' },
   post_likes: owned,
   post_comments: owned,
+  post_comment_likes: owned,
   post_reports: owned,
   post_media: owned,
   feed_feedback: owned,

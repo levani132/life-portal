@@ -139,6 +139,13 @@ describe('the assistant for pages', () => {
     expect((following.body.result?.['posts'] as { id: string }[]).map((post) => post.id)).toContain(theirPost);
     const comments = await call('get_post_comments', { pageId: first, postId: theirPost });
     expect((comments.body.result?.['comments'] as { text: string; author: { isPage: boolean } }[])[0]).toMatchObject({ text: 'Saved this.', author: { isPage: true } });
+    // The other page likes that comment back; the count shows on the list, and unliking takes it away.
+    const commentId = (comments.body.result?.['comments'] as { id: string }[])[0].id;
+    const callBeka = await connector(beka);
+    expect((await callBeka('like_comment', { pageId: other, postId: theirPost, commentId })).body.result).toEqual({ likeCount: 1, liked: true });
+    const liked = await callBeka('get_post_comments', { pageId: other, postId: theirPost });
+    expect((liked.body.result?.['comments'] as { likeCount: number; likedByPage: boolean }[])[0]).toMatchObject({ likeCount: 1, likedByPage: true });
+    expect((await callBeka('unlike_comment', { pageId: other, postId: theirPost, commentId })).body.result).toEqual({ likeCount: 0, liked: false });
 
     // The owner lowers this person's comment cap to what is already used: the next is refused.
     const { CONFIG } = await import('../apps/api/src/config/configuration');

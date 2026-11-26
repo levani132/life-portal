@@ -62,6 +62,22 @@ PostCommentSchema.index({ userId: 1, createdAt: -1 });
 // Replies to someone's comments, for their Activity.
 PostCommentSchema.index({ parentUserId: 1, createdAt: -1 }, { sparse: true });
 
+/**
+ * A like on a comment or reply. Counted on read like a post's likes; the comment's author is told
+ * (grouped per comment). Never listed: nobody sees who liked a comment, only how many.
+ */
+@Schema({ collection: 'post_comment_likes', timestamps: true })
+export class PostCommentLikeRecord {
+  @Prop({ required: true }) commentId!: string;
+  @Prop({ required: true }) postId!: string;
+  @Prop({ required: true }) userId!: string;
+  createdAt!: Date;
+}
+export const PostCommentLikeSchema = SchemaFactory.createForClass(PostCommentLikeRecord);
+PostCommentLikeSchema.index({ commentId: 1, userId: 1 }, { unique: true });
+PostCommentLikeSchema.index({ postId: 1 });
+PostCommentLikeSchema.index({ userId: 1 });
+
 const LIKE_WINDOW_MS = 15 * 60_000;
 const COMMENT_WINDOW_MS = 2 * 60_000;
 
@@ -72,6 +88,8 @@ export class PostEngagementService implements OnModuleInit {
     private readonly likes: Model<PostLikeRecord>,
     @InjectModel(PostCommentRecord.name)
     private readonly comments: Model<PostCommentRecord>,
+    @InjectModel(PostCommentLikeRecord.name)
+    private readonly commentLikes: Model<PostCommentLikeRecord>,
     private readonly posts: PostsService,
     private readonly social: SocialService,
     private readonly graph: SocialGraphService,
@@ -93,6 +111,8 @@ export class PostEngagementService implements OnModuleInit {
     });
     this.notifications.register({ type: 'commentReply', windowMs: COMMENT_WINDOW_MS, ...common });
     this.notifications.register({ type: 'postRepost', windowMs: LIKE_WINDOW_MS, ...common });
+    // Grouped per comment: a burst of likes on one comment is one notification.
+    this.notifications.register({ type: 'commentLike', windowMs: LIKE_WINDOW_MS, ...common, collapseKey: (event: { targetId: string; commentId?: string }) => event.commentId ?? event.targetId });
     this.notifications.registerActivitySource({
       rows: (userId, since, before, limit) => this.activity(userId, since, before, limit),
     });
@@ -105,7 +125,8 @@ export class PostEngagementService implements OnModuleInit {
     limit: number,
   ): Promise<ActivityRow[]> {
     const titles = await this.posts.ownTitles(userId);
-    if (!titles.size) return [];
+    const commentLikes = await this.commentLikeRows(userId, since, before, limit);
+    if (!titles.size) return commentLikes;
     const filter = {
       postId: { $in: [...titles.keys()] },
       userId: { $ne: userId },
@@ -144,6 +165,7 @@ export class PostEngagementService implements OnModuleInit {
       createdAt: r.createdAt,
     });
     return [
+      ...commentLikes,
       ...likes.map((r) => row('postLike', r)),
       ...comments.map((r) => row('postComment', r)),
       // A reply under my own post is already there as a comment; these are replies elsewhere.
@@ -153,6 +175,31 @@ export class PostEngagementService implements OnModuleInit {
       ),
     ];
   }
+  /**
+   * Likes by others on the person's own recent comments, one Activity item per comment. The row's
+   * target is the comment, so likes group per comment; it carries no post title (the post may be
+   * someone else's).
+   */
+  private async commentLikeRows(userId: string, since: Date, before: Date | undefined, limit: number): Promise<ActivityRow[]> {
+    const own = await this.comments.find({ userId, deleted: false }).sort({ _id: -1 }).limit(1000).select('_id postId').lean();
+    if (!own.length) return [];
+    const postOf = new Map(own.map((row) => [String(row._id), row.postId]));
+    const rows = await this.commentLikes
+      .find({ commentId: { $in: [...postOf.keys()] }, userId: { $ne: userId }, createdAt: { $gte: since, ...(before ? { $lt: before } : {}) } })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+    const names = await this.social.displayNames(rows.map((row) => row.userId));
+    return rows.map((row) => ({
+      type: 'commentLike' as const,
+      actorId: row.userId,
+      actorName: names.get(row.userId) ?? 'Former member',
+      targetId: row.commentId,
+      url: `/posts/${postOf.get(row.commentId) ?? row.postId}?comment=${row.commentId}`,
+      createdAt: row.createdAt,
+    }));
+  }
+
   /** Tells the post's owner. Not awaited by callers, and never throws. */
   private notifyOwner(
     post: FoodPost,
@@ -241,10 +288,22 @@ export class PostEngagementService implements OnModuleInit {
   }
   /** Comments the viewer may see: not from someone blocked either way. */
   private async visibleTo(rows: (PostCommentRecord & { _id: unknown })[], viewerId: string, owner: boolean): Promise<PostComment[]> {
+    const ids = rows.map((row) => String(row._id));
+    const [counts, mine] = ids.length
+      ? await Promise.all([
+          this.commentLikes.aggregate<{ _id: string; n: number }>([{ $match: { commentId: { $in: ids } } }, { $group: { _id: '$commentId', n: { $sum: 1 } } }]),
+          this.commentLikes.find({ commentId: { $in: ids }, userId: viewerId }).select('commentId').lean(),
+        ])
+      : [[], []];
+    const countOf = new Map(counts.map((row) => [row._id, row.n]));
+    const liked = new Set(mine.map((row) => row.commentId));
     const shown = await Promise.all(
       rows.map(async (row) => {
         if (row.userId !== viewerId && (await this.graph.between(viewerId, row.userId))?.blockedBy.length) return null;
-        return this.commentDto(row, viewerId, owner);
+        const dto = await this.commentDto(row, viewerId, owner);
+        const id = String(row._id);
+        const shown: PostComment = { ...dto, likeCount: countOf.get(id) ?? 0, liked: liked.has(id) };
+        return shown;
       }),
     );
     return shown.filter((row): row is PostComment => row !== null);
@@ -373,6 +432,45 @@ export class PostEngagementService implements OnModuleInit {
     if (target.parentId && !thread.replies.length) throw gone();
     return thread;
   }
+  /**
+   * Likes or unlikes a comment or reply the viewer can see. Repeating either is a no-op; only a
+   * new like tells the comment's author, never their own like. 404 COMMENT_GONE when the comment
+   * is removed or either side blocked the other.
+   */
+  async setCommentLike(userId: string, postId: string, commentId: string, liked: boolean): Promise<{ likeCount: number; liked: boolean }> {
+    const post = await this.posts.detail(userId, postId);
+    const gone = () => new NotFoundException({ code: 'COMMENT_GONE', message: 'That comment is no longer there.' });
+    const comment = isValidObjectId(commentId) ? await this.comments.findOne({ _id: commentId, postId, deleted: false }).lean() : null;
+    if (!comment) {
+      // Unliking what is gone is done (a retry from the device, or the comment was removed).
+      if (!liked) return { likeCount: 0, liked: false };
+      throw gone();
+    }
+    if (comment.userId !== userId && (await this.graph.between(userId, comment.userId))?.blockedBy.length) throw gone();
+    if (liked) {
+      try {
+        const result = await this.commentLikes.updateOne({ commentId, userId }, { $setOnInsert: { commentId, postId, userId } }, { upsert: true });
+        if (result.upsertedCount && comment.userId !== userId) {
+          const actor = await this.social.postAuthor(userId);
+          if (actor)
+            void this.notifications.notify({
+              type: 'commentLike',
+              recipientId: comment.userId,
+              actorId: userId,
+              actorName: actor.displayName,
+              targetId: post.id,
+              commentText: comment.text,
+              commentId,
+            });
+        }
+      } catch (error) {
+        if ((error as { code?: number }).code !== 11000) throw error;
+      }
+    } else await this.commentLikes.deleteOne({ commentId, userId });
+    const [likeCount, mine] = await Promise.all([this.commentLikes.countDocuments({ commentId }), this.commentLikes.exists({ commentId, userId })]);
+    return { likeCount, liked: !!mine };
+  }
+
   async remove(userId: string, postId: string, commentId: string) {
     const post = await this.posts.detail(userId, postId);
     if (!isValidObjectId(commentId))

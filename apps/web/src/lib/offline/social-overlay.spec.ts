@@ -52,4 +52,29 @@ describe('likes, reposts and comments made offline (spec 031)', () => {
     expect(cancelledBy(items, { op: 'like', postId: 'p3', on: false })).toEqual([]);
     expect(cancelledBy(items, { op: 'like', postId: 'p1', on: true })).toEqual([]);
   });
+
+  it('shows a waiting comment like on that comment only, and never counts it twice', () => {
+    const comment = (id: string, liked = false, likeCount = 0) =>
+      ({ id, text: 'Hi', createdAt: '', canDelete: false, author: { userId: 'u2', displayName: 'Ana', username: 'ana' }, liked, likeCount }) as PostComment;
+    const me = { userId: 'u1', displayName: 'You', username: '' };
+    const likeComment = (commentId: string, on: boolean, settled = false): SocialWrite => ({ meta: { op: 'comment.like', postId: 'p1', commentId, on }, settled });
+    const [first, second] = overlayComments([comment('c1', false, 2), comment('c2')], 'p1', [likeComment('c1', true)], me);
+    expect([first.liked, first.likeCount, second.liked, second.likeCount]).toEqual([true, 3, false, 0]);
+    // Already liked on the server: the waiting like changes nothing.
+    expect(overlayComments([comment('c1', true, 3)], 'p1', [likeComment('c1', true)], me)[0].likeCount).toBe(3);
+    // Sent and acknowledged: the refetched figures decide.
+    expect(overlayComments([comment('c1', false, 2)], 'p1', [likeComment('c1', true, true)], me)[0].liked).toBe(false);
+    // The post's own figures do not move for a comment like.
+    expect(overlayEngagement(base, 'p1', [likeComment('c1', true)]).likeCount).toBe(3);
+  });
+
+  it('withdraws a waiting opposite comment like for the same comment only', () => {
+    const items = [
+      { id: 'a', state: 'pending', meta: { op: 'comment.like', postId: 'p1', commentId: 'c1', on: true } },
+      { id: 'b', state: 'pending', meta: { op: 'comment.like', postId: 'p1', commentId: 'c2', on: true } },
+      { id: 'c', state: 'pending', meta: { op: 'like', postId: 'p1', on: true } },
+    ];
+    expect(cancelledBy(items, { op: 'comment.like', postId: 'p1', commentId: 'c1', on: false })).toEqual(['a']);
+    expect(cancelledBy(items, { op: 'comment.like', postId: 'p1', commentId: 'c3', on: false })).toEqual([]);
+  });
 });

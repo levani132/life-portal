@@ -1,8 +1,6 @@
 'use client';
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import type { PeoplePage } from '@life-portal/shared-types';
-import { PageHeader } from './page-header';
 import { PersonCard, useSocialApi } from './social';
 import { ErrorNote, Input, Spinner } from './ui';
 export function PeopleSearch() {
@@ -23,15 +21,6 @@ export function PeopleSearch() {
   );
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader
-        title="Find your people"
-        subtitle="Search by name or username."
-        actions={
-          <Link href="/profile" className="btn-ghost">
-            My profile
-          </Link>
-        }
-      />
       <Input
         type="search"
         aria-label="Search people"

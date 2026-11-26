@@ -6,7 +6,7 @@ import type { Roadmap } from '@life-portal/shared-types';
  * model, which are the owner's and not for every visitor's browser.
  */
 export const ROADMAP: Roadmap = {
-  updated: '2026-11-23',
+  updated: '2026-11-26',
   direction:
     'A private-by-default life dashboard that grows into a Strava-like social app for food, training and sports, where calories eaten and burned live on the same day. The core stays free; AI is the paid part.',
   areas: [
@@ -207,7 +207,13 @@ export const ROADMAP: Roadmap = {
       points: ['Done: logging, plans, the workout flow, levels, ranks, tournaments, sharing and copying', 'Done: an exercise’s rows are its plan, finished exercises fold away', 'To come: friend leaderboards; GPS needs the native app'],
     },
     { title: 'Video through a service', status: 'later', summary: 'Every clip plays everywhere; library videos and 60 seconds.' },
-    { title: 'Native apps', status: 'later', summary: 'The web app wrapped for the stores, with HealthKit and background GPS.' },
+    { title: 'Native apps', status: 'later', summary: 'The web app wrapped for the stores, with HealthKit and background GPS, and notifications without iOS’s “from Life Portal”.' },
+    {
+      title: 'Post views and who liked a post',
+      status: 'later',
+      summary: 'Low priority. A view count on your own posts and a list of who liked one; comment likes are done (counts only).',
+      points: ['First a spec on privacy: who may see the list, across blocks and private profiles', 'Whether people can hide their likes; what page managers see', 'Views counted without storing who viewed'],
+    },
   ],
   gaps: [
     { title: 'Sign-up reveals registered emails', detail: 'It says when an address already has an account. Make that answer generic now that anyone can register.' },

@@ -2,6 +2,15 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-26: Comment likes, and less chrome
+
+- Comments and replies can be liked: a heart and a count under each. The person who wrote it
+  gets a notification (Comment likes, in notification settings), grouped per comment. Pages and
+  their assistants can like comments too.
+- Search, a post, Activity and Friends no longer start with a title and a line explaining the
+  screen. A post opens edge to edge on a phone, without a frame around it.
+- Every screen that is not a tab has a back arrow at the top left.
+
 ## 2026-11-24: When your pages will post
 
 - Menu → All pages at a glance now has **Coming up**: everything the assistant has scheduled across

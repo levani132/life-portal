@@ -137,6 +137,20 @@ describe('a reply to a comment', () => {
   });
 });
 
+describe('a like on a comment', () => {
+  it('says so, names the others in a burst, and quotes the comment only with previews on', () => {
+    const event = { type: 'commentLike' as const, actorName: 'Ana', commentText: 'Great tip' };
+    expect(notificationText(event, { showCommentPreviews: false })).toEqual({ title: 'Ana', body: 'liked your comment' });
+    expect(notificationText(event, { showCommentPreviews: true })).toEqual({ title: 'Ana', body: 'liked your comment: Great tip' });
+    expect(notificationText(event, { showCommentPreviews: false, others: 2 })).toEqual({ title: 'Ana', body: 'and 2 others liked your comment' });
+  });
+  it('groups likes per comment in Activity', () => {
+    const row = (actor: string, comment: string): ActivityRow => ({ type: 'commentLike', actorId: actor, actorName: actor, targetId: comment, url: `/posts/p1?comment=${comment}`, createdAt: new Date() });
+    const items = groupActivity([row('a', 'c1'), row('b', 'c1'), row('c', 'c2')]);
+    expect(items.map((item) => [item.id, item.actors.length])).toEqual([['commentLike:c1', 2], ['commentLike:c2', 1]]);
+  });
+});
+
 describe('pageNotification (spec 040)', () => {
   it('is titled with the page, names the actor in the body and opens as the page', () => {
     expect(pageNotification({ title: 'Ana', body: 'commented on your post' }, '/posts/p1', { id: 'pg1', name: 'Kitchen' })).toEqual({

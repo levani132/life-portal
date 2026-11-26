@@ -4,6 +4,8 @@ import {
   PostEngagementService,
   PostLikeRecord,
   PostLikeSchema,
+  PostCommentLikeRecord,
+  PostCommentLikeSchema,
   PostCommentRecord,
   PostCommentSchema,
 } from './post-engagement.service';
@@ -236,6 +238,20 @@ class PostsController {
   ) {
     return this.engagement.add(userId, id, dto.text, dto.requestId, dto.id, dto.parentId);
   }
+  @Put(':id/comments/:commentId/like') likeComment(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Param('commentId') commentId: string,
+  ) {
+    return this.engagement.setCommentLike(userId, id, commentId, true);
+  }
+  @Delete(':id/comments/:commentId/like') unlikeComment(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Param('commentId') commentId: string,
+  ) {
+    return this.engagement.setCommentLike(userId, id, commentId, false);
+  }
   @Delete(':id/comments/:commentId') removeComment(
     @CurrentUser('userId') userId: string,
     @Param('id') id: string,
@@ -354,6 +370,7 @@ class PublicPostsController {
     MongooseModule.forFeature([
       { name: FoodPostRecord.name, schema: FoodPostSchema },
       { name: PostLikeRecord.name, schema: PostLikeSchema },
+      { name: PostCommentLikeRecord.name, schema: PostCommentLikeSchema },
       { name: PostCommentRecord.name, schema: PostCommentSchema },
       { name: PostReportRecord.name, schema: PostReportSchema },
       { name: FeedFeedbackRecord.name, schema: FeedFeedbackSchema },

@@ -317,6 +317,9 @@ export interface PostComment {
   /** On a top-level comment in a list: how many replies it has, and its newest ones (oldest first). */
   replyCount?: number;
   replies?: PostComment[];
+  /** How many people liked it, and whether the viewer did. Who liked it is never listed. */
+  likeCount?: number;
+  liked?: boolean;
 }
 /** How many comments and replies a list shows first, and how many each "show earlier" adds. */
 export const COMMENTS_FIRST = 3;

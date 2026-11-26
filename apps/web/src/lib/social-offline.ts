@@ -35,8 +35,8 @@ if (typeof window !== 'undefined') {
   subscribeOutbox(() => {
     for (const item of outboxItems()) {
       const meta = isSocial(item) ? socialMetaOf(item.meta) : undefined;
-      if (item.state !== 'error' || item.lastErrorCode !== 'POST_GONE') continue;
-      if (meta?.op === 'like' || meta?.op === 'repost' || meta?.op === 'comment.remove') {
+      if (item.state !== 'error' || (item.lastErrorCode !== 'POST_GONE' && !(meta?.op === 'comment.like' && item.lastErrorCode === 'COMMENT_GONE'))) continue;
+      if (meta?.op === 'like' || meta?.op === 'repost' || meta?.op === 'comment.remove' || meta?.op === 'comment.like') {
         void outbox.discard(item.id).then(() => revalidate(`/posts/${meta.postId}/engagement`));
       }
     }
@@ -84,6 +84,18 @@ export const socialWrites = {
       on ? { method: 'PUT', path, body: {} } : { method: 'DELETE', path },
       `${op === 'like' ? (on ? 'Like' : 'Unlike') : on ? 'Repost' : 'Undo repost'} · ${short(title || 'post')}`,
     );
+  },
+
+  /** Likes or unlikes a comment or reply. A waiting opposite one is withdrawn instead. */
+  async commentLike(postId: string, commentId: string, on: boolean): Promise<void> {
+    const meta = { op: 'comment.like', postId, commentId, on } as const;
+    const cancelled = cancelledBy(outboxItems(), meta);
+    if (cancelled.length && !outboxSyncing()) {
+      for (const id of cancelled) await outbox.discard(id);
+      return;
+    }
+    const path = `/posts/${postId}/comments/${commentId}/like`;
+    await write(meta, on ? { method: 'PUT', path, body: {} } : { method: 'DELETE', path }, on ? 'Like a comment' : 'Unlike a comment');
   },
 
   /** A comment with the id chosen here; shown at once as not sent. */

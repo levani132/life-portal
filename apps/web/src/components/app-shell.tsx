@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import {
+  ChevronLeft,
   Home,
   Menu,
   MessageCircle,
@@ -150,7 +151,18 @@ function Portal({ children }: { children: ReactNode }) {
           {/* Name in the middle, Activity on the right. New posts start from the tab bar. */}
           <div className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-2 py-2">
             {/* Spec 027: the sync state, when there is one. Empty and the same size otherwise. */}
-            <div className="flex h-10 items-center pl-2">
+            {/* Off the tabs, the way back: screens carry no title bar of their own (see CLAUDE.md). */}
+            <div className="flex h-10 items-center gap-1 pl-1">
+              {current < 0 && (
+                <button
+                  type="button"
+                  aria-label="Back"
+                  onClick={() => (window.history.length > 1 ? router.back() : router.push('/'))}
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-ink-muted hover:bg-ink/5 hover:text-ink"
+                >
+                  <ChevronLeft size={22} />
+                </button>
+              )}
               <SyncStatus />
             </div>
             <Link href="/" aria-label="Home">
