@@ -137,7 +137,8 @@ opens on its posts. The tab bar says "Portal". A portal's address is
 
 **Widgets (slice 2, reworked the same day).** The Portal tab and the visitor's view draw each
 shared module as a read-only widget in Home's glass look (`components/portal-grid.tsx`). The grid
-is four squares wide and each row one square tall (`100cqw` on the grid's container), so a widget
+is four columns wide and each row 80% of a column's width (`ROW_RATIO`, owner 2026-11-26: square
+rows looked too tall), so a widget
 `w`×`h` (`portalSize()`: 1 to 4 each; one wide is always `1x1`, drawn as an app icon) is exactly
 that many squares, packed densely. Its content follows its size: one square tall shows one
 figure; Food shows Home's calories ring and macro bars, and the week from three squares tall.

@@ -17,12 +17,18 @@ import { EstimateMark, ErrorNote } from './ui';
 /** A module's widget look: Money is drawn as Home's cash-flow card. */
 const keyOf = (module: string): WidgetCard['key'] => (module === 'money' ? 'cashflow' : (module as WidgetCard['key']));
 const GAP = '0.625rem';
+/**
+ * A row is this share of a column's width: a little flatter than square, so a 2×2 widget has
+ * about Home's proportions and the portal takes less height (owner, 2026-11-26).
+ */
+const ROW_RATIO = 0.8;
 
 type Viewer = 'normal' | 'friend' | 'stranger';
 
 /**
- * Spec 046: a portal's widgets, laid out like an iOS home screen. The grid is four squares wide
- * and every row is one square tall, so a widget `w`×`h` is exactly that many squares; they pack
+ * Spec 046: a portal's widgets, laid out like an iOS home screen. The grid is four columns wide
+ * and every row a little flatter than a column is wide (`ROW_RATIO`), so a widget `w`×`h` takes
+ * exactly that many cells; they pack
  * densely, as if dropped and arranged by hand. A 1×1 widget is just the module's icon, like an
  * app. Widgets look like Home's, show only, and open like an iOS folder into everything that
  * module shares. On your own portal (seen as yourself), holding a widget arranges: drag it, and
@@ -78,7 +84,7 @@ export function PortalGrid({
   const gridStyle: CSSProperties = {
     display: 'grid',
     gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-    gridAutoRows: `calc((100cqw - 3 * ${GAP}) / 4)`,
+    gridAutoRows: `calc((100cqw - 3 * ${GAP}) / 4 * ${ROW_RATIO})`,
     gridAutoFlow: 'row dense',
     gap: GAP,
   };
@@ -270,7 +276,7 @@ function PortalWidget({
     >
       {icon ? (
         <>
-          <span className={clsx('flex aspect-square w-3/5 items-center justify-center rounded-[28%]', hue.tile)}>
+          <span className={clsx('flex aspect-square h-3/5 items-center justify-center rounded-[28%]', hue.tile)}>
             <Icon className="h-1/2 w-1/2" aria-hidden />
           </span>
           <span className="mt-1 max-w-full truncate text-[10px] leading-none text-ink-muted">{widget.title}</span>
