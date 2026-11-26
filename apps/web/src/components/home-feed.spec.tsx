@@ -19,7 +19,7 @@ jest.mock('../lib/api', () => ({
 }));
 // These tests are about the feed, not the card's footer and media.
 jest.mock('./post-engagement', () => ({ PostEngagement: () => null }));
-jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }), usePathname: () => '/' }));
 
 const post = (id: string, title: string) =>
   ({

@@ -186,6 +186,13 @@ class PostsController {
   @Post('views') views(@CurrentUser('userId') userId: string, @Body() dto: PostViewsDto) {
     return this.insights.recordViews(userId, dto.ids);
   }
+  /** Spec 045: a page pins one of its posts to the top of its profile. */
+  @Put(':id/pin') pin(@CurrentUser('userId') userId: string, @Param('id') id: string) {
+    return this.posts.setPinned(userId, id, true);
+  }
+  @Delete(':id/pin') unpin(@CurrentUser('userId') userId: string, @Param('id') id: string) {
+    return this.posts.setPinned(userId, id, false);
+  }
   @Get(':id/engagement') engagementStats(
     @CurrentUser('userId') userId: string,
     @Param('id') id: string,

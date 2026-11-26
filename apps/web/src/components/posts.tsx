@@ -2,7 +2,7 @@
 import { APP_NAME } from '../lib/brand';
 import { Avatar } from './avatar';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Apple,
@@ -10,6 +10,7 @@ import {
   CookingPot,
   Layers,
   Library,
+  Pin,
   Repeat2,
   Utensils,
 } from 'lucide-react';
@@ -385,6 +386,9 @@ export function PostCard({
     [onForYou, tracker, post.id],
   );
   const card = useRef<HTMLElement>(null);
+  // Spec 045: "Pinned" is said only on a profile, where the pin puts the post first.
+  const pathname = usePathname();
+  const onProfile = pathname.startsWith('/people/') || pathname === '/profile';
   useImpression(card, recordMetric ? () => recordMetric('impression') : null);
   // Spec 045: a page's post seen by someone else counts toward the page's insights.
   useImpression(card, post.author.isPage && !post.isOwner ? () => recordPostView(post.id) : null);
@@ -408,6 +412,16 @@ export function PostCard({
       )
     )
       setRemoved(true);
+  }
+  /** Spec 045: a page pins its own post to the top of its profile, or unpins it. */
+  async function setPinned(on: boolean) {
+    await action.run(
+      async () => {
+        await (on ? api.put(`/posts/${post.id}/pin`, {}) : api.delete(`/posts/${post.id}/pin`));
+        await revalidate('/posts');
+      },
+      { revalidate: false },
+    );
   }
   /** Not interested (`post`) or hide the author (`author`) from For You, or undo either. */
   async function feedback(kind: 'post' | 'author', on: boolean) {
@@ -502,6 +516,12 @@ export function PostCard({
       ref={card}
       className={`card overflow-hidden p-4 sm:p-5 ${detail ? 'rounded-none border-0 bg-transparent sm:rounded-2xl sm:border sm:bg-surface-raised' : 'rounded-none border-0 sm:rounded-2xl sm:border'}`}
     >
+      {post.pinned && onProfile && (
+        <p className="-mt-1 mb-3 flex items-center gap-1.5 text-xs font-medium text-ink-muted">
+          <Pin size={14} aria-hidden="true" />
+          Pinned
+        </p>
+      )}
       {post.repost && (
         <p className="-mt-1 mb-3 flex items-center gap-1.5 text-xs text-ink-muted">
           <Repeat2 size={14} aria-hidden="true" />
@@ -556,6 +576,7 @@ export function PostCard({
           owner={post.isOwner}
           busy={action.pending}
           onEdit={() => setEditing(true)}
+          pin={post.isOwner && post.author.isPage && !post.repost ? { pinned: !!post.pinned, run: () => void setPinned(!post.pinned) } : undefined}
           onDelete={() => void remove()}
           onImport={hasFood ? () => setImporting(true) : undefined}
           onReport={() => setReporting(true)}

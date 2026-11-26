@@ -151,6 +151,9 @@ describe('the assistant for pages', () => {
     const counted = (insights.body.result?.['posts'] as { id: string; likes: number; comments: number }[]).find((row) => row.id === theirPost);
     expect(counted).toMatchObject({ likes: 1, comments: 1 });
     expect((await call('get_page_insights', { pageId: other })).body.code).toBe('NOT_A_MANAGER');
+    // Spec 045: the assistant pins the page's own post, never another's.
+    expect((await callBeka('pin_page_post', { pageId: other, postId: theirPost })).body.result).toEqual({ pinned: true });
+    expect((await call('pin_page_post', { pageId: first, postId: theirPost })).status).toBe(404);
 
     // The owner lowers this person's comment cap to what is already used: the next is refused.
     const { CONFIG } = await import('../apps/api/src/config/configuration');

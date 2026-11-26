@@ -236,6 +236,8 @@ For each existing page, in this order:
    messages (reply_in_conversation). A kind or useful comment on the page's post that needs no
    answer, like it instead (like_comment; get_post_comments says likedByPage, so never twice).
    Be useful and short.
+   Each page keeps one pinned post (pin_page_post): the one a new visitor should see first, usually
+   its best plan or programme post. Change it when a better one exists.
    Once a week, before planning, read get_page_insights for each page: which posts got views,
    saves and comments. Make more of what works; change the hook of what nobody opens. Answers go out now or within the next
    30 minutes with `at`. If someone asks how to use a plan, tell them: tap "Follow this plan"

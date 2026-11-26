@@ -139,8 +139,11 @@ export function PostOptions({
   onReport,
   onNotInterested,
   onHideAuthor,
+  pin,
 }: {
   owner: boolean;
+  /** Spec 045: a page's own post can be pinned to the top of its profile. */
+  pin?: { pinned: boolean; run: () => void };
   busy: boolean;
   onEdit: () => void;
   onDelete: () => void;
@@ -195,6 +198,16 @@ export function PostOptions({
             >
               Edit post
             </button>
+            {pin && (
+              <button
+                type="button"
+                disabled={busy}
+                className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-special-solid/10"
+                onClick={() => choose(pin.run)}
+              >
+                {pin.pinned ? 'Unpin from profile' : 'Pin to profile'}
+              </button>
+            )}
             <button
               type="button"
               disabled={busy}

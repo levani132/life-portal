@@ -1126,6 +1126,18 @@ export class PageAssistantService {
         },
       },
       {
+        name: 'pin_page_post',
+        description: 'Pin one of the page’s own posts to the top of its profile: the post a new visitor should see first (what the page is about, its best plan). Pinning another replaces it.',
+        shape: { pageId, postId: id },
+        run: async (personId, args) => this.posts.setPinned(await this.acting(personId, args), String(args['postId']), true),
+      },
+      {
+        name: 'unpin_page_post',
+        description: 'Take the pin off a post.',
+        shape: { pageId, postId: id },
+        run: async (personId, args) => this.posts.setPinned(await this.acting(personId, args), String(args['postId']), false),
+      },
+      {
         name: 'get_page_insights',
         description:
           'How the page is doing (spec 045): followers and new follows per day over 28 days, and for its 30 newest posts the views, likes, comments, reposts and saves. Use it to see which posts and subjects work before planning the next ones.',

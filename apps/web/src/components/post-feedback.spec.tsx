@@ -14,7 +14,7 @@ jest.mock('../lib/api', () => {
   return { ...actual, api: { put: jest.fn(), delete: jest.fn(), post: jest.fn(), get: jest.fn() } };
 });
 jest.mock('./post-engagement', () => ({ PostEngagement: () => null }));
-jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn(), replace: jest.fn() }) }));
+jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn(), replace: jest.fn() }), usePathname: () => '/' }));
 
 const post = (id: string, title: string, author: string) =>
   ({

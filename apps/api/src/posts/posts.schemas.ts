@@ -62,6 +62,8 @@ export class FoodPostRecord {
    * "by a person" mark. Set once, when the post is created, and only on such a page.
    */
   @Prop() byPerson?: boolean;
+  /** Spec 045: a page's pinned post (one per page), shown first on its profile. */
+  @Prop({ type: Date }) pinnedAt?: Date;
   /**
    * Spec 039: while set, only the author can read the post. `heldReason` says why: its photos
    * are waiting for the automatic check, the check flagged them, or people reported it.

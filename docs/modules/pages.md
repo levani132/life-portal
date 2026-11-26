@@ -215,3 +215,12 @@ request was made acting as the page (`actorId !== userId`) and the page is `aiMa
 assistant calls the services directly, so what it writes is never marked. Likes, reposts and
 follows carry no mark. Tested in `integration/by-person.integration.ts`.
 
+## Pinned post (spec 045, slice 5)
+
+`food_posts.pinnedAt` on one of a page's own original posts. `PUT /posts/:id/pin` and `DELETE`
+(acting as the page; 403 `PAGES_ONLY` for a person, 404 for a post not its own) set it; pinning
+another clears the old one. `GET /posts?authorId=<page>` (first page, no cursor) puts the pinned
+post first and does not repeat it; every post answer carries `pinned`. The web says "Pinned" on a
+profile only; "Pin to profile" is in a page's own post menu. The assistant has `pin_page_post`
+and `unpin_page_post`. Tested in `integration/pinned-post.integration.ts`.
+

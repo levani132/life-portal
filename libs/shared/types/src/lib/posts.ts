@@ -151,6 +151,8 @@ export interface FoodPost {
   linkOnly?: boolean;
   /** Spec 045: written by a person on a page run with AI, not by its assistant. */
   byPerson?: boolean;
+  /** Spec 045: the page's pinned post, shown first on its profile. */
+  pinned?: boolean;
   /** The secret part of a link-only post's link (`/posts/<id>?k=<shareKey>`). */
   shareKey?: string;
   /**

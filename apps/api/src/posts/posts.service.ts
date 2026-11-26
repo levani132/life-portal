@@ -209,6 +209,7 @@ export class PostsService {
       topics: postTopics({ caption: row.caption, publication: p }),
       isOwner: row.userId === viewerId,
       ...(row.byPerson ? { byPerson: true as const } : {}),
+      ...(row.pinnedAt ? { pinned: true as const } : {}),
       // Spec 039: only its author ever learns a post is held.
       ...(row.heldAt && row.userId === viewerId ? { held: row.heldReason === 'checking' ? ('checking' as const) : ('review' as const) } : {}),
       ...(await this.trainingPart(row, viewerId)),
@@ -543,6 +544,23 @@ export class PostsService {
       'base64url',
     );
   }
+  /**
+   * Spec 045: pins one of a page's own posts to the top of its profile (or unpins it). One pin per
+   * page: pinning another replaces it. 403 `PAGES_ONLY` for a person, 404 for a post not its own.
+   */
+  async setPinned(userId: string, postId: string, pinned: boolean): Promise<{ pinned: boolean }> {
+    const author = await this.social.postAuthor(userId);
+    if (!author?.isPage) throw new ForbiddenException({ code: 'PAGES_ONLY', message: 'Only a page can pin a post.' });
+    if (!isValidObjectId(postId)) throw new NotFoundException('Post not found.');
+    const row = await this.posts.findOne({ _id: postId, userId, deleted: { $ne: true }, repostOf: { $exists: false } }).select('_id').lean();
+    if (!row) throw new NotFoundException('Post not found.');
+    if (pinned) {
+      await this.posts.updateMany({ userId, pinnedAt: { $exists: true }, _id: { $ne: row._id } }, { $unset: { pinnedAt: '' } });
+      await this.posts.updateOne({ _id: row._id }, { $set: { pinnedAt: new Date() } });
+    } else await this.posts.updateOne({ _id: row._id }, { $unset: { pinnedAt: '' } });
+    return { pinned };
+  }
+
   async list(userId: string, query: PostListDto): Promise<PostPage> {
     await this.requireEnabled(userId);
     const authors = query.authorId
@@ -557,6 +575,17 @@ export class PostsService {
     const visible: FoodPost[] = [];
     // A post and a repost of it can both be in range; a page shows it once.
     const shown = new Set<string>();
+    // Spec 045: a page's pinned post opens its profile, and is not repeated further down.
+    let pinnedId: string | undefined;
+    if (query.authorId && !query.cursor) {
+      const pinned = await this.posts.findOne({ userId: query.authorId, pinnedAt: { $exists: true }, deleted: { $ne: true } }).lean();
+      const card = pinned && !(query.authorId === userId && query.preview !== 'normal' && pinned.audience !== 'public') ? await this.card(userId, pinned, shown) : null;
+      if (card) {
+        visible.push(card);
+        shown.add(card.id);
+        pinnedId = card.id;
+      }
+    }
     let last: (FoodPostRecord & { _id: Types.ObjectId }) | undefined;
     let visibleCursor: (FoodPostRecord & { _id: Types.ObjectId }) | undefined;
     while (scanned < 100) {
@@ -579,6 +608,7 @@ export class PostsService {
       for (const row of rows) {
         scanned++;
         last = row;
+        if (String(row._id) === pinnedId) continue;
         if (
           query.authorId === userId &&
           query.preview !== 'normal' &&
