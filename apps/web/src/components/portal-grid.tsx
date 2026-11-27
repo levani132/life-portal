@@ -641,7 +641,8 @@ function PortalFolder({ widget, from, ownerId, viewAs, onClose }: { widget: Shar
       />
       <div
         ref={panel}
-        className="card home-widget absolute inset-x-3 top-[max(4rem,calc(var(--top-chrome,0px)+3rem))] mx-auto flex max-h-[78vh] max-w-2xl flex-col overflow-hidden rounded-3xl shadow-2xl"
+        // Centred between the top chrome and the tab bar: a short folder sits mid-screen, a long one fills the band.
+        className="card home-widget absolute inset-x-3 bottom-[calc(env(safe-area-inset-bottom,0px)+5rem)] top-[max(4rem,calc(var(--top-chrome,0px)+3rem))] mx-auto my-auto flex h-fit max-h-[78vh] max-w-2xl flex-col overflow-hidden rounded-3xl shadow-2xl"
       >
         <header className="flex items-center gap-2.5 px-4 pb-2 pt-4">
           <span className={clsx('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', hue.tile)}>
