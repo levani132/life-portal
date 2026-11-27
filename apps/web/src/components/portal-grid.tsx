@@ -14,6 +14,7 @@ import { DailyFoodDiary } from './shared-food-diary';
 import { HistoryRow } from './training/history-row';
 import { RankEmblem } from './training/rank-emblem';
 import { TrainingHeroView } from './training/training-hero';
+import { ScrubBars, barDay } from './scrub-bars';
 import { SortableGrid, type SortableState } from './sortable-grid';
 import { EstimateMark, ErrorNote } from './ui';
 
@@ -411,25 +412,22 @@ function TrainingBody({ widget, w, h }: { widget: SharedWidget; w: number; h: nu
   );
 }
 
-/** Minutes trained on each of the last seven days. */
-function MinutesBars({ widget, tall = false }: { widget: SharedWidget; tall?: boolean }) {
+/** Minutes trained on each of the last seven days; in a folder, touch a bar for its minutes. */
+function MinutesBars({ widget, tall = false, interactive = false }: { widget: SharedWidget; tall?: boolean; interactive?: boolean }) {
   const days = widget.training!.workouts!.days;
-  const most = Math.max(30, ...days.map((day) => day.minutes));
   return (
-    <div className={clsx('mt-3 flex min-h-0 flex-1 items-end gap-1.5', tall && 'min-h-32')} aria-label="Minutes trained each day this week">
-      {days.map((day) => (
-        <div key={day.day} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
-          <span
-            title={`${day.day}: ${day.minutes} min`}
-            className={clsx('w-full rounded-md', day.minutes ? 'bg-train-arms-solid/70' : 'bg-border')}
-            style={{ height: day.minutes ? `${Math.max(12, (day.minutes / most) * 100)}%` : '4px' }}
-          />
-          <span className="text-[10px] leading-none text-ink-faint">{'SMTWTFS'[new Date(`${day.day}T12:00:00Z`).getUTCDay()]}</span>
-        </div>
-      ))}
-    </div>
+    <ScrubBars
+      className={clsx('mt-3 flex-1', tall && 'min-h-32')}
+      label="Minutes trained each day this week"
+      barClass="bg-train-arms-solid/70"
+      max={30}
+      interactive={interactive}
+      bars={days.map((day) => ({ key: day.day, value: day.minutes, axis: weekLetter(day.day), valueText: day.minutes ? minutesText(day.minutes) : 'No workout', when: barDay(day.day) }))}
+    />
   );
 }
+
+const weekLetter = (day: string) => 'SMTWTFS'[new Date(`${day}T12:00:00Z`).getUTCDay()];
 
 /**
  * Everything Training shares, opened: Training's own hero, history rows and rank emblems, read
@@ -446,7 +444,7 @@ function TrainingFolder({ widget }: { widget: SharedWidget }) {
         <section>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">This week</p>
           <div className="flex h-20 flex-col">
-            <MinutesBars widget={widget} />
+            <MinutesBars widget={widget} interactive />
           </div>
           <p className="mt-1 text-xs text-ink-muted">
             {training.workouts.streakWeeks} {training.workouts.streakWeeks === 1 ? 'week' : 'weeks'} in a row
@@ -504,7 +502,6 @@ function TrainingFolder({ widget }: { widget: SharedWidget }) {
 /** The last seven days of calories, against the larger of the best day and the target. */
 function WeekBars({ widget, tall = false }: { widget: SharedWidget; tall?: boolean }) {
   const week = widget.food!.week!;
-  const most = Math.max(1, ...week.days.map((day) => day.kcal), widget.food?.targets?.kcal ?? 0);
   const weight = widget.stats.find((stat) => stat.label === 'Weight');
   return (
     <div className={clsx('mt-3 flex min-h-0 flex-1 flex-col', tall && 'min-h-40')}>
@@ -515,18 +512,14 @@ function WeekBars({ widget, tall = false }: { widget: SharedWidget; tall?: boole
           {week.daysLogged}/7 days
         </span>
       </p>
-      <div className="flex min-h-0 flex-1 items-end gap-1.5" aria-label={`Calories each day this week; ${week.daysLogged} of 7 days logged`}>
-        {week.days.map((day) => (
-          <div key={day.day} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
-            <span
-              title={`${day.day}: ${day.kcal} kcal`}
-              className={clsx('w-full rounded-md', day.kcal ? 'bg-accent-solid/70' : 'bg-border')}
-              style={{ height: day.kcal ? `${Math.max(12, (day.kcal / most) * 100)}%` : '4px' }}
-            />
-            <span className="text-[10px] leading-none text-ink-faint">{'SMTWTFS'[new Date(`${day.day}T12:00:00Z`).getUTCDay()]}</span>
-          </div>
-        ))}
-      </div>
+      <ScrubBars
+        className="flex-1"
+        label={`Calories each day this week; ${week.daysLogged} of 7 days logged`}
+        barClass="bg-accent-solid/70"
+        max={widget.food?.targets?.kcal}
+        interactive={tall}
+        bars={week.days.map((day) => ({ key: day.day, value: day.kcal, axis: weekLetter(day.day), valueText: day.kcal ? `${day.kcal.toLocaleString('en-GB')} kcal` : 'Nothing logged', when: barDay(day.day) }))}
+      />
       {weight && <p className="mt-1 text-[11px] text-ink-muted">Weight {weight.value}</p>}
     </div>
   );

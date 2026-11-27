@@ -1,5 +1,6 @@
 'use client';
 import { useId, useState } from 'react';
+import { ScrubBars } from './scrub-bars';
 import type { ActivityAdjustment } from '@life-portal/shared-types';
 
 export function HealthActivityChart({
@@ -12,7 +13,6 @@ export function HealthActivityChart({
   const rows = activity.timeline ?? [];
   const present = (row: (typeof rows)[number]) =>
     metric === 'steps' ? row.hasSteps : row.hasActiveEnergy;
-  const maximum = Math.max(1, ...rows.map((row) => row[metric]));
   const unit = metric === 'steps' ? 'steps' : 'kcal';
   const hasData = rows.some(present);
   return (
@@ -43,46 +43,22 @@ export function HealthActivityChart({
         </div>
       </div>
       {hasData ? (
-        <svg
-          viewBox="0 0 480 120"
-          className="mt-3 w-full"
-          role="img"
-          aria-label={`${metric === 'steps' ? 'Steps' : 'Active energy'} by local hour; gaps indicate no imported samples`}
-        >
-          {rows.map((row, index) => {
-            const height = present(row)
-              ? Math.max(2, (row[metric] / maximum) * 84)
-              : 2;
-            return (
-              <g key={row.hour}>
-                <title>{`${String(row.hour).padStart(2, '0')}:00 — ${present(row) ? `${Math.round(row[metric]).toLocaleString()} ${unit}` : 'No imported samples'}`}</title>
-                <rect
-                  x={index * 20 + 3}
-                  y={92 - height}
-                  width={14}
-                  height={height}
-                  rx={3}
-                  className={
-                    present(row)
-                      ? 'fill-special'
-                      : 'fill-current text-ink-muted opacity-20'
-                  }
-                />
-                {index % 4 === 0 && (
-                  <text
-                    x={index * 20 + 10}
-                    y={113}
-                    textAnchor="middle"
-                    fontSize={11}
-                    className="fill-current text-ink-muted"
-                  >
-                    {String(row.hour).padStart(2, '0')}
-                  </text>
-                )}
-              </g>
-            );
+        <ScrubBars
+          className="mt-3 h-28"
+          label={`${metric === 'steps' ? 'Steps' : 'Active energy'} by local hour; gaps indicate no imported samples`}
+          barClass="bg-special-solid"
+          bars={rows.map((row) => {
+            const hour = `${String(row.hour).padStart(2, '0')}:00`;
+            return {
+              key: String(row.hour),
+              value: present(row) ? row[metric] : 0,
+              present: present(row),
+              axis: row.hour % 4 === 0 ? String(row.hour).padStart(2, '0') : undefined,
+              valueText: present(row) ? `${Math.round(row[metric]).toLocaleString()} ${unit}` : 'No imported samples',
+              when: `${hour}–${String((row.hour + 1) % 24).padStart(2, '0')}:00`,
+            };
           })}
-        </svg>
+        />
       ) : (
         <p className="py-6 text-center text-xs text-ink-muted">
           No {metric === 'steps' ? 'steps' : 'active energy'} imported for this

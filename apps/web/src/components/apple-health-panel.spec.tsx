@@ -91,7 +91,10 @@ it('switches between recorded energy and steps without presenting missing hours 
   ).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Steps' }));
   expect(screen.getByRole('img', { name: /Steps by local hour/ })).toBeTruthy();
-  expect(screen.getByText('05:00 — No imported samples')).toBeTruthy();
+  expect(screen.getByTitle('05:00–06:00: No imported samples')).toBeTruthy();
+  // Touching a bar reads it out, like Apple Health.
+  fireEvent.pointerDown(screen.getByRole('img', { name: /Steps by local hour/ }), { clientX: 0 });
+  expect(screen.getByRole('status').textContent).toContain('1,200 steps');
   view.unmount();
 });
 

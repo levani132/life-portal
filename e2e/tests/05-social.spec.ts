@@ -86,6 +86,12 @@ test('your portal shows Food as a large widget, and you can arrange it', async (
   await expect(folder.getByText('This week', { exact: true })).toBeVisible();
   await page.waitForTimeout(400);
   await snap(page, '05-portal-folder');
+  // Touching a day's bar reads it out, like Apple Health.
+  const bars = folder.getByRole('img', { name: /Calories each day this week/ });
+  const area = (await bars.boundingBox())!;
+  await page.mouse.click(area.x + area.width - 4, area.y + area.height - 4);
+  await expect(folder.getByRole('status')).toContainText('kcal');
+  await snap(page, '05-portal-folder-bar');
   await folder.getByRole('button', { name: 'Close' }).last().click();
   await expect(folder).toHaveCount(0);
   // Hold to arrange; the size button opens the board of squares.
