@@ -1,7 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export interface ScrubBar {
   key: string;
@@ -20,7 +20,8 @@ export interface ScrubBar {
 /**
  * Bars you can read by touching (or pointing at) them: the touched bar stays bright, the others
  * dim and a callout above says its value. Dragging sideways moves along the bars; a vertical drag
- * still scrolls the page (`touch-action: pan-y`), and the gesture is never a tab swipe.
+ * still scrolls the page (`touch-action: pan-y`), and the gesture is never a tab swipe. Tapping
+ * the highlighted bar again, or anywhere outside the chart, clears it.
  */
 export function ScrubBars({
   bars,
@@ -40,12 +41,28 @@ export function ScrubBars({
 }) {
   const [active, setActive] = useState<number | null>(null);
   const box = useRef<HTMLDivElement>(null);
+  // A tap on the bar that is already highlighted clears it; a drag that starts there does not.
+  const gesture = useRef<{ startIndex: number | null; wasActive: boolean; moved: boolean } | null>(null);
+  useEffect(() => {
+    if (active === null) return;
+    const away = (event: PointerEvent) => {
+      if (!box.current?.contains(event.target as Node)) setActive(null);
+    };
+    document.addEventListener('pointerdown', away);
+    return () => document.removeEventListener('pointerdown', away);
+  }, [active]);
+  const indexAt = (clientX: number) => {
+    const rect = box.current?.getBoundingClientRect();
+    if (!rect || !bars.length) return null;
+    const index = rect.width ? Math.floor(((clientX - rect.left) / rect.width) * bars.length) : 0;
+    return Math.min(bars.length - 1, Math.max(0, index));
+  };
   const most = Math.max(1, max ?? 0, ...bars.map((bar) => (bar.present === false ? 0 : bar.value)));
   const pick = (clientX: number) => {
-    const rect = box.current?.getBoundingClientRect();
-    if (!rect || !bars.length) return;
-    const index = rect.width ? Math.floor(((clientX - rect.left) / rect.width) * bars.length) : 0;
-    setActive(Math.min(bars.length - 1, Math.max(0, index)));
+    const index = indexAt(clientX);
+    if (index === null) return;
+    if (gesture.current && index !== gesture.current.startIndex) gesture.current.moved = true;
+    setActive(index);
   };
   const shown = active === null ? undefined : bars[active];
   const hasAxis = bars.some((bar) => bar.axis !== undefined);
@@ -71,11 +88,21 @@ export function ScrubBars({
           interactive
             ? (event) => {
                 event.stopPropagation();
+                const index = indexAt(event.clientX);
+                gesture.current = { startIndex: index, wasActive: index !== null && index === active, moved: false };
                 pick(event.clientX);
               }
             : undefined
         }
         onPointerMove={interactive ? (event) => (event.pointerType === 'mouse' || event.buttons ? pick(event.clientX) : undefined) : undefined}
+        onPointerUp={
+          interactive
+            ? () => {
+                if (gesture.current?.wasActive && !gesture.current.moved) setActive(null);
+                gesture.current = null;
+              }
+            : undefined
+        }
         onPointerLeave={interactive ? (event) => event.pointerType === 'mouse' && setActive(null) : undefined}
         onClick={interactive ? (event) => event.stopPropagation() : undefined}
       >

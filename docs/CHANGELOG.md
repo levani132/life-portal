@@ -13,7 +13,8 @@ User-visible changes. Newest first.
 
 - Touch (or point at) a bar in the week charts of an opened portal widget, or in Recorded
   activity (steps and active kcal), to see its value and day or hour, like Apple Health. Drag
-  sideways to move along the bars. A short portal widget now opens mid-screen.
+  sideways to move along the bars; tap the bar again, or anywhere else, to clear it. A short
+  portal widget now opens mid-screen.
 
 ## 2026-11-26: My Portal, part four
 

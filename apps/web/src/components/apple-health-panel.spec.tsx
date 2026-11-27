@@ -95,6 +95,17 @@ it('switches between recorded energy and steps without presenting missing hours 
   // Touching a bar reads it out, like Apple Health.
   fireEvent.pointerDown(screen.getByRole('img', { name: /Steps by local hour/ }), { clientX: 0 });
   expect(screen.getByRole('status').textContent).toContain('1,200 steps');
+  // Tapping the highlighted bar again clears it; so does a tap outside the chart.
+  const chart = screen.getByRole('img', { name: /Steps by local hour/ });
+  fireEvent.pointerUp(chart);
+  fireEvent.pointerDown(chart, { clientX: 0 });
+  fireEvent.pointerUp(chart);
+  expect(screen.queryByRole('status')).toBeNull();
+  fireEvent.pointerDown(chart, { clientX: 0 });
+  fireEvent.pointerUp(chart);
+  expect(screen.getByRole('status')).toBeTruthy();
+  fireEvent.pointerDown(document.body);
+  expect(screen.queryByRole('status')).toBeNull();
   view.unmount();
 });
 
