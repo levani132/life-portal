@@ -6,7 +6,7 @@ import type { Roadmap } from '@life-portal/shared-types';
  * model, which are the owner's and not for every visitor's browser.
  */
 export const ROADMAP: Roadmap = {
-  updated: '2026-11-26',
+  updated: '2026-11-27',
   direction:
     'A private-by-default life dashboard that grows into a Strava-like social app for food, training and sports, where calories eaten and burned live on the same day. The core stays free; AI is the paid part.',
   areas: [
@@ -83,15 +83,16 @@ export const ROADMAP: Roadmap = {
     },
     {
       title: 'Your portal',
-      status: 'next',
-      summary: 'Next, planning started 2026-11-26 (spec 046). Make "portal" a real thing: a person’s profile becomes their portal, showing their widgets and modules to others as far as they choose.',
+      status: 'built',
+      summary: 'Built 2026-11-26/27 (spec 046). A person’s profile is their portal: their widgets, shown to others as far as they choose, at lifeportal.one/@username.',
       points: [
-        'One page for a life: food and training today, more later',
-        'The person decides per module: private, friends or public; private stays the default',
-        'Sharing by module already exists; this makes it the centre of the profile and names it',
-        'Money is the person’s choice too, later, with a plain warning',
-        'What a portal says is what its owner entered: nothing is shown as checked unless it was',
-        '"Profile" becomes "Portal" everywhere, with an address a person can send',
+        'Done: the Portal tab and /@username, open to people without an account (public only, then a popup to join)',
+        'Done: widgets on a grid like iPhone widgets, 1–4 squares each, arranged for the portal alone, in Home’s look, read only',
+        'Done: Food (today, the week, the diary in Food’s own look) and Training (workouts, records, level, ranks; never body weight), each part its own switch',
+        'Done: a widget opens like an iOS folder into the module’s own screens; touch a chart’s bar to read it',
+        'Later: one "Who sees my portal" screen (Privacy and sharing does it today)',
+        'Later: labels for what was imported (Apple Health) versus typed in, once there is more to import',
+        'Later: money, one module at a time (the terms cover it); pages’ portals; collections',
       ],
     },
     {

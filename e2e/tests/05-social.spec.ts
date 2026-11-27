@@ -70,7 +70,7 @@ test('a portal address opens for a visitor, then asks them to join', async ({ pa
 test('your portal shows Food as a large widget, and you can arrange it', async ({ page }) => {
   const ana = await account('Ana');
   const day = today();
-  await call(ana, 'PUT', '/nutrition/profile', { sex: 'female', heightCm: 165, birthDate: '1992-01-01', goal: 'maintain', shareMeals: true, shareTargets: true });
+  await call(ana, 'PUT', '/nutrition/profile', { sex: 'female', heightCm: 165, birthDate: '1992-01-01', goal: 'maintain', shareMeals: true, shareTargets: true, shareDiary: true });
   await call(ana, 'PUT', `/nutrition/weigh-ins?today=${day}`, { day, weightGrams: 62_000 });
   const food = await call<{ id: string }>(ana, 'POST', '/nutrition/foods', { name: 'E2E oats', unit: 'g', servingSize: 100, entryMode: 'per_100', energyKcal: 380, proteinMg: 13000, fatMg: 7000, carbMg: 60000 });
   await call(ana, 'POST', '/nutrition/entries', { foodId: food.id, amount: 150, slot: 'breakfast', day });
@@ -86,8 +86,12 @@ test('your portal shows Food as a large widget, and you can arrange it', async (
   await expect(folder.getByText('This week', { exact: true })).toBeVisible();
   await page.waitForTimeout(400);
   await snap(page, '05-portal-folder');
+  // Food's own day, read only: the meal card and the food row as the Food page draws them.
+  await expect(folder.getByRole('region', { name: 'Breakfast' })).toContainText('E2E oats');
+  await expect(folder.getByRole('button', { name: /Edit|Remove/ })).toHaveCount(0);
   // Touching a day's bar reads it out, like Apple Health.
   const bars = folder.getByRole('img', { name: /Calories each day this week/ });
+  await bars.scrollIntoViewIfNeeded();
   const area = (await bars.boundingBox())!;
   await page.mouse.click(area.x + area.width - 4, area.y + area.height - 4);
   await expect(folder.getByRole('status')).toContainText('kcal');

@@ -1,6 +1,6 @@
 # Roadmap
 
-Where Life Portal is, where it is going, and in what order. Updated 2026-11-26. The admin sees this roadmap in the app (Menu → Roadmap); its content lives in
+Where Life Portal is, where it is going, and in what order. Updated 2026-11-27. The admin sees this roadmap in the app (Menu → Roadmap); its content lives in
 `apps/api/src/roadmap/roadmap.data.ts`, which must change with this file. Product
 direction comes from the owner; the order and the architecture tiers are recommendations agreed
 in conversation, not commitments. Costs are rough late-2026 list prices, order of magnitude only.
@@ -17,7 +17,7 @@ the same day. The core stays free; AI is the paid part.
 | **Work and life** | EPAM boards, side projects, personal plans | — |
 | **Food** | Nutrition tracking, food profile and activity targets with a target weight, Apple Health sync with resumable batches, AI assistant connectors (MCP with OAuth: ChatGPT, Claude), brands with logos (public and own) and brand filters, logging several foods for several meals in one go, suggestions from recent meals, collapsible meals. Recipes with a method, servings, portions and one row per recipe in the day. Meal plans (days, "or" options, lines at several meals) with rules (amounts, per kg of weight or target weight, shares; on totals or on each food), followed several at a time: their daily rules become the targets everywhere, planned food sits in each meal, the diary is matched to them, past days too. Programmes (a meal plan and a training plan) followed in one tap | 001, 004, 010, 011, 042–044 |
 | **Training** | Exercise catalogue and logging, ready-made and own plans, the workout flow (rest, supersets, pinned bar; an exercise's rows are its plan), levels, strength ranks, monthly tournaments, sharing and copying workouts, plans and exercises | 020, 023–025, 036 |
-| **Social** | Friends, shared widgets, shared daily diary, posts (text, photos, 30 s camera video, food, training, or food and training together) with likes, comments with one level of replies (deep links to a comment) and Share, For You with real people first and unseen posts first, Following, endless scrolling, pages (spec 040), a camera-first new post page, a Share sheet with chats, reposts and app buttons, Story share images and public link previews, Home feed, link-only posts (sent to particular people, on no wall) | 006–009, 014–017 |
+| **Social** | Friends, shared widgets, shared daily diary, posts (text, photos, 30 s camera video, food, training, or food and training together) with likes, comments with one level of replies (deep links to a comment) and Share, For You with real people first and unseen posts first, Following, endless scrolling, pages (spec 040), a camera-first new post page, a Share sheet with chats, reposts and app buttons, Story share images and public link previews, Home feed, link-only posts (sent to particular people, on no wall), portals at `/@username` with widgets on a grid that open like folders | 006–009, 014–017, 046 |
 | **Assistants** | Assistants that run pages marked as run with AI, with the person's consent: everything a page can do in the app (library, posts with photos and drafts, reading feeds, reactions, replies, follows, messages, notifications, moderation), actions scheduled to the minute, caps per person, a 90-day activity log, an overview of all pages; a playbook and five worker instructions for 100 pages | 041 |
 | **Offline** | Training, food and social writes work with no connection and sync later; conflicts are shown, never merged silently; sync health counters for the admin | 027–035 |
 | **Look and feel** | Colour themes as data with an admin page (v0 and Crisp), glass surfaces, a floating tab bar that shrinks on scroll, resizable Home widgets, the Food page redesign | 037 |
@@ -148,7 +148,16 @@ three have moved into the numbered steps, because friends already use the app.
 4. ~~**Switch on what is built.**~~ Done 2026-11-22: the owner switched every feature on for
    everyone, except the money, shares, debts, items to sell, personal plans and projects modules,
    which stay the owner's own.
-5. **Your portal. Next: planning started 2026-11-26 (spec 046).** Make "portal" a real thing in
+5. **Your portal. Built 2026-11-26/27 (spec 046).** Done: the Portal tab and `/@username`,
+   open without an account (public widgets and the two newest public posts, then a popup to
+   join); widgets on an iOS-like grid of squares (1–4 wide and tall), arranged for the portal
+   alone, in Home's look and read only; Food (today, the week, the diary in Food's own look) and
+   Training (workouts, records, level, ranks, never body weight), each part behind its own
+   switch; a widget opens like an iOS folder into the module's own screens; charts read by
+   touch. **Later:** one "Who sees my portal" screen (Privacy and sharing does the job today);
+   labels for imported (Apple Health) versus typed-in figures, once more can be imported (a
+   workout cannot be yet); money one module at a time, covered by the terms rather than a
+   warning; pages' portals; collections. Was: make "portal" a real thing in
    the app, so "check my portal" is literally true (decided 2026-11-22; it is what the name
    promises). A person's profile becomes their
    portal: the same widgets and modules they see themselves, shown to others as far as they
@@ -158,10 +167,11 @@ three have moved into the numbered steps, because friends already use the app.
    - **The person decides, per module:** private, friends or public. Private stays the default
      for everything. Sharing by module exists since 006 (`moduleVisibility`, shared widgets and
      the shared diary); this step turns it into the centre of the profile and names it.
-   - **Money is the person's choice too,** later and with a plain warning: it is the kind of
-     information scams are built on, and once public it cannot be taken back.
+   - **Money is the person's choice too,** later. No in-app warning (owner, 2026-11-26): the
+     terms will say what sharing money means.
    - **Self-declared, and shown as such.** What a portal says is what its owner entered. Nothing
-     is presented as checked unless it was (imported workouts are the one "verified" kind).
+     is presented as checked unless it was (imported data, such as Apple Health's, is the one
+     "verified" kind).
    - **The words follow:** "Profile" becomes "Portal" in the tab bar, the menu, sharing and
      links, and a portal has an address a person can send.
 6. **Pages.** An account that is not a person: a page that one or more people manage, which

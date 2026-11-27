@@ -143,7 +143,7 @@ rows looked too tall), so a widget
 that many squares, packed densely. Its content follows its size: one square tall shows one
 figure; Food shows Home's calories ring and macro bars, and the week from three squares tall.
 Tapping a widget opens it like an iOS folder: a full-width window grown out of the widget, with
-everything the module shares (Food: today's four rings, the week, the shared diary day by day).
+everything the module shares (Food: today's four rings, the week, the shared diary day by day in the Food page's own look, then the week chart at the bottom).
 A visitor without an account is asked to join instead. On your own portal, seen as yourself,
 holding a widget arranges: drag to move; its size badge opens a 4×4 board of squares to pick a
 size. `PUT /portal/arrangement {order, sizes}` saves both (sizes `"<w>x<h>"`; the older

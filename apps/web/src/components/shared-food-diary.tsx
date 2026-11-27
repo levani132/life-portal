@@ -1,9 +1,15 @@
 'use client';
+import clsx from 'clsx';
 import { useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { SharedFoodDiary } from '@life-portal/shared-types';
-import { addDays, formatDay, mgToG } from '@life-portal/shared-domain';
+import { addDays, formatDay } from '@life-portal/shared-domain';
 import { useSocialApi } from '../lib/social-hooks';
+import { MacroLine, SLOT_STYLES } from './food-day';
+import { FoodThumb } from './food-thumb';
+import { MacroSplit } from './macro-split';
 import { ErrorNote, Spinner } from './ui';
+
 const SLOT_LABELS = {
   breakfast: 'Breakfast',
   lunch: 'Lunch',
@@ -11,6 +17,12 @@ const SLOT_LABELS = {
   snack: 'Snacks',
   uncategorized: 'Other foods',
 };
+
+/**
+ * Someone's shared food diary, one day at a time, in the Food page's own look (spec 046): each
+ * meal a card with its colour, icon, total and macro split, each food a row with its picture,
+ * amount and macros. Read only: no swipe actions, no adding, no editing.
+ */
 export function DailyFoodDiary({
   userId,
   preview = 'normal',
@@ -20,79 +32,94 @@ export function DailyFoodDiary({
 }) {
   const [day, setDay] = useState<string | null>(null);
   const query = new URLSearchParams({ preview, ...(day ? { day } : {}) });
-  const result = useSocialApi<SharedFoodDiary>(
-    `/social/profiles/${userId}/food?${query}`,
-  );
-  if (result.error)
-    return <ErrorNote message="This diary is no longer shared with you." />;
+  const result = useSocialApi<SharedFoodDiary>(`/social/profiles/${userId}/food?${query}`);
+  if (result.error) return <ErrorNote message="This diary is no longer shared with you." />;
   if (!result.data) return <Spinner label="Opening food diary…" />;
   const diary = result.data;
+  const arrow = 'flex h-9 w-9 items-center justify-center rounded-full bg-ink/5 text-ink-muted disabled:opacity-30';
   return (
-    <div className="mt-5 border-t border-border pt-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h4 className="font-semibold">Daily food intake</h4>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="btn-ghost"
-            aria-label="Previous diary day"
-            onClick={() => setDay(addDays(diary.day, -1))}
-          >
-            ←
-          </button>
-          <span className="text-sm">{formatDay(diary.day)}</span>
-          <button
-            type="button"
-            className="btn-ghost"
-            aria-label="Next diary day"
-            disabled={diary.day >= diary.today}
-            onClick={() => setDay(addDays(diary.day, 1))}
-          >
-            →
-          </button>
+    <section className="space-y-2" aria-label="Food diary">
+      <header className="flex items-center gap-2">
+        <button type="button" className={arrow} aria-label="Previous diary day" onClick={() => setDay(addDays(diary.day, -1))}>
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <div className="min-w-0 flex-1 text-center">
+          <p className="text-sm font-semibold">{diary.day === diary.today ? 'Today' : formatDay(diary.day)}</p>
+          <p className="text-xs text-ink-muted">
+            <span className="font-semibold tabular text-ink">{diary.totals.energyKcal.toLocaleString()} kcal</span>
+            {' · '}
+            <MacroLine totals={diary.totals} />
+          </p>
         </div>
-      </div>
-      <p className="my-3 text-sm text-ink-muted">
-        {diary.totals.energyKcal} kcal · P {mgToG(diary.totals.proteinMg)}g · C{' '}
-        {mgToG(diary.totals.carbMg)}g · F {mgToG(diary.totals.fatMg)}g
-      </p>
+        <button
+          type="button"
+          className={arrow}
+          aria-label="Next diary day"
+          disabled={diary.day >= diary.today}
+          onClick={() => setDay(addDays(diary.day, 1))}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </header>
       {diary.slots.length === 0 ? (
-        <p className="text-sm text-ink-faint">Nothing logged for this day.</p>
+        <p className="py-4 text-center text-sm text-ink-faint">Nothing logged for this day.</p>
       ) : (
-        diary.slots.map((slot) => (
-          <section key={slot.slot} className="mt-4">
-            <h5 className="text-sm font-semibold">{SLOT_LABELS[slot.slot]}</h5>
-            <ul className="mt-2 divide-y divide-border">
-              {slot.foods.map((food, index) => (
-                <li
-                  key={index}
-                  className="flex flex-wrap justify-between gap-2 py-3 text-sm"
-                >
-                  <div className="min-w-0 break-words">
-                    <p>
-                      {food.name}
-                      {food.brand && (
-                        <span className="ml-1 text-ink-faint">
-                          {food.brand}
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-ink-muted">
-                      {food.amount} {food.unit} · P{' '}
-                      {mgToG(food.totals.proteinMg)}g · C{' '}
-                      {mgToG(food.totals.carbMg)}g · F{' '}
-                      {mgToG(food.totals.fatMg)}g
-                    </p>
-                  </div>
-                  <span className="text-ink-muted">
-                    {food.totals.energyKcal} kcal
+        diary.slots.map((slot) => {
+          const { icon: Icon, style } = SLOT_STYLES[slot.slot];
+          const totals = slot.foods.reduce(
+            (sum, food) => ({
+              energyKcal: sum.energyKcal + food.totals.energyKcal,
+              proteinMg: sum.proteinMg + food.totals.proteinMg,
+              carbMg: sum.carbMg + food.totals.carbMg,
+              fatMg: sum.fatMg + food.totals.fatMg,
+            }),
+            { energyKcal: 0, proteinMg: 0, carbMg: 0, fatMg: 0 },
+          );
+          return (
+            <section key={slot.slot} className={clsx('card overflow-hidden border-l-4', style.edge)} aria-label={SLOT_LABELS[slot.slot]}>
+              <header className="flex items-center gap-2.5 p-2.5">
+                <span className={clsx('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow', style.gradient)} aria-hidden>
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span className="block min-w-0 flex-1">
+                  <span role="heading" aria-level={3} className="block text-base font-bold leading-tight">
+                    {SLOT_LABELS[slot.slot]}
                   </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))
+                  <span className="block text-[13px] leading-snug text-ink-muted">
+                    <span className={clsx('font-semibold tabular', style.text)}>{totals.energyKcal.toLocaleString()} kcal</span>
+                    {' · '}
+                    <MacroLine totals={totals} />
+                  </span>
+                  <MacroSplit macros={totals} className="mt-1.5" />
+                </span>
+              </header>
+              <ul className="space-y-1 px-2.5 pb-2.5">
+                {slot.foods.map((food, index) => (
+                  <li key={index} className="flex items-center gap-2 rounded-xl bg-surface px-2.5 py-2 text-[15px] leading-snug">
+                    <FoodThumb name={food.name} brand={food.brand} macros={food.totals} size={38} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold">
+                        {food.name}
+                        {food.brand && <span className="ml-1 text-xs font-normal text-ink-faint">{food.brand}</span>}
+                      </p>
+                      <p className="truncate text-[13px] text-ink-muted">
+                        {food.amount} {food.unit}
+                      </p>
+                      <p className="text-[13px] text-ink-muted">
+                        <MacroLine totals={food.totals} />
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-right leading-tight">
+                      <span className="tabular block text-base font-bold">{food.totals.energyKcal}</span>
+                      <span className="block text-[10px] text-ink-faint">kcal</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })
       )}
-    </div>
+    </section>
   );
 }

@@ -85,5 +85,11 @@ Principles already decided (ROADMAP item 5):
   level, ranks), never body weight; its widget and folder.
 - **Folders step 2, Training, done 2026-11-26:** opening the Training widget shows Training's own
   screens read only: its hero (`TrainingHeroView`), History's rows and the rank emblems, from the
-  same components the Training tab uses. Food and money next.
+  same components the Training tab uses.
+- **Folders step 2, Food, done 2026-11-27:** the shared diary in the Food page's own look (meal
+  cards with colour, icon, total and macro split; food rows with picture, amount and macros), day
+  by day, between today's rings and the week chart, which moved to the bottom.
+- **Closed 2026-11-27.** Left for later, on the roadmap: one "Who sees my portal" screen (slice
+  4; Privacy and sharing does it today), imported-versus-typed labels (slice 6; only Health's
+  kcal and steps are imported today, no workouts), money (7) and pages' portals (8).
 

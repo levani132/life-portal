@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-27: My Portal, part five
+
+- Opening Food on a portal shows the shared diary the way the Food page draws it: each meal's
+  card with its colour, total and macro split, and each food with its picture and macros. Go back
+  a day with the arrows. The week chart is now at the bottom.
+
 ## 2026-11-27: Steps count without a Watch
 
 - Without an Apple Watch, Health sends steps but no active calories. Hours with steps only now

@@ -673,11 +673,8 @@ function FolderBody({ widget, ownerId, viewAs }: { widget: SharedWidget; ownerId
           </div>
         </section>
       )}
-      {food?.week && (
-        <section className="flex flex-col" style={{ height: '11rem' }}>
-          <WeekBars widget={widget} tall />
-        </section>
-      )}
+      {/* Food's own day, read only, between today's rings and the week at the bottom. */}
+      {widget.hasDiary && ownerId && <DailyFoodDiary key={`${ownerId}:${viewAs}`} userId={ownerId} preview={viewAs} />}
       {stats.length > 0 && (
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {stats.map((stat) => (
@@ -692,7 +689,11 @@ function FolderBody({ widget, ownerId, viewAs }: { widget: SharedWidget; ownerId
         </dl>
       )}
       {widget.training && <TrainingFolder widget={widget} />}
-      {widget.hasDiary && ownerId && <DailyFoodDiary key={`${ownerId}:${viewAs}`} userId={ownerId} preview={viewAs} />}
+      {food?.week && (
+        <section className="flex flex-col" style={{ height: '11rem' }}>
+          <WeekBars widget={widget} tall />
+        </section>
+      )}
     </div>
   );
 }
