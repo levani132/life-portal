@@ -11,8 +11,12 @@ export function HealthActivityChart({
   const [metric, setMetric] = useState<'activeKcal' | 'steps'>('activeKcal');
   const titleId = useId();
   const rows = activity.timeline ?? [];
+  // An hour with steps only (no Watch) shows its estimate from steps, fainter and labelled.
+  const estimate = (row: (typeof rows)[number]) =>
+    metric === 'activeKcal' && !row.hasActiveEnergy ? row.estimatedKcal : undefined;
   const present = (row: (typeof rows)[number]) =>
-    metric === 'steps' ? row.hasSteps : row.hasActiveEnergy;
+    metric === 'steps' ? row.hasSteps : row.hasActiveEnergy || row.estimatedKcal !== undefined;
+  const amount = (row: (typeof rows)[number]) => estimate(row) ?? row[metric];
   const unit = metric === 'steps' ? 'steps' : 'kcal';
   const hasData = rows.some(present);
   return (
@@ -51,10 +55,15 @@ export function HealthActivityChart({
             const hour = `${String(row.hour).padStart(2, '0')}:00`;
             return {
               key: String(row.hour),
-              value: present(row) ? row[metric] : 0,
+              value: present(row) ? amount(row) : 0,
+              barClass: estimate(row) !== undefined ? 'bg-special-solid/40' : undefined,
               present: present(row),
               axis: row.hour % 4 === 0 ? String(row.hour).padStart(2, '0') : undefined,
-              valueText: present(row) ? `${Math.round(row[metric]).toLocaleString()} ${unit}` : 'No imported samples',
+              valueText: !present(row)
+                ? 'No imported samples'
+                : estimate(row) !== undefined
+                  ? `≈${Math.round(amount(row)).toLocaleString()} kcal · est. from steps`
+                  : `${Math.round(row[metric]).toLocaleString()} ${unit}`,
               when: `${hour}–${String((row.hour + 1) % 24).padStart(2, '0')}:00`,
             };
           })}
@@ -66,7 +75,7 @@ export function HealthActivityChart({
         </p>
       )}
       <p className="mt-1 text-[11px] text-ink-muted">
-        Local hours · Gaps mean missing data, not inactivity.
+        Local hours · Gaps mean missing data, not inactivity.{metric === 'activeKcal' && rows.some((row) => estimate(row) !== undefined) ? ' Fainter bars are estimated from steps.' : ''}
       </p>
     </section>
   );

@@ -2953,3 +2953,14 @@ server (Training's record without `shareRecords`, every quick action and alert a
 a widget should follow: the module's own screens, read only, built from shared components rather
 than a second set; that is the next piece of work, one module at a time.
 
+## 2026-11-27: Steps stand in for active energy only where there is none
+
+Without an Apple Watch, Health has steps but no active energy, so the activity adjustment never
+moved. Now each hour uses recorded active energy when it has any (a Watch's figure already
+includes the walking, so adding steps would double count), and an hour with steps only is
+estimated from the steps, height and the latest weigh-in (0.415 × height stride, about 0.5 kcal
+per kg per km net). Decided per hour rather than per day so a Watch taken off for the evening is
+filled in by the phone. A steps-only hour counts as covered in full, because phone step samples
+cover only the minutes spent moving; counting only those minutes would replace almost none of
+the forecast and overstate the adjustment. The estimate is labelled everywhere it shows.
+

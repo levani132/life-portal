@@ -559,7 +559,10 @@ function IOSAppleHealthPanel({
           <>
             <dl className="grid grid-cols-3 gap-2">
               {[
-                ['Active kcal', activity.recordedActiveKcal.toLocaleString()],
+                [
+                  activity.estimatedFromStepsKcal ? 'Active kcal · est' : 'Active kcal',
+                  activity.recordedActiveKcal.toLocaleString(),
+                ],
                 ['Steps', activity.steps.toLocaleString()],
                 ['Adjustment', `+${activity.adjustmentKcal} kcal`],
               ].map(([label, value]) => (
@@ -569,6 +572,12 @@ function IOSAppleHealthPanel({
                 </div>
               ))}
             </dl>
+            {!!activity.estimatedFromStepsKcal && (
+              <p className="text-[11px] text-ink-muted">
+                Includes {activity.estimatedFromStepsKcal.toLocaleString()} kcal estimated from steps, your height and
+                weight, for hours with no recorded active energy (no Watch).
+              </p>
+            )}
             <HealthActivityChart activity={activity} />
           </>
         )}

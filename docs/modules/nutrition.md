@@ -342,7 +342,10 @@ retired. See [the iPhone setup guide](../integrations/apple-health-shortcut-manu
 The Activity info panel shows the per-device confirmed Shortcut state (installed, update
 available, or not confirmed), recorded hourly activity, and compact totals. Hourly bars
 use the same source-overlap priority and timezone/food-day boundary as activity targets;
-unimported periods stay missing rather than becoming measured zero.
+unimported periods stay missing rather than becoming measured zero. An hour with steps but no
+recorded active energy (no Watch) carries `estimatedKcal` from `stepsActiveKcal()` (height,
+latest weigh-in), counts toward the adjustment and is drawn fainter with "est. from steps";
+recorded energy always wins in an hour that has both. See `docs/APPLE_HEALTH_SETUP.md`.
 
 The configured developer alone can GET/PUT `/settings/health-shortcut`. Its validated
 iCloud URL lives in the singleton `health_shortcut_settings` document; the old environment

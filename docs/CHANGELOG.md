@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-27: Steps count without a Watch
+
+- Without an Apple Watch, Health sends steps but no active calories. Hours with steps only now
+  count toward your activity adjustment, estimated from the steps, your height and latest
+  weight, and are marked as estimates (fainter bars, "est. from steps"). When the Watch recorded
+  active calories for an hour, those are used and the steps are not added on top.
+
 ## 2026-11-27: Read a bar by touching it
 
 - Touch (or point at) a bar in the week charts of an opened portal widget, or in Recorded

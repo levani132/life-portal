@@ -1,4 +1,4 @@
-import { activityTargets } from './activity';
+import { activityTargets, stepsActiveKcal } from './activity';
 import { nutritionTargets } from './nutrition';
 import { migratedSetupSteps } from './portal';
 import type {
@@ -248,4 +248,44 @@ it('merges thousands of adjacent samples from overlapping devices without adding
     calculate([...rows, ...rows.map((s) => ({ ...s, source: 'b' }))])
       .recordedActiveKcal,
   ).toBe(2000);
+});
+
+describe('steps without a Watch', () => {
+  const weighed = { ...targets, weightGrams: 96_000 } as NutritionTargets;
+  const run = (samples: HealthSample[]) => activityTargets(weighed, profile, '2026-10-31', samples, now, now).activity!;
+  const steps = (value: number, extra: Partial<HealthSample> = {}) => sample(value, { type: 'steps', id: `s${value}`, source: 'phone', ...extra });
+
+  it('works out walking energy from height and weight, and needs both', () => {
+    expect(stepsActiveKcal(10_000, 180, 96_000)).toBeCloseTo(358.6, 1);
+    expect(stepsActiveKcal(10_000, undefined, 96_000)).toBeUndefined();
+    expect(stepsActiveKcal(10_000, 180, undefined)).toBeUndefined();
+  });
+
+  it('estimates an hour with steps only, labels it, and counts the whole hour as covered', () => {
+    // 07:00–08:00 UTC is 11:00 in Tbilisi, an awake hour: 50 kcal expected in it.
+    const result = run([steps(5000)]);
+    const hour = result.timeline!.find((row) => row.hour === 11)!;
+    expect(hour.estimatedKcal).toBeCloseTo(179.3, 1);
+    expect(result.estimatedFromStepsKcal).toBe(179);
+    expect(result.recordedActiveKcal).toBe(179);
+    expect(result.expectedReplacedKcal).toBe(50);
+    expect(result.adjustmentKcal).toBe(129);
+  });
+
+  it('uses recorded energy, not steps, in an hour that has both', () => {
+    const result = run([sample(200), steps(5000)]);
+    expect(result.recordedActiveKcal).toBe(200);
+    expect(result.estimatedFromStepsKcal).toBeUndefined();
+    expect(result.timeline!.find((row) => row.hour === 11)!.estimatedKcal).toBeUndefined();
+  });
+
+  it('fills only the hours the Watch missed', () => {
+    const result = run([sample(200), steps(5000, { start: '2026-10-31T09:00:00Z', end: '2026-10-31T10:00:00Z' })]);
+    expect(result.recordedActiveKcal).toBe(379);
+    expect(result.estimatedFromStepsKcal).toBe(179);
+  });
+
+  it('keeps the old rule without a weigh-in: steps alone change nothing', () => {
+    expect(calculate([steps(5000)]).currentTargetKcal).toBe(2800);
+  });
 });

@@ -69,8 +69,13 @@ samples also use one interval rather than summing. Under-counting is possible an
 `adjustment = max(0, recorded active kcal − expected kcal in matched sampled intervals)`.
 `current target = starting target + adjustment`. Digestion/resting/goal adjustment are never
 replaced. No downward adjustment is enabled: Shortcuts exposes neither assured wear coverage
-nor permission-denial evidence sufficient to prove inactivity. Steps are explanatory only;
-workout/step energy is never added to active energy. Macros retain their starting goals.
+nor permission-denial evidence sufficient to prove inactivity. Recorded active energy
+always wins: in an hour that has any, steps add nothing. An hour with steps and **no** active
+energy (an iPhone without a Watch) is estimated with `stepsActiveKcal()`: stride 0.415 × height,
+times about 0.5 kcal per kg per km of net walking cost, with the latest weigh-in; that hour then
+counts as covered in full (a phone's step samples cover only the moving minutes). Without height
+or a weigh-in there is no estimate. The estimate is labelled (`estimatedKcal` per hour,
+`estimatedFromStepsKcal` in total) and drawn fainter. Workout energy is never added. Macros retain their starting goals.
 Daily storage buckets retain historical samples. Recent uploads replace only matching
 source/type/ID records and preserve all unreceived records. Empty uploads never delete data.
 Revocation deletes stored uploads. Timestamps are normalized to UTC; displayed day

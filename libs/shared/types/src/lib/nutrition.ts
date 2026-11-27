@@ -300,12 +300,17 @@ export interface ActivityHour {
   steps: number;
   hasActiveEnergy: boolean;
   hasSteps: boolean;
+  /** an hour with steps and no recorded energy, estimated from the steps. */
+  estimatedKcal?: number;
 }
 export interface ActivityAdjustment {
   /** Local clock hours, ordered from the configured food-day boundary. Missing is not zero. */
   timeline?: ActivityHour[];
   startingTargetKcal: number;
+  /** Recorded energy plus the steps-only hours' estimate. */
   recordedActiveKcal: number;
+  /** the part of `recordedActiveKcal` estimated from steps (no Watch that hour). */
+  estimatedFromStepsKcal?: number;
   expectedReplacedKcal: number;
   adjustmentKcal: number;
   currentTargetKcal: number;

@@ -8,6 +8,8 @@ export interface ScrubBar {
   value: number;
   /** False draws a stub: no data, which is not the same as zero. */
   present?: boolean;
+  /** Overrides the chart's fill for this bar, e.g. a fainter one for an estimate. */
+  barClass?: string;
   /** Under the bar; leave out to show no label for it. */
   axis?: string;
   /** The callout when the bar is touched, like Apple Health: the value, then when. */
@@ -85,7 +87,7 @@ export function ScrubBars({
                 title={`${bar.when}: ${bar.valueText}`}
                 className={clsx(
                   'w-full rounded-md transition-opacity',
-                  present ? barClass : 'bg-border',
+                  present ? (bar.barClass ?? barClass) : 'bg-border',
                   active !== null && active !== index && 'opacity-40',
                 )}
                 style={{ height: present ? `${Math.max(6, (bar.value / most) * 100)}%` : '4px' }}

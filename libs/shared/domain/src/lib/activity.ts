@@ -5,6 +5,17 @@ import type {
   NutritionTargets,
 } from '@life-portal/shared-types';
 
+/**
+ * Active kcal for walking `steps`: stride from height (0.415 × height, the usual
+ * pedometer rule) times the net cost of walking, about 0.5 kcal per kg per km above resting.
+ * 10,000 steps at 180 cm and 96 kg is about 360 kcal. Undefined without height or weight.
+ */
+export function stepsActiveKcal(steps: number, heightCm?: number, weightGrams?: number) {
+  if (!heightCm || !weightGrams || steps <= 0) return undefined;
+  const km = (steps * heightCm * 0.415) / 100_000;
+  return km * (weightGrams / 1000) * 0.5;
+}
+
 /** Raw sample merging: pick one source per overlapping interval, never sum devices.
  * A stable source order is deliberately conservative; this is not HealthKit statistics.
  * No downward adjustment: neither permissions nor sample absence proves full coverage.
@@ -67,7 +78,10 @@ export function activityTargets(
   }));
   let recorded = 0,
     expected = 0,
-    steps = 0;
+    steps = 0,
+    fromSteps = 0;
+  // Expected activity in the minutes an energy sample covered, per hour.
+  const energyExpected = timeline.map(() => 0);
   const expectedDaily =
     (targets.expenditure?.everydayKcal ?? 0) +
     (targets.expenditure?.exerciseKcal ?? 0);
@@ -143,29 +157,50 @@ export function activityTargets(
           } else {
             bucket.activeKcal += amount;
             bucket.hasActiveEnergy = true;
-            recorded += rate * (next - t);
             // 07:00–23:00 is an explicit forecast assumption; no activity phased through sleep.
             if (hour >= 7 && hour < 23)
-              expected += (expectedDaily * (next - t)) / (16 * 3600000);
+              energyExpected[(hour - profile.dayStartHour + 24) % 24] +=
+                (expectedDaily * (next - t)) / (16 * 3600000);
           }
         }
         t = next;
       }
     }
   }
+  // recorded energy wins in any hour that has it (a Watch's figure already includes
+  // the walking); an hour with steps only (an iPhone without a Watch) is estimated from the
+  // steps, height and weight, and then counts as covered for the whole hour, because a phone's
+  // step samples cover only the moving minutes.
+  const estimated: (number | undefined)[] = timeline.map(() => undefined);
+  timeline.forEach((bucket, index) => {
+    if (bucket.hasActiveEnergy) {
+      recorded += bucket.activeKcal;
+      expected += energyExpected[index];
+      return;
+    }
+    if (!bucket.hasSteps) return;
+    const kcal = stepsActiveKcal(bucket.steps, profile.heightCm, targets.weightGrams);
+    if (kcal === undefined) return;
+    estimated[index] = kcal;
+    recorded += kcal;
+    fromSteps += kcal;
+    if (bucket.hour >= 7 && bucket.hour < 23) expected += expectedDaily / 16;
+  });
   // Old all-activity multipliers cannot safely be decomposed; wait for profile migration.
   const adjustment = targets.expenditure
     ? Math.max(0, Math.round(recorded - expected))
     : 0;
   const starting = targets.energyKcal.value;
   const activity = {
-    timeline: timeline.map((bucket) => ({
+    timeline: timeline.map((bucket, index) => ({
       ...bucket,
       activeKcal: Math.round(bucket.activeKcal * 100) / 100,
+      ...(estimated[index] !== undefined && { estimatedKcal: Math.round(estimated[index]! * 100) / 100 }),
       steps: Math.round(bucket.steps * 100) / 100,
     })),
     startingTargetKcal: starting,
     recordedActiveKcal: Math.round(recorded),
+    ...(fromSteps > 0 && { estimatedFromStepsKcal: Math.round(fromSteps) }),
     expectedReplacedKcal: Math.round(expected),
     adjustmentKcal: adjustment,
     currentTargetKcal: starting + adjustment,
@@ -186,7 +221,7 @@ export function activityTargets(
     energyKcal: {
       value: activity.currentTargetKcal,
       basis:
-        'Starting target + recorded active energy − expected activity in matching sampled periods; uncertain periods retain their forecast. Downward adjustments are withheld because coverage cannot be established. No workout or step calories are added separately.',
+        'Starting target + recorded active energy − expected activity in matching sampled periods; uncertain periods retain their forecast. Downward adjustments are withheld because coverage cannot be established. An hour with steps but no recorded energy is estimated from the steps, height and weight; workouts are never added separately.',
       confidence: 'low',
     },
   };
