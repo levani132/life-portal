@@ -23,7 +23,8 @@ or a cover photo in the header card). Chosen: the wallpaper, running under the i
 `PortalWallpaperLayer variant="band"` draws the same fixed picture behind Home (portalled to
 `<body>`, so pull-to-refresh cannot drag it). Everything from the feed down sits in a solid,
 full-width section that slides over it as the page scrolls, so the picture shows only above the
-feed. It sets `html[data-wallpaper='band']`, which clears the header like a portal but leaves posts
+feed; that section's top edge is a 10rem fade from the page's colour to clear (the owner's idea),
+drawn behind the widgets (`-z-10`, the picture being `-z-20`). It sets `html[data-wallpaper='band']`, which clears the header like a portal but leaves posts
 alone (only `data-wallpaper='on'` turns them to glass).
 
 ## Chrome

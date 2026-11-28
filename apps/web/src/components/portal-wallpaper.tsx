@@ -128,7 +128,7 @@ export function PortalWallpaperLayer({
       <span ref={host} hidden />
       {onScreen &&
         createPortal(
-          <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+          <div aria-hidden className="pointer-events-none fixed inset-0 -z-20 overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element -- a signed, expiring link; next/image would cache it. */}
             <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover object-top" decoding="async" />
             <div className="absolute inset-0 bg-gradient-to-b from-surface/10 via-surface/30 to-surface/80" />

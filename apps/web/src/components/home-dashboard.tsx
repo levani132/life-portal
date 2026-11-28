@@ -244,7 +244,9 @@ export function Dashboard() {
       <div
         className={
           wallpaper
-            ? '-mx-[var(--page-gutter)] -mb-[calc(6rem+env(safe-area-inset-bottom))] min-h-[60vh] bg-surface px-[var(--page-gutter)] pb-[calc(6rem+env(safe-area-inset-bottom))] pt-1'
+            ? // The owner's idea: the feed's own top edge fades from the page's colour to clear,
+              // upwards, so the picture melts into the feed wherever it starts and as it scrolls.
+              "relative -mx-[var(--page-gutter)] -mb-[calc(6rem+env(safe-area-inset-bottom))] min-h-[60vh] bg-surface px-[var(--page-gutter)] pb-[calc(6rem+env(safe-area-inset-bottom))] pt-1 before:pointer-events-none before:absolute before:-z-10 before:inset-x-0 before:bottom-full before:h-40 before:bg-gradient-to-t before:from-surface before:to-transparent before:content-['']"
             : undefined
         }
       >
