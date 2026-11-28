@@ -8,6 +8,7 @@ import { Avatar } from './avatar';
 import { OfficialMark } from './follow';
 import { PageMark } from './identity-switcher';
 import { PortalGrid } from './portal-grid';
+import { PortalWallpaperLayer } from './portal-wallpaper';
 import { Spinner } from './ui';
 import { Wordmark } from './wordmark';
 
@@ -69,8 +70,9 @@ export function PublicPortalView({ username }: { username: string }) {
           <Spinner />
         ) : (
           <>
-            <section className="card relative">
-              <div aria-hidden className="h-24 rounded-t-xl bg-gradient-to-br from-accent/30 via-special-solid/15 to-success-solid/10" />
+            {portal.data.wallpaper && <PortalWallpaperLayer wallpaper={portal.data.wallpaper} />}
+            <section className={portal.data.wallpaper ? 'relative rounded-xl border border-border/60 bg-surface-raised/55 backdrop-blur-xl' : 'card relative'}>
+              <div aria-hidden className={portal.data.wallpaper ? 'h-24' : 'h-24 rounded-t-xl bg-gradient-to-br from-accent/30 via-special-solid/15 to-success-solid/10'} />
               <div className="px-5 pb-5">
                 <div className="-mt-12">
                   <Avatar name={portal.data.displayName} url={portal.data.avatarUrl} size={96} className="ring-4 ring-surface-raised" />

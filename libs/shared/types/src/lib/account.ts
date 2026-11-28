@@ -30,4 +30,4 @@ export type AccountDeleteCode = (typeof ACCOUNT_DELETE_CODES)[number];
  * The date of the terms, privacy policy and community rules a new account agrees to. Change it
  * whenever one of them changes in substance; it is stored on the account as `agreedVersion`.
  */
-export const LEGAL_VERSION = '2026-11-26';
+export const LEGAL_VERSION = '2026-11-28';

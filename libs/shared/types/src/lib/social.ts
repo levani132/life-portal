@@ -80,7 +80,32 @@ export interface SocialProfile extends SocialPerson {
   discoverable?: boolean;
   /** Accepted friends. Only on your own profile: other people's counts are not shown. */
   friendCount?: number;
+  /** Spec 048: shown to whoever can open the portal, like the profile photo. */
+  wallpaper?: PortalWallpaper;
 }
+/**
+ * Spec 048: the portal's preset wallpapers, drawn for the app (`apps/web/scripts/wallpapers.mjs`)
+ * and served from `/wallpapers/<id>.jpg`. `top` is the colour of the picture's top edge, which
+ * Android's status bar takes while the portal is open.
+ */
+export const PORTAL_WALLPAPERS = [
+  { id: 'dusk', label: 'Dusk', top: '#f6ad49' },
+  { id: 'aurora', label: 'Aurora', top: '#041623' },
+  { id: 'ocean', label: 'Ocean', top: '#0d2b5c' },
+  { id: 'dunes', label: 'Dunes', top: '#f7c4a1' },
+  { id: 'forest', label: 'Forest', top: '#9cc5bd' },
+  { id: 'nebula', label: 'Nebula', top: '#0b0617' },
+  { id: 'alpine', label: 'Alpine', top: '#bad5f4' },
+  { id: 'lavender', label: 'Lavender', top: '#c2b2fd' },
+  { id: 'city', label: 'City', top: '#1f1c4c' },
+  { id: 'ember', label: 'Ember', top: '#3d1b11' },
+] as const;
+export type PortalWallpaperPreset = (typeof PORTAL_WALLPAPERS)[number]['id'];
+/** A portal's wallpaper: one of the presets, or the person's own photo behind a signed link. */
+export type PortalWallpaper = { preset: PortalWallpaperPreset } | { url: string };
+/** Spec 048: sets the wallpaper to a preset, or to a photo uploaded with `POST /media`. */
+export type SocialWallpaperUpdate = { preset: PortalWallpaperPreset } | { mediaId: string };
+
 /** Sets the profile photo from an upload (`POST /media`). */
 export interface SocialAvatarUpdate {
   mediaId: string;
@@ -131,4 +156,6 @@ export interface PublicPortal {
   widgets: SharedWidget[];
   /** The two newest public posts, in the link preview's narrow form. */
   posts: PublicPostPreview[];
+  /** Spec 048: the portal's wallpaper, as signed-in viewers see it. */
+  wallpaper?: PortalWallpaper;
 }

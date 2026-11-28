@@ -49,6 +49,12 @@ export function ThemeSync() {
           : preference;
       document.documentElement.dataset.theme = theme;
       // The status bar takes the page's surface, whatever theme set it (spec 037).
+      // Spec 048: while a portal's wallpaper is on screen, the bar takes the wallpaper's top colour.
+      const wallpaperTop = document.documentElement.dataset.wallpaperTop;
+      if (wallpaperTop) {
+        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', wallpaperTop);
+        return;
+      }
       const surface = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim();
       const fallback = theme === 'dark' ? '#0c0e14' : '#f5f7fa';
       document

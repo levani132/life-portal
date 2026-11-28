@@ -1003,3 +1003,12 @@
     animation: none;
   }
 }
+
+/*
+ * Spec 048: over a portal's wallpaper the header is see-through, so the picture runs to the top of
+ * the screen (under the status bar in the installed iPhone app). Set by `PortalWallpaperLayer`
+ * only while that portal is the one on screen; it outranks the standalone rule above.
+ */
+html[data-wallpaper] .portal-header {
+  background-color: transparent;
+}

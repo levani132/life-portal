@@ -23,7 +23,7 @@ export default function PrivacyPage() {
           <li><strong>Your account:</strong> name, email address, a scrambled form of your password that cannot be turned back into it, and, if you sign in with Google, the identifier Google gives us for you.</li>
           <li><strong>What you log:</strong> foods and meals, body weight, nutrition goals, workouts, exercises, sets and plans. This is information about your health.</li>
           <li><strong>Activity from Apple Health,</strong> only if you set up the Shortcut that sends it: energy burned and similar daily totals.</li>
-          <li><strong>What you share:</strong> your profile (name, username, photo, bio), posts, photos, short videos, comments, likes, friends, blocks and messages. Messages are stored so both people can read them; they are not end-to-end encrypted.</li>
+          <li><strong>What you share:</strong> your profile (name, username, photo, bio, and your portal's wallpaper if you upload your own), posts, photos, short videos, comments, likes, friends, blocks and messages. Messages are stored so both people can read them; they are not end-to-end encrypted.</li>
           <li><strong>Pages you follow and pages you manage:</strong> which pages you follow, and for a page you created or help run, its profile, posts, messages, who manages it and the invitations to help run it. A page’s follower count is shown; the list of who follows it is not shown to anyone, including the page. A page may follow you: it then sees your public posts in its feed, which it could already open, and nothing else.</li>
           <li><strong>Anything else you enter</strong> in a part of the app you switched on.</li>
           <li><strong>Sign-in and safety records:</strong> the devices signed in to your account, and a log of sign-in events (for example a failed password) kept for 90 days. It holds a scrambled form of the internet address, never the address itself.</li>
@@ -37,7 +37,7 @@ export default function PrivacyPage() {
         <p>
           Our error log and usage counters hold no person: a scrubbed error message, the kind of page, and a count.
           If you turn on “Let people find me”, your portal’s address (lifeportal.one/@your-username) also shows people
-          without an account your name, photo, bio, what you made public and your two newest public posts; nothing
+          without an account your name, photo, bio, wallpaper, what you made public and your two newest public posts; nothing
           else. A page’s portal is always open this way.
           When you see a page’s post, the page’s managers see one more view on it. We keep only a count per post and
           day; to count you once a day we keep a coded key made from your account, the post and the day, which
@@ -72,7 +72,7 @@ export default function PrivacyPage() {
           <li><strong>Render</strong> and <strong>Vercel</strong>: the servers that run the app.</li>
           <li><strong>Cloudflare (R2)</strong>: storage for photos and videos. Files are private; each view uses a link that expires.</li>
           <li><strong>Resend</strong>: delivers the emails about your account, so it receives your email address and the message.</li>
-          <li><strong>OpenAI</strong>: checks photos and video stills that <em>other people can see</em>, and profile photos, for nudity, graphic violence and self-harm before they are shown. It receives an expiring link to the picture and nothing else: not your name, your account or your text. A private post is never sent.</li>
+          <li><strong>OpenAI</strong>: checks photos and video stills that <em>other people can see</em>, and profile photos and portal wallpapers, for nudity, graphic violence and self-harm before they are shown. It receives an expiring link to the picture and nothing else: not your name, your account or your text. A private post is never sent.</li>
           <li><strong>Google</strong>: only if you choose to sign in with Google.</li>
           <li><strong>Apple and Google push services</strong>: only if you allow notifications, to deliver them to your device.</li>
           <li><strong>Open Food Facts</strong>: when you scan a barcode, the barcode is looked up there. Nothing about you is sent.</li>

@@ -6,7 +6,7 @@ describe('account export helpers', () => {
       { key: 'media/u1/abc.jpg', posterKey: 'media/u1/abc-poster.jpg' },
       { image: { key: 'foods/u1/f1-9.jpg', width: 10 } },
       { training: { exercises: [{ key: 'bench-press', image: { key: 'posts/u1/training/x.jpg' } }] } },
-      { avatarKey: 'avatars/u1/a.jpg' },
+      { avatarKey: 'avatars/u1/a.jpg', wallpaper: 'dusk', wallpaperKey: 'wallpapers/u1/w.jpg' },
       { name: 'Coca-Cola', key: 'coca-cola', logo: { key: 'brands/b1-2.jpg' } },
       { linkKey: 'media/u1/not-a-file.jpg', note: 'media/u1/in-text.jpg' },
     ];
@@ -17,6 +17,8 @@ describe('account export helpers', () => {
       'media/u1/abc-poster.jpg',
       'media/u1/abc.jpg',
       'posts/u1/training/x.jpg',
+      // Spec 048: a portal's own wallpaper is a file to delete with the account; a preset is not.
+      'wallpapers/u1/w.jpg',
     ]);
     expect(isStorageKey('../etc/passwd.jpg')).toBe(false);
     expect(isStorageKey('media/u1/abc.exe')).toBe(false);

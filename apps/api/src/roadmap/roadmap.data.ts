@@ -6,7 +6,7 @@ import type { Roadmap } from '@life-portal/shared-types';
  * model, which are the owner's and not for every visitor's browser.
  */
 export const ROADMAP: Roadmap = {
-  updated: '2026-11-27',
+  updated: '2026-11-28',
   direction:
     'A private-by-default life dashboard that grows into a Strava-like social app for food, training and sports, where calories eaten and burned live on the same day. The core stays free; AI is the paid part.',
   areas: [
@@ -90,6 +90,7 @@ export const ROADMAP: Roadmap = {
         'Done: widgets on a grid like iPhone widgets, 1–4 squares each, arranged for the portal alone, in Home’s look, read only',
         'Done: Food (today, the week, the diary in Food’s own look) and Training (workouts, records, level, ranks; never body weight), each part its own switch',
         'Done: a widget opens like an iOS folder into the module’s own screens; touch a chart’s bar to read it',
+        'Done: a wallpaper behind the portal: ten made for the app, or your own photo (spec 048)',
         'Later: one "Who sees my portal" screen (Privacy and sharing does it today)',
         'Later: labels for what was imported (Apple Health) versus typed in, once there is more to import',
         'Later: money, one module at a time (the terms cover it); pages’ portals; collections',

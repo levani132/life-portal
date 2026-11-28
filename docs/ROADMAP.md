@@ -1,6 +1,6 @@
 # Roadmap
 
-Where Life Portal is, where it is going, and in what order. Updated 2026-11-27. The admin sees this roadmap in the app (Menu → Roadmap); its content lives in
+Where Life Portal is, where it is going, and in what order. Updated 2026-11-28. The admin sees this roadmap in the app (Menu → Roadmap); its content lives in
 `apps/api/src/roadmap/roadmap.data.ts`, which must change with this file. Product
 direction comes from the owner; the order and the architecture tiers are recommendations agreed
 in conversation, not commitments. Costs are rough late-2026 list prices, order of magnitude only.
@@ -154,7 +154,7 @@ three have moved into the numbered steps, because friends already use the app.
    alone, in Home's look and read only; Food (today, the week, the diary in Food's own look) and
    Training (workouts, records, level, ranks, never body weight), each part behind its own
    switch; a widget opens like an iOS folder into the module's own screens; charts read by
-   touch. **Later:** one "Who sees my portal" screen (Privacy and sharing does the job today);
+   touch; a wallpaper behind the portal, ten presets or an own photo (spec 048, 2026-11-28). **Later:** one "Who sees my portal" screen (Privacy and sharing does the job today);
    labels for imported (Apple Health) versus typed-in figures, once more can be imported (a
    workout cannot be yet); money one module at a time, covered by the terms rather than a
    warning; pages' portals; collections. Was: make "portal" a real thing in

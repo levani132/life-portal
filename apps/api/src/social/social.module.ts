@@ -2,6 +2,7 @@ import {
   Body,
   CallHandler,
   ConflictException,
+  ForbiddenException,
   Controller,
   Inject,
   Optional,
@@ -54,6 +55,9 @@ import {
   type PublicPortal,
   type SocialPerson,
   type SocialAvatarUpdate,
+  PORTAL_WALLPAPERS,
+  type PortalWallpaper,
+  type PortalWallpaperPreset,
   type SocialProfile as ProfileDto,
   type SocialProfileUpdate,
 } from '@life-portal/shared-types';
@@ -91,6 +95,9 @@ class SocialProfile {
   @Prop({ default: false, index: true }) discoverable!: boolean;
   /** The profile photo's storage key. Never leaves the API: responses carry a signed `avatarUrl`. */
   @Prop() avatarKey?: string;
+  /** Spec 048: a preset wallpaper's id, or (never both) the storage key of the person's own. */
+  @Prop() wallpaper?: string;
+  @Prop() wallpaperKey?: string;
   /** Spec 040: copied from the account, so naming an author needs no second lookup. */
   @Prop({ type: String, enum: ['page'] }) kind?: 'page';
   /** Spec 040: the app's own page; a copy of `users.official`, set only by the owner. */
@@ -110,6 +117,16 @@ export class ProfileUpdateDto implements SocialProfileUpdate {
 }
 class AvatarDto implements SocialAvatarUpdate {
   @IsString() @MaxLength(64) mediaId!: string;
+}
+/** Spec 048: a preset, or an upload; exactly one. */
+class WallpaperDto {
+  @ValidateIf((dto: WallpaperDto) => dto.mediaId === undefined)
+  @IsIn(PORTAL_WALLPAPERS.map((each) => each.id))
+  preset?: PortalWallpaperPreset;
+  @ValidateIf((dto: WallpaperDto) => dto.preset === undefined)
+  @IsString()
+  @MaxLength(64)
+  mediaId?: string;
 }
 class ConnectionDto {
   @IsIn(CONNECTION_ACTIONS) action!: ConnectionAction;
@@ -377,6 +394,7 @@ export class SocialService implements OnModuleInit {
       ...(identity.isPage ? { isPage: true as const } : {}),
       ...(identity.official ? { official: true as const } : {}),
       ...(identity.aiManaged ? { aiManaged: true as const } : {}),
+      ...(await this.wallpaperOf(profile).then((wallpaper) => (wallpaper ? { wallpaper } : {}))),
       widgets: profile.kind === 'page' ? [] : await this.shared.forViewer(profile.userId, owner.access, false, today),
     };
   }
@@ -416,15 +434,55 @@ export class SocialService implements OnModuleInit {
     if (previous) await this.media.deleteKey(previous);
     return { avatarUrl: await this.media.signKey(key) };
   }
+  /**
+   * Spec 048: sets the portal's wallpaper to a preset or a copy of an upload, then deletes the
+   * previous file. Pages have no portal of their own yet, so a page has no wallpaper.
+   */
+  async setWallpaper(userId: string, dto: WallpaperDto): Promise<{ wallpaper: PortalWallpaper }> {
+    const profile = await this.own(userId);
+    if (profile.kind === 'page') throw new ForbiddenException('A page has no wallpaper yet.');
+    if (dto.preset) {
+      await this.profiles.updateOne({ userId }, { $set: { wallpaper: dto.preset }, $unset: { wallpaperKey: 1 } });
+      if (profile.wallpaperKey) await this.media.deleteKey(profile.wallpaperKey);
+      return { wallpaper: { preset: dto.preset } };
+    }
+    const { key } = await this.media.copyForWallpaper(userId, dto.mediaId as string);
+    // Spec 039: shown to everyone who opens the portal, so it is checked before it is used.
+    const refusal = await this.avatarRefusal(key, 'That photo can’t be used as a wallpaper. Choose another one.');
+    if (refusal) {
+      await this.media.deleteKey(key);
+      throw refusal;
+    }
+    await this.profiles.updateOne({ userId }, { $set: { wallpaperKey: key }, $unset: { wallpaper: 1 } });
+    if (profile.wallpaperKey) await this.media.deleteKey(profile.wallpaperKey);
+    const url = await this.media.signKey(key);
+    return { wallpaper: url ? { url } : { preset: PORTAL_WALLPAPERS[0].id } };
+  }
+  async removeWallpaper(userId: string) {
+    const profile = await this.own(userId);
+    await this.profiles.updateOne({ userId }, { $unset: { wallpaper: 1, wallpaperKey: 1 } });
+    if (profile.wallpaperKey) await this.media.deleteKey(profile.wallpaperKey);
+    return { success: true };
+  }
+  /** The wallpaper as a viewer gets it: a preset's id, or a fresh signed link to the photo. */
+  private async wallpaperOf(profile: SocialProfile): Promise<PortalWallpaper | undefined> {
+    if (profile.kind === 'page') return undefined;
+    if (profile.wallpaperKey) {
+      const url = await this.media.signKey(profile.wallpaperKey);
+      return url ? { url } : undefined;
+    }
+    const preset = PORTAL_WALLPAPERS.find((each) => each.id === profile.wallpaper);
+    return preset ? { preset: preset.id } : undefined;
+  }
   /** Why this stored image may not be a profile photo, or nothing when it may (or no check is set up). */
-  private async avatarRefusal(key: string): Promise<Error | undefined> {
+  private async avatarRefusal(key: string, message = 'That photo can’t be used as a profile photo. Choose another one.'): Promise<Error | undefined> {
     if (!this.imageChecker) return undefined;
     const url = await this.media.signKey(key);
     if (!url) return undefined;
     try {
       const { flagged } = await this.imageChecker.check([url]);
       return imageHoldCategories(flagged).length
-        ? new UnprocessableEntityException({ code: 'PHOTO_REFUSED', message: 'That photo can’t be used as a profile photo. Choose another one.' })
+        ? new UnprocessableEntityException({ code: 'PHOTO_REFUSED', message })
         : undefined;
     } catch {
       return new ServiceUnavailableException({ code: 'PHOTO_CHECK_DOWN', message: 'Photos can’t be checked right now. Try again in a minute.' });
@@ -488,6 +546,7 @@ export class SocialService implements OnModuleInit {
         self ? 'self' : relationshipFor(row, viewerId, targetId),
         row?.mutedBy.includes(viewerId),
       )),
+      ...(await this.wallpaperOf(profile).then((wallpaper) => (wallpaper ? { wallpaper } : {}))),
       ...(self
         ? {
             discoverable: profile.discoverable,
@@ -705,6 +764,15 @@ export class SocialController {
   }
   @Delete('me/avatar') removeAvatar(@CurrentUser('userId') userId: string) {
     return this.social.removeAvatar(userId);
+  }
+  @Put('me/wallpaper') setWallpaper(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: WallpaperDto,
+  ) {
+    return this.social.setWallpaper(userId, dto);
+  }
+  @Delete('me/wallpaper') removeWallpaper(@CurrentUser('userId') userId: string) {
+    return this.social.removeWallpaper(userId);
   }
   @Get('search') search(
     @CurrentUser('userId') userId: string,

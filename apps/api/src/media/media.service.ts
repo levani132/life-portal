@@ -248,6 +248,15 @@ export class MediaService {
     return { key };
   }
 
+  /**
+   * Spec 048: a portal wallpaper, copied like a profile photo. The browser has already scaled it
+   * down and re-encoded it (`prepareWallpaper`), which strips its location.
+   */
+  async copyForWallpaper(userId: string, mediaId: string): Promise<{ key: string }> {
+    const { key } = await this.copyImage(userId, mediaId, `wallpapers/${userId}/`, false);
+    return { key };
+  }
+
   private async copyImage(
     userId: string,
     mediaId: string,

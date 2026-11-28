@@ -148,3 +148,24 @@ test('Training shows on your portal and opens into the week, records and workout
   await page.waitForTimeout(400);
   await snap(page, '05-portal-training-folder');
 });
+
+test('a wallpaper fills the portal behind a see-through header, and the picker changes it', async ({ page }) => {
+  const ana = await account('Ana');
+  await call(ana, 'PUT', '/social/me/wallpaper', { preset: 'dusk' });
+  await signIn(page, ana);
+  await page.goto('/profile');
+  const wallpaper = page.locator('img[src="/wallpapers/dusk.jpg"]').first();
+  await expect(wallpaper).toBeAttached();
+  await expect(page.locator('html')).toHaveAttribute('data-wallpaper', 'on');
+  await page.waitForTimeout(400);
+  await snap(page, '05-portal-wallpaper');
+  await page.getByRole('button', { name: 'Wallpaper' }).filter({ visible: true }).first().click();
+  const picker = page.getByRole('dialog', { name: 'Wallpaper' });
+  await expect(picker.getByRole('button', { name: 'Dusk' })).toHaveAttribute('aria-pressed', 'true');
+  await snap(page, '05-portal-wallpaper-picker');
+  await picker.getByRole('button', { name: 'Aurora' }).click();
+  await expect(page.locator('img[src="/wallpapers/aurora.jpg"]').first()).toBeAttached();
+  // Leaving the portal hands the header and the status bar back.
+  await page.goto('/');
+  await expect(page.locator('html')).not.toHaveAttribute('data-wallpaper', 'on');
+});

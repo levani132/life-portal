@@ -5,11 +5,11 @@
 
 /** Field names that never leave in an export: credentials, hashes and where files are stored. */
 const SECRET_NAME = /(hash|secret|token|fingerprint)/i;
-const STORAGE_FIELDS = new Set(['key', 'posterKey', 'avatarKey']);
+const STORAGE_FIELDS = new Set(['key', 'posterKey', 'avatarKey', 'wallpaperKey']);
 const DROPPED_FIELDS = new Set(['linkKey', 'linkViewers', '__v']);
 
 /** A file's place in storage, as every upload and copy names it (see `MediaService`). */
-const STORAGE_KEY = /^(media|foods|brands|training|avatars|posts)\/[A-Za-z0-9/_-]+\.(jpg|mp4|webm|mov)$/;
+const STORAGE_KEY = /^(media|foods|brands|training|avatars|wallpapers|posts)\/[A-Za-z0-9/_-]+\.(jpg|mp4|webm|mov)$/;
 
 export function isStorageKey(value: unknown): value is string {
   return typeof value === 'string' && value.length <= 300 && STORAGE_KEY.test(value);

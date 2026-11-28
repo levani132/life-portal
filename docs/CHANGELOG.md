@@ -2,6 +2,14 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-28: Portal wallpaper
+
+- Your portal can have a wallpaper behind it, like a phone's home screen: tap **Wallpaper** on
+  your portal and pick one of ten made for the app, use your own photo, or none. It reaches the
+  top of the screen; on Android the status bar takes its colour. Everyone who can open your
+  portal sees it, like your profile photo. Your own photo is checked before it is shown, and its
+  location is removed before it leaves your phone.
+
 ## 2026-11-28: The identity chooser opens like a folder
 
 - Holding the Portal tab opens "Using the app as" the way a portal widget opens: it grows out of

@@ -2964,3 +2964,14 @@ filled in by the phone. A steps-only hour counts as covered in full, because pho
 cover only the minutes spent moving; counting only those minutes would replace almost none of
 the forecast and overstate the adjustment. The estimate is labelled everywhere it shows.
 
+## 2026-11-28: The portal gets a wallpaper, not a cover photo
+
+Shown two concepts, the owner chose a picture behind the whole portal over a banner in the header
+card: the portal is built like a phone's home screen, its widgets are already glass, and the
+picture can reach the top of the screen. Ten presets are drawn for the app, each fading to dark
+at the bottom, because a random photo is easy to get wrong. The readability risk of a photo
+behind text is handled by a veil of the theme's own surface that strengthens towards the bottom
+and as the page scrolls. Android cannot draw under its status bar, so it takes the picture's top
+colour instead. A wallpaper is public in the same way as a profile photo and goes through the same
+photo check; pages have none until pages' portals exist.
+

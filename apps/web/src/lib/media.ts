@@ -108,6 +108,29 @@ export async function prepareAvatar(file: Blob): Promise<PreparedMedia> {
   return { kind: 'image', blob, width: edge, height: edge, previewUrl: URL.createObjectURL(blob) };
 }
 
+/** Spec 048: a wallpaper's longest side. Enough for a phone's screen at 3×, small to send. */
+const WALLPAPER_EDGE = 2560;
+
+/**
+ * Spec 048: a portal wallpaper, scaled down and re-encoded as JPEG. Re-encoding is what strips
+ * the photo's location and every other piece of metadata; the original file is never sent.
+ */
+export async function prepareWallpaper(file: Blob): Promise<PreparedMedia> {
+  const image = await decode(file);
+  const width = 'naturalWidth' in image ? image.naturalWidth : image.width;
+  const height = 'naturalHeight' in image ? image.naturalHeight : image.height;
+  const scale = Math.min(1, WALLPAPER_EDGE / Math.max(width, height, 1));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('This browser cannot prepare photos.');
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  if ('close' in image) image.close();
+  const blob = await toJpeg(canvas, 0.84);
+  return { kind: 'image', blob, width: canvas.width, height: canvas.height, previewUrl: URL.createObjectURL(blob) };
+}
+
 /** Every brand logo is stored as this square, so they all sit the same in lists and chips. */
 export const LOGO_EDGE = 512;
 /** The margin kept around the artwork, as a share of the square's edge. */

@@ -1,4 +1,5 @@
 'use client';
+import clsx from 'clsx';
 import { GlassPill } from './glass-pill';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -11,6 +12,7 @@ import {
   Check,
   Eye,
   Lock,
+  Image as ImageIcon,
   ImagePlus,
   LockKeyhole,
   Menu,
@@ -60,6 +62,7 @@ import { useOfflineCopy } from '../lib/offline/use-offline-copy';
 import { requestNotificationOffer } from './notifications';
 import { messagingAvailable, openConversation } from './messages';
 import { PortalGrid } from './portal-grid';
+import { PortalWallpaperLayer, WallpaperPicker } from './portal-wallpaper';
 
 export function SharedWidgets({
   widgets,
@@ -409,6 +412,7 @@ export function ProfileView({ userId }: { userId?: string }) {
   // Spec 046: a person's portal opens on the Portal; a page (which shares no modules) on its posts.
   const [tab, setTab] = useState<'posts' | 'badges' | 'about'>('about');
   const [openBadge, setOpenBadge] = useState<BadgeId | null>(null);
+  const [choosingWallpaper, setChoosingWallpaper] = useState(false);
   // Spec 033: offline, the shell's kept portal state still says the Posts tab exists.
   const portalLive = useApi<PortalState>('/portal');
   const portal = { data: useOfflineCopy('shell:portal', portalLive).data };
@@ -442,13 +446,27 @@ export function ProfileView({ userId }: { userId?: string }) {
     ...(own && preview === 'normal' && !person.isPage ? (['badges'] as const) : []),
   ];
   const shown = tabs.find((value) => value === tab) ?? tabs[0];
+  // Spec 048: a wallpaper fills the screen behind the portal, and the header card turns to glass.
+  const wallpaper = person.isPage ? undefined : person.wallpaper;
+  const canChooseWallpaper = own && preview === 'normal' && !person.isPage && !actingPageId();
   return (
     <div className="mx-auto max-w-3xl">
-      <section className="card relative">
+      {wallpaper && <PortalWallpaperLayer wallpaper={wallpaper} />}
+      <section className={wallpaper ? 'relative rounded-xl border border-border/60 bg-surface-raised/55 backdrop-blur-xl' : 'card relative'}>
         <div
           aria-hidden
-          className="h-24 rounded-t-xl bg-gradient-to-br from-accent/30 via-special-solid/15 to-success-solid/10"
+          className={clsx('h-24 rounded-t-xl', !wallpaper && 'bg-gradient-to-br from-accent/30 via-special-solid/15 to-success-solid/10')}
         />
+        {canChooseWallpaper && (
+          <button
+            type="button"
+            className="absolute left-3 top-3 inline-flex h-9 items-center gap-1.5 rounded-full bg-black/35 px-3 text-xs font-medium text-white backdrop-blur"
+            onClick={() => setChoosingWallpaper(true)}
+          >
+            <ImageIcon size={15} aria-hidden />
+            Wallpaper
+          </button>
+        )}
         <div className="absolute right-3 top-3 flex items-center gap-1.5">
           {own ? (
             <OwnHeaderActions
@@ -501,6 +519,9 @@ export function ProfileView({ userId }: { userId?: string }) {
           )}
         </div>
       </section>
+      {canChooseWallpaper && (
+        <WallpaperPicker open={choosingWallpaper} current={person.wallpaper} onClose={() => setChoosingWallpaper(false)} />
+      )}
       {own && preview !== 'normal' && (
         <div
           role="status"

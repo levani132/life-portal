@@ -161,3 +161,15 @@ its shared parts. One square tall shows the card's first figure as a line; one s
 icon. The folder still shows the module's shared detail; making it the module's own screens in
 read-only form is the next step.
 
+## Portal wallpaper (spec 048)
+
+A portal can have a wallpaper: one of ten presets (`PORTAL_WALLPAPERS`, files in
+`apps/web/public/wallpapers`) or the person's own photo. `social_profiles.wallpaper` holds a
+preset's id and `wallpaperKey` an own photo's storage key, never both; responses carry
+`wallpaper: { preset } | { url }` on the profile and on the open portal. `PUT /social/me/wallpaper`
+(`{ preset }` or `{ mediaId }`) and `DELETE /social/me/wallpaper`; a page gets 403. An own photo is
+checked like a profile photo before it is stored; the old file is deleted on every change.
+On the web, `PortalWallpaperLayer` draws it fixed behind the screen and, while that portal is on
+screen, sets `html[data-wallpaper]` (the header turns see-through) and `data-wallpaper-top`
+(Android's status bar colour, via `ThemeSync`). See `specs/048-portal-wallpaper/spec.md`.
+
