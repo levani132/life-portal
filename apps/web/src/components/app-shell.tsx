@@ -1,7 +1,7 @@
 'use client';
 import { Wordmark } from './wordmark';
 import { ActAsLinks, IdentitySwitcher, switchToOtherIdentity } from './identity-switcher';
-import { Modal } from './ui';
+import { FolderSheet } from './folder-sheet';
 import { Avatar } from './avatar';
 import { useSocialApi } from '../lib/social-hooks';
 import type { SocialProfile } from '@life-portal/shared-types';
@@ -11,7 +11,7 @@ import { HealthSyncBridge } from './apple-health';
 import clsx from 'clsx';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import {
   ChevronLeft,
   Home,
@@ -20,6 +20,7 @@ import {
   Plus,
   Search,
   UserRound,
+  Users,
   LibraryBig,
   type LucideIcon,
 } from 'lucide-react';
@@ -98,7 +99,8 @@ function Portal({ children }: { children: ReactNode }) {
   }, [loading, user, needsSetup, pathname, router]);
   const [scrolledDown, revealChrome] = useScrolledDown(pathname);
   // Long-pressing the profile tab opens "Using the app as" here.
-  const [choosingIdentity, setChoosingIdentity] = useState(false);
+  // The tab's place on screen: the chooser grows out of it, like a portal widget's folder.
+  const [choosingIdentity, setChoosingIdentity] = useState<DOMRect | null>(null);
   // Only the feed's header gets out of the way; the tab bar shrinks on every page instead.
   const chromeHidden = scrolledDown && pathname === '/';
   // iOS can leave the screen shifted after the keyboard: the bar and header follow it.
@@ -272,7 +274,7 @@ function Portal({ children }: { children: ReactNode }) {
                         if (problem) window.alert(problem);
                       }),
                     // A long press opens "Using the app as": yourself and every page you manage.
-                    onLongPress: () => setChoosingIdentity(true),
+                    onLongPress: (from) => setChoosingIdentity(from),
                   }
                 : {})}
             >
@@ -299,9 +301,7 @@ function Portal({ children }: { children: ReactNode }) {
         </div>
       </nav>
       {/* Always in the tree (the shell's tree never changes shape); open only after a long press. */}
-      <Modal open={choosingIdentity} onClose={() => setChoosingIdentity(false)} title="Using the app as">
-        <IdentitySwitcher inSheet />
-      </Modal>
+      <IdentityFolder from={choosingIdentity} onClose={() => setChoosingIdentity(null)} />
     </div>
   );
 }
@@ -491,8 +491,8 @@ function TabLink({
   picture?: ReactNode;
   /** Two taps within a moment. The first tap has already opened the tab. */
   onDoubleTap?: () => void;
-  /** Held for half a second. The tab is not opened. */
-  onLongPress?: () => void;
+  /** Held for half a second, with where the tab is. The tab is not opened. */
+  onLongPress?: (from: DOMRect) => void;
 }) {
   const lastTap = useRef(0);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -508,13 +508,14 @@ function TabLink({
       scroll={false}
       {...(onLongPress
         ? {
-            onPointerDown: () => {
+            onPointerDown: (event: ReactPointerEvent<HTMLAnchorElement>) => {
               pressed.current = false;
               cancelPress();
+              const tab = event.currentTarget;
               pressTimer.current = setTimeout(() => {
                 pressed.current = true;
                 navigator.vibrate?.(10);
-                onLongPress();
+                onLongPress(tab.getBoundingClientRect());
               }, LONG_PRESS_MS);
             },
             onPointerUp: cancelPress,
@@ -650,3 +651,26 @@ function tabsFor(
 }
 
 export { PageHeader } from './page-header';
+
+/**
+ * "Using the app as", after a long press on the Portal tab: it grows out of the tab the way a
+ * portal widget opens. Always in the shell's tree (rendering nothing while closed), so opening it
+ * never changes the tree's shape.
+ */
+function IdentityFolder({ from, onClose }: { from: DOMRect | null; onClose: () => void }) {
+  if (!from) return null;
+  return (
+    <FolderSheet
+      from={from}
+      label="Using the app as"
+      onClose={onClose}
+      icon={
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-solid/15 text-accent">
+          <Users size={18} aria-hidden />
+        </span>
+      }
+    >
+      <IdentitySwitcher inSheet />
+    </FolderSheet>
+  );
+}

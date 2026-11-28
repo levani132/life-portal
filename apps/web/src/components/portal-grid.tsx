@@ -11,6 +11,7 @@ import { revalidate } from '../lib/hooks';
 import { MACRO_COLORS } from '../lib/macro-colors';
 import { HomeWidget, MacroBar, NutritionRing, WIDGET_HUES, WIDGET_ICONS, type NutritionMetric } from './home-widget';
 import { DailyFoodDiary } from './shared-food-diary';
+import { FolderSheet } from './folder-sheet';
 import { HistoryRow } from './training/history-row';
 import { RankEmblem } from './training/rank-emblem';
 import { TrainingHeroView } from './training/training-hero';
@@ -592,67 +593,23 @@ function SizePicker({ anchor, current, onPick, onClose }: { anchor: DOMRect; cur
  * screen, with everything that module shares. Closed by its button, a tap outside or Escape.
  */
 function PortalFolder({ widget, from, ownerId, viewAs, onClose }: { widget: SharedWidget; from: DOMRect; ownerId?: string; viewAs: Viewer; onClose: () => void }) {
-  const panel = useRef<HTMLDivElement>(null);
-  const [shown, setShown] = useState(false);
   const key = keyOf(widget.module);
   const Icon = WIDGET_ICONS[key] ?? WIDGET_ICONS.projects;
   const hue = WIDGET_HUES[key] ?? WIDGET_HUES.projects;
-  // Starts as the widget it came from, then grows into place.
-  useLayoutEffect(() => {
-    const node = panel.current;
-    if (!node) return;
-    const to = node.getBoundingClientRect();
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!reduce) {
-      node.style.transformOrigin = 'top left';
-      node.style.transform = `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})`;
-      node.getBoundingClientRect();
-    }
-    requestAnimationFrame(() => {
-      node.style.transition = 'transform 320ms cubic-bezier(0.2, 0.9, 0.3, 1), opacity 200ms';
-      node.style.transform = '';
-      setShown(true);
-    });
-  }, [from]);
-  useEffect(() => {
-    const esc = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
-    document.addEventListener('keydown', esc);
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', esc);
-      document.body.style.overflow = overflow;
-    };
-  }, [onClose]);
-  return createPortal(
-    <div className="fixed inset-0 z-[55]" role="dialog" aria-modal="true" aria-label={widget.title}>
-      <button
-        type="button"
-        aria-label="Close"
-        className={clsx('absolute inset-0 bg-surface/50 backdrop-blur-xl transition-opacity duration-300', shown ? 'opacity-100' : 'opacity-0')}
-        onClick={onClose}
-      />
-      <div
-        ref={panel}
-        // Centred between the top chrome and the tab bar: a short folder sits mid-screen, a long one fills the band.
-        className="card home-widget absolute inset-x-3 bottom-[calc(env(safe-area-inset-bottom,0px)+5rem)] top-[max(4rem,calc(var(--top-chrome,0px)+3rem))] mx-auto my-auto flex h-fit max-h-[78vh] max-w-2xl flex-col overflow-hidden rounded-3xl shadow-2xl"
-      >
-        <header className="flex items-center gap-2.5 px-4 pb-2 pt-4">
-          <span className={clsx('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', hue.tile)}>
-            <Icon size={18} aria-hidden />
-          </span>
-          <h2 className="min-w-0 flex-1 truncate text-lg font-semibold">{widget.title}</h2>
-          <span className="shrink-0 text-xs text-ink-faint">{widget.audience === 'friends' ? 'Friends' : 'Everyone'}</span>
-          <button type="button" aria-label="Close" className="ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink/5 text-ink-muted" onClick={onClose}>
-            <X size={16} />
-          </button>
-        </header>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-5">
-          <FolderBody widget={widget} ownerId={ownerId} viewAs={viewAs} />
-        </div>
-      </div>
-    </div>,
-    document.body,
+  return (
+    <FolderSheet
+      from={from}
+      label={widget.title}
+      onClose={onClose}
+      aside={widget.audience === 'friends' ? 'Friends' : 'Everyone'}
+      icon={
+        <span className={clsx('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', hue.tile)}>
+          <Icon size={18} aria-hidden />
+        </span>
+      }
+    >
+      <FolderBody widget={widget} ownerId={ownerId} viewAs={viewAs} />
+    </FolderSheet>
   );
 }
 

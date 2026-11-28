@@ -2,6 +2,11 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-28: The identity chooser opens like a folder
+
+- Holding the Portal tab opens "Using the app as" the way a portal widget opens: it grows out of
+  the tab over a blurred screen.
+
 ## 2026-11-27: My Portal, part five
 
 - Opening Food on a portal shows the shared diary the way the Food page draws it: each meal's
