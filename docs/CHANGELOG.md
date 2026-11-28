@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-28: Onboarding, Android and small widgets
+
+- Setting up the app no longer shows the tab bar or a back arrow: setup has the screen to itself.
+- A one-row portal widget (such as Training two squares wide) no longer cuts its line off on
+  Android.
+- Android's status bar follows the app's light or dark theme from the first moment it opens.
+
 ## 2026-11-28: Portal wallpaper
 
 - Your portal can have a wallpaper behind it, like a phone's home screen: tap **Wallpaper** on

@@ -260,7 +260,8 @@ function PortalWidget({
       ref={ref}
       className={clsx(
         'card home-widget relative flex h-full flex-col overflow-hidden rounded-2xl',
-        icon ? 'items-center justify-center p-1.5' : 'px-3 pb-2.5 pt-2.5',
+        // One row is short (flatter than square): a tighter frame, so its line is never cut off.
+        icon ? 'items-center justify-center p-1.5' : size.h === 1 ? 'px-3 py-1.5' : 'px-3 pb-2.5 pt-2.5',
         editing && !state?.dragging && 'widget-jiggle',
         state?.dragging && 'border-accent shadow-xl',
         !editing && 'cursor-pointer active:scale-[0.98] transition-transform',
@@ -288,8 +289,8 @@ function PortalWidget({
         </>
       ) : (
         <>
-          <header className="mb-1.5 flex items-center gap-2 pr-7">
-            <span className={clsx('widget-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-lg', hue.tile)}>
+          <header className={clsx('flex items-center gap-2 pr-7', size.h === 1 ? 'mb-0' : 'mb-1.5')}>
+            <span className={clsx('widget-icon flex shrink-0 items-center justify-center rounded-lg', size.h === 1 ? 'h-6 w-6' : 'h-7 w-7', hue.tile)}>
               <Icon size={15} aria-hidden />
             </span>
             <h3 className="widget-title truncate text-sm font-semibold">{widget.title}</h3>
@@ -310,8 +311,8 @@ function WidgetBody({ widget, w, h }: { widget: SharedWidget; w: number; h: numb
   const first = widget.card?.stats[0];
   if (h === 1 && first)
     return (
-      <p className="mt-auto truncate text-sm">
-        <strong className="text-lg tabular">{first.value}</strong>
+      <p className="mt-auto truncate text-sm leading-tight">
+        <strong className="text-base tabular">{first.value}</strong>
         <span className="text-ink-muted"> {first.label.toLowerCase()}{widget.card?.subtitle ? ` ${widget.card.subtitle}` : ''}</span>
       </p>
     );
@@ -351,8 +352,8 @@ function FoodBody({ widget, w, h }: { widget: SharedWidget; w: number; h: number
   const target = widget.food?.targets?.kcal;
   if (h === 1)
     return (
-      <p className="mt-auto truncate text-sm">
-        <strong className="text-lg tabular">{today.eatenKcal.toLocaleString('en-GB')}</strong>
+      <p className="mt-auto truncate text-sm leading-tight">
+        <strong className="text-base tabular">{today.eatenKcal.toLocaleString('en-GB')}</strong>
         <span className="text-ink-muted"> {target ? `/ ${target.toLocaleString('en-GB')} kcal` : 'kcal today'}</span>
       </p>
     );
@@ -381,8 +382,8 @@ function TrainingBody({ widget, w, h }: { widget: SharedWidget; w: number; h: nu
   const workouts = training.workouts!;
   if (h === 1)
     return (
-      <p className="mt-auto truncate text-sm">
-        <strong className="text-lg tabular">{workouts.thisWeek}</strong>
+      <p className="mt-auto truncate text-sm leading-tight">
+        <strong className="text-base tabular">{workouts.thisWeek}</strong>
         <span className="text-ink-muted"> {workouts.thisWeek === 1 ? 'workout' : 'workouts'} this week</span>
       </p>
     );

@@ -2975,3 +2975,12 @@ and as the page scrolls. Android cannot draw under its status bar, so it takes t
 colour instead. A wallpaper is public in the same way as a profile photo and goes through the same
 photo check; pages have none until pages' portals exist.
 
+## 2026-11-28: Android's status bar colour is set per scheme and in hex
+
+On Android the status bar is whatever `theme-color` says; the page can never show under it. A
+friend's phone showed a bar that did not match the header. The page now ships one `theme-color` per
+colour scheme (so the first paint is right before any script runs), and `ThemeSync` writes the
+theme's surface to every one of them as hex, which every Android browser reads, instead of an
+`rgb()` value to the first tag only. While a portal's wallpaper is on screen it writes the
+picture's top colour instead.
+

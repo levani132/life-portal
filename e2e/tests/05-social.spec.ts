@@ -159,6 +159,11 @@ test('a wallpaper fills the portal behind a see-through header, and the picker c
   await expect(page.locator('html')).toHaveAttribute('data-wallpaper', 'on');
   await page.waitForTimeout(400);
   await snap(page, '05-portal-wallpaper');
+  // Dark mode too: the veil follows the theme's own surface.
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.waitForTimeout(300);
+  await snap(page, '05-portal-wallpaper-dark');
+  await page.emulateMedia({ colorScheme: 'light' });
   await page.getByRole('button', { name: 'Wallpaper' }).filter({ visible: true }).first().click();
   const picker = page.getByRole('dialog', { name: 'Wallpaper' });
   await expect(picker.getByRole('button', { name: 'Dusk' })).toHaveAttribute('aria-pressed', 'true');

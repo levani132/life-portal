@@ -159,7 +159,7 @@ function Portal({ children }: { children: ReactNode }) {
             {/* Spec 027: the sync state, when there is one. Empty and the same size otherwise. */}
             {/* Off the tabs, the way back: screens carry no title bar of their own (see CLAUDE.md). */}
             <div className="flex h-10 items-center gap-1 pl-1">
-              {current < 0 && (
+              {current < 0 && pathname !== '/setup' && (
                 <button
                   type="button"
                   aria-label="Back"
@@ -227,8 +227,9 @@ function Portal({ children }: { children: ReactNode }) {
       {/* A floating glass capsule, in the manner of iOS's tab bars: the page scrolls under it,
           and a pill slides to the open tab. Only the capsule takes touches; the band beside
           it lets them through to the page. */}
+      {/* Onboarding owns the screen too: the tabs would lead away from a setup not yet finished. */}
       <nav
-        hidden={inChat}
+        hidden={inChat || pathname === '/setup'}
         aria-label="Main navigation"
         onFocusCapture={revealChrome}
         className={clsx(

@@ -277,6 +277,12 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   not a tab. `PageHeader` stays for tool screens reached from Menu (settings, money, admin),
   where the title is the only thing saying where you are; even there, a subtitle only when it
   says something the screen does not.
+- **Everything is built for light and dark mode alike** (owner, 2026-11-28). Check a new screen
+  in both (a screen test can `page.emulateMedia({ colorScheme: 'dark' })`); anything drawn over a
+  picture uses the theme's own surface for its veil, never a fixed black or white.
+- **Android's status bar is `theme-color`, never the page.** It cannot draw under the bar.
+  `ThemeSync` sets every `theme-color` tag (one per scheme in `layout.tsx`) to the theme's surface
+  as hex, or to a portal wallpaper's top colour while one is on screen.
 - **Never write a palette colour or a literal in the web app** (spec 037). Every colour is a
   role from `THEME_ROLES` (`text-ink`, `bg-danger-solid/10`, `rgb(var(--macro-kcal))`), because
   the active theme is data: `text-emerald-400` would ignore it. A plain role is text; its

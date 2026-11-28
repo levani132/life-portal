@@ -41,7 +41,12 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0C0E14',
+  // Android's status bar is this colour (it cannot show the page under it). One per scheme, so the
+  // first paint is already right; `ThemeSync` then sets both to the theme actually in use.
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f5f7fa' },
+    { media: '(prefers-color-scheme: dark)', color: '#0c0e14' },
+  ],
   width: 'device-width',
   initialScale: 1,
   // Zoom is locked off. Installed on a phone this is an app, not a page: a stray pinch left the

@@ -35,6 +35,22 @@ function usePreference() {
   );
 }
 
+/** `12 14 20` as `#0c0e14`: hex is what every Android browser reads in `theme-color`. */
+function hex(rgb: string) {
+  return `#${rgb
+    .split(' ')
+    .map((part) => Math.min(255, Number(part)).toString(16).padStart(2, '0'))
+    .join('')}`;
+}
+
+/**
+ * Every `theme-color` tag (there is one per colour scheme), so whichever one Android reads says
+ * the colour actually in use, also when the app's theme differs from the phone's.
+ */
+function setThemeColor(colour: string) {
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => meta.setAttribute('content', colour));
+}
+
 /** Keep native controls and browser chrome aligned with the resolved palette. */
 export function ThemeSync() {
   const preference = usePreference();
@@ -52,14 +68,12 @@ export function ThemeSync() {
       // Spec 048: while a portal's wallpaper is on screen, the bar takes the wallpaper's top colour.
       const wallpaperTop = document.documentElement.dataset.wallpaperTop;
       if (wallpaperTop) {
-        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', wallpaperTop);
+        setThemeColor(wallpaperTop);
         return;
       }
       const surface = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim();
       const fallback = theme === 'dark' ? '#0c0e14' : '#f5f7fa';
-      document
-        .querySelector('meta[name="theme-color"]')
-        ?.setAttribute('content', /^\d{1,3} \d{1,3} \d{1,3}$/.test(surface) ? `rgb(${surface.split(' ').join(', ')})` : fallback);
+      setThemeColor(/^\d{1,3} \d{1,3} \d{1,3}$/.test(surface) ? hex(surface) : fallback);
     }
     apply();
     media.addEventListener('change', apply);
