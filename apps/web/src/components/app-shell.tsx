@@ -157,7 +157,7 @@ function Portal({ children }: { children: ReactNode }) {
       {!inChat && (
         <ScrollHeader hidden={chromeHidden} onReveal={revealChrome}>
           {/* Name in the middle, Activity on the right. New posts start from the tab bar. */}
-          <div className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-2 py-2">
+          <div className="header-row mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-2 py-2">
             {/* Spec 027: the sync state, when there is one. Empty and the same size otherwise. */}
             {/* Off the tabs, the way back: screens carry no title bar of their own (see CLAUDE.md). */}
             <div className="flex h-10 items-center gap-1 pl-1">
@@ -174,7 +174,7 @@ function Portal({ children }: { children: ReactNode }) {
               <SyncStatus />
             </div>
             <Link href="/" aria-label="Home">
-              <Wordmark />
+              <Wordmark className="wordmark-title" />
             </Link>
             <div className="flex items-center justify-end gap-1 pr-2">
               {isPage && portal.data.access.social && (
@@ -429,8 +429,12 @@ const NO_ACCESS = {} as PortalState['access'];
 /** The page padding for a route. The tab pager's previews use it too, so they line up exactly. */
 function mainClassFor(pathname: string): string {
   const chat = /^\/messages\/[^/]+/.test(pathname) || pathname === '/new';
+  // A portal sits close to the screen's edges, like a phone's home screen (owner, 2026-11-28).
+  // `--page-gutter` is the side padding, so edge-to-edge content (the feed) can bleed by it exactly.
+  const portal = pathname === '/profile' || pathname.startsWith('/people/');
   return clsx(
-    'mx-auto max-w-7xl px-4',
+    'mx-auto max-w-7xl px-[var(--page-gutter)]',
+    portal ? '[--page-gutter:0.5rem]' : '[--page-gutter:1rem]',
     chat ? 'pb-0' : 'pb-[calc(6rem+env(safe-area-inset-bottom))]',
     // A portal starts right under the header, like the feed: the card is its own top.
     pathname === '/' || pathname === '/profile' || pathname.startsWith('/people/') ? 'pt-2' : chat ? 'pt-0' : 'pt-6',

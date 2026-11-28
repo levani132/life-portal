@@ -228,7 +228,7 @@ export function PostsList({
   return (
     <FeedMetricsContext.Provider value={tracker}>
     <div className="space-y-5">
-      <div className="-mx-4 space-y-0.5 sm:mx-0 sm:space-y-5">
+      <div className="-mx-[var(--page-gutter,1rem)] space-y-0.5 sm:mx-0 sm:space-y-5">
         {posts.map((post) => {
           const key = post.repost?.id ?? post.id;
           const hiddenBy = hiddenAuthors[post.author.userId];
@@ -614,7 +614,7 @@ export function PostCard({
         </p>
       )}
       {post.media.length > 0 && !hasFood && (
-        <div className="-mx-4 mt-4 sm:mx-0">
+        <div className="-mx-[var(--page-gutter,1rem)] mt-4 sm:mx-0">
           <PostMediaCarousel media={post.media} />
         </div>
       )}

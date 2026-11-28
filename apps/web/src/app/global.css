@@ -1028,6 +1028,22 @@ html[data-wallpaper] .portal-post {
 @media (max-width: 639px) {
   /* On a phone the feed runs edge to edge; over a wallpaper the cards line up with the widgets. */
   html[data-wallpaper] .portal-post {
-    margin-inline: 1rem;
+    margin-inline: var(--page-gutter, 1rem);
   }
 }
+
+/*
+ * Over a wallpaper the header's controls sit on whatever colour the picture has at the top, so
+ * each gets its own glass disc, like the portal's own buttons; the name gets a soft shadow.
+ */
+html[data-wallpaper] .portal-header .header-row :is(a, button):not([aria-label="Home"]) {
+  border-radius: 9999px;
+  background-color: rgb(var(--surface) / 0.55);
+  color: rgb(var(--ink));
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+html[data-wallpaper] .portal-header .wordmark-title {
+  text-shadow: 0 1px 8px rgb(var(--surface) / 0.6);
+}
+

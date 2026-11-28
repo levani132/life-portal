@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-28: A wider portal, readable header buttons
+
+- A portal sits much closer to the screen's edges (8 px instead of 16), like a phone's home screen.
+- Over a wallpaper, the header's buttons (back, search, Activity) each sit on a glass disc, so they
+  stay readable on a bright picture.
+
 ## 2026-11-28: No hard lines over a wallpaper
 
 - At the top of a page the header is fully clear; it turns to glass only once something scrolls
