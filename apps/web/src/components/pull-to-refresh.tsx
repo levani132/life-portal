@@ -167,7 +167,9 @@ export function PullToRefresh({
     <div className="relative">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-center overflow-hidden"
+        // Above the content: while it is pulled, its transform makes it a layer of its own that
+        // would otherwise cover the ring, and a wallpaper band (Home) fills that space.
+        className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-center overflow-hidden"
         style={{ height: pull, opacity: refreshing ? 1 : progress }}
       >
         <RefreshRing progress={progress} spinning={refreshing} />

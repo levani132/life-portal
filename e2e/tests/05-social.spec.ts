@@ -92,6 +92,7 @@ test('your portal shows Food as a large widget, and you can arrange it', async (
   // Touching a day's bar reads it out, like Apple Health.
   const bars = folder.getByRole('img', { name: /Calories each day this week/ });
   await bars.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
   const area = (await bars.boundingBox())!;
   await page.mouse.click(area.x + area.width - 4, area.y + area.height - 4);
   await expect(folder.getByRole('status')).toContainText('kcal');
@@ -183,6 +184,8 @@ test('a wallpaper fills the portal behind a see-through header, and the picker c
   // Home shows the same wallpaper behind its top, down to the feed; posts there keep their look.
   await page.goto('/');
   await expect(page.locator('html')).toHaveAttribute('data-wallpaper', 'band');
+  // Fixed on the page itself, as on a portal: scrolling and pulling to refresh never move it.
+  expect(await page.locator('img[src^="/wallpapers/"]').first().evaluate((node) => getComputedStyle(node.parentElement!).position === 'fixed' && node.parentElement!.parentElement === document.body)).toBe(true);
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.waitForTimeout(400);
   await snap(page, '05-home-wallpaper');

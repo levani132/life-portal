@@ -186,9 +186,10 @@ export function Dashboard() {
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="sr-only">Home</h1>
-      {/* Your portal's wallpaper behind Home's top, down to the feed (owner, 2026-11-28). */}
-      <div className="relative pb-3">
+      {/* Your portal's wallpaper, fixed behind Home's top; the feed below is solid and slides over
+          it as you scroll (owner, 2026-11-28). */}
       {wallpaper && <PortalWallpaperLayer wallpaper={wallpaper} variant="band" />}
+      <div className="pb-3">
       {/* A failed refresh keeps the cards that were loaded (issue #34). */}
       {error && <LoadProblemBar error={error} onRetry={() => void reload()} />}
       {(saveError || startError) && (
@@ -237,6 +238,16 @@ export function Dashboard() {
       )}
       </div>
 
+      {/* Over a wallpaper the feed is solid and full width, so it slides up over the fixed picture
+          as you scroll, and the picture shows only above it. It also covers the page's bottom
+          padding, so the picture never peeks out under the tab bar. */}
+      <div
+        className={
+          wallpaper
+            ? '-mx-[var(--page-gutter)] -mb-[calc(6rem+env(safe-area-inset-bottom))] min-h-[60vh] bg-surface px-[var(--page-gutter)] pb-[calc(6rem+env(safe-area-inset-bottom))] pt-1'
+            : undefined
+        }
+      >
       {/* Spec 032: posts written offline, before they are published. */}
       {canReadPosts && <PostDrafts />}
       {canReadPosts && portal.data?.access.forYou && <HomeFeed />}
@@ -384,6 +395,7 @@ export function Dashboard() {
           slot={logging}
         />
       )}
+      </div>
     </div>
   );
 }

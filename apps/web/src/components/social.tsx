@@ -466,7 +466,7 @@ export function ProfileView({ userId }: { userId?: string }) {
         )}
         <div aria-hidden className="h-14" />
         {/* The buttons sit in the empty space right of the photo: yours, or what you can do here. */}
-        <div className="absolute right-3 top-3 flex items-center gap-1.5">
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5">
           {own ? (
             <OwnHeaderActions
               person={person}

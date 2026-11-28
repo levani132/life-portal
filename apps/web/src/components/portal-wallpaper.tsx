@@ -39,9 +39,9 @@ export function PortalWallpaperLayer({
 }: {
   wallpaper: PortalWallpaper;
   /**
-   * `screen`: behind the whole portal, fixed. `band`: Home's top (owner, 2026-11-28): the picture
-   * runs from under the status bar to the bottom of the component's parent (which must be
-   * `relative`), scrolls with the page and fades into it; the feed below keeps its own look.
+   * `screen`: a portal. `band`: Home (owner, 2026-11-28): the same fixed picture, but Home's feed
+   * keeps its own look (its section is solid and slides over the picture), so posts are not
+   * turned to glass (`data-wallpaper="band"` instead of `"on"`).
    */
   variant?: 'screen' | 'band';
 }) {
@@ -122,24 +122,6 @@ export function PortalWallpaperLayer({
       if (frame) cancelAnimationFrame(frame);
     };
   }, [onScreen]);
-
-  if (variant === 'band')
-    return (
-      <>
-        <span ref={host} hidden />
-        {/* From the very top of the screen (under the header and the status bar) to the bottom of
-            the parent, the full width of the screen. */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute bottom-0 left-1/2 -z-10 w-screen -translate-x-1/2 overflow-hidden"
-          style={{ top: 'calc(-1 * (var(--top-chrome, 0px) + 4rem))' }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element -- a signed, expiring link; next/image would cache it. */}
-          <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover object-top" decoding="async" />
-          <div className="absolute inset-0 bg-gradient-to-b from-surface/10 via-surface/20 via-60% to-surface" />
-        </div>
-      </>
-    );
 
   return (
     <>
