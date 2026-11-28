@@ -180,19 +180,31 @@ test('a wallpaper fills the portal behind a see-through header, and the picker c
   await snap(page, '05-portal-wallpaper-picker');
   await picker.getByRole('button', { name: 'Aurora' }).click();
   await expect(page.locator('img[src="/wallpapers/aurora.jpg"]').first()).toBeAttached();
-  // Leaving the portal hands the header and the status bar back.
+  // Home shows the same wallpaper behind its top, down to the feed; posts there keep their look.
   await page.goto('/');
-  await expect(page.locator('html')).not.toHaveAttribute('data-wallpaper', 'on');
+  await expect(page.locator('html')).toHaveAttribute('data-wallpaper', 'band');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.waitForTimeout(400);
+  await snap(page, '05-home-wallpaper');
+  await page.emulateMedia({ colorScheme: 'light' });
+  // A screen without one hands the header and the status bar back.
+  await page.goto('/menu');
+  await expect(page.locator('html')).not.toHaveAttribute('data-wallpaper', /.+/);
 });
 
 test('someone else’s portal: their wallpaper, and the buttons beside their photo', async ({ page }) => {
   const ana = await account('Ana');
   const beka = await account('Beka');
   await call(ana, 'PUT', '/social/me/wallpaper', { preset: 'aurora' });
+  // A long name wraps beside the photo and must stay below the buttons.
+  await call(ana, 'PUT', '/social/me', { username: `ana-${randomUUID().slice(0, 6)}`, displayName: 'Anastasia Konstantinopolskaya-Beridze', bio: '', discoverable: false });
   await signIn(page, beka);
   await page.goto(`/people/${ana.id}`);
   await expect(page.locator('img[src="/wallpapers/aurora.jpg"]').first()).toBeAttached();
   await expect(page.getByRole('button', { name: 'Add friend' }).filter({ visible: true }).first()).toBeVisible();
+  const button = (await page.getByRole('button', { name: 'Add friend' }).filter({ visible: true }).first().boundingBox())!;
+  const name = (await page.getByRole('heading', { level: 1, name: /Anastasia/ }).filter({ visible: true }).first().boundingBox())!;
+  expect(name.y).toBeGreaterThanOrEqual(button.y + button.height - 1);
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.waitForTimeout(300);
   await snap(page, '05-portal-someone-else');

@@ -75,15 +75,16 @@ export function PublicPortalView({ username }: { username: string }) {
               <div aria-hidden className={portal.data.wallpaper ? 'h-14' : 'h-14 rounded-t-xl bg-gradient-to-br from-accent/30 via-special-solid/15 to-success-solid/10'} />
               <div className="px-5 pb-5">
                 {/* As on a signed-in portal: the name beside the photo. */}
-                <div className="-mt-8 flex items-end gap-3">
-                  <Avatar name={portal.data.displayName} url={portal.data.avatarUrl} size={96} className="shrink-0 ring-4 ring-surface-raised" />
-                  <div className="min-w-0 flex-1 pb-1">
-                    <h1 className="break-words text-xl font-semibold leading-tight sm:text-2xl">
+                <div className="-mt-8 flex items-stretch gap-3">
+                  <Avatar name={portal.data.displayName} url={portal.data.avatarUrl} size={96} className="shrink-0 self-start ring-4 ring-surface-raised" />
+                  {/* As on a signed-in portal: the name centred on the photo, the username under it. */}
+                  <div className="grid min-w-0 flex-1 grid-rows-[minmax(0,1fr)_auto_minmax(min-content,1fr)]">
+                    <h1 className="row-start-2 min-w-0 break-words text-xl font-semibold leading-tight sm:text-2xl">
                       {portal.data.displayName}
                       {portal.data.official && <OfficialMark className="ml-1.5" />}
                       {portal.data.isPage && <PageMark className="ml-2" ai={portal.data.aiManaged} />}
                     </h1>
-                    <p className="truncate text-sm text-ink-faint">@{portal.data.username}</p>
+                    <p className="row-start-3 mt-0.5 truncate self-start text-sm text-ink-faint">@{portal.data.username}</p>
                   </div>
                 </div>
                 {portal.data.bio && <p className="mt-2 whitespace-pre-wrap break-words text-sm">{portal.data.bio}</p>}

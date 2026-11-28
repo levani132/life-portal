@@ -479,21 +479,24 @@ export function ProfileView({ userId }: { userId?: string }) {
         <div className="px-5 pb-5">
           {/* The name sits beside the photo, under the buttons: the space right of the photo was
               empty, and the card is shorter for it (owner, 2026-11-28). */}
-          <div className="-mt-8 flex items-end gap-3">
-            <div className="shrink-0">
+          <div className="-mt-8 flex items-stretch gap-3">
+            <div className="shrink-0 self-start">
               {own ? (
                 <AvatarEditor person={person} />
               ) : (
                 <ViewableAvatar name={person.displayName} url={person.avatarUrl} />
               )}
             </div>
-            <div className="min-w-0 flex-1 pb-1">
-              <h1 className="break-words text-xl font-semibold leading-tight sm:text-2xl">
+            {/* The name alone is centred on the photo; the username hangs under it, in the lower
+                half. The top track may not shrink below the buttons' bottom edge (1.5rem into the
+                photo's height), so a long name that wraps moves down instead of under them. */}
+            <div className="grid min-w-0 flex-1 grid-rows-[minmax(1.5rem,1fr)_auto_minmax(min-content,1fr)]">
+              <h1 className="row-start-2 min-w-0 break-words text-xl font-semibold leading-tight sm:text-2xl">
                 {person.displayName}
                 {person.official && <OfficialMark className="ml-1.5" />}
                 {person.isPage && <PageMark className="ml-2" ai={person.aiManaged} />}
               </h1>
-              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-ink-faint">
+              <p className="row-start-3 mt-0.5 flex min-w-0 flex-wrap items-start gap-x-2 self-start text-sm text-ink-faint">
                 <span className="truncate">@{person.username}</span>
                 {!person.isPage && <RelationshipChip person={person} />}
               </p>

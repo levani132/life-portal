@@ -18,6 +18,13 @@ or a cover photo in the header card). Chosen: the wallpaper, running under the i
   reports `hasWallpaper`; the playbook's WALLPAPERS section has the workers generate one per page
   (945×2048, subject in the top third, dark bottom half) and fall back to a preset per page kind.
 
+## On Home
+
+`PortalWallpaperLayer variant="band"` draws the same picture behind Home's top: from under the
+status bar to the bottom of the widget carousel, scrolling with the page and fading into the
+theme's surface. It sets `html[data-wallpaper='band']`, which clears the header like a portal but
+leaves posts alone (only `data-wallpaper='on'` turns them to glass).
+
 ## Chrome
 
 - While a portal with a wallpaper is the one on screen, `html[data-wallpaper]` makes the app's

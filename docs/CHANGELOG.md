@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-28: Your wallpaper on Home, the name centred on the photo
+
+- Home shows your portal's wallpaper behind its top, from under the status bar down to the feed,
+  fading into it. The feed and its posts look as before.
+- On a portal the name sits at the middle of the photo with the @username under it; a long name
+  that wraps moves down rather than running under the buttons.
+
 ## 2026-11-28: The name beside the photo
 
 - On a portal (yours, someone else's, a page's, and the open view for visitors) the name and

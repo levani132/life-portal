@@ -33,7 +33,18 @@ let chromeOwner: symbol | null = null;
  * it (the pull showed the page's background above a dragged wallpaper). Only a marker stays here,
  * to tell whether this portal is the one on screen.
  */
-export function PortalWallpaperLayer({ wallpaper }: { wallpaper: PortalWallpaper }) {
+export function PortalWallpaperLayer({
+  wallpaper,
+  variant = 'screen',
+}: {
+  wallpaper: PortalWallpaper;
+  /**
+   * `screen`: behind the whole portal, fixed. `band`: Home's top (owner, 2026-11-28): the picture
+   * runs from under the status bar to the bottom of the component's parent (which must be
+   * `relative`), scrolls with the page and fades into it; the feed below keeps its own look.
+   */
+  variant?: 'screen' | 'band';
+}) {
   const host = useRef<HTMLSpanElement>(null);
   const [onScreen, setOnScreen] = useState(false);
   const dim = useRef<HTMLDivElement>(null);
@@ -69,7 +80,8 @@ export function PortalWallpaperLayer({ wallpaper }: { wallpaper: PortalWallpaper
       setOnScreen(visible);
       if (visible) {
         chromeOwner = token;
-        root.dataset.wallpaper = 'on';
+        // `on` also turns the portal's posts to glass; Home's band leaves its feed as it is.
+        root.dataset.wallpaper = variant === 'band' ? 'band' : 'on';
         if (top) root.dataset.wallpaperTop = top;
         else delete root.dataset.wallpaperTop;
       } else if (chromeOwner === token) {
@@ -91,7 +103,7 @@ export function PortalWallpaperLayer({ wallpaper }: { wallpaper: PortalWallpaper
         window.dispatchEvent(new Event(THEME_APPLIED_EVENT));
       }
     };
-  }, [top, pathname]);
+  }, [top, pathname, variant]);
 
   // The further down the page, the stronger the veil: posts are read over a quiet background.
   useEffect(() => {
@@ -110,6 +122,24 @@ export function PortalWallpaperLayer({ wallpaper }: { wallpaper: PortalWallpaper
       if (frame) cancelAnimationFrame(frame);
     };
   }, [onScreen]);
+
+  if (variant === 'band')
+    return (
+      <>
+        <span ref={host} hidden />
+        {/* From the very top of the screen (under the header and the status bar) to the bottom of
+            the parent, the full width of the screen. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute bottom-0 left-1/2 -z-10 w-screen -translate-x-1/2 overflow-hidden"
+          style={{ top: 'calc(-1 * (var(--top-chrome, 0px) + 4rem))' }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- a signed, expiring link; next/image would cache it. */}
+          <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover object-top" decoding="async" />
+          <div className="absolute inset-0 bg-gradient-to-b from-surface/10 via-surface/20 via-60% to-surface" />
+        </div>
+      </>
+    );
 
   return (
     <>

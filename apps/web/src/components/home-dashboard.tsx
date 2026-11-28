@@ -13,6 +13,7 @@ import {
   type WidgetCard,
   type WidgetSize,
   type PortalState,
+  type SocialProfile,
 } from '@life-portal/shared-types';
 import {
   arrangeWidgets,
@@ -24,6 +25,8 @@ import { WidgetCarousel } from './widget-carousel';
 import { LogFoodModal } from './log-food-modal';
 import { PostsList } from './posts';
 import { HomeFeed } from './home-feed';
+import { PortalWallpaperLayer } from './portal-wallpaper';
+import { useSocialApi } from '../lib/social-hooks';
 import { SuggestedPages } from './follow';
 import {
   EmptyState,
@@ -47,6 +50,9 @@ const SIZE_SHARE: Record<WidgetSize, string> = { half: '50%', wide: '75%', full:
 export function Dashboard() {
   // Issue #34: Home reads again on its own after a failure (resume, reconnect, backoff).
   const portal = useApi<PortalState>('/portal');
+  // The same read as the tab bar's photo, so the wallpaper costs no extra request.
+  const me = useSocialApi<SocialProfile>(portal.data?.access.social ? '/social/me?preview=normal' : null);
+  const wallpaper = me.data?.wallpaper;
   // Spec 040: a page has no widgets; its Home is the feeds.
   const isPage = !!portal.data?.page;
   const { data, error, isLoading, mutate: reload } = useApi<DashboardResponse>(isPage || !portal.data ? null : '/dashboard', RECOVERS);
@@ -180,6 +186,9 @@ export function Dashboard() {
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="sr-only">Home</h1>
+      {/* Your portal's wallpaper behind Home's top, down to the feed (owner, 2026-11-28). */}
+      <div className="relative pb-3">
+      {wallpaper && <PortalWallpaperLayer wallpaper={wallpaper} variant="band" />}
       {/* A failed refresh keeps the cards that were loaded (issue #34). */}
       {error && <LoadProblemBar error={error} onRetry={() => void reload()} />}
       {(saveError || startError) && (
@@ -226,6 +235,7 @@ export function Dashboard() {
           )}
         </WidgetCarousel>
       )}
+      </div>
 
       {/* Spec 032: posts written offline, before they are published. */}
       {canReadPosts && <PostDrafts />}
