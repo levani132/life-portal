@@ -8,6 +8,8 @@ User-visible changes. Newest first.
   fading into it. The feed and its posts look as before.
 - On a portal the name sits at the middle of the photo with the @username under it; a long name
   that wraps moves down rather than running under the buttons.
+- Without a wallpaper, a portal's coloured band now runs behind the name and username, ending
+  just above the bottom of the photo.
 
 ## 2026-11-28: The name beside the photo
 

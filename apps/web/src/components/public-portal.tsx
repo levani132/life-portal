@@ -72,8 +72,11 @@ export function PublicPortalView({ username }: { username: string }) {
           <>
             {portal.data.wallpaper && <PortalWallpaperLayer wallpaper={portal.data.wallpaper} />}
             <section className={portal.data.wallpaper ? 'relative rounded-xl border border-border/60 bg-surface-raised/55 backdrop-blur-xl' : 'card relative'}>
-              <div aria-hidden className={portal.data.wallpaper ? 'h-14' : 'h-14 rounded-t-xl bg-gradient-to-br from-accent/30 via-special-solid/15 to-success-solid/10'} />
-              <div className="px-5 pb-5">
+              {!portal.data.wallpaper && (
+                <div aria-hidden className="absolute inset-x-0 top-0 h-[6.75rem] rounded-t-xl bg-gradient-to-br from-accent/30 via-special-solid/15 to-success-solid/10" />
+              )}
+              <div aria-hidden className="h-14" />
+              <div className="relative px-5 pb-5">
                 {/* As on a signed-in portal: the name beside the photo. */}
                 <div className="-mt-8 flex items-stretch gap-3">
                   <Avatar name={portal.data.displayName} url={portal.data.avatarUrl} size={96} className="shrink-0 self-start ring-4 ring-surface-raised" />

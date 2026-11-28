@@ -455,11 +455,16 @@ export function ProfileView({ userId }: { userId?: string }) {
     <div className="mx-auto max-w-3xl">
       {wallpaper && <PortalWallpaperLayer wallpaper={wallpaper} />}
       <section className={wallpaper ? 'relative rounded-xl border border-border/60 bg-surface-raised/55 backdrop-blur-xl' : 'card relative'}>
-        <div
-          aria-hidden
-          // Just enough band for the buttons beside the photo: a taller one was empty space.
-          className={clsx('h-14 rounded-t-xl', !wallpaper && 'bg-gradient-to-br from-accent/30 via-special-solid/15 to-success-solid/10')}
-        />
+        {/* Without a wallpaper, the coloured band runs behind the name and username and ends above
+            the photo's bottom edge (owner, 2026-11-28); the photo sits on it. It is drawn behind
+            the content, so the space it takes in the layout stays just the buttons' row. */}
+        {!wallpaper && (
+          <div
+            aria-hidden
+            className="absolute inset-x-0 top-0 h-[6.75rem] rounded-t-xl bg-gradient-to-br from-accent/30 via-special-solid/15 to-success-solid/10"
+          />
+        )}
+        <div aria-hidden className="h-14" />
         {/* The buttons sit in the empty space right of the photo: yours, or what you can do here. */}
         <div className="absolute right-3 top-3 flex items-center gap-1.5">
           {own ? (
@@ -476,7 +481,7 @@ export function ProfileView({ userId }: { userId?: string }) {
             </>
           )}
         </div>
-        <div className="px-5 pb-5">
+        <div className="relative px-5 pb-5">
           {/* The name sits beside the photo, under the buttons: the space right of the photo was
               empty, and the card is shorter for it (owner, 2026-11-28). */}
           <div className="-mt-8 flex items-stretch gap-3">
