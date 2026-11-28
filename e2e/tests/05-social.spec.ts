@@ -167,6 +167,8 @@ test('a wallpaper fills the portal behind a see-through header, and the picker c
   await page.getByRole('button', { name: 'Wallpaper' }).filter({ visible: true }).first().click();
   const picker = page.getByRole('dialog', { name: 'Wallpaper' });
   await expect(picker.getByRole('button', { name: 'Dusk' })).toHaveAttribute('aria-pressed', 'true');
+  // Every modal is placed on the page itself, never inside a card (a glass card would trap it).
+  expect(await picker.evaluate((node) => node.closest('section') === null)).toBe(true);
   await snap(page, '05-portal-wallpaper-picker');
   await picker.getByRole('button', { name: 'Aurora' }).click();
   await expect(page.locator('img[src="/wallpapers/aurora.jpg"]').first()).toBeAttached();

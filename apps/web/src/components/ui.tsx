@@ -3,6 +3,7 @@
 import clsx from 'clsx';
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
@@ -12,6 +13,8 @@ import {
   type TextareaHTMLAttributes,
 } from 'react';
 import type { Currency, WidgetTone } from '@life-portal/shared-types';
+import { createPortal } from 'react-dom';
+import { recentTapOrigin } from '../lib/tap-origin';
 import { SUPPORTED_CURRENCIES } from '@life-portal/shared-types';
 import { formatCents } from '@life-portal/shared-domain';
 
@@ -305,14 +308,52 @@ export function Modal({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  // Grows out of what was tapped to open it, like a portal widget's folder (owner, 2026-11-28).
+  const panel = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(false);
+  useLayoutEffect(() => {
+    if (!open) {
+      setShown(false);
+      return;
+    }
+    const node = panel.current;
+    if (!node) return;
+    const from = recentTapOrigin();
+    const to = node.getBoundingClientRect();
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (!reduce) {
+      node.style.transformOrigin = 'top left';
+      node.style.transform =
+        from && to.width && to.height
+          ? `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})`
+          : 'translateY(12px) scale(0.96)';
+      node.style.opacity = from ? '1' : '0';
+      node.getBoundingClientRect();
+    }
+    const frame = requestAnimationFrame(() => {
+      node.style.transition = 'transform 320ms cubic-bezier(0.2, 0.9, 0.3, 1), opacity 200ms';
+      node.style.transform = '';
+      node.style.opacity = '';
+      setShown(true);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 pt-[10vh]">
+  if (!open || typeof document === 'undefined') return null;
+
+  // On <body>, never inside the page: a glass card (backdrop-filter) or a transformed tab would
+  // otherwise become the box a `fixed` dialog is placed in, and trap it inside that card.
+  return createPortal(
+    <div className="fixed inset-0 z-[65] flex items-start justify-center overflow-y-auto p-4 pt-[10vh]" data-no-tab-swipe>
       {/* Backdrop click closes; the dialog stops propagation so inner clicks do not. */}
-      <div className="absolute inset-0" onClick={onClose} aria-hidden />
       <div
-        className={clsx('card relative w-full p-5 shadow-2xl', wide ? 'max-w-2xl' : 'max-w-md')}
+        className={clsx('fixed inset-0 bg-surface/50 backdrop-blur-xl transition-opacity duration-300', shown ? 'opacity-100' : 'opacity-0')}
+        onClick={onClose}
+        aria-hidden
+      />
+      <div
+        ref={panel}
+        className={clsx('card home-widget relative w-full rounded-3xl p-5 shadow-2xl', wide ? 'max-w-2xl' : 'max-w-md')}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -365,7 +406,8 @@ export function Modal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

@@ -151,6 +151,11 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   gesture is never a swipe. At rest no tab may have a transform, because modals are
   `position: fixed` inside it. A swipe that starts in anything that scrolls sideways belongs to
   that element; mark other sideways gestures with `data-no-tab-swipe`.
+- **Every dialog opens like a folder, on `<body>`** (owner, 2026-11-28). Use `Modal` (a dialog
+  with a title) or `FolderSheet` (a panel grown from a rect): both grow out of what was tapped
+  (`lib/tap-origin.ts`) over a blurred screen, and both are portalled to `<body>`. Never render a
+  `fixed` dialog in place: a glass card (`backdrop-filter`) or a transformed tab becomes its box
+  and traps it inside (the badge dialog opened inside the portal's header card).
 - **The app's header is glass and hides while scrolling down, on every page** (owner,
   2026-11-28). Anything sticky follows `--header-offset` / `--header-band` (see the rest timer);
   never assume the header is there or that it is opaque.

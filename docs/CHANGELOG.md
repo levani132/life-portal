@@ -2,6 +2,11 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-28: Dialogs open like folders
+
+- Every dialog now grows out of the button you tapped over a blurred screen, the way a portal
+  widget opens. A badge's details no longer open squeezed inside the portal's header card.
+
 ## 2026-11-28: Glass header everywhere, a tighter portal header
 
 - The app's header is glass on every page, and it slides away while you scroll down and comes back

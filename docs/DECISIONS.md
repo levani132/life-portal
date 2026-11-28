@@ -3000,3 +3000,13 @@ and `ProfileView` compared the id with the signed-in person. Both now compare wi
 `actingPageId() ?? user.id`, so the page's id opens the Portal tab and the person's opens their
 profile as someone else's, seen as the page.
 
+## 2026-11-28: Every modal opens like a folder, from <body>
+
+A badge's dialog opened inside the portal's glass header card: `backdrop-filter` (like a
+transform) makes an element the containing block of its `fixed` descendants. `Modal` is now
+portalled to `<body>` and, like a portal widget's folder, grows out of whatever was just tapped
+(`lib/tap-origin.ts` remembers it for 1.5 s; without one it rises and fades in) over a blurred
+screen. The owner made this the rule for every dialog. The few hand-made full-screen dialogs (the
+post composer, the share sheet, the photo viewer, the new plan editor) are already outside any
+card and keep their own entrances for now.
+
