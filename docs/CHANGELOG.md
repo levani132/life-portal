@@ -6,7 +6,7 @@ User-visible changes. Newest first.
 
 - Home shows your portal's wallpaper behind its top, fixed like on your portal: the feed is solid
   and slides up over it as you scroll, its top edge fading into the picture, and its posts look as
-  before. Pulling to refresh no longer
+  before. The empty space between Home's widgets and the feed's tabs is gone. Pulling to refresh no longer
   uncovers a bare strip, and the refresh ring shows above the page.
 - On a portal the name sits at the middle of the photo with the @username under it; a long name
   that wraps moves down rather than running under the buttons.

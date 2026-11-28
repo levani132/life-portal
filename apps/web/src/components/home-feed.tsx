@@ -114,7 +114,7 @@ export function HomeFeed() {
   }
 
   return (
-    <section ref={section} id="wall" className="mt-5" aria-label="Feed">
+    <section ref={section} id="wall" className="mt-2" aria-label="Feed">
       <div
         ref={strip}
         role="tablist"
