@@ -1029,6 +1029,7 @@ html[data-wallpaper] .portal-post {
   /* On a phone the feed runs edge to edge; over a wallpaper the cards line up with the widgets. */
   html[data-wallpaper] .portal-post {
     margin-inline: var(--page-gutter, 1rem);
+    margin-bottom: 0.25rem;
   }
 }
 
@@ -1045,5 +1046,16 @@ html[data-wallpaper] .portal-header .header-row :is(a, button):not([aria-label="
 }
 html[data-wallpaper] .portal-header .wordmark-title {
   text-shadow: 0 1px 8px rgb(var(--surface) / 0.6);
+}
+
+/*
+ * A portal widget two rows tall is flatter than Home's card (rows are 0.8 of a square): the four
+ * rings shrink and drop their "left" line, so every label fits.
+ */
+.portal-cell[data-rows='2'] .home-widget .widget-rings .nutrition-ring {
+  width: clamp(34px, 100%, 50px);
+}
+.portal-cell[data-rows='2'] .home-widget .widget-rings .ring-left {
+  display: none;
 }
 

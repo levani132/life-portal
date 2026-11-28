@@ -538,7 +538,7 @@ export function ProfileView({ userId }: { userId?: string }) {
       )}
       {tabs.length > 1 && (
         <div
-          className="glass-tabs relative mt-5 inline-flex gap-1 rounded-full border p-1"
+          className="glass-tabs relative mt-3 inline-flex gap-1 rounded-full border p-1"
           role="tablist"
           aria-label="Profile sections"
         >
@@ -573,13 +573,14 @@ export function ProfileView({ userId }: { userId?: string }) {
         </Suspense>
       )}
       {shown === 'posts' ? (
-        <div className="mt-4">
+        <div className="mt-2">
           <PostsList authorId={person.userId} preview={viewAs} />
         </div>
       ) : shown === 'badges' ? (
         <BadgeCollection open={openBadge} onOpened={() => setOpenBadge(null)} />
       ) : (
-        <div className="mt-4">
+        // The portal's spacing is tight throughout, in step with its 8 px edge.
+        <div className="mt-2">
           {person.widgets.length ? (
             <>
               {/* Spec 046: the portal's widgets, read only; arranged only by its owner, as themselves. */}
@@ -590,7 +591,7 @@ export function ProfileView({ userId }: { userId?: string }) {
           ) : null}
           {/* Spec 046: on your own portal, the way to who sees each widget and what it shows. */}
           {own && viewAs === 'normal' && !actingPageId() && (
-            <div className="mt-3 flex justify-center">
+            <div className="mt-2 flex justify-center">
               <Link href="/settings/privacy" className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-muted hover:text-ink">
                 <Lock size={13} aria-hidden="true" />
                 Who sees your portal
@@ -598,7 +599,7 @@ export function ProfileView({ userId }: { userId?: string }) {
             </div>
           )}
           {posts && (
-            <div className={person.widgets.length || own ? 'mt-5' : ''}>
+            <div className={person.widgets.length || own ? 'mt-3' : ''}>
               <PostsList authorId={person.userId} preview={viewAs} />
             </div>
           )}

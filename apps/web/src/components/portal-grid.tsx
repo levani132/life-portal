@@ -21,7 +21,8 @@ import { EstimateMark, ErrorNote } from './ui';
 
 /** A module's widget look: Money is drawn as Home's cash-flow card. */
 const keyOf = (module: string): WidgetCard['key'] => (module === 'money' ? 'cashflow' : (module as WidgetCard['key']));
-const GAP = '0.625rem';
+// Tight, like a phone's home screen, in step with the portal's 8 px edge (owner, 2026-11-28).
+const GAP = '0.375rem';
 /**
  * A row is this share of a column's width: a little flatter than square, so a 2×2 widget has
  * about Home's proportions and the portal takes less height (owner, 2026-11-26).
@@ -230,7 +231,9 @@ function PortalWidget({
     return (
       <div
         ref={ref as never}
-        className={clsx('relative h-full', !editing && 'cursor-pointer transition-transform active:scale-[0.98]')}
+        // `data-rows`: a two-row portal widget is flatter than Home's card, so its rings shrink.
+        data-rows={size.h}
+        className={clsx('portal-cell relative h-full', !editing && 'cursor-pointer transition-transform active:scale-[0.98]')}
         role={editing ? undefined : 'button'}
         tabIndex={editing ? -1 : 0}
         aria-label={editing ? undefined : `Open ${widget.title}`}

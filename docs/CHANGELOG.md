@@ -4,7 +4,9 @@ User-visible changes. Newest first.
 
 ## 2026-11-28: A wider portal, readable header buttons
 
-- A portal sits much closer to the screen's edges (8 px instead of 16), like a phone's home screen.
+- A portal sits much closer to the screen's edges (8 px instead of 16), like a phone's home screen,
+  and the gaps between its widgets, sections and posts shrank to match.
+- A Food widget two rows tall on a portal no longer cuts off its ring labels.
 - Over a wallpaper, the header's buttons (back, search, Activity) each sit on a glass disc, so they
   stay readable on a bright picture.
 
