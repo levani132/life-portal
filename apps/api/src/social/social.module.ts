@@ -462,6 +462,15 @@ export class SocialService implements OnModuleInit {
     if (profile.wallpaperKey) await this.media.deleteKey(profile.wallpaperKey);
     return { success: true };
   }
+  /** Spec 048: which of these accounts have a wallpaper (a preset or their own). */
+  async withWallpaper(userIds: string[]): Promise<Set<string>> {
+    if (!userIds.length) return new Set();
+    const rows = await this.profiles
+      .find({ userId: { $in: userIds }, $or: [{ wallpaper: { $exists: true } }, { wallpaperKey: { $exists: true } }] })
+      .select('userId')
+      .lean();
+    return new Set(rows.map((row) => row.userId));
+  }
   /** The wallpaper as a viewer gets it: a preset's id, or a fresh signed link to the photo. */
   private async wallpaperOf(profile: SocialProfile): Promise<PortalWallpaper | undefined> {
     if (profile.wallpaperKey) {

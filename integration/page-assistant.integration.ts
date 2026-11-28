@@ -159,6 +159,9 @@ describe('the assistant for pages', () => {
     expect((await call('set_page_wallpaper', { pageId: first })).status).toBe(400);
     expect((await call('set_page_wallpaper', { pageId: other, preset: 'ocean' })).body.code).toBe('NOT_A_MANAGER');
     expect((await api.call<{ wallpaper?: unknown }>(beka, 'GET', `/social/profiles/${first}`)).body.wallpaper).toEqual({ preset: 'ocean' });
+    // The page list says which pages still need one.
+    const listed = (await call('list_my_pages')).body.result?.['pages'] as { id: string; hasWallpaper: boolean }[];
+    expect(listed.find((page) => page.id === first)?.hasWallpaper).toBe(true);
     expect((await call('set_page_wallpaper', { pageId: first, remove: true })).body.result).toEqual({ wallpaper: null });
 
     // The owner lowers this person's comment cap to what is already used: the next is refused.

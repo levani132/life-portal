@@ -14,7 +14,9 @@ or a cover photo in the header card). Chosen: the wallpaper, running under the i
 - Shown to everyone who can open the portal, like the profile photo; to visitors without an
   account on the open portal too (which is only there for people findable by strangers).
 - **Pages have one too** (owner, 2026-11-28): set by a manager acting as the page, or by its
-  assistant with `set_page_wallpaper` (a preset, a checked upload, or `remove`).
+  assistant with `set_page_wallpaper` (a preset, a checked upload, or `remove`). `list_my_pages`
+  reports `hasWallpaper`; the playbook's WALLPAPERS section has the workers generate one per page
+  (945×2048, subject in the top third, dark bottom half) and fall back to a preset per page kind.
 
 ## Chrome
 

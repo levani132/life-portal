@@ -590,6 +590,8 @@ export class PageAssistantService {
         run: async (personId) => {
           const [mine, allowed] = await Promise.all([this.pages.mine(personId), this.pages.assistantAllowed(personId)]);
           const marked = mine.pages.some((page) => page.aiManaged);
+          // Spec 048: which pages still need a wallpaper, so a run can give them one.
+          const walled = await this.social.withWallpaper(mine.pages.map((page) => page.id));
           return {
             assistantAllowed: allowed,
             // What the person has to do, in words the assistant can pass on.
@@ -606,6 +608,7 @@ export class PageAssistantService {
               bio: page.bio,
               runWithAi: page.aiManaged,
               hasPhoto: !!page.avatarUrl,
+              hasWallpaper: walled.has(page.id),
               suspended: page.suspended,
               disabled: page.disabled,
               usable: allowed && page.aiManaged && !page.suspended && !page.disabled,
@@ -991,7 +994,7 @@ export class PageAssistantService {
       {
         name: 'prepare_page_media_upload',
         description:
-          'Step 1 of 3 to put a photo on a page’s post. Answers a one-time upload link. Before calling: convert the picture to JPEG, make its longest edge 2048 pixels or less, and measure the file. Step 2: send the file with an HTTP PUT to uploadUrl with exactly the headers given (the link accepts only that size and type, for 15 minutes). Step 3: call finish_page_media_upload. Only upload pictures the page has the right to use.',
+          'Step 1 of 3 to put a photo on a page’s post, or to use one as its profile photo or wallpaper. Answers a one-time upload link. Before calling: convert the picture to JPEG, make its longest edge 2048 pixels or less, and measure the file. Step 2: send the file with an HTTP PUT to uploadUrl with exactly the headers given (the link accepts only that size and type, for 15 minutes). Step 3: call finish_page_media_upload. Only upload pictures the page has the right to use.',
         shape: {
           pageId,
           kind: z.enum(['image']).describe('Only "image" for now.'),
@@ -1038,7 +1041,7 @@ export class PageAssistantService {
       {
         name: 'set_page_wallpaper',
         description:
-          'Set the picture behind the page’s profile (spec 048): one of the app’s presets (dusk, aurora, ocean, dunes, forest, nebula, alpine, lavender, city, ember), or an uploaded picture (a mediaId from finish_page_media_upload, tall, calm at the top and dark at the bottom, no text or people), or none (remove: true). An uploaded picture is checked like a profile photo.',
+          'Set the picture behind the page’s profile, shown full screen like a phone wallpaper (spec 048): an uploaded picture (a mediaId from finish_page_media_upload: portrait, about 9:19.5 such as 945×2048, the subject in the top 40%, fading to almost black across the bottom half, no text, logos or faces), one of the app’s presets (dusk, aurora, ocean, dunes, forest, nebula, alpine, lavender, city, ember) when no picture can be made, or none (remove: true). An uploaded picture is checked like a profile photo.',
         shape: {
           pageId,
           preset: z.enum(PORTAL_WALLPAPERS.map((each) => each.id) as [PortalWallpaperPreset, ...PortalWallpaperPreset[]]).optional(),

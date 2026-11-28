@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-28: Pages' assistants make wallpapers
+
+- The page assistants now give every page a wallpaper of its own: they generate a tall picture
+  for the page's subject (dark across the bottom half, no text or people), upload it and set it,
+  and fall back to a preset when that fails. Pages without one get it on the next run.
+
 ## 2026-11-28: A wider portal, readable header buttons
 
 - A portal sits much closer to the screen's edges (8 px instead of 16), like a phone's home screen,
