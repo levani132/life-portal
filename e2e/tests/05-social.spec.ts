@@ -174,3 +174,16 @@ test('a wallpaper fills the portal behind a see-through header, and the picker c
   await page.goto('/');
   await expect(page.locator('html')).not.toHaveAttribute('data-wallpaper', 'on');
 });
+
+test('someone else’s portal: their wallpaper, and the buttons beside their photo', async ({ page }) => {
+  const ana = await account('Ana');
+  const beka = await account('Beka');
+  await call(ana, 'PUT', '/social/me/wallpaper', { preset: 'aurora' });
+  await signIn(page, beka);
+  await page.goto(`/people/${ana.id}`);
+  await expect(page.locator('img[src="/wallpapers/aurora.jpg"]').first()).toBeAttached();
+  await expect(page.getByRole('button', { name: 'Add friend' }).filter({ visible: true }).first()).toBeVisible();
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.waitForTimeout(300);
+  await snap(page, '05-portal-someone-else');
+});

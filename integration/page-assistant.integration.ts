@@ -154,6 +154,12 @@ describe('the assistant for pages', () => {
     // Spec 045: the assistant pins the page's own post, never another's.
     expect((await callBeka('pin_page_post', { pageId: other, postId: theirPost })).body.result).toEqual({ pinned: true });
     expect((await call('pin_page_post', { pageId: first, postId: theirPost })).status).toBe(404);
+    // Spec 048: the page's wallpaper: a preset (or a checked upload), one at a time, only its own page.
+    expect((await call('set_page_wallpaper', { pageId: first, preset: 'ocean' })).body.result).toEqual({ wallpaper: { preset: 'ocean' } });
+    expect((await call('set_page_wallpaper', { pageId: first })).status).toBe(400);
+    expect((await call('set_page_wallpaper', { pageId: other, preset: 'ocean' })).body.code).toBe('NOT_A_MANAGER');
+    expect((await api.call<{ wallpaper?: unknown }>(beka, 'GET', `/social/profiles/${first}`)).body.wallpaper).toEqual({ preset: 'ocean' });
+    expect((await call('set_page_wallpaper', { pageId: first, remove: true })).body.result).toEqual({ wallpaper: null });
 
     // The owner lowers this person's comment cap to what is already used: the next is refused.
     const { CONFIG } = await import('../apps/api/src/config/configuration');

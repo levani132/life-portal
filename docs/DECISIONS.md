@@ -2984,3 +2984,19 @@ theme's surface to every one of them as hex, which every Android browser reads, 
 `rgb()` value to the first tag only. While a portal's wallpaper is on screen it writes the
 picture's top colour instead.
 
+## 2026-11-28: The header is glass on every page and hides while scrolling down
+
+The owner liked the see-through header over a wallpaper and asked for it everywhere, hiding on the
+way down like the feed's. It is now `bg-surface/60` with a strong blur on every page, and
+`chromeHidden` no longer checks for the feed. The installed iPhone app's rule that made it solid
+(because iOS 26 blurs whatever sits under its status bar) now applies to a chat's header only: a
+glass header shows what is under it, blurred, which is what that band does anyway. Sticky content
+still follows `--header-offset` and `--header-band`, so the rest timer is unaffected.
+
+## 2026-11-28: "Your own profile" means the identity in use
+
+Acting as a page, tapping your own (person's) name opened the page's profile, because `/people/<you>`
+and `ProfileView` compared the id with the signed-in person. Both now compare with
+`actingPageId() ?? user.id`, so the page's id opens the Portal tab and the person's opens their
+profile as someone else's, seen as the page.
+

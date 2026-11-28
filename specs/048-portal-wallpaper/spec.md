@@ -13,7 +13,8 @@ or a cover photo in the header card). Chosen: the wallpaper, running under the i
   person's **own photo**, or none.
 - Shown to everyone who can open the portal, like the profile photo; to visitors without an
   account on the open portal too (which is only there for people findable by strangers).
-- **Pages have none** until pages' portals exist (403 when acting as a page).
+- **Pages have one too** (owner, 2026-11-28): set by a manager acting as the page, or by its
+  assistant with `set_page_wallpaper` (a preset, a checked upload, or `remove`).
 
 ## Chrome
 
@@ -24,6 +25,8 @@ or a cover photo in the header card). Chosen: the wallpaper, running under the i
   wallpaper's top colour (`data-wallpaper-top`) while it is on screen: each preset's is listed in
   `PORTAL_WALLPAPERS`; an own photo's is measured in the browser from the signed link.
 - A kept tab that is hidden is `inert`; its wallpaper gives the chrome back.
+- The picture is portalled to `<body>`: pull-to-refresh and tab swipes transform the page, and a
+  transformed ancestor would drag a `fixed` picture along (the pull showed a bare band above it).
 
 ## Storage and privacy
 

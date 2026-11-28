@@ -2,6 +2,16 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-28: Glass header everywhere, a tighter portal header
+
+- The app's header is glass on every page, and it slides away while you scroll down and comes back
+  when you scroll up, as on Home.
+- A portal's header card is shorter, and the buttons sit beside the photo: on someone else's
+  portal, Add friend, Accept or Message now sits next to "…" instead of in a row of its own.
+- Pages can have a wallpaper too (from the page's portal while acting as it, or by its assistant).
+- Acting as a page, tapping your own name opens your own profile, not the page's.
+- Pulling to refresh on a portal with a wallpaper no longer drags the wallpaper down.
+
 ## 2026-11-28: Onboarding, Android and small widgets
 
 - Setting up the app no longer shows the tab bar or a back arrow: setup has the screen to itself.

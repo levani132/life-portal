@@ -407,7 +407,8 @@ function BadgeDeepLink({ onOpen }: { onOpen: (badgeId: BadgeId) => void }) {
 
 export function ProfileView({ userId }: { userId?: string }) {
   const { user } = useAuth();
-  const own = !userId || userId === user?.id;
+  // The identity in use: acting as a page, the person behind it is someone else here.
+  const own = !userId || userId === (actingPageId() ?? user?.id);
   const [preview, setPreview] = useState<Preview>('normal');
   // Spec 046: a person's portal opens on the Portal; a page (which shares no modules) on its posts.
   const [tab, setTab] = useState<'posts' | 'badges' | 'about'>('about');
@@ -447,39 +448,36 @@ export function ProfileView({ userId }: { userId?: string }) {
   ];
   const shown = tabs.find((value) => value === tab) ?? tabs[0];
   // Spec 048: a wallpaper fills the screen behind the portal, and the header card turns to glass.
-  const wallpaper = person.isPage ? undefined : person.wallpaper;
-  const canChooseWallpaper = own && preview === 'normal' && !person.isPage && !actingPageId();
+  // A page has one too: set here by whoever is acting as it, or by its assistant.
+  const wallpaper = person.wallpaper;
+  const canChooseWallpaper = own && preview === 'normal';
   return (
     <div className="mx-auto max-w-3xl">
       {wallpaper && <PortalWallpaperLayer wallpaper={wallpaper} />}
       <section className={wallpaper ? 'relative rounded-xl border border-border/60 bg-surface-raised/55 backdrop-blur-xl' : 'card relative'}>
         <div
           aria-hidden
-          className={clsx('h-24 rounded-t-xl', !wallpaper && 'bg-gradient-to-br from-accent/30 via-special-solid/15 to-success-solid/10')}
+          // Just enough band for the buttons beside the photo: a taller one was empty space.
+          className={clsx('h-14 rounded-t-xl', !wallpaper && 'bg-gradient-to-br from-accent/30 via-special-solid/15 to-success-solid/10')}
         />
-        {canChooseWallpaper && (
-          <button
-            type="button"
-            className="absolute left-3 top-3 inline-flex h-9 items-center gap-1.5 rounded-full bg-black/35 px-3 text-xs font-medium text-white backdrop-blur"
-            onClick={() => setChoosingWallpaper(true)}
-          >
-            <ImageIcon size={15} aria-hidden />
-            Wallpaper
-          </button>
-        )}
+        {/* The buttons sit in the empty space right of the photo: yours, or what you can do here. */}
         <div className="absolute right-3 top-3 flex items-center gap-1.5">
           {own ? (
             <OwnHeaderActions
               person={person}
               preview={preview}
               setPreview={setPreview}
+              onWallpaper={canChooseWallpaper ? () => setChoosingWallpaper(true) : undefined}
             />
           ) : (
-            <OtherHeaderActions person={person} />
+            <>
+              {!person.isPage && !actingPageId() && <ProfileActions person={person} compact />}
+              <OtherHeaderActions person={person} />
+            </>
           )}
         </div>
         <div className="px-5 pb-5">
-          <div className="-mt-12">
+          <div className="-mt-8">
             {own ? (
               <AvatarEditor person={person} />
             ) : (
@@ -514,9 +512,7 @@ export function ProfileView({ userId }: { userId?: string }) {
             person.isPage ? null : <OwnStats person={person} />
           ) : person.isPage ? null : actingPageId() && person.relationship !== 'blocked' ? (
             <FollowToggle id={person.userId} following={person.following} name={person.displayName} />
-          ) : (
-            <ProfileActions person={person} />
-          )}
+          ) : null}
         </div>
       </section>
       {canChooseWallpaper && (
@@ -639,10 +635,12 @@ function OwnHeaderActions({
   person,
   preview,
   setPreview,
+  onWallpaper,
 }: {
   person: SocialProfile;
   preview: Preview;
   setPreview: (value: Preview) => void;
+  onWallpaper?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
@@ -674,6 +672,11 @@ function OwnHeaderActions({
   }
   return (
     <>
+      {onWallpaper && (
+        <button type="button" className={HEADER_ICON} aria-label="Wallpaper" title="Wallpaper" onClick={onWallpaper}>
+          <ImageIcon size={17} />
+        </button>
+      )}
       <DropdownMenu
         label="View my profile as"
         triggerClassName={HEADER_ICON}
@@ -779,34 +782,51 @@ function OtherHeaderActions({ person }: { person: SocialPerson }) {
 }
 
 /** The one or two buttons worth a row: befriending, answering a request, messaging, unblocking. */
-function ProfileActions({ person }: { person: SocialPerson }) {
+/**
+ * What you can do on someone's profile. `compact` puts it in the header, beside the "…", as small
+ * pills: the space right of their photo was otherwise empty.
+ */
+function ProfileActions({ person, compact = false }: { person: SocialPerson; compact?: boolean }) {
   const { act, message, pending, error } = useConnection(person);
   const portal = useApi<PortalState>('/portal');
   const r = person.relationship;
+  const primary = compact ? 'btn-primary h-9 rounded-full px-4 py-0 text-sm' : 'btn-primary';
+  const ghost = compact ? `${HEADER_ICON} w-auto px-3 text-sm` : 'btn-ghost';
   const buttons =
     r === 'none' ? (
-      <button type="button" className="btn-primary" disabled={pending} onClick={() => void act('request')}>
+      <button type="button" className={primary} disabled={pending} onClick={() => void act('request')}>
         Add friend
       </button>
     ) : r === 'incoming' ? (
       <>
-        <button type="button" className="btn-primary" disabled={pending} onClick={() => void act('accept')}>
+        <button type="button" className={primary} disabled={pending} onClick={() => void act('accept')}>
           Accept request
         </button>
-        <button type="button" className="btn-ghost" disabled={pending} onClick={() => void act('decline')}>
+        <button type="button" className={ghost} disabled={pending} onClick={() => void act('decline')}>
           Decline
         </button>
       </>
     ) : r === 'friends' && messagingAvailable(portal.data?.access) ? (
-      <button type="button" className="btn-primary" disabled={pending} onClick={() => void message()}>
+      <button type="button" className={primary} disabled={pending} onClick={() => void message()}>
         Message
       </button>
     ) : r === 'blocked' ? (
-      <button type="button" className="btn-ghost" disabled={pending} onClick={() => void act('unblock')}>
+      <button type="button" className={ghost} disabled={pending} onClick={() => void act('unblock')}>
         Unblock
       </button>
     ) : null;
   if (!buttons && !error) return null;
+  if (compact)
+    return (
+      <>
+        {buttons}
+        {error && (
+          <div className="absolute right-0 top-full z-10 mt-2 w-72" role="alert">
+            <ErrorNote message={error} />
+          </div>
+        )}
+      </>
+    );
   return (
     <div className="mt-4">
       {buttons && <div className="flex flex-wrap gap-2">{buttons}</div>}

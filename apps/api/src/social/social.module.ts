@@ -2,7 +2,6 @@ import {
   Body,
   CallHandler,
   ConflictException,
-  ForbiddenException,
   Controller,
   Inject,
   Optional,
@@ -436,11 +435,10 @@ export class SocialService implements OnModuleInit {
   }
   /**
    * Spec 048: sets the portal's wallpaper to a preset or a copy of an upload, then deletes the
-   * previous file. Pages have no portal of their own yet, so a page has no wallpaper.
+   * previous file. A page has one too, behind its profile (its managers, or its assistant).
    */
-  async setWallpaper(userId: string, dto: WallpaperDto): Promise<{ wallpaper: PortalWallpaper }> {
+  async setWallpaper(userId: string, dto: { preset?: PortalWallpaperPreset; mediaId?: string }): Promise<{ wallpaper: PortalWallpaper }> {
     const profile = await this.own(userId);
-    if (profile.kind === 'page') throw new ForbiddenException('A page has no wallpaper yet.');
     if (dto.preset) {
       await this.profiles.updateOne({ userId }, { $set: { wallpaper: dto.preset }, $unset: { wallpaperKey: 1 } });
       if (profile.wallpaperKey) await this.media.deleteKey(profile.wallpaperKey);
@@ -466,7 +464,6 @@ export class SocialService implements OnModuleInit {
   }
   /** The wallpaper as a viewer gets it: a preset's id, or a fresh signed link to the photo. */
   private async wallpaperOf(profile: SocialProfile): Promise<PortalWallpaper | undefined> {
-    if (profile.kind === 'page') return undefined;
     if (profile.wallpaperKey) {
       const url = await this.media.signKey(profile.wallpaperKey);
       return url ? { url } : undefined;

@@ -151,6 +151,9 @@ Domain logic changes need a unit test covering the new branch. UI-only changes d
   gesture is never a swipe. At rest no tab may have a transform, because modals are
   `position: fixed` inside it. A swipe that starts in anything that scrolls sideways belongs to
   that element; mark other sideways gestures with `data-no-tab-swipe`.
+- **The app's header is glass and hides while scrolling down, on every page** (owner,
+  2026-11-28). Anything sticky follows `--header-offset` / `--header-band` (see the rest timer);
+  never assume the header is there or that it is opaque.
 - **Top chrome starts at `var(--top-chrome)` (or `var(--chat-top)`), not `env(safe-area-inset-top)`.** In the installed
   iOS app it adds room for the blur iOS 26 draws over the top of web apps; content placed in that
   band looks out of focus and nothing turns the blur off. See `docs/DECISIONS.md`.

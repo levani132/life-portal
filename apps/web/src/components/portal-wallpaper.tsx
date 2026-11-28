@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { Check, ImagePlus, Trash2 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { PORTAL_WALLPAPERS, type MediaConfig, type PortalWallpaper } from '@life-portal/shared-types';
 import { api } from '../lib/api';
 import { revalidate, useApi } from '../lib/hooks';
@@ -26,9 +27,15 @@ let chromeOwner: symbol | null = null;
  * picture's top colour instead (`data-wallpaper-top`, read by `ThemeSync`). A veil of the theme's
  * own surface darkens (or, in light mode, lightens) the picture towards the bottom and as the page
  * scrolls, so text over it stays readable whatever the photo.
+ *
+ * The picture itself is drawn on `<body>`, not where the component sits: pull-to-refresh and tab
+ * swipes move the page with a transform, and a transform would carry a `fixed` picture along with
+ * it (the pull showed the page's background above a dragged wallpaper). Only a marker stays here,
+ * to tell whether this portal is the one on screen.
  */
 export function PortalWallpaperLayer({ wallpaper }: { wallpaper: PortalWallpaper }) {
-  const host = useRef<HTMLDivElement>(null);
+  const host = useRef<HTMLSpanElement>(null);
+  const [onScreen, setOnScreen] = useState(false);
   const dim = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const src = wallpaperSrc(wallpaper);
@@ -59,6 +66,7 @@ export function PortalWallpaperLayer({ wallpaper }: { wallpaper: PortalWallpaper
     const sync = () => {
       const node = host.current;
       const visible = !!node && !node.closest('[inert]');
+      setOnScreen(visible);
       if (visible) {
         chromeOwner = token;
         root.dataset.wallpaper = 'on';
@@ -101,15 +109,22 @@ export function PortalWallpaperLayer({ wallpaper }: { wallpaper: PortalWallpaper
       window.removeEventListener('scroll', onScroll);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, []);
+  }, [onScreen]);
 
   return (
-    <div ref={host} aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-      {/* eslint-disable-next-line @next/next/no-img-element -- a signed, expiring link; next/image would cache it. */}
-      <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover object-top" decoding="async" />
-      <div className="absolute inset-0 bg-gradient-to-b from-surface/10 via-surface/30 to-surface/80" />
-      <div ref={dim} className="absolute inset-0 bg-surface" style={{ opacity: 0 }} />
-    </div>
+    <>
+      <span ref={host} hidden />
+      {onScreen &&
+        createPortal(
+          <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a signed, expiring link; next/image would cache it. */}
+            <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover object-top" decoding="async" />
+            <div className="absolute inset-0 bg-gradient-to-b from-surface/10 via-surface/30 to-surface/80" />
+            <div ref={dim} className="absolute inset-0 bg-surface" style={{ opacity: 0 }} />
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 

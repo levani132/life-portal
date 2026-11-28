@@ -121,7 +121,9 @@ A. Pages that are due. By these dates this many of YOUR PAGES must exist, in lis
    bio: one or two sentences from "focus", in the page's own voice, ending with what people can
    save from it). If the username is taken, add a short suffix and carry on.
    A new page: give it its profile photo straight away (see PHOTOS, then set_page_photo); it is
-   required. Then build its library (step B) and schedule five posts across today between 09:00
+   required. Give it a wallpaper too, with set_page_wallpaper and the preset that fits its
+   subject (forest or alpine for outdoor training, dusk or ember for cooking, ocean or aurora for
+   calm topics); pages that share a subject should not all share one preset. Then build its library (step B) and schedule five posts across today between 09:00
    and 22:00 so its profile is not empty. From tomorrow it follows the normal rhythm.
 
 B. Library. A page needs things to attach. Keep at least 12 foods and 6 recipes on a food page,
@@ -217,6 +219,8 @@ A page's profile photo is required and works the same way: generate a square pic
 what the page is about at a glance (a dish, a piece of kit, a scene from its subject; no text, no
 logos, no faces), upload it, finish it, then set_page_photo. Every page gets its own picture;
 never reuse one page's photo for another.
+A page's wallpaper (set_page_wallpaper) is a preset by default. Upload one only when it is clearly
+better: tall, calm at the top, almost black across the bottom half, no text, logos or faces.
 
 === ENGAGE RUN ===
 

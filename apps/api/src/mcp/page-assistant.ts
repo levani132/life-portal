@@ -32,6 +32,8 @@ import {
   type AssistantUpcoming,
   type AssistantCaps,
   type FoodPost,
+  PORTAL_WALLPAPERS,
+  type PortalWallpaperPreset,
 } from '@life-portal/shared-types';
 import { assistantCap, assistantDefaults, describePlanRule, underAssistantCap } from '@life-portal/shared-domain';
 import { AccessService } from '../access/access.module';
@@ -1030,6 +1032,33 @@ export class PageAssistantService {
           await this.social.setAvatar(page, { mediaId });
           await this.record(personId, page, 'media', 'set_page_photo', mediaId);
           return { photoSet: true };
+        },
+      },
+
+      {
+        name: 'set_page_wallpaper',
+        description:
+          'Set the picture behind the page’s profile (spec 048): one of the app’s presets (dusk, aurora, ocean, dunes, forest, nebula, alpine, lavender, city, ember), or an uploaded picture (a mediaId from finish_page_media_upload, tall, calm at the top and dark at the bottom, no text or people), or none (remove: true). An uploaded picture is checked like a profile photo.',
+        shape: {
+          pageId,
+          preset: z.enum(PORTAL_WALLPAPERS.map((each) => each.id) as [PortalWallpaperPreset, ...PortalWallpaperPreset[]]).optional(),
+          mediaId: id.optional(),
+          remove: z.boolean().optional(),
+        },
+        run: async (personId, args) => {
+          const page = await this.acting(personId, args);
+          if (args['remove'] === true) {
+            await this.social.removeWallpaper(page);
+            await this.record(personId, page, 'media', 'set_page_wallpaper', page);
+            return { wallpaper: null };
+          }
+          const preset = args['preset'] as PortalWallpaperPreset | undefined;
+          const mediaId = args['mediaId'] === undefined ? undefined : String(args['mediaId']);
+          if (!preset === !mediaId) throw new BadRequestException({ code: 'ONE_WALLPAPER', message: 'Give a preset or a mediaId (one of them), or remove: true.' });
+          if (mediaId) await this.media.requireAssistantChecked(page, [mediaId]);
+          const { wallpaper } = await this.social.setWallpaper(page, preset ? { preset } : { mediaId });
+          await this.record(personId, page, 'media', 'set_page_wallpaper', mediaId ?? page);
+          return { wallpaper: 'preset' in wallpaper ? wallpaper : { photo: true } };
         },
       },
 

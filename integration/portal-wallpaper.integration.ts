@@ -1,6 +1,6 @@
 /**
  * Spec 048: a portal's wallpaper. A preset is stored by name and shown to whoever can open the
- * portal (visitors included, once the portal is public); a page has none; "No wallpaper" clears it.
+ * portal (visitors included, once the portal is public); a page has one of its own; "No wallpaper" clears it.
  * Own photos go through storage, which this harness does not run.
  */
 import { randomUUID } from 'node:crypto';
@@ -30,9 +30,11 @@ describe('portal wallpaper', () => {
     expect((await api.call<SocialProfile>(beka, 'GET', `/social/profiles/${ana.id}`)).body.wallpaper).toEqual({ preset: 'aurora' });
     expect((await api.call<PublicPortal>(null, 'GET', `/public/portals/${username}`)).body.wallpaper).toEqual({ preset: 'aurora' });
 
-    // A page has no portal of its own yet, so it has no wallpaper.
+    // A page has one too, set by its manager acting as it; the person's own is untouched.
     const page = (await api.call<PageSummary>(ana, 'POST', '/pages', { name: 'Wall page', username: `wp-${randomUUID().slice(0, 6)}`, bio: '' })).body;
-    expect((await api.call(ana, 'PUT', '/social/me/wallpaper', { preset: 'dusk' }, { 'x-lp-act-as': page.id })).status).toBe(403);
+    expect((await api.call(ana, 'PUT', '/social/me/wallpaper', { preset: 'dusk' }, { 'x-lp-act-as': page.id })).status).toBe(200);
+    expect((await api.call<SocialProfile>(beka, 'GET', `/social/profiles/${page.id}`)).body.wallpaper).toEqual({ preset: 'dusk' });
+    expect((await api.call<SocialProfile>(ana, 'GET', '/social/me')).body.wallpaper).toEqual({ preset: 'aurora' });
 
     expect((await api.call(ana, 'DELETE', '/social/me/wallpaper')).status).toBe(200);
     expect((await api.call<SocialProfile>(ana, 'GET', '/social/me')).body.wallpaper).toBeUndefined();

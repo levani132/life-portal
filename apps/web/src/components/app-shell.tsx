@@ -1,6 +1,7 @@
 'use client';
 import { Wordmark } from './wordmark';
 import { ActAsLinks, IdentitySwitcher, switchToOtherIdentity } from './identity-switcher';
+import { actingPageId } from '../lib/identity';
 import { FolderSheet } from './folder-sheet';
 import { Avatar } from './avatar';
 import { useSocialApi } from '../lib/social-hooks';
@@ -101,8 +102,9 @@ function Portal({ children }: { children: ReactNode }) {
   // Long-pressing the profile tab opens "Using the app as" here.
   // The tab's place on screen: the chooser grows out of it, like a portal widget's folder.
   const [choosingIdentity, setChoosingIdentity] = useState<DOMRect | null>(null);
-  // Only the feed's header gets out of the way; the tab bar shrinks on every page instead.
-  const chromeHidden = scrolledDown && pathname === '/';
+  // The header gets out of the way on every page while scrolling down, and comes back on the way
+  // up (owner, 2026-11-28; it was the feed only).
+  const chromeHidden = scrolledDown;
   // iOS can leave the screen shifted after the keyboard: the bar and header follow it.
   useViewportDrift();
   const unreadMessages = useUnreadMessages(portal.data?.access ?? NO_ACCESS);
@@ -143,7 +145,7 @@ function Portal({ children }: { children: ReactNode }) {
     pathname === '/setup' ||
     pathname === '/profile' ||
     pathname === '/friends' ||
-    pathname === `/people/${user.id}`;
+    pathname === `/people/${actingPageId() ?? user.id}`;
   const tabs = tabsFor(portal.data.access, pathname, inMenu, isPage);
   const current = tabs.findIndex((tab) => tab.href === pathname);
   // The bar's cells (the tabs, with New post in the middle) and which one the pill sits under.
@@ -392,7 +394,8 @@ function ScrollHeader({
       // Follows a shifted screen (see `lib/viewport-drift.ts`), on top of its own hide transform.
       style={{ translate: '0 var(--vv-top-shift, 0px)' }}
       className={clsx(
-        'portal-header sticky top-0 z-40 bg-surface/95 pt-[var(--top-chrome)] backdrop-blur transition-transform duration-200',
+        // Glass: what scrolls under it shows through, blurred (owner, 2026-11-28).
+        'portal-header sticky top-0 z-40 bg-surface/60 pt-[var(--top-chrome)] backdrop-blur-xl backdrop-saturate-150 transition-transform duration-200',
         hidden && '-translate-y-full',
       )}
     >
@@ -409,7 +412,8 @@ function mainClassFor(pathname: string): string {
   return clsx(
     'mx-auto max-w-7xl px-4',
     chat ? 'pb-0' : 'pb-[calc(6rem+env(safe-area-inset-bottom))]',
-    pathname === '/' ? 'pt-2' : chat ? 'pt-0' : 'pt-6',
+    // A portal starts right under the header, like the feed: the card is its own top.
+    pathname === '/' || pathname === '/profile' || pathname.startsWith('/people/') ? 'pt-2' : chat ? 'pt-0' : 'pt-6',
   );
 }
 
