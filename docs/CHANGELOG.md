@@ -2,6 +2,11 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-28: Wallpaper in light mode
+
+- In light mode a portal's wallpaper now fades into the light page colour instead of turning a
+  muddy grey towards the bottom (the presets are drawn dark at the bottom).
+
 ## 2026-11-28: Your wallpaper on Home, the name centred on the photo
 
 - Home shows your portal's wallpaper behind its top, fixed like on your portal: the feed is solid

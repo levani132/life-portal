@@ -131,7 +131,9 @@ export function PortalWallpaperLayer({
           <div aria-hidden className="pointer-events-none fixed inset-0 -z-20 overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element -- a signed, expiring link; next/image would cache it. */}
             <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover object-top" decoding="async" />
-            <div className="absolute inset-0 bg-gradient-to-b from-surface/10 via-surface/30 to-surface/80" />
+            {/* Fully the page's own colour from two thirds down: the presets are drawn dark at
+                the bottom, and in light mode an 80% veil over that came out a muddy grey. */}
+            <div className="absolute inset-0 bg-gradient-to-b from-surface/10 via-surface/35 via-35% to-surface to-65%" />
             <div ref={dim} className="absolute inset-0 bg-surface" style={{ opacity: 0 }} />
           </div>,
           document.body,
