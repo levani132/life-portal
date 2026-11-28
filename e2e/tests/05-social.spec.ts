@@ -152,6 +152,7 @@ test('Training shows on your portal and opens into the week, records and workout
 test('a wallpaper fills the portal behind a see-through header, and the picker changes it', async ({ page }) => {
   const ana = await account('Ana');
   await call(ana, 'PUT', '/social/me/wallpaper', { preset: 'dusk' });
+  await call(ana, 'POST', '/posts', { requestId: randomUUID(), title: '', caption: 'Morning run along the river.', audience: 'public' });
   await signIn(page, ana);
   await page.goto('/profile');
   const wallpaper = page.locator('img[src="/wallpapers/dusk.jpg"]').first();
@@ -163,6 +164,13 @@ test('a wallpaper fills the portal behind a see-through header, and the picker c
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.waitForTimeout(300);
   await snap(page, '05-portal-wallpaper-dark');
+  // Scrolled: the header turns to glass over what passes under it, and posts are glass too.
+  await page.mouse.wheel(0, 500);
+  await page.waitForTimeout(400);
+  await page.mouse.wheel(0, -120);
+  await page.waitForTimeout(400);
+  await snap(page, '05-portal-wallpaper-scrolled');
+  await page.mouse.wheel(0, -2000);
   await page.emulateMedia({ colorScheme: 'light' });
   await page.getByRole('button', { name: 'Wallpaper' }).filter({ visible: true }).first().click();
   const picker = page.getByRole('dialog', { name: 'Wallpaper' });

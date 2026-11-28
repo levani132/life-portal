@@ -2,6 +2,13 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-28: No hard lines over a wallpaper
+
+- At the top of a page the header is fully clear; it turns to glass only once something scrolls
+  under it. Over a wallpaper this removes the band and the line under the header.
+- Posts on a portal with a wallpaper are rounded glass cards lined up with the widgets, instead
+  of a solid band across the picture.
+
 ## 2026-11-28: Dialogs open like folders
 
 - Every dialog now grows out of the button you tapped over a blurred screen, the way a portal

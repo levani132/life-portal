@@ -1012,3 +1012,22 @@
 html[data-wallpaper] .portal-header {
   background-color: transparent;
 }
+
+/*
+ * Over a portal's wallpaper a post is glass with rounded corners, like the widgets: edge to edge and
+ * opaque it was a solid band with a hard top line across the picture.
+ */
+html[data-wallpaper] .portal-post {
+  background-color: rgb(var(--surface-raised) / 0.55);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  backdrop-filter: blur(24px) saturate(1.3);
+  border: 1px solid rgb(var(--border) / 0.6);
+  border-radius: 1rem;
+}
+
+@media (max-width: 639px) {
+  /* On a phone the feed runs edge to edge; over a wallpaper the cards line up with the widgets. */
+  html[data-wallpaper] .portal-post {
+    margin-inline: 1rem;
+  }
+}

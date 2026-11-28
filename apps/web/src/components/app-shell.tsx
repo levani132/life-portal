@@ -360,6 +360,25 @@ function ScrollHeader({
   onReveal: () => void;
 }) {
   const ref = useRef<HTMLElement>(null);
+  // At the very top nothing is under the header, so it is fully clear: a blurred, tinted band over
+  // a portal's wallpaper ended in a hard line. The glass comes on once the page scrolls under it.
+  const [atTop, setAtTop] = useState(true);
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      setAtTop(window.scrollY <= 2);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
   // Where the visible header ends, for content that sticks under it (the workout's rest timer).
   // `--header-offset` is the header's height while it shows and 0 once it hides; `--header-band`
   // is the safe-area band such content must then fill itself, on a solid background, because
@@ -395,7 +414,8 @@ function ScrollHeader({
       style={{ translate: '0 var(--vv-top-shift, 0px)' }}
       className={clsx(
         // Glass: what scrolls under it shows through, blurred (owner, 2026-11-28).
-        'portal-header sticky top-0 z-40 bg-surface/60 pt-[var(--top-chrome)] backdrop-blur-xl backdrop-saturate-150 transition-transform duration-200',
+        'portal-header sticky top-0 z-40 pt-[var(--top-chrome)] transition-[transform,background-color,backdrop-filter] duration-200',
+        atTop ? 'bg-transparent' : 'bg-surface/60 backdrop-blur-xl backdrop-saturate-150',
         hidden && '-translate-y-full',
       )}
     >

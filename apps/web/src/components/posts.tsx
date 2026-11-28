@@ -514,7 +514,7 @@ export function PostCard({
     <PostMetricsContext.Provider value={recordMetric}>
     <article
       ref={card}
-      className={`card overflow-hidden p-4 sm:p-5 ${detail ? 'rounded-none border-0 bg-transparent sm:rounded-2xl sm:border sm:bg-surface-raised' : 'rounded-none border-0 sm:rounded-2xl sm:border'}`}
+      className={`portal-post card overflow-hidden p-4 sm:p-5 ${detail ? 'rounded-none border-0 bg-transparent sm:rounded-2xl sm:border sm:bg-surface-raised' : 'rounded-none border-0 sm:rounded-2xl sm:border'}`}
     >
       {post.pinned && onProfile && (
         <p className="-mt-1 mb-3 flex items-center gap-1.5 text-xs font-medium text-ink-muted">
