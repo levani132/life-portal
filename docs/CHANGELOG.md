@@ -7,6 +7,7 @@ User-visible changes. Newest first.
 - A portal sits much closer to the screen's edges (8 px instead of 16), like a phone's home screen,
   and the gaps between its widgets, sections and posts shrank to match.
 - A Food widget two rows tall on a portal no longer cuts off its ring labels.
+- A post's photos run edge to edge of the post again on a portal (they had picked up a margin).
 - Over a wallpaper, the header's buttons (back, search, Activity) each sit on a glass disc, so they
   stay readable on a bright picture.
 

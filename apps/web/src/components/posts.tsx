@@ -614,7 +614,8 @@ export function PostCard({
         </p>
       )}
       {post.media.length > 0 && !hasFood && (
-        <div className="-mx-[var(--page-gutter,1rem)] mt-4 sm:mx-0">
+        // Bleeds by the card's own padding (p-4), so a photo runs edge to edge of the card.
+        <div className="-mx-4 mt-4 sm:mx-0">
           <PostMediaCarousel media={post.media} />
         </div>
       )}
