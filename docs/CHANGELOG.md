@@ -2,6 +2,12 @@
 
 User-visible changes. Newest first.
 
+## 2026-11-28: The name beside the photo
+
+- On a portal (yours, someone else's, a page's, and the open view for visitors) the name and
+  @username sit beside the photo, under the buttons, instead of on a line below it: the card is
+  shorter and the space right of the photo is used.
+
 ## 2026-11-28: Pages' assistants make wallpapers
 
 - The page assistants now give every page a wallpaper of its own: they generate a tall picture

@@ -477,22 +477,28 @@ export function ProfileView({ userId }: { userId?: string }) {
           )}
         </div>
         <div className="px-5 pb-5">
-          <div className="-mt-8">
-            {own ? (
-              <AvatarEditor person={person} />
-            ) : (
-              <ViewableAvatar name={person.displayName} url={person.avatarUrl} />
-            )}
+          {/* The name sits beside the photo, under the buttons: the space right of the photo was
+              empty, and the card is shorter for it (owner, 2026-11-28). */}
+          <div className="-mt-8 flex items-end gap-3">
+            <div className="shrink-0">
+              {own ? (
+                <AvatarEditor person={person} />
+              ) : (
+                <ViewableAvatar name={person.displayName} url={person.avatarUrl} />
+              )}
+            </div>
+            <div className="min-w-0 flex-1 pb-1">
+              <h1 className="break-words text-xl font-semibold leading-tight sm:text-2xl">
+                {person.displayName}
+                {person.official && <OfficialMark className="ml-1.5" />}
+                {person.isPage && <PageMark className="ml-2" ai={person.aiManaged} />}
+              </h1>
+              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-ink-faint">
+                <span className="truncate">@{person.username}</span>
+                {!person.isPage && <RelationshipChip person={person} />}
+              </p>
+            </div>
           </div>
-          <h1 className="mt-3 break-words text-2xl font-semibold leading-tight">
-            {person.displayName}
-            {person.official && <OfficialMark className="ml-1.5" />}
-            {person.isPage && <PageMark className="ml-2" ai={person.aiManaged} />}
-          </h1>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-ink-faint">
-            <span>@{person.username}</span>
-            {!person.isPage && <RelationshipChip person={person} />}
-          </p>
           {!person.isPage && <HeaderBadges userId={person.userId} live={own && preview === 'normal'} />}
           {person.bio && (
             <p className="mt-3 whitespace-pre-wrap break-words text-ink-muted">

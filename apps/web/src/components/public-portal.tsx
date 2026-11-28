@@ -72,21 +72,24 @@ export function PublicPortalView({ username }: { username: string }) {
           <>
             {portal.data.wallpaper && <PortalWallpaperLayer wallpaper={portal.data.wallpaper} />}
             <section className={portal.data.wallpaper ? 'relative rounded-xl border border-border/60 bg-surface-raised/55 backdrop-blur-xl' : 'card relative'}>
-              <div aria-hidden className={portal.data.wallpaper ? 'h-24' : 'h-24 rounded-t-xl bg-gradient-to-br from-accent/30 via-special-solid/15 to-success-solid/10'} />
+              <div aria-hidden className={portal.data.wallpaper ? 'h-14' : 'h-14 rounded-t-xl bg-gradient-to-br from-accent/30 via-special-solid/15 to-success-solid/10'} />
               <div className="px-5 pb-5">
-                <div className="-mt-12">
-                  <Avatar name={portal.data.displayName} url={portal.data.avatarUrl} size={96} className="ring-4 ring-surface-raised" />
+                {/* As on a signed-in portal: the name beside the photo. */}
+                <div className="-mt-8 flex items-end gap-3">
+                  <Avatar name={portal.data.displayName} url={portal.data.avatarUrl} size={96} className="shrink-0 ring-4 ring-surface-raised" />
+                  <div className="min-w-0 flex-1 pb-1">
+                    <h1 className="break-words text-xl font-semibold leading-tight sm:text-2xl">
+                      {portal.data.displayName}
+                      {portal.data.official && <OfficialMark className="ml-1.5" />}
+                      {portal.data.isPage && <PageMark className="ml-2" ai={portal.data.aiManaged} />}
+                    </h1>
+                    <p className="truncate text-sm text-ink-faint">@{portal.data.username}</p>
+                  </div>
                 </div>
-                <h1 className="mt-3 break-words text-2xl font-semibold leading-tight">
-                  {portal.data.displayName}
-                  {portal.data.official && <OfficialMark className="ml-1.5" />}
-                  {portal.data.isPage && <PageMark className="ml-2" ai={portal.data.aiManaged} />}
-                </h1>
-                <p className="text-sm text-ink-faint">@{portal.data.username}</p>
                 {portal.data.bio && <p className="mt-2 whitespace-pre-wrap break-words text-sm">{portal.data.bio}</p>}
               </div>
             </section>
-            <div className="glass-tabs relative mt-5 inline-flex gap-1 rounded-full border p-1" role="tablist" aria-label="Portal sections">
+            <div className="glass-tabs relative mt-3 inline-flex gap-1 rounded-full border p-1" role="tablist" aria-label="Portal sections">
               <button type="button" role="tab" aria-selected className="glass-tab-on rounded-full border border-transparent px-4 py-1.5 text-sm font-medium">
                 {portal.data.isPage ? 'Posts' : 'Portal'}
               </button>
